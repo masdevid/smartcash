@@ -9,7 +9,8 @@ from typing import Dict, Any, Optional
 from .split_initializer import (
     create_split_config_cell,
     get_split_config_components,
-    SplitInitializer
+    SplitInitializer,
+    init_split_ui
 )
 from .handlers.config_handler import SplitConfigHandler
 
@@ -56,6 +57,7 @@ __all__ = [
     
     # Convenience functions
     'initialize_split_ui',
+    'init_split_ui',
     'get_split_ui_components',
     'get_split_config',
     

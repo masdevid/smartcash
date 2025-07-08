@@ -32,24 +32,25 @@ class DownloaderConfigHandler(ConfigHandler, BaseDownloaderHandler):
     """
     
     @handle_ui_errors(error_component_title="Config Handler Initialization Error", log_error=True)
-    def __init__(self, ui_components: Optional[Dict[str, Any]] = None, module_name: str = 'downloader', 
+    def __init__(self, module_name: str = 'downloader', ui_components: Optional[Dict[str, Any]] = None, 
                  parent_module: str = 'dataset', persistence_enabled: bool = True, 
                  use_shared_config: bool = True, config: Optional[Dict[str, Any]] = None, **kwargs):
         """Initialize downloader config handler with centralized error handling.
         
         Args:
+            module_name: Name of the module (first parameter for compatibility)
             ui_components: Dictionary containing UI components
-            module_name: Name of the module
             parent_module: Parent module name
             persistence_enabled: Whether to enable config persistence to disk
             use_shared_config: Whether to use shared config manager
             config: Optional configuration dictionary (ignored, for compatibility)
             **kwargs: Additional arguments for compatibility
         """
-        # Initialize both parent classes
+        # Initialize BaseDownloaderHandler first to get logger
+        BaseDownloaderHandler.__init__(self, ui_components=ui_components)
+        
+        # Initialize ConfigHandler with proper parameters
         ConfigHandler.__init__(self, module_name=module_name, parent_module=parent_module)
-        BaseDownloaderHandler.__init__(self, ui_components=ui_components, module_name=module_name, 
-                                      parent_module=parent_module)
         
         # Set config filename
         self.config_filename = 'dataset_config.yaml'

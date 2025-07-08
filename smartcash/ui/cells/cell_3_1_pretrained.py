@@ -5,5 +5,5 @@ NOTE: Cell Code should remain minimal (import and run initializer only).
       Initializer should handle all the logic.
 """
 
-from smartcash.ui.model.pretrained import initialize_pretrained_ui
+from smartcash.ui.model.pretrained.pretrained_initializer import initialize_pretrained_ui
 initialize_pretrained_ui()

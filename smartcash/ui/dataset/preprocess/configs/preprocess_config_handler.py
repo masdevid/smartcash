@@ -24,13 +24,16 @@ class PreprocessConfigHandler(ConfigHandler):
     - 💾 Configuration persistence
     """
     
-    def __init__(self, module_name: str = 'preprocess', parent_module: str = 'dataset'):
+    def __init__(self, module_name: str = 'preprocess', parent_module: str = 'dataset', 
+                 persistence_enabled: bool = True, **kwargs):
         """
         Initialize preprocessing config handler.
         
         Args:
             module_name: Module name
             parent_module: Parent module name
+            persistence_enabled: Whether to enable persistence (for compatibility)
+            **kwargs: Additional arguments for compatibility
         """
         super().__init__(
             module_name=module_name,
@@ -39,6 +42,16 @@ class PreprocessConfigHandler(ConfigHandler):
         )
         
         # Configuration is already set in super()
+        self.persistence_enabled = persistence_enabled
+    
+    @property
+    def default_config(self) -> Dict[str, Any]:
+        """Get default configuration (property for compatibility)."""
+        return self.get_default_config()
+    
+    def get_config(self) -> Dict[str, Any]:
+        """Get current configuration (method for compatibility)."""
+        return self.config
     
     def get_default_config(self) -> Dict[str, Any]:
         """
@@ -285,9 +298,15 @@ class PreprocessConfigHandler(ConfigHandler):
         preset = norm_config.get('preset', 'yolov5s')
         preset_config = self.get_yolo_preset_config(preset)
         
-        # Merge preset with custom settings
+        # Start with preset config as base
         effective_config = preset_config.copy()
-        effective_config.update(norm_config)
+        
+        # Merge custom settings - preset target_size takes precedence
+        for key, value in norm_config.items():
+            effective_config[key] = value
+        
+        # Always use preset target_size (preset controls target_size)
+        effective_config['target_size'] = preset_config['target_size']
         
         return effective_config
     
@@ -315,6 +334,11 @@ class PreprocessConfigHandler(ConfigHandler):
             'source_dir': data_config.get('dir', 'data'),
             'preprocessed_dir': data_config.get('preprocessed_dir', 'data/preprocessed')
         }
+    
+    def save_config(self) -> None:
+        """Save current configuration (placeholder for compatibility)."""
+        # This is a placeholder - actual saving would depend on persistence implementation
+        self.logger.debug("Configuration saved (placeholder)")
     
     def reset_to_defaults(self) -> None:
         """Reset configuration to default values."""

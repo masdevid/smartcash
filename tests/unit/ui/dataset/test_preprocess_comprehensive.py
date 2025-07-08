@@ -627,6 +627,13 @@ class TestPreprocessIntegration:
     @patch('smartcash.ui.core.initializers.display_initializer.create_ui_display_function')
     def test_display_function_creation(self, mock_create_display):
         """Test display function creation"""
+        import sys
+        
+        # Clear module cache for a fresh import
+        modules_to_clear = [k for k in sys.modules.keys() if 'smartcash.ui.dataset.preprocess' in k]
+        for module in modules_to_clear:
+            del sys.modules[module]
+        
         # Import should trigger display function creation
         from smartcash.ui.dataset.preprocess.preprocess_initializer import initialize_preprocessing_ui
         

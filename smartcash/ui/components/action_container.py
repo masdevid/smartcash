@@ -153,12 +153,17 @@ class ActionContainer:
     - Action button: Standard button for secondary actions
     """
     
-    def __init__(self, container_margin: str = "12px 0"):
+    def __init__(self, container_margin: str = "12px 0", phases: List[str] = None, **kwargs):
         """Initialize the ActionContainer.
         
         Args:
             container_margin: Margin around the container (default: "12px 0")
+            phases: List of phase names for primary button (optional)
+            **kwargs: Additional keyword arguments (ignored for compatibility)
         """
+        # Store phases for primary button
+        self.phases = phases or []
+        
         # Button storage
         self.buttons = {
             'primary': None,

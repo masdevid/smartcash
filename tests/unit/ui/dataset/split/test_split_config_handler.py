@@ -245,7 +245,11 @@ class TestSplitConfigHandler:
     
     def test_update_ui_from_config(self, handler, valid_config):
         """Test updating UI components from configuration."""
-        # Mock UI components
+        # Mock UI components with context manager support
+        mock_log_output = Mock()
+        mock_log_output.__enter__ = Mock(return_value=mock_log_output)
+        mock_log_output.__exit__ = Mock(return_value=None)
+        
         mock_components = {
             'form_components': {
                 'train_ratio': Mock(),
@@ -260,7 +264,7 @@ class TestSplitConfigHandler:
                 'create_subdirs': Mock(),
                 'overwrite': Mock()
             },
-            'log_output': Mock()
+            'log_output': mock_log_output
         }
         
         custom_config = copy.deepcopy(valid_config)
@@ -276,11 +280,15 @@ class TestSplitConfigHandler:
     def test_update_ui_from_config_with_error(self, handler, valid_config):
         """Test updating UI components with error handling."""
         # Mock UI components that will raise an error
+        mock_log_output = Mock()
+        mock_log_output.__enter__ = Mock(return_value=mock_log_output)
+        mock_log_output.__exit__ = Mock(return_value=None)
+        
         mock_components = {
             'form_components': {
                 'train_ratio': Mock(side_effect=Exception("Mock error"))
             },
-            'log_output': Mock()
+            'log_output': mock_log_output
         }
         
         # Should not raise exception, but log error

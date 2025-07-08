@@ -43,13 +43,13 @@ downloader = safe_import('downloader', '.downloader')
 initialize_downloader_ui = safe_import('downloader', '.downloader', 'initialize_downloader_ui')
 
 split = safe_import('split', '.split')
-initialize_split_ui = safe_import('split_ui', '.split', 'initialize_split_ui')
+initialize_split_ui = safe_import('split_ui', '.split', 'init_split_ui')
 
-preprocessing = safe_import('preprocessing', '.preprocessing')
-initialize_preprocessing_ui = safe_import('preprocessing_ui', '.preprocessing', 'initialize_preprocessing_ui')
+preprocessing = safe_import('preprocessing', '.preprocess')
+initialize_preprocessing_ui = safe_import('preprocessing_ui', '.preprocess', 'initialize_preprocess_ui')
 
-augmentation = safe_import('augmentation', '.augmentation')
-initialize_augmentation_ui = safe_import('augmentation_ui', '.augmentation', 'initialize_augmentation_ui')
+augmentation = safe_import('augmentation', '.augment')
+initialize_augmentation_ui = safe_import('augmentation_ui', '.augment', 'init_augment_ui')
 
 # Define public API
 __all__ = [
@@ -59,7 +59,7 @@ __all__ = [
     'initialize_split_ui',
     'preprocessing',
     'initialize_preprocessing_ui',
-    'augmentation',
+    'augmentation', 
     'initialize_augmentation_ui'
 ]
 

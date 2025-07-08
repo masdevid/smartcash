@@ -23,7 +23,7 @@ class ColabUIHandler(ModuleUIHandler):
             parent_module: Parent module name
             **kwargs: Additional arguments
         """
-        super().__init__(module_name, parent_module, **kwargs)
+        super().__init__(module_name, parent_module)
         
         self.config_handler = ColabConfigHandler()
         self._status_messages = []

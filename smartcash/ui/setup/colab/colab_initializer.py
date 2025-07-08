@@ -91,8 +91,8 @@ class ColabInitializer(ModuleInitializer):
             }
             
         except Exception as e:
-            from smartcash.ui.core.shared.error_handler import get_error_handler
-            error_handler = get_error_handler('colab')
+            from smartcash.ui.core.errors.handlers import get_error_handler
+            error_handler = get_error_handler()
             error_handler.handle_exception(e, 'initialization', fail_fast=False)
             self.logger.error(f"❌ Initialization failed: {str(e)}")
             return {
@@ -187,8 +187,8 @@ class ColabInitializer(ModuleInitializer):
             self.logger.warning("⚠️ Operation handlers not available, creating minimal setup")
             self._operation_handlers = {}
         except Exception as e:
-            from smartcash.ui.core.shared.error_handler import get_error_handler
-            error_handler = get_error_handler('colab')
+            from smartcash.ui.core.errors.handlers import get_error_handler
+            error_handler = get_error_handler()
             error_handler.handle_exception(e, 'setting up operation handlers', fail_fast=False)
     
     def setup_environment_manager(self) -> None:

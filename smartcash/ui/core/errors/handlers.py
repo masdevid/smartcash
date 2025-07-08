@@ -241,6 +241,9 @@ class CoreErrorHandler:
             **kwargs
         }
         
+        # Remove exc_info from context if it exists to avoid duplicate keyword argument
+        context.pop('exc_info', None)
+        
         # Handle the error
         return self.handle_error(
             error_msg=error_msg,

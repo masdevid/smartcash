@@ -5,5 +5,5 @@ NOTE: Cell Code should remain minimal (import and run initializer only).
       Initializer should handle all the logic.
 """
 
-from smartcash.ui.model.evaluate import initialize_evaluate_ui
-initialize_evaluate_ui()
+from smartcash.ui.model.evaluate.evaluation_initializer import initialize_evaluation_ui
+initialize_evaluation_ui()

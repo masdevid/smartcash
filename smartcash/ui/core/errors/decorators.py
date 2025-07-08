@@ -86,6 +86,10 @@ def handle_errors(
                     **kwargs
                 }
                 
+                # Remove exc_info from kwargs if it exists to avoid duplicate keyword argument
+                error_kwargs.pop('exc_info', None)
+                error_kwargs['exc_info'] = True
+                
                 # Handle the error using the error handler with error_msg as positional argument
                 result = error_handler.handle_error(
                     formatted_msg,

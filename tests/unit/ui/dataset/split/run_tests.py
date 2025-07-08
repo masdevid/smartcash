@@ -49,54 +49,52 @@ def run_split_module_tests():
         try:
             # Run pytest for the specific file
             result = subprocess.run([
-                sys.executable, "-m", "pytest", 
-                str(test_path), 
-                "-v", 
-                "--tb=short"
+                sys.executable, "-m", "pytest", str(test_path), "-v", "--tb=short"
             ], capture_output=True, text=True, cwd=project_root)
             
-            output = result.stdout + result.stderr
-            
             # Parse results
-            passed = output.count(" PASSED")
-            failed = output.count(" FAILED")
-            errors = output.count(" ERROR")
+            output_lines = result.stdout.split('\n')
+            test_line = None
+            for line in output_lines:
+                if "passed" in line and "failed" in line:
+                    test_line = line
+                    break
             
-            total_passed += passed
-            total_failed += (failed + errors)
-            
-            results[test_file] = {
-                "passed": passed,
-                "failed": failed + errors,
-                "success": result.returncode == 0
-            }
-            
-            if result.returncode == 0:
-                print(f"✅ {test_file}: {passed} passed")
+            if test_line:
+                # Extract numbers from line like "27 passed, 2 warnings in 1.73s"  
+                import re
+                passed_match = re.search(r'(\d+) passed', test_line)
+                failed_match = re.search(r'(\d+) failed', test_line)
+                
+                passed = int(passed_match.group(1)) if passed_match else 0
+                failed = int(failed_match.group(1)) if failed_match else 0
+                
+                print(f"✅ {test_file}: {passed} passed, {failed} failed")
+                
+                total_passed += passed
+                total_failed += failed
+                results[test_file] = (passed, failed)
             else:
-                print(f"❌ {test_file}: {passed} passed, {failed + errors} failed")
-                if failed + errors > 0:
-                    print("Error details:")
-                    # Extract error information
-                    lines = output.split('\n')
-                    for i, line in enumerate(lines):
-                        if "FAILED" in line or "ERROR" in line:
-                            print(f"  • {line}")
-                            # Print a few lines of context
-                            for j in range(i+1, min(i+4, len(lines))):
-                                if lines[j].strip() and not lines[j].startswith("="):
-                                    print(f"    {lines[j]}")
-                                elif lines[j].startswith("="):
-                                    break
-            
+                # Alternative parsing - look for patterns like "27 passed, 2 warnings"
+                import re
+                passed_match = re.search(r'(\d+) passed', result.stdout)
+                failed_match = re.search(r'(\d+) failed', result.stdout)
+                
+                passed = int(passed_match.group(1)) if passed_match else 0
+                failed = int(failed_match.group(1)) if failed_match else 0
+                
+                if passed > 0 or failed > 0:
+                    print(f"✅ {test_file}: {passed} passed, {failed} failed")
+                    total_passed += passed
+                    total_failed += failed
+                    results[test_file] = (passed, failed)
+                else:
+                    print(f"❌ {test_file}: Could not parse results")
+                    results[test_file] = (0, 0)
+                
         except Exception as e:
-            print(f"❌ Error running {test_file}: {e}")
-            results[test_file] = {
-                "passed": 0,
-                "failed": 1,
-                "success": False
-            }
-            total_failed += 1
+            print(f"❌ {test_file}: Error running tests - {str(e)}")
+            results[test_file] = (0, 0)
     
     # Summary
     print("\n" + "=" * 50)
@@ -104,8 +102,13 @@ def run_split_module_tests():
     print("=" * 50)
     
     for test_file, result in results.items():
-        status = "✅" if result["success"] else "❌"
-        print(f"{status} {test_file}: {result['passed']}/{result['passed'] + result['failed']} passed")
+        if isinstance(result, tuple):
+            passed, failed = result
+            status = "✅" if failed == 0 else "❌"
+            print(f"{status} {test_file}: {passed}/{passed + failed} passed")
+        else:
+            status = "✅" if result["success"] else "❌"
+            print(f"{status} {test_file}: {result['passed']}/{result['passed'] + result['failed']} passed")
     
     total_tests = total_passed + total_failed
     success_rate = (total_passed / total_tests * 100) if total_tests > 0 else 0

@@ -41,8 +41,7 @@ class AugmentInitializer(BaseInitializer):
         """
         super().__init__(
             module_name=UI_CONFIG['module_name'],
-            parent_module=UI_CONFIG['parent_module'],
-            config=config
+            parent_module=UI_CONFIG['parent_module']
         )
         
         # Module-specific components

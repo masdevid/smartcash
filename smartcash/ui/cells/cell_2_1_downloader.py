@@ -5,5 +5,5 @@ NOTE: Cell Code should remain minimal (import and run initializer only).
       Initializer should handle all the logic.
 """
 
-from smartcash.ui.dataset.download import initialize_download_ui
-initialize_download_ui()
+from smartcash.ui.dataset.downloader.downloader_initializer import initialize_downloader_ui
+initialize_downloader_ui()

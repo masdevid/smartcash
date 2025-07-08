@@ -38,3 +38,24 @@ branch_dropdown = widgets.Dropdown(options=['main', 'migration', 'dev'], value='
 clone_button = widgets.Button(description='Clone/Update Repository', button_style='primary', icon='sync', layout={'width': '100%', 'margin': '10px 0'}); clone_button.on_click(clone_or_update_repos)
 output = widgets.Output(layout={'width': '100%', 'border': '1px solid #ddd', 'min_height': '200px', 'margin': '10px 0'})
 display(widgets.VBox([title, widgets.HBox([url_input, branch_dropdown]), clone_button, output], layout={'width': '100%', 'padding': '15px'}))
+
+
+
+import subprocess, os; from pathlib import Path; from IPython.display import display, HTML, clear_output; import ipywidgets as widgets
+
+def setup():
+    b, btn, p, s = (widgets.ToggleButtons(options=['dev', 'main'], value='dev', layout={'width': '320px', 'margin': '0 10px 0 0'}), widgets.Button(description='Go', button_style='info', layout={'width': '80px', 'margin': '0 10px 0 0'}), widgets.FloatProgress(min=0, max=5, layout={'flex': '1', 'margin': '0 10px 0 0'}),widgets.HTML(value='<span style="color:#666">Ready</span>', layout={'width': '120px'}))
+    c, o = (widgets.HBox([widgets.Label('🚀', layout={'margin': '0'}), b, p, s, btn], layout={'width': '100%', 'display': 'flex', 'align_items': 'center', 'justify_content': 'space-between', 'padding': '10px 4px', 'border': '1px solid #ddd'}),widgets.Output())
+    def run_cmd(cmd): r = subprocess.run(cmd, shell=True, capture_output=True, text=True); return r.stdout if not r.returncode else (_ for _ in ()).throw(Exception(r.stderr))
+    def on_click(_):
+        with o:
+            clear_output(); s.value, p.bar_style = '<span style="color:orange">Working...</span>', ''
+            try:
+                for i, cmd in enumerate(['rm -rf smartcash yolov5', f'git clone -b {b.value} https://github.com/masdevid/smartcash.git', 'cd smartcash && pip install -q -e .', 'git clone https://github.com/ultralytics/yolov5.git', 'cd yolov5 && pip install -qr requirements.txt']):
+                    run_cmd(cmd); p.value = i + 1
+                p.bar_style, s.value = 'success', '<span style="color:green">✅ Done, Restart!</span>'
+            except:
+                p.bar_style, s.value = 'danger', '<span style="color:red">❌ Error</span>'
+    btn.on_click(on_click); display(widgets.VBox([c, o]))
+
+setup()

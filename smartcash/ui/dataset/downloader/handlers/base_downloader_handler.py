@@ -11,17 +11,16 @@ class BaseDownloaderHandler(BaseHandler):
     """Base handler for downloader module with centralized error handling."""
     
     @handle_ui_errors(error_component_title="Downloader Handler Error", log_error=True)
-    def __init__(self, ui_components: Optional[Dict[str, Any]] = None, **kwargs):
+    def __init__(self, ui_components: Optional[Dict[str, Any]] = None, 
+                 module_name: str = 'downloader', parent_module: str = 'dataset', **kwargs):
         """Initialize base downloader handler with centralized error handling.
         
         Args:
             ui_components: Dictionary containing UI components
+            module_name: Name of the module (default: 'downloader')
+            parent_module: Name of the parent module (default: 'dataset')
             **kwargs: Additional arguments passed to parent class
         """
-        # Set default module name and parent module if not provided
-        module_name = kwargs.get('module_name', 'downloader')
-        parent_module = kwargs.get('parent_module', 'dataset')
-        
         # Initialize parent with proper module naming
         super().__init__(module_name=module_name, parent_module=parent_module)
         

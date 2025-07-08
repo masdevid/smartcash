@@ -13,19 +13,24 @@ class OperationHandlerFactory:
     
     @classmethod
     def create_handler(cls, 
+                      operation_type: str,
+                      ui_components: Dict[str, Any],
                       config: Dict[str, Any],
-                      operation_container: Optional[OperationContainer] = None,
                       max_workers: int = 2) -> ColabOperationManager:
         """Create a colab operation manager.
         
         Args:
+            operation_type: Type of operation to create
+            ui_components: Dictionary of UI components
             config: Configuration dictionary
-            operation_container: Optional OperationContainer for UI integration
             max_workers: Maximum number of worker threads
             
         Returns:
             ColabOperationManager instance
         """
+        # Get operation container from UI components if available
+        operation_container = ui_components.get('operation_container')
+        
         return ColabOperationManager(
             config=config,
             operation_container=operation_container,

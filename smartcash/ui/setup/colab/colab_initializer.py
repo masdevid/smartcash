@@ -172,13 +172,26 @@ class ColabInitializer(ModuleInitializer):
             from .operations.factory import OperationHandlerFactory
             
             # Create operation handlers for colab-specific operations
+            config = self.get_default_config()
             self._operation_handlers = {
-                'environment_detection': OperationHandlerFactory.create_handler('environment_detection', self._ui_components, self.get_default_config()),
-                'drive_mount': OperationHandlerFactory.create_handler('drive_mount', self._ui_components, self.get_default_config()),
-                'gpu_setup': OperationHandlerFactory.create_handler('gpu_setup', self._ui_components, self.get_default_config()),
-                'folder_setup': OperationHandlerFactory.create_handler('folder_setup', self._ui_components, self.get_default_config()),
-                'config_sync': OperationHandlerFactory.create_handler('config_sync', self._ui_components, self.get_default_config()),
-                'verify': OperationHandlerFactory.create_handler('verify', self._ui_components, self.get_default_config())
+                'environment_detection': OperationHandlerFactory.create_handler(
+                    'environment_detection', self._ui_components, config
+                ),
+                'drive_mount': OperationHandlerFactory.create_handler(
+                    'drive_mount', self._ui_components, config
+                ),
+                'gpu_setup': OperationHandlerFactory.create_handler(
+                    'gpu_setup', self._ui_components, config
+                ),
+                'folder_setup': OperationHandlerFactory.create_handler(
+                    'folder_setup', self._ui_components, config
+                ),
+                'config_sync': OperationHandlerFactory.create_handler(
+                    'config_sync', self._ui_components, config
+                ),
+                'verify': OperationHandlerFactory.create_handler(
+                    'verify', self._ui_components, config
+                )
             }
             
             self.logger.info("✅ Operation handlers setup complete")

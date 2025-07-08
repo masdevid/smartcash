@@ -69,8 +69,9 @@ class EnvironmentManager:
             
         self.logger = logger
         self._in_colab = _is_colab_environment()
-        self._drive_mounted = _is_drive_mounted() if self._in_colab else False
-        self._drive_path = _get_drive_path() if self._drive_mounted else None
+        # Don't check for drive mount during initialization
+        self._drive_mounted = None
+        self._drive_path = None
         self._base_dir = self._resolve_base_dir(base_dir)
         self._data_path = self._resolve_data_path()
         self._initialized = True
@@ -80,7 +81,11 @@ class EnvironmentManager:
         if base_dir:
             return Path(base_dir)
         
-        if self._drive_path:
+        # Only check drive path if we're in Colab and haven't checked yet
+        if self._in_colab and self._drive_mounted is None:
+            self.is_drive_mounted  # This will update _drive_path if needed
+            
+        if self._drive_path and self._drive_path.exists():
             return self._drive_path
         elif self._in_colab:
             return Path('/content')
@@ -89,7 +94,10 @@ class EnvironmentManager:
     
     def _resolve_data_path(self) -> Path:
         """Resolve data path dengan prioritas yang benar"""
-        if self._drive_path:
+        if self._in_colab and self._drive_mounted is None:
+            self.is_drive_mounted  # This will update _drive_path if needed
+            
+        if self._drive_path and self._drive_path.exists():
             return self._drive_path / 'data'
         elif self._in_colab:
             return Path('/content/data')
@@ -98,6 +106,17 @@ class EnvironmentManager:
     
     @property
     def is_colab(self) -> bool:
+        """Check if running in Google Colab environment."""
+        return self._in_colab
+        
+    @property
+    def is_drive_mounted(self) -> bool:
+        """Lazily check if Google Drive is mounted."""
+        if self._drive_mounted is None:
+            self._drive_mounted = _is_drive_mounted() if self._in_colab else False
+            if self._drive_mounted and self._drive_path is None:
+                self._drive_path = _get_drive_path()
+        return self._drive_mounted
         return self._in_colab
     
     @property

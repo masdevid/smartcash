@@ -339,7 +339,7 @@ def create_colab_ui_components(config: Optional[Dict[str, Any]] = None, **kwargs
         container_padding="0",
         gap="10px"
     )
-    form_container['form_container'].children = (two_column_layout,)
+    form_container['container'].children = (two_column_layout,)
     child_components['form_container'] = form_container['container']
     
     # 7. Create status summary

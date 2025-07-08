@@ -257,6 +257,16 @@ def get_split_config_components(
 
 # Standard entry point functions following UI module pattern
 
+def initialize_split_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> None:
+    """Initialize and display the split configuration UI.
+    
+    Args:
+        config: Optional configuration dictionary
+        **kwargs: Additional arguments passed to the initializer
+    """
+    initializer = get_split_initializer(config, **kwargs)
+    initializer.initialize_and_display(config)
+
 def init_split_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> None:
     """Initialize and display the split configuration UI.
     
@@ -278,3 +288,16 @@ def get_split_initializer(config: Optional[Dict[str, Any]] = None, **kwargs) -> 
         SplitInitializer instance
     """
     return SplitInitializer(config=config, **kwargs)
+
+
+# Public API
+export_functions = [
+    'SplitInitializer',
+    'create_split_config_cell',
+    'get_split_config_components',
+    'init_split_ui',
+    'initialize_split_ui',
+    'get_split_initializer'
+]
+
+__all__ = export_functions

@@ -33,7 +33,7 @@ NOTES AND REPORT/
 PRPs/
 
 # Project specific
-development_tests/
+# development_tests/  # Commented out to include development tests
 commands/
 .claude/
 scripts/

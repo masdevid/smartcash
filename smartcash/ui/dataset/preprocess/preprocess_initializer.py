@@ -250,7 +250,7 @@ class PreprocessInitializer(ModuleInitializer):
 # ==================== DISPLAY FUNCTION ====================
 
 # Create display function using DisplayInitializer pattern
-initialize_preprocessing_ui = create_ui_display_function(
+initialize_preprocess_ui = create_ui_display_function(
     module_name=UI_CONFIG['module_name'],
     parent_module=UI_CONFIG['parent_module'],
 )

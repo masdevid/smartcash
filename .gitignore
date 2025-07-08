@@ -66,6 +66,7 @@ test_config*
 pytest.ini
 tox.ini
 .coveragerc
+pyproject.toml
 .coverage
 .coverage.*
 setup.cfg  # Exclude setup.cfg as it may contain test settings

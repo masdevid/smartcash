@@ -64,7 +64,7 @@ def create_dependency_ui_components(config: Optional[Dict[str, Any]] = None, **k
         container_padding="16px",
         gap="12px"
     )
-    form_container['form_container'].children = (dependency_tabs,)
+    form_container['container'].children = (dependency_tabs,)
     child_components['form_container'] = form_container['container']
     
     # 5. Create Save/Reset buttons for configurations

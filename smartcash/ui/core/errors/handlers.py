@@ -270,10 +270,25 @@ class CoreErrorHandler:
             exc_info: Whether to include exception info in the log.
             **kwargs: Additional context to include in the log.
         """
-        # Format the log message with context
+        # Format the log message with context, safely handling any objects that might cause recursion
         context_str = ""
         if kwargs:
-            context_str = " | " + ", ".join(f"{k}={v}" for k, v in kwargs.items())
+            try:
+                # Safely convert each value to string, with recursion protection
+                safe_kwargs = {}
+                for k, v in kwargs.items():
+                    try:
+                        # Skip any values that might cause recursion
+                        if isinstance(v, (int, float, str, bool, type(None))):
+                            safe_kwargs[k] = str(v)
+                        else:
+                            safe_kwargs[k] = f"<{type(v).__name__}>"
+                    except Exception:
+                        safe_kwargs[k] = "<error_converting_value>"
+                
+                context_str = " | " + ", ".join(f"{k}={v}" for k, v in safe_kwargs.items())
+            except Exception as e:
+                context_str = f" | error_formatting_context: {str(e)[:100]}"
         
         log_msg = f"{error_msg}{context_str}"
         

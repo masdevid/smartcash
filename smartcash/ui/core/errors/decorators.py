@@ -69,10 +69,19 @@ def handle_errors(
                 # Format the error message with function name and arguments
                 formatted_msg = f"{msg}: {str(e)}"
                 
-                # Get the error context from the instance if context_attr is provided
+                # Get the error context from the instance if context_attr is provided and valid
                 error_context = None
-                if args and hasattr(args[0], context_attr):
-                    error_context = getattr(args[0], context_attr)
+                if args and isinstance(context_attr, str) and context_attr.strip():
+                    try:
+                        if hasattr(args[0], context_attr):
+                            error_context = getattr(args[0], context_attr, None)
+                    except Exception as e:
+                        # Log but don't fail if we can't get the context
+                        error_handler = handler or get_error_handler()
+                        error_handler._logger.warning(
+                            f"Failed to get error context from {context_attr}: {str(e)}",
+                            exc_info=True
+                        )
                 
                 # Prepare error context
                 error_kwargs = {

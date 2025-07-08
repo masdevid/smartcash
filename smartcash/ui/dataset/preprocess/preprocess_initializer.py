@@ -150,8 +150,40 @@ class PreprocessInitializer(ModuleInitializer):
         Returns:
             Dictionary of UI components
         """
-        # Call the parent implementation which handles the full initialization flow
-        return super().initialize(**kwargs)
+        try:
+            # Get configuration
+            config = kwargs.get('config', {})
+            
+            # Create UI components
+            ui_components = self.create_ui_components(config, **kwargs)
+            
+            # Create config handler if needed
+            if not hasattr(self, 'config_handler'):
+                self.config_handler = self.create_config_handler(**kwargs)
+                
+            # Load configuration
+            loaded_config = self.config_handler.load_config()
+            
+            # Update UI with loaded configuration
+            self.config_handler.update_ui(ui_components, loaded_config)
+            
+            # Setup handlers
+            ui_components = self.setup_handlers(ui_components, **kwargs)
+            
+            # Return UI components
+            return {
+                'status': 'success',
+                'message': 'Preprocessing UI initialized successfully',
+                'components': ui_components
+            }
+            
+        except Exception as e:
+            self.logger.error(f"❌ Failed to initialize preprocessing UI: {str(e)}", exc_info=True)
+            return {
+                'status': 'error',
+                'message': f"Failed to initialize preprocessing UI: {str(e)}",
+                'error': str(e)
+            }
     
     def _setup_event_handlers(self, ui_components: Dict[str, Any], module_handler: PreprocessUIHandler) -> None:
         """
@@ -215,37 +247,13 @@ class PreprocessInitializer(ModuleInitializer):
             raise RuntimeError("Backend preprocessing module not available")
 
 
-# ==================== LEGACY FUNCTION WRAPPER ====================
-
-def _legacy_initialize_preprocessing_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> Dict[str, Any]:
-    """
-    Legacy function wrapper for backward compatibility.
-    
-    Args:
-        config: Optional configuration dictionary
-        **kwargs: Additional arguments
-        
-    Returns:
-        Dictionary of UI components
-    """
-    # Create initializer instance
-    initializer = PreprocessInitializer()
-    
-    # Initialize with provided config
-    return initializer.initialize(config=config, **kwargs)
-
-
 # ==================== DISPLAY FUNCTION ====================
 
 # Create display function using DisplayInitializer pattern
 initialize_preprocessing_ui = create_ui_display_function(
     module_name=UI_CONFIG['module_name'],
     parent_module=UI_CONFIG['parent_module'],
-    legacy_function=_legacy_initialize_preprocessing_ui
 )
-
-# Also create the preprocess_ui alias for consistency
-initialize_preprocess_ui = initialize_preprocessing_ui
 
 
 # ==================== FACTORY FUNCTION ====================

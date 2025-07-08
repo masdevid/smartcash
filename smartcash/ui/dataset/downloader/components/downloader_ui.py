@@ -125,7 +125,7 @@ def create_downloader_ui_components(config: Optional[Dict[str, Any]] = None, **k
             }
         ],
         title="🚀 Dataset Operations", 
-        alignment="center"
+        alignment="left"
     )
     child_components['action_container'] = action_container['container']
     child_components['download_button'] = action_container['buttons'].get('download_button')

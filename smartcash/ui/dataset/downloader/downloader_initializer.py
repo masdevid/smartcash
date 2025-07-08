@@ -13,7 +13,8 @@ from typing import Dict, Any, List, Optional
 from smartcash.ui.core.initializers.module_initializer import ModuleInitializer
 from smartcash.ui.dataset.downloader.components.downloader_ui import create_downloader_ui_components
 from smartcash.ui.dataset.downloader.configs.downloader_config_handler import DownloaderConfigHandler
-from smartcash.ui.dataset.downloader.operations.manager import DownloaderOperationManager, DownloadHandlerManager
+from smartcash.ui.dataset.downloader.operations.manager import DownloaderOperationManager
+from smartcash.ui.dataset.downloader.operations.download_manager import DownloadHandlerManager
 from smartcash.ui.core.errors.handlers import create_error_response
 
 class DownloaderInitializer(ModuleInitializer):

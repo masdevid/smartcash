@@ -4,7 +4,7 @@ Deskripsi: Entry point untuk download handlers dengan operation/ structure
 """
 
 from typing import Dict, Any, Optional
-from smartcash.ui.dataset.downloader.operations.manager import DownloadHandlerManager
+from smartcash.ui.dataset.downloader.operations.download_manager import DownloadHandlerManager
 from smartcash.ui.dataset.downloader.services.validation_utils import validate_config
 
 def setup_download_handlers(ui_components: Dict[str, Any], config: Dict[str, Any], env=None) -> Dict[str, Any]:

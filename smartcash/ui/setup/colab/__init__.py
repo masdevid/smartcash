@@ -1,52 +1,12 @@
 """
 file_path: smartcash/ui/setup/colab/__init__.py
-Deskripsi: Modul `colab` menyediakan antarmuka utama untuk inisialisasi dan manajemen
-komponen UI konfigurasi lingkungan khusus Google Colab di SmartCash.
-
-Modul ini merupakan hasil refaktor dari `smartcash.ui.setup.env_config` agar penamaan
-lebih sesuai dengan konteks penggunaannya.
-
-Ekspor:
-    - constants: Modul berisi konstanta yang dibutuhkan untuk proses setup di Colab.
-    - handlers: Modul berisi handler untuk manajemen konfigurasi dan setup
-    - components: Modul berisi komponen UI untuk konfigurasi Colab
-    - utils: Modul berisi utilitas untuk konfigurasi Colab
-    - colab_initializer: Modul untuk inisialisasi konfigurasi Colab
+Deskripsi: Modul utama untuk inisialisasi dan manajemen UI di lingkungan Google Colab.
 """
 
+from .colab_initializer import ColabEnvInitializer, initialize_colab_ui
+
 __version__ = "1.0.0"
-
-from importlib import import_module
-from types import ModuleType
-from typing import Any, Dict, Optional, List
-
-# Public API -----------------------------------------------------------
-
-# Lazy loading implementation
-_import_structure = {
-    "constants": ["*"],
-    "handlers": ["*"],
-    "components": ["*"],
-    "utils": ["*"],
-    "colab_initializer": ["initialize_colab_ui"],
-}
-
-# Cache for lazy-loaded modules
-_module_cache: Dict[str, ModuleType] = {}
-
-def _lazy_import(name: str) -> ModuleType:
-    """Lazy import a module with caching.
-    
-    Args:
-        name: Name of the module to import (without the package prefix)
-        
-    Returns:
-        The imported module
-    """
-    if name not in _module_cache:
-        full_name = f"smartcash.ui.setup.colab.{name}"
-        _module_cache[name] = import_module(full_name)
-    return _module_cache[name]
+__all__ = ["ColabEnvInitializer", "initialize_colab_ui"]
 
 def __getattr__(name: str) -> Any:
     """Lazy load modules on attribute access.

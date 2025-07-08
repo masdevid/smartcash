@@ -34,6 +34,43 @@ class PreprocessInitializer(ModuleInitializer):
         # Store module metadata
         self.module_metadata = MODULE_METADATA
     
+    def _initialize_impl(self, config: Optional[Dict[str, Any]] = None, **kwargs) -> Dict[str, Any]:
+        """Implementation of the initialization logic.
+        
+        Args:
+            config: Optional configuration dictionary
+            **kwargs: Additional arguments
+            
+        Returns:
+            Dictionary containing initialization results
+        """
+        if config is None:
+            config = {}
+            
+        try:
+            self.logger.info("🚀 Starting preprocessing module initialization...")
+            
+            # Create UI components
+            ui_components = self.create_ui_components(config, **kwargs)
+            
+            # Store components
+            self._ui_components = ui_components
+            
+            # Setup handlers if auto_setup is enabled
+            if hasattr(self, '_auto_setup_handlers') and self._auto_setup_handlers:
+                self.setup_handlers(ui_components)
+                
+            self.logger.info("✅ Preprocessing module initialized successfully")
+            return {
+                'status': 'success',
+                'components': ui_components,
+                'config': config
+            }
+            
+        except Exception as e:
+            self.logger.error(f"❌ Failed to initialize preprocessing module: {str(e)}", exc_info=True)
+            raise
+    
     def create_ui_components(self, config: Dict[str, Any], **kwargs) -> Dict[str, Any]:
         """
         Create UI components for preprocessing module.

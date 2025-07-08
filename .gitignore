@@ -22,10 +22,15 @@ wheels/
 
 # Development and environment
 venv/
+venv-test/
 ENV/
 .env
 .env.*
 .windsurf/
+
+# Reports and documentation
+NOTES AND REPORT/
+PRPs/
 
 # Project specific
 development_tests/

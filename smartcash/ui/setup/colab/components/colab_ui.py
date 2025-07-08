@@ -7,52 +7,36 @@ from __future__ import annotations
 
 import ipywidgets as widgets
 from typing import Dict, Any, Optional, List
+from datetime import datetime
 
-# Import shared UI components
-from smartcash.ui.components import (
+# Import container components
+from smartcash.ui.components.main_container import (
     create_main_container,
-    create_header_container,
-    create_action_container,
-    create_operation_container,
-    create_footer_container,
-    create_form_container,
-    create_save_reset_buttons
+    ContainerConfig
 )
-from smartcash.ui.components.form_container import LayoutType
+from smartcash.ui.components.header_container import create_header_container
+from smartcash.ui.components.action_container import create_action_container
+from smartcash.ui.components.operation_container import create_operation_container
+from smartcash.ui.components.footer_container import create_footer_container, PanelConfig, PanelType
+from smartcash.ui.components.form_container import create_form_container, LayoutType
 
 # Import local colab components
 from smartcash.ui.setup.colab.components.setup_summary import create_setup_summary
 from smartcash.ui.setup.colab.components.env_info_panel import create_env_info_panel
+from smartcash.ui.setup.colab.components.tips_panel import create_tips_requirements
 
-# Handle missing tips_panel gracefully
-try:
-    from smartcash.ui.setup.colab.components.tips_panel import create_tips_requirements
-except ImportError:
-    def create_tips_requirements():
-        return widgets.HTML(
-            value="""
-            <div style="padding: 15px; border: 1px solid #ddd; border-radius: 5px; background: #f9f9f9;">
-                <h4>💡 Environment Setup Tips</h4>
-                <ul>
-                    <li>Ensure Google Drive is accessible for Colab environments</li>
-                    <li>Check GPU availability for better performance</li>
-                    <li>Verify all required dependencies are installed</li>
-                </ul>
-            </div>
-            """,
-            layout=widgets.Layout(margin='10px 0')
-        )
-
-
-def create_colab_ui() -> Dict[str, Any]:
+def create_colab_ui_components(config: Optional[Dict[str, Any]] = None, **kwargs) -> Dict[str, Any]:
     """
-    Create the main Colab UI components using main_container for layout management.
+    Create Colab UI components with new container
     
+    Args:
+        config: Configuration for UI components
+        **kwargs: Additional arguments
+        
     Returns:
-        Dictionary containing all UI components and the main container
+        Dictionary containing all created UI components
     """
-    # Initialize components dictionary
-    ui_components: Dict[str, Any] = {}
+    current_config = config or {}
     
     # 1. Create Header Container
     header_container = create_header_container(
@@ -61,18 +45,25 @@ def create_colab_ui() -> Dict[str, Any]:
         status_message="Ready to setup environment",
         status_type="info"
     )
-    ui_components['header_container'] = header_container.container
     
-    # 2. Create Form Container for configuration
+    # 2. Create Form Container for main content
     form_container = create_form_container(
         layout_type=LayoutType.COLUMN,
         container_margin="0",
         container_padding="16px",
         gap="12px"
     )
-    ui_components['form_container'] = form_container['container']
     
-    # 3. Create Action Container with single main action button using phases
+    # Add panels to form container
+    env_info_panel = create_env_info_panel()
+    tips_panel = create_tips_requirements()
+    setup_summary = create_setup_summary()
+    
+    form_container['add_item'](env_info_panel, height="auto")
+    form_container['add_item'](tips_panel, height="auto")
+    form_container['add_item'](setup_summary, height="auto")
+    
+    # 3. Create Action Container
     action_container = create_action_container(
         buttons=[],  # No additional buttons, use the primary button with phases
         title="🚀 Environment Setup",
@@ -82,130 +73,56 @@ def create_colab_ui() -> Dict[str, Any]:
             'config', 'env', 'verify', 'complete', 'error'
         ]
     )
-    ui_components['action_container'] = action_container['container']
-    ui_components['setup_button'] = action_container.get('primary_button')
-    ui_components['action_container_manager'] = action_container  # For phase management
     
-    # 4. Create Setup Summary and Environment Info Panel
-    setup_summary = create_setup_summary()
-    env_info_panel = create_env_info_panel()
-    
-    # Create a two-column layout for summary and info
-    info_summary_layout = widgets.HBox([
-        widgets.VBox([
-            setup_summary
-        ], layout=widgets.Layout(width='50%', padding='0 10px 0 0')),
-        widgets.VBox([
-            env_info_panel
-        ], layout=widgets.Layout(width='50%', padding='0 0 0 10px'))
-    ], layout=widgets.Layout(width='100%', margin='10px 0'))
-    
-    ui_components['setup_summary'] = setup_summary
-    ui_components['env_info_panel'] = env_info_panel
-    ui_components['info_summary_layout'] = info_summary_layout
-    
-    # 5. Create Operation Container (for progress and logging)
+    # 4. Create Operation Container for progress and logs
     operation_container = create_operation_container(
-        component_name="colab_operation_container",
-        show_progress=True,
+        title="Setup Progress",
         show_logs=True,
-        initial_message="Environment setup ready to begin...",
-        log_height="200px"
+        show_progress=True,
+        collapsible=True,
+        collapsed=False
     )
-    ui_components['operation_container'] = operation_container['container']
-    ui_components['operation_manager'] = operation_container
     
-    # 6. Create Tips Panel
-    tips_panel = create_tips_requirements()
-    ui_components['tips_panel'] = tips_panel
-    
-    # 7. Create Footer Container
+    # 5. Create Footer Container
     footer_container = create_footer_container(
-        info_box=widgets.HTML(
-            value="""
-            <div class="alert alert-info" style="font-size: 0.9em; padding: 8px 12px;">
-                <strong>💡 Environment Setup Tips:</strong>
-                <ul style="margin: 5px 0 0 15px; padding: 0;">
-                    <li>Single click runs: INIT → DRIVE → SYMLINK → FOLDERS → CONFIG → ENV → VERIFY → COMPLETE</li>
-                    <li>Progress tracking and detailed logs are shown in the operation container</li>
-                    <li>Setup will automatically verify all components at the end</li>
-                    <li>Any issues will be reported with specific remediation steps</li>
-                </ul>
-            </div>
-            """
-        )
+        left_text="SmartCash Environment Setup v1.0",
+        right_text=f" 2023-{datetime.now().year} SmartCash Team"
     )
-    ui_components['footer_container'] = footer_container.container
     
-    # 8. Create Main Container using main_container component
+    # 6. Create Main Container and assemble all components
     main_container = create_main_container(
-        # Use the new components list for better control
-        components=[
-            # Header section
-            {
-                'type': 'header',
-                'component': ui_components['header_container'],
-                'order': 0,
-                'name': 'header'
-            },
-            # Form section
-            {
-                'type': 'form',
-                'component': ui_components['form_container'],
-                'order': 1,
-                'name': 'form'
-            },
-            # Action buttons
-            {
-                'type': 'action',
-                'component': ui_components['action_container'],
-                'order': 2,
-                'name': 'actions'
-            },
-            # Info and summary section (custom component)
-            {
-                'type': 'custom',
-                'component': ui_components['info_summary_layout'],
-                'order': 3,
-                'name': 'info_summary'
-            },
-            # Operation container (progress and logs)
-            {
-                'type': 'operation',
-                'component': ui_components['operation_container'],
-                'order': 4,
-                'name': 'operations'
-            },
-            # Tips panel
-            {
-                'type': 'custom',
-                'component': ui_components['tips_panel'],
-                'order': 5,
-                'name': 'tips'
-            },
-            # Footer
-            {
-                'type': 'footer',
-                'component': ui_components['footer_container'],
-                'order': 6,
-                'name': 'footer'
-            }
-        ],
-        # Styling options
-        container_style={
-            'width': '100%',
-            'padding': '20px',
-            'border': '1px solid #ddd',
-            'border_radius': '10px',
-            'overflow_y': 'auto',
-            'max_height': '90vh'
+        header=header_container['container'],
+        content=widgets.VBox([
+            form_container['container'],
+            action_container['container'],
+            operation_container['container']
+        ]),
+        footer=footer_container['container'],
+        container_config={
+            'margin': '0 auto',
+            'max_width': '1200px',
+            'padding': '10px',
+            'border': '1px solid #e0e0e0',
+            'border_radius': '5px',
+            'box_shadow': '0 1px 3px rgba(0,0,0,0.1)'
         }
     )
     
-    # Store the main container and its UI reference
-    ui_components['main_container'] = main_container.container
-    ui_components['ui'] = main_container.container  # Main UI reference
-    ui_components['main_container_manager'] = main_container  # For programmatic control
+    # Prepare the components dictionary
+    ui_components = {
+        'main_container': main_container,
+        'header_container': header_container['container'],
+        'form_container': form_container['container'],
+        'action_container': action_container['container'],
+        'setup_button': action_container.get('primary_button'),
+        'action_container_manager': action_container,
+        'operation_container': operation_container['container'],
+        'footer_container': footer_container['container'],
+        'env_info_panel': env_info_panel,
+        'tips_panel': tips_panel,
+        'setup_summary': setup_summary,
+        'ui': main_container  # Main UI reference
+    }
     
     return ui_components
 
@@ -416,47 +333,34 @@ def create_colab_ui_components(config: Optional[Dict[str, Any]] = None, **kwargs
     ))
     
     # 6. Create Form Container
-    try:
-        form_container = create_form_container(
-            layout_type=LayoutType.COLUMN,
-            container_margin="0",
-            container_padding="0",
-            gap="10px"
-        )
-        form_container['form_container'].children = (two_column_layout,)
-        child_components['form_container'] = form_container['container']
-    except Exception:
-        # Fallback if form_container has issues
-        child_components['form_container'] = widgets.VBox([two_column_layout])
+    form_container = create_form_container(
+        layout_type=LayoutType.COLUMN,
+        container_margin="0",
+        container_padding="0",
+        gap="10px"
+    )
+    form_container['form_container'].children = (two_column_layout,)
+    child_components['form_container'] = form_container['container']
     
     # 7. Create status summary
     status_summary = create_setup_summary()
     child_components['status_summary'] = status_summary
     
     # 8. Create save/reset buttons
-    try:
-        save_reset_components = create_save_reset_buttons(
-            save_label="💾 Save Config",
-            reset_label="🔄 Reset", 
-            with_sync_info=True
-        )
-        child_components['save_reset_buttons'] = save_reset_components
-        
-        config_buttons_container = widgets.Box(
-            [save_reset_components['container']], 
-            layout=widgets.Layout(display='flex', justify_content='flex-end', width='100%', margin='8px 0')
-        )
-        child_components['config_buttons_container'] = config_buttons_container
-        child_components['save_button'] = save_reset_components.get('save_button')
-        child_components['reset_button'] = save_reset_components.get('reset_button')
-    except Exception:
-        # Fallback buttons
-        save_button = widgets.Button(description="💾 Save Config", button_style='primary')
-        reset_button = widgets.Button(description="🔄 Reset", button_style='warning')
-        config_buttons_container = widgets.HBox([save_button, reset_button])
-        child_components['config_buttons_container'] = config_buttons_container
-        child_components['save_button'] = save_button
-        child_components['reset_button'] = reset_button
+    save_reset_components = create_save_reset_buttons(
+        save_label="💾 Save Config",
+        reset_label="🔄 Reset", 
+        with_sync_info=True
+    )
+    child_components['save_reset_buttons'] = save_reset_components
+    
+    config_buttons_container = widgets.Box(
+        [save_reset_components['container']], 
+        layout=widgets.Layout(display='flex', justify_content='flex-end', width='100%', margin='8px 0')
+    )
+    child_components['config_buttons_container'] = config_buttons_container
+    child_components['save_button'] = save_reset_components.get('save_button')
+    child_components['reset_button'] = save_reset_components.get('reset_button')
     
     # 9. Create Action Container with single main action button using phases
     action_container = create_action_container(
@@ -509,13 +413,7 @@ def create_colab_ui_components(config: Optional[Dict[str, Any]] = None, **kwargs
                 'order': 0,
                 'name': 'header'
             },
-            # Operation container (progress and logs)
-            {
-                'type': 'operation',
-                'component': child_components['operation_container'],
-                'order': 1,
-                'name': 'operations'
-            },
+
             # Form section
             {
                 'type': 'form',
@@ -552,11 +450,18 @@ def create_colab_ui_components(config: Optional[Dict[str, Any]] = None, **kwargs
                 'order': 5,
                 'name': 'actions'
             },
+            # Operation container (progress and logs)
+            {
+                'type': 'operation',
+                'component': child_components['operation_container'],
+                'order': 6,
+                'name': 'operations'
+            },
             # Footer
             {
                 'type': 'footer',
                 'component': child_components['footer_container'],
-                'order': 6,
+                'order': 7,
                 'name': 'footer'
             }
         ],

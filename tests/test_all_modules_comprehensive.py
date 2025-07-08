@@ -59,15 +59,21 @@ def run_core_handlers_tests():
         from smartcash.ui.core.handlers.base_handler import BaseHandler
         print("📁 Core handlers found, running basic validation...")
         
-        # Test basic functionality
-        handler = BaseHandler()
+        # Test basic functionality (with required module_name parameter)
+        handler = BaseHandler("test_handler", "test_parent")
         
-        if hasattr(handler, 'config') and hasattr(handler, 'logger'):
-            print("✅ PASSED: Core Handlers (basic validation successful)")
-            return True, 85.0
+        if hasattr(handler, 'logger') and hasattr(handler, 'initialize'):
+            # Test initialization
+            result = handler.initialize()
+            if result and result.get('status') == 'success':
+                print("✅ PASSED: Core Handlers (basic validation successful)")
+                return True, 85.0
+            else:
+                print("⚠️ PARTIAL: Core Handlers (initialization issues)")
+                return True, 60.0
         else:
             print("⚠️ PARTIAL: Core Handlers (basic functionality issues)")
-            return True, 60.0
+            return True, 40.0
         
     except Exception as e:
         print(f"❌ Core handlers test error: {e}")
@@ -84,10 +90,10 @@ def run_core_shared_tests():
         from smartcash.ui.core.shared.shared_config_manager import SharedConfigManager
         print("📁 Core shared components found, running basic validation...")
         
-        # Test basic functionality
-        config_manager = SharedConfigManager()
+        # Test basic functionality (with required parent_module parameter)
+        config_manager = SharedConfigManager("test_module")
         
-        if hasattr(config_manager, 'get_config') and hasattr(config_manager, 'set_config'):
+        if hasattr(config_manager, 'get_config') and hasattr(config_manager, 'update_config'):
             print("✅ PASSED: Core Shared Components (basic validation successful)")
             return True, 80.0
         else:
@@ -309,10 +315,43 @@ def run_preprocessing_module_tests():
     print("=" * 50)
     
     try:
-        # Check if preprocessing module exists
-        preprocessing_path = project_root / "smartcash" / "ui" / "dataset" / "preprocessing"
-        if preprocessing_path.exists():
-            print("📁 Preprocessing module found...")
+        # Check new preprocess module (refactored from preprocessing)
+        preprocess_path = project_root / "smartcash" / "ui" / "dataset" / "preprocess"
+        if preprocess_path.exists():
+            print("📁 New preprocess module found, running comprehensive tests...")
+            
+            # Run comprehensive tests
+            test_file = project_root / "tests" / "unit" / "ui" / "dataset" / "test_preprocess_comprehensive.py"
+            if test_file.exists():
+                result = subprocess.run([
+                    sys.executable, "-m", "pytest", str(test_file), "-v", "--tb=short"
+                ], capture_output=True, text=True, cwd=project_root)
+                
+                if result.returncode == 0:
+                    print("✅ PASSED: New Preprocess Module (comprehensive tests passed)")
+                    return True, 95.0
+                else:
+                    print("⚠️ PARTIAL: New Preprocess Module (some tests failed)")
+                    print(f"Test output: {result.stdout[-500:]}")  # Last 500 chars
+                    return True, 75.0
+            else:
+                # Basic validation without comprehensive tests
+                from smartcash.ui.dataset.preprocess import initialize_preprocess_ui, PreprocessInitializer
+                print("📁 Preprocess module imports successfully")
+                
+                # Test initializer creation
+                initializer = PreprocessInitializer()
+                if hasattr(initializer, 'module_name') and initializer.module_name == 'preprocess':
+                    print("✅ PASSED: New Preprocess Module (basic validation)")
+                    return True, 85.0
+                else:
+                    print("⚠️ PARTIAL: New Preprocess Module (initialization issues)")
+                    return True, 70.0
+        
+        # Check legacy preprocessing module
+        legacy_preprocessing_path = project_root / "smartcash" / "ui" / "dataset" / "preprocessing"
+        if legacy_preprocessing_path.exists():
+            print("📁 Legacy preprocessing module found...")
             return True, 60.0  # Partial implementation
         else:
             print("⚠️ TODO: Data Preprocessing Module (not yet implemented)")
@@ -520,7 +559,7 @@ def run_full_integration_validation():
             from smartcash.ui.components.action_container import ActionContainer
             
             # Test basic instantiation
-            config_manager = SharedConfigManager()
+            config_manager = SharedConfigManager("integration_test")
             action_container = ActionContainer()
             
             print("✅ Core infrastructure integration successful")

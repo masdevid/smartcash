@@ -11,7 +11,7 @@ from smartcash.ui.core.handlers.ui_handler import UIHandler
 from smartcash.ui.core.initializers.base_initializer import BaseInitializer
 
 # Shared utilities
-from smartcash.ui.core.shared.ui_component_manager import UIComponentManager, ComponentRegistry
+from smartcash.ui.core.shared.shared_config_manager import SharedConfigManager, get_shared_config_manager
 
 # Error handling
 from smartcash.ui.core.errors import (
@@ -31,8 +31,8 @@ __all__ = [
     'BaseHandler',
     'UIHandler',
     'BaseInitializer',
-    'UIComponentManager',
-    'ComponentRegistry',
+    'SharedConfigManager',
+    'get_shared_config_manager',
     'ErrorLevel',
     'CoreErrorHandler',
     'get_error_handler',

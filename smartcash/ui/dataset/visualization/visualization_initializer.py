@@ -105,3 +105,18 @@ def initialize_visualization(config: Optional[Dict[str, Any]] = None):
         Instance of VisualizationInitializer
     """
     return VisualizationInitializer(config=config)
+
+
+def init_visualization_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> Dict[str, Any]:
+    """
+    Initialize visualization UI module.
+    
+    Args:
+        config: Configuration dictionary
+        **kwargs: Additional arguments
+        
+    Returns:
+        Dictionary of UI components
+    """
+    initializer = VisualizationInitializer(config=config)
+    return initializer._initialize_impl(**kwargs)

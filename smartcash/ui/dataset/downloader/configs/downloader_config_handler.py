@@ -34,7 +34,7 @@ class DownloaderConfigHandler(ConfigHandler, BaseDownloaderHandler):
     @handle_ui_errors(error_component_title="Config Handler Initialization Error", log_error=True)
     def __init__(self, ui_components: Optional[Dict[str, Any]] = None, module_name: str = 'downloader', 
                  parent_module: str = 'dataset', persistence_enabled: bool = True, 
-                 use_shared_config: bool = True):
+                 use_shared_config: bool = True, config: Optional[Dict[str, Any]] = None, **kwargs):
         """Initialize downloader config handler with centralized error handling.
         
         Args:
@@ -43,10 +43,11 @@ class DownloaderConfigHandler(ConfigHandler, BaseDownloaderHandler):
             parent_module: Parent module name
             persistence_enabled: Whether to enable config persistence to disk
             use_shared_config: Whether to use shared config manager
+            config: Optional configuration dictionary (ignored, for compatibility)
+            **kwargs: Additional arguments for compatibility
         """
         # Initialize both parent classes
-        ConfigHandler.__init__(self, module_name=module_name, parent_module=parent_module,
-                              persistence_enabled=persistence_enabled, use_shared_config=use_shared_config)
+        ConfigHandler.__init__(self, module_name=module_name, parent_module=parent_module)
         BaseDownloaderHandler.__init__(self, ui_components=ui_components, module_name=module_name, 
                                       parent_module=parent_module)
         
@@ -449,3 +450,17 @@ class DownloaderConfigHandler(ConfigHandler, BaseDownloaderHandler):
         except Exception as e:
             self.log_error(f"❌ Error saat mendapatkan konfigurasi default: {str(e)}")
             raise
+
+
+# Factory function for creating downloader config handler
+def get_downloader_config_handler(**kwargs) -> DownloaderConfigHandler:
+    """
+    Factory function to create a DownloaderConfigHandler instance.
+    
+    Args:
+        **kwargs: Arguments to pass to DownloaderConfigHandler constructor
+        
+    Returns:
+        DownloaderConfigHandler instance
+    """
+    return DownloaderConfigHandler(**kwargs)

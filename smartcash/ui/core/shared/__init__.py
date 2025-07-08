@@ -14,11 +14,6 @@ from smartcash.ui.core.errors import (
     validate_ui_components,
     handle_errors
 )
-from smartcash.ui.core.shared.ui_component_manager import (
-    UIComponentManager,
-    ComponentRegistry,
-    get_component_manager
-)
 from smartcash.ui.core.shared.shared_config_manager import (
     SharedConfigManager,
     get_shared_config_manager
@@ -35,13 +30,6 @@ __all__ = [
     'safe_component_operation',
     'validate_ui_components',
     'handle_errors',
-    
-    # Component manager
-    'UIComponentManager',
-    'ComponentRegistry',
-    'get_component_manager',
-    'ComponentRegistry',
-    'get_component_manager',
     
     # Config manager
     'SharedConfigManager',

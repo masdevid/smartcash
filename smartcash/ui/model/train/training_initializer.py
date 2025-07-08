@@ -183,3 +183,17 @@ def create_training_ui_components(config: Optional[Dict[str, Any]] = None) -> Di
     """
     initializer = TrainingInitializer()
     return initializer.create_ui_components(config)
+
+
+def init_training_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> Dict[str, Any]:
+    """
+    Initialize training UI module.
+    
+    Args:
+        config: Configuration dictionary
+        **kwargs: Additional arguments
+        
+    Returns:
+        Dictionary of UI components
+    """
+    return initialize_training_ui(config, **kwargs)

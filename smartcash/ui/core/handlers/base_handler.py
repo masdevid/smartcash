@@ -224,7 +224,9 @@ class BaseHandler(ABC):
     
     def cleanup(self) -> None:
         """Cleanup handler resources."""
-        self._component_manager.cleanup()
+        # Reset internal state
+        self._error_count = 0
+        self._last_error = None
         self.logger.debug(f"🧹 Cleaned up {self.__class__.__name__}")
     
     def __enter__(self):

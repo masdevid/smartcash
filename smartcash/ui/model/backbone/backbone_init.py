@@ -202,3 +202,17 @@ def get_backbone_initializer() -> BackboneInitializer:
         _backbone_initializer = BackboneInitializer()
     
     return _backbone_initializer
+
+
+def init_backbone_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> Dict[str, Any]:
+    """
+    Initialize backbone UI module.
+    
+    Args:
+        config: Configuration dictionary
+        **kwargs: Additional arguments
+        
+    Returns:
+        Dictionary of UI components
+    """
+    return initialize_backbone_ui(config, **kwargs)

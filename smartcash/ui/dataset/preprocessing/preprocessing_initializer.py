@@ -142,6 +142,19 @@ class PreprocessingInitializer(ModuleInitializer):
         except ImportError:
             raise RuntimeError("Dataset preprocessing requires IPython environment")
 
+    def _initialize_impl(self, **kwargs) -> Dict[str, Any]:
+        """
+        Implementation of the abstract _initialize_impl method.
+        
+        Args:
+            **kwargs: Additional arguments
+            
+        Returns:
+            Dictionary of UI components
+        """
+        # Call the parent implementation which handles the full initialization flow
+        return super().initialize(**kwargs)
+
 
 # Global instance
 _preprocessing_initializer = PreprocessingInitializer()

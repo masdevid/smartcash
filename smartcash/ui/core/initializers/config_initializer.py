@@ -63,8 +63,8 @@ class ConfigurableInitializer(BaseInitializer):
             self.config_handler = SharedConfigHandler(
                 module_name=module_name,
                 parent_module=parent_module,
-                enable_sharing=enable_shared_config,
-                config=self._initial_config or {}
+                default_config=self._initial_config or {},
+                enable_sharing=enable_shared_config
             )
         
         self.logger.debug(f"📋 ConfigurableInitializer setup with {type(self.config_handler).__name__}")

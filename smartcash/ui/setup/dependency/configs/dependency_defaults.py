@@ -22,6 +22,9 @@ def get_default_dependency_config() -> Dict[str, Any]:
         # Uninstalled default packages (to track which defaults were uninstalled)
         'uninstalled_defaults': [],
         
+        # Package categories - include reference to package categories
+        'package_categories': get_default_package_categories(),
+        
         # Install options
         'install_options': {
             'use_venv': True,

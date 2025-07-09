@@ -116,24 +116,26 @@ smartcash/ui/[group]/[module]/
 - Follows the principle of composition over inheritance
 - Using defaults container based component with order:
     - Header Container:
-        - Header
-        - Status Panel
+        - Header (must)
+        - Status Panel (must)
     - Form Container (Custom to each module)
     - Action Container:
-        - Big Primary Buttons (for single operation only)
-        - Save/Reset Buttons (only if need persistence config)
-        - Action Buttons (for multiple operations)
-    - Summary Container (Custom to each module)
+        - Save/Reset Buttons (only if need persistence config) | (float right)
+        - Big Primary Buttons (for single operation only) | (float center)
+        - Action Buttons (for multiple operations) | (float left)
+    - Summary Container (Custom to each module) (Nice to have)
     - Operation Container:
-        - Progress Tracker
-        - Dialogs
-        - Log Accordion
+        - Progress Tracker (must)
+        - Dialog Confirmation Area (Opsional)
+        - Log Accordion (must)
     - Footer Container:
-        - Info Accordion
+        - Info Accordion(s) (Nice to have)
+        - Tips Panel (opsional)
 - `[module]_ui.py`: Contains main UI component definitions
 - `*_section.py`: Contains section UI component definitions
 - `*_panel.py`: Contains panel UI component
 - `*_widget.py`: Contains specific widget UI component
+- `*[what]_info.py`: Contains collapsible infos or guidances, but must be placed in dedicated `info_box/` folder
 
 ### configs/
 - Manages all configuration-related functionality. 

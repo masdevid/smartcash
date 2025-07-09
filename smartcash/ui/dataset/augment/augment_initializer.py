@@ -8,7 +8,7 @@ initialization while preserving all original business logic.
 
 from typing import Dict, Any, Optional
 import logging
-from smartcash.ui.core.initializers.module_initializer import ModuleInitializer
+from smartcash.ui.core.initializers.display_initializer import DisplayInitializer
 from smartcash.ui.core.errors.handlers import handle_ui_errors
 from smartcash.ui.core.errors.decorators import handle_errors
 
@@ -18,7 +18,7 @@ from .configs.augment_config_handler import AugmentConfigHandler
 from .constants import UI_CONFIG
 
 
-class AugmentInitializer(ModuleInitializer):
+class AugmentInitializer(DisplayInitializer):
     """
     Main initializer for augment module with core inheritance patterns.
     
@@ -47,6 +47,10 @@ class AugmentInitializer(ModuleInitializer):
         # Module-specific components
         self.ui_handler: Optional[AugmentUIHandler] = None
         self.config_handler: Optional[AugmentConfigHandler] = None
+        self.initial_config = config or {}
+        
+        # Add logger for compatibility
+        self.logger = logging.getLogger(f"smartcash.ui.{UI_CONFIG['parent_module']}.{UI_CONFIG['module_name']}")
         
         self.logger.info(f"🎨 {UI_CONFIG['title']} initializer created")
     
@@ -59,28 +63,31 @@ class AugmentInitializer(ModuleInitializer):
             **kwargs: Additional initialization arguments
             
         Returns:
-            Dictionary containing initialized UI components
+            Dictionary containing initialized UI components for display
         """
         self.logger.info("🚀 Starting augment module initialization")
         
         try:
+            # Get configuration from kwargs or use initial config
+            config = kwargs.get('config', self.initial_config)
+            
             # Step 1: Create configuration handler
             self.config_handler = AugmentConfigHandler(
                 module_name=self.module_name,
                 parent_module=self.parent_module,
-                default_config=self.config
+                default_config=config
             )
             
             # Step 2: Create UI components
-            ui_components = create_augment_ui(self.config)
+            ui_components = create_augment_ui(config)
             
             # Step 3: Create and setup UI handler
             self.ui_handler = AugmentUIHandler(ui_components)
             self.ui_handler.setup_handlers()
             
             # Step 4: Apply configuration to UI
-            if self.config:
-                self.config_handler.update_ui_from_config(ui_components, self.config)
+            if config:
+                self.config_handler.update_ui_from_config(ui_components, config)
             
             # Step 5: Add initialization metadata
             ui_components.update({
@@ -91,6 +98,10 @@ class AugmentInitializer(ModuleInitializer):
                 'module_version': UI_CONFIG['version'],
                 'module_info': UI_CONFIG
             })
+            
+            # Step 6: Add ui key for DisplayInitializer
+            if 'main_container' in ui_components:
+                ui_components['ui'] = ui_components['main_container']
             
             self.logger.info("✅ Augment module initialization completed successfully")
             return ui_components
@@ -123,7 +134,7 @@ class AugmentInitializer(ModuleInitializer):
                     raise ValueError(f"Invalid configuration: {errors}")
                 
                 # Update configuration
-                self.config = new_config
+                self.initial_config = new_config
                 self.config_handler.update_config(new_config)
                 
                 self.logger.info("✅ Configuration updated successfully")

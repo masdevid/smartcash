@@ -221,55 +221,59 @@ class ColabInitializer(ModuleInitializer):
 # Global instance for backward compatibility
 _colab_initializer: Optional[ColabInitializer] = None
 
+# Add DisplayInitializer import
+from smartcash.ui.core.initializers.display_initializer import DisplayInitializer
 
-def initialize_colab_ui_internal(config: Optional[Dict[str, Any]] = None) -> Any:
-    """Internal colab UI initialization that returns components.
+class ColabDisplayInitializer(DisplayInitializer):
+    """DisplayInitializer wrapper for colab module"""
     
-    This function ensures only one instance of the colab UI is created.
+    def __init__(self):
+        super().__init__(module_name="colab", parent_module="setup")
+        self._colab_initializer = ColabInitializer()
     
+    def _initialize_impl(self, **kwargs) -> Dict[str, Any]:
+        """Implementation using existing ColabInitializer"""
+        return self._colab_initializer._initialize_impl(**kwargs)
+
+# Global display initializer instance
+_colab_display_initializer = ColabDisplayInitializer()
+
+def initialize_colab_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> None:
+    """Initialize and display colab UI using DisplayInitializer
+
     Args:
-        config: Optional configuration dictionary for initialization
-        
+        config: Optional configuration dictionary
+        **kwargs: Additional arguments
+    
+    Note:
+        This function displays the UI directly and returns None.
+        Use get_colab_components() if you need access to the components dictionary.
+    """
+    _colab_display_initializer.initialize_and_display(config=config, **kwargs)
+
+def get_colab_components(config: Optional[Dict[str, Any]] = None, **kwargs) -> Dict[str, Any]:
+    """Get colab components dictionary without displaying UI
+
+    Args:
+        config: Optional configuration dictionary
+        **kwargs: Additional arguments
+
     Returns:
-        The main UI container widget or dict of components
+        Dictionary of UI components
     """
     global _colab_initializer
-    
-    # If we already have an initialized instance, return its UI
-    if (_colab_initializer is not None and 
-        hasattr(_colab_initializer, '_ui_components') and 
-        _colab_initializer._ui_components is not None):
-        return _colab_initializer._ui_components.get('ui')
-    elif _colab_initializer is not None:
-        # If _ui_components is None, force reinitialization
-        _colab_initializer = None
-    
-    # Otherwise, create a new instance using ModuleInitializer
-    from smartcash.ui.core.initializers.module_initializer import ModuleInitializer
-    
-    # Use the centralized initialization
-    result = ModuleInitializer.initialize_module_ui(
-        module_name='colab',
-        parent_module='setup',
-        config=config,
-        initializer_class=ColabInitializer
-    )
-    
-    # Store the initializer instance for future use
-    _colab_initializer = ModuleInitializer.get_module_instance('colab', 'setup')
-    
-    return result
+    if _colab_initializer is None:
+        _colab_initializer = ColabInitializer()
+    return _colab_initializer.initialize(config=config, **kwargs)
 
+def display_colab_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> None:
+    """Display colab UI (alias for initialize_colab_ui)
 
-# Import the display function creator
-from smartcash.ui.core.initializers.display_initializer import create_ui_display_function
-
-# Create the initialize function using the consistent pattern with legacy fallback
-initialize_colab_ui = create_ui_display_function(
-    module_name='colab',
-    parent_module='setup',
-    legacy_function=initialize_colab_ui_internal
-)
+    Args:
+        config: Optional configuration dictionary
+        **kwargs: Additional arguments
+    """
+    initialize_colab_ui(config=config, **kwargs)
 
 
 def get_colab_initializer() -> ColabInitializer:

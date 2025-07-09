@@ -213,7 +213,9 @@ class DependencyOperationManager(OperationHandler):
             'install': self.execute_install,
             'uninstall': self.execute_uninstall, 
             'update': self.execute_update,
-            'check_status': self.execute_check_status
+            'check_status': self.execute_check_status,
+            'install_requirements': self.install_requirements_txt,
+            'install_smartcash_yolo_requirements': self.install_smartcash_and_yolo_requirements
         }
     
     async def execute_install(self, packages: List[str], progress_callback=None) -> Dict[str, Any]:
@@ -324,6 +326,188 @@ class DependencyOperationManager(OperationHandler):
             self.logger.error(f"Error in execute_check_status: {e}")
             return {'success': False, 'error': str(e)}
     
+    async def install_requirements_txt(self, repo_path: str, progress_callback=None) -> Dict[str, Any]:
+        """Install requirements.txt from a repository path.
+        
+        Args:
+            repo_path: Path to the repository containing requirements.txt
+            progress_callback: Optional callback for progress updates
+            
+        Returns:
+            Dict containing installation results
+        """
+        try:
+            import os
+            import subprocess
+            import asyncio
+            
+            # Check if requirements.txt exists
+            requirements_path = os.path.join(repo_path, 'requirements.txt')
+            if not os.path.exists(requirements_path):
+                return {
+                    'success': False,
+                    'error': f'requirements.txt not found in {repo_path}',
+                    'message': f'No requirements.txt found in {repo_path}'
+                }
+            
+            self.logger.info(f"🚀 Installing requirements.txt from {repo_path}")
+            
+            # Read requirements.txt to get package count for progress
+            with open(requirements_path, 'r') as f:
+                requirements_content = f.read()
+            
+            # Parse requirements to count packages
+            requirements_lines = [line.strip() for line in requirements_content.split('\n') 
+                                if line.strip() and not line.strip().startswith('#')]
+            total_packages = len(requirements_lines)
+            
+            if total_packages == 0:
+                return {
+                    'success': True,
+                    'message': 'No packages to install (empty requirements.txt)',
+                    'installed': 0,
+                    'total': 0
+                }
+            
+            # Update progress - starting installation
+            if progress_callback:
+                progress_callback(0, f"Installing {total_packages} packages from requirements.txt")
+            
+            # Build pip install command
+            cmd = ['pip', 'install', '-r', requirements_path]
+            
+            # Execute pip install command
+            self.logger.info(f"Executing: {' '.join(cmd)}")
+            process = await asyncio.create_subprocess_exec(
+                *cmd,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+                cwd=repo_path
+            )
+            
+            stdout, stderr = await process.communicate()
+            stdout_str = stdout.decode('utf-8') if stdout else ''
+            stderr_str = stderr.decode('utf-8') if stderr else ''
+            
+            # Update progress - installation complete
+            if progress_callback:
+                progress_callback(100, "Requirements.txt installation complete")
+            
+            if process.returncode == 0:
+                self.logger.info(f"✅ Successfully installed requirements.txt from {repo_path}")
+                return {
+                    'success': True,
+                    'message': f'Successfully installed {total_packages} packages from requirements.txt',
+                    'installed': total_packages,
+                    'total': total_packages,
+                    'stdout': stdout_str,
+                    'repo_path': repo_path
+                }
+            else:
+                error_msg = stderr_str or stdout_str or 'Unknown error'
+                self.logger.error(f"❌ Failed to install requirements.txt from {repo_path}: {error_msg}")
+                return {
+                    'success': False,
+                    'error': error_msg,
+                    'message': f'Failed to install requirements.txt: {error_msg}',
+                    'repo_path': repo_path
+                }
+                
+        except Exception as e:
+            error_msg = f"Error installing requirements.txt from {repo_path}: {str(e)}"
+            self.logger.error(error_msg)
+            return {
+                'success': False,
+                'error': str(e),
+                'message': error_msg,
+                'repo_path': repo_path
+            }
+    
+    async def install_smartcash_and_yolo_requirements(self, progress_callback=None) -> Dict[str, Any]:
+        """Install requirements.txt from both smartcash and yolov5 repositories.
+        
+        Args:
+            progress_callback: Optional callback for progress updates
+            
+        Returns:
+            Dict containing installation results
+        """
+        try:
+            # Define repository paths
+            smartcash_path = '/content/smartcash'
+            yolov5_path = '/content/yolov5'
+            
+            results = {
+                'smartcash': None,
+                'yolov5': None,
+                'overall_success': False,
+                'installed_total': 0,
+                'errors': []
+            }
+            
+            # Install smartcash requirements
+            if progress_callback:
+                progress_callback(0, "Installing SmartCash requirements.txt")
+            
+            smartcash_result = await self.install_requirements_txt(smartcash_path, progress_callback)
+            results['smartcash'] = smartcash_result
+            
+            if smartcash_result['success']:
+                results['installed_total'] += smartcash_result.get('installed', 0)
+                self.logger.info("✅ SmartCash requirements.txt installed successfully")
+            else:
+                results['errors'].append(f"SmartCash: {smartcash_result.get('error', 'Unknown error')}")
+                self.logger.warning(f"⚠️ SmartCash requirements.txt failed: {smartcash_result.get('error')}")
+            
+            # Install yolov5 requirements
+            if progress_callback:
+                progress_callback(50, "Installing YOLOv5 requirements.txt")
+            
+            yolov5_result = await self.install_requirements_txt(yolov5_path, progress_callback)
+            results['yolov5'] = yolov5_result
+            
+            if yolov5_result['success']:
+                results['installed_total'] += yolov5_result.get('installed', 0)
+                self.logger.info("✅ YOLOv5 requirements.txt installed successfully")
+            else:
+                results['errors'].append(f"YOLOv5: {yolov5_result.get('error', 'Unknown error')}")
+                self.logger.warning(f"⚠️ YOLOv5 requirements.txt failed: {yolov5_result.get('error')}")
+            
+            # Update final progress
+            if progress_callback:
+                progress_callback(100, "Requirements installation complete")
+            
+            # Determine overall success
+            results['overall_success'] = smartcash_result['success'] and yolov5_result['success']
+            
+            # Create summary message
+            if results['overall_success']:
+                message = f"✅ Successfully installed requirements from both repositories ({results['installed_total']} packages total)"
+            elif smartcash_result['success'] or yolov5_result['success']:
+                message = f"⚠️ Partial success: {results['installed_total']} packages installed, but some repositories failed"
+            else:
+                message = "❌ Failed to install requirements from both repositories"
+            
+            results['message'] = message
+            
+            # Update operation summary
+            await self._update_operation_summary('install_requirements', results)
+            
+            return results
+            
+        except Exception as e:
+            error_msg = f"Error installing requirements from repositories: {str(e)}"
+            self.logger.error(error_msg)
+            return {
+                'overall_success': False,
+                'error': str(e),
+                'message': error_msg,
+                'smartcash': None,
+                'yolov5': None,
+                'installed_total': 0,
+                'errors': [str(e)]
+            }
+
     async def _update_operation_summary(self, operation_type: str, result: Dict[str, Any]) -> None:
         """Update operation summary with operation results."""
         try:
@@ -339,7 +523,7 @@ class DependencyOperationManager(OperationHandler):
                 # Determine status type based on result
                 if result.get('cancelled'):
                     status_type = 'warning'
-                elif result.get('success'):
+                elif result.get('success', result.get('overall_success', False)):
                     status_type = 'success'
                 else:
                     status_type = 'error'

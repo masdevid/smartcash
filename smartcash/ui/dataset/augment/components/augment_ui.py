@@ -140,7 +140,7 @@ def create_augment_ui(config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]
         title="🚀 Augmentation Operations",
         alignment="left"
     )
-    ui_components['action_container'] = action_container.container
+    ui_components['action_container'] = action_container['container']
     
     # 4. Operation Container for status and progress
     operation_container = create_operation_container(

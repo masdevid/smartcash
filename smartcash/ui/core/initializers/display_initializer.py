@@ -16,9 +16,7 @@ from contextlib import contextmanager
 
 from .base_initializer import BaseInitializer
 from smartcash.ui.core.errors import (
-    ErrorLevel,
-    create_error_component,
-    get_error_handler
+    create_error_component
 )
 
 
@@ -66,26 +64,49 @@ class DisplayInitializer(BaseInitializer):
         """
         if isinstance(ui_result, dict):
             # Try to find the main UI component to display
-            if 'ui' in ui_result:
-                display(ui_result['ui'])
-            elif 'main_container' in ui_result:
-                display(ui_result['main_container'])
-            elif 'container' in ui_result:
-                display(ui_result['container'])
-            else:
-                # Look for any displayable widget
-                for key, component in ui_result.items():
-                    if hasattr(component, 'children') or hasattr(component, 'layout'):
+            for key in ['ui', 'main_container', 'container']:
+                if key in ui_result:
+                    component = ui_result[key]
+                    if self._is_displayable_widget(component):
                         display(component)
-                        break
-                else:
-                    self.logger.warning(f"⚠️ No displayable UI component found in {self.module_name} initialization")
+                        return
+            
+            # Look for any displayable widget
+            for key, component in ui_result.items():
+                if self._is_displayable_widget(component):
+                    display(component)
+                    return
                     
-        elif hasattr(ui_result, 'children') or hasattr(ui_result, 'layout'):
+            self.logger.warning(f"⚠️ No displayable UI component found in {self.module_name} initialization")
+                    
+        elif self._is_displayable_widget(ui_result):
             # Direct widget
             display(ui_result)
         else:
             self.logger.warning(f"⚠️ Unexpected UI result type in {self.module_name}: {type(ui_result)}")
+    
+    def _is_displayable_widget(self, component) -> bool:
+        """Check if a component is displayable."""
+        if component is None:
+            return False
+            
+        # Direct ipywidgets
+        if hasattr(component, 'children') or hasattr(component, 'layout'):
+            return True
+        
+        # Custom container classes with .container attribute
+        if hasattr(component, 'container'):
+            container = component.container
+            if hasattr(container, 'children') or hasattr(container, 'layout'):
+                display(container)
+                return True
+        
+        # Classes with show() method
+        if hasattr(component, 'show') and callable(component.show):
+            display(component.show())
+            return True
+        
+        return False
     
     def _display_error_component(self, error: Exception, error_msg: str = None) -> None:
         """
@@ -242,22 +263,45 @@ class DisplayInitializer(BaseInitializer):
         """Static version of _display_ui_component for use in factory function"""
         if isinstance(ui_result, dict):
             # Try to find the main UI component to display
-            if 'ui' in ui_result:
-                display(ui_result['ui'])
-            elif 'main_container' in ui_result:
-                display(ui_result['main_container'])
-            elif 'container' in ui_result:
-                display(ui_result['container'])
-            else:
-                # Look for any displayable widget
-                for key, component in ui_result.items():
-                    if hasattr(component, 'children') or hasattr(component, 'layout'):
-                        display(component)
-                        break
+            for key in ['ui', 'main_container', 'container']:
+                if key in ui_result:
+                    component = ui_result[key]
+                    if DisplayInitializer._is_displayable_widget_static(component):
+                        return
+            
+            # Look for any displayable widget
+            for key, component in ui_result.items():
+                if DisplayInitializer._is_displayable_widget_static(component):
+                    return
                         
-        elif hasattr(ui_result, 'children') or hasattr(ui_result, 'layout'):
+        elif DisplayInitializer._is_displayable_widget_static(ui_result):
             # Direct widget
-            display(ui_result)
+            pass
+    
+    @staticmethod
+    def _is_displayable_widget_static(component) -> bool:
+        """Static version of _is_displayable_widget."""
+        if component is None:
+            return False
+            
+        # Direct ipywidgets
+        if hasattr(component, 'children') or hasattr(component, 'layout'):
+            display(component)
+            return True
+        
+        # Custom container classes with .container attribute
+        if hasattr(component, 'container'):
+            container = component.container
+            if hasattr(container, 'children') or hasattr(container, 'layout'):
+                display(container)
+                return True
+        
+        # Classes with show() method
+        if hasattr(component, 'show') and callable(component.show):
+            display(component.show())
+            return True
+        
+        return False
     
     @staticmethod
     def _display_error_component_static(error: Exception, module_name: str) -> None:

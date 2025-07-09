@@ -146,3 +146,11 @@ class DependencyConfigHandler(SharedConfigHandler):
                         packages.append(pkg_name)
         
         return list(set(packages))  # Remove duplicates
+    
+    def get_config(self) -> Dict[str, Any]:
+        """Get current configuration.
+        
+        Returns:
+            Current configuration dictionary
+        """
+        return self.config.copy()

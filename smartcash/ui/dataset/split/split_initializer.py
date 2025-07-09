@@ -59,20 +59,17 @@ class SplitInitializer(DisplayInitializer):
             **kwargs: Arbitrary keyword arguments
             
         Returns:
-            Dict containing initialization status
+            Dict containing UI components for display
         """
         try:
             # Create UI components
-            self._create_ui_components(self.config or {})
+            components = self._create_ui_components(self.config or {})
             
             # Mark as initialized
             self._is_initialized = True
             
-            return {
-                'status': 'success',
-                'message': 'SplitInitializer initialized successfully',
-                'components': self.components
-            }
+            # Return components directly for DisplayInitializer
+            return components
             
         except Exception as e:
             error_msg = f"Failed to initialize SplitInitializer: {str(e)}"
@@ -83,7 +80,7 @@ class SplitInitializer(DisplayInitializer):
                 'error': str(e)
             }
     
-    def _create_ui_components(self, config: Dict[str, Any], **kwargs) -> Dict[str, Any]:
+    def _create_ui_components(self, config: Dict[str, Any]) -> Dict[str, Any]:
         """Create and return UI components using the container-based pattern.
         
         Args:
@@ -101,6 +98,7 @@ class SplitInitializer(DisplayInitializer):
             self.components = {
                 **ui_components,
                 'main_container': ui_components['main_container'],
+                'ui': ui_components['main_container'],  # Add ui key for DisplayInitializer
                 'form_components': ui_components.get('form_components', {})
             }
             
@@ -139,7 +137,7 @@ class SplitInitializer(DisplayInitializer):
         # Set up save button handler
         save_button = form_components.get('save_button')
         if save_button and hasattr(self, 'save_config'):
-            def on_save_clicked(button):
+            def on_save_clicked(_):
                 try:
                     self.save_config()
                     self._log_success("Konfigurasi berhasil disimpan")
@@ -151,7 +149,7 @@ class SplitInitializer(DisplayInitializer):
         # Set up reset button handler
         reset_button = form_components.get('reset_button')
         if reset_button and hasattr(self, 'reset_ui'):
-            def on_reset_clicked(button):
+            def on_reset_clicked(_):
                 try:
                     self.reset_ui()
                     self._log_success("UI berhasil direset ke nilai default")

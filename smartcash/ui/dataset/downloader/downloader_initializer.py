@@ -166,8 +166,25 @@ class DownloaderInitializer(ModuleInitializer):
         Returns:
             Dictionary of UI components
         """
-        # Call the parent implementation which handles the full initialization flow
-        return super().initialize(**kwargs)
+        # Pre-initialization checks
+        self.pre_initialize_checks(**kwargs)
+        
+        # Load configuration
+        config = kwargs.get('config')
+        if config is None:
+            config = self._get_default_config()
+        
+        # Create UI components
+        filtered_kwargs = {k: v for k, v in kwargs.items() if k not in ['config', 'env']}
+        ui_components = self._create_ui_components(config, env=kwargs.get('env'), **filtered_kwargs)
+        
+        # Setup module handlers
+        ui_components = self._setup_module_handlers(ui_components, config, env=kwargs.get('env'), **filtered_kwargs)
+        
+        # Post-initialization cleanup
+        self.post_initialize_cleanup()
+        
+        return ui_components
 
 # Global instance dan public API
 _downloader_initializer = DownloaderInitializer()

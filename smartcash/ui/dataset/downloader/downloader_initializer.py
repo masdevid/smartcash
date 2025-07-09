@@ -103,10 +103,10 @@ class DownloaderInitializer(ModuleInitializer):
                 
                 # Fallback to legacy handler
                 handler_manager = DownloadHandlerManager(ui_components, config, env)
-                handlers = handler_manager.setup_handlers()
-                
-                if handlers:
-                    ui_components.update(handlers)
+                # Initialize the handler manager
+                handler_manager.initialize()
+                # Store the handler manager in UI components
+                ui_components['download_handler_manager'] = handler_manager
 
             return ui_components
         except Exception as e:

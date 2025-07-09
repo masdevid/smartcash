@@ -49,11 +49,15 @@ class SplitInitializer(DisplayInitializer):
         
         self.logger.debug(f"Initialized with config: {bool(config)}")
             
-    def _initialize_impl(self, **kwargs) -> Dict[str, Any]:
+    def _initialize_impl(self, *args, **kwargs) -> Dict[str, Any]:
         """Implementation of the initialization process.
         
         This method is called by the parent class's initialize() method.
         
+        Args:
+            *args: Variable length argument list
+            **kwargs: Arbitrary keyword arguments
+            
         Returns:
             Dict containing initialization status
         """

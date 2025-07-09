@@ -102,8 +102,8 @@ def create_backbone_child_components(config: Optional[Dict[str, Any]] = None) ->
     ))
     
     # Add the two-column layout to the form container
-    form_container.add_item(two_column_layout, width='100%')
-    child_components['form_container'] = form_container
+    form_container['add_item'](two_column_layout, width='100%')
+    child_components['form_container'] = form_container['container']
     
     # Store the two-column layout for reference
     child_components['two_column_layout'] = two_column_layout

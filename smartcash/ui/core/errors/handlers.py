@@ -329,11 +329,16 @@ class CoreErrorHandler:
         try:
             # Import from local error components
             from .error_component import create_error_component
+            from .enums import ErrorLevel
             
+            # Ensure level is an ErrorLevel enum value
+            if not isinstance(level, ErrorLevel):
+                level = ErrorLevel.ERROR
+                
             # Create and return an error display component
             return create_error_component(
                 error_message=error_msg,
-                error_type=level.value.lower(),
+                error_type=level.name.lower(),
                 ui_components=ui_components,
                 **kwargs
             )

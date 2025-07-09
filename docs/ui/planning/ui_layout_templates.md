@@ -20,33 +20,82 @@ SmartCash mendukung dua pendekatan layout:
 
 SmartCash menggunakan pendekatan container-based layout untuk memastikan konsistensi UI di seluruh aplikasi. Berikut adalah struktur utama yang digunakan:
 
-```
-┌─────────────────────────────────────────────────────────┐
-│ Main Container                                          │
-│ ┌─────────────────────────────────────────────────────┐ │
-│ │ Header Container                                    │ │
-│ │ - Header (Title, Subtitle, Icon)                    │ │
-│ │ - Status Panel                                      │ │
-│ ├─────────────────────────────────────────────────────┤ │
-│ │ Form Container                                      │ │
-│ │ - Form Sections                                     │ │
-│ │ - Save/Reset Buttons                                │ │
-│ ├─────────────────────────────────────────────────────┤ │
-│ │ Summary Container                                   │ │
-│ │ - Summary Cards                                     │ │
-│ │ - Summary Table                                     │ │
-│ ├─────────────────────────────────────────────────────┤ │
-│ │ Action Container                                    │ │
-│ │ - Action Buttons                                    │ │
-│ │ - Progress Tracker                                  │ │
-│ │ - Confirmation Area                                 │ │
-│ ├─────────────────────────────────────────────────────┤ │
-│ │ Footer Container                                    │ │
-│ │ - Log Accordion                                     │ │
-│ │ - Info Box                                          │ │
-│ └─────────────────────────────────────────────────────┘ │
-└─────────────────────────────────────────────────────────┘
-```
+### Komponen Container Utama
+
+- **Header Container**
+  - Header (must)
+  - Status Panel (must)
+
+- **Form Container**
+  - Custom to each module
+  - Input fields and form controls
+  - Validation messages
+
+- **Action Container**
+  - Save/Reset Buttons (only if need persistence config) | (float right)
+  - Big Primary Buttons (for single operation only) | (float center)
+  - Action Buttons (for multiple operations) | (float left)
+
+- **Summary Container** (Nice to have)
+  - Custom to each module
+  - Displays summary or preview of settings
+
+- **Operation Container**
+  - Progress Tracker (must)
+  - Dialog Confirmation Area (Opsional)
+  - Log Accordion (must)
+
+- **Footer Container**
+  - Info Accordion(s) (Nice to have)
+  - Tips Panel (opsional)
+
+### Struktur File UI
+
+- `[module]_ui.py`: Berisi definisi komponen UI utama
+- `*_section.py`: Berisi definisi komponen UI untuk section
+- `*_panel.py`: Berisi komponen UI panel
+- `*_widget.py`: Berisi komponen widget spesifik
+- `*[what]_info.py`: Berisi informasi atau panduan yang bisa di-collapse (harus diletakkan di folder `info_box/`)
+
+### Komponen UI Standar
+
+1. **Header Container**
+   - Menunjukkan modul yang sedang aktif
+   - Menampilkan status operasi terbaru
+   - Dapat menyertakan tombol aksi cepat
+
+2. **Form Container**
+   - Input fields yang terorganisir dalam section
+   - Validasi input inline
+   - Tombol aksi yang relevan dengan konteks
+
+3. **Visualization Container**
+   - Menampilkan output atau visualisasi data
+   - Dapat berupa tabel, grafik, atau preview
+   - Mendukung interaksi pengguna
+
+4. **Operation Container**
+   - Progress bar untuk operasi yang berjalan
+   - Confirmation dialog area
+   - Logging real-time dengan filter level
+   - Notifikasi untuk event penting
+
+### Tipe Layout Khusus
+
+1. **Wizard/Stepper**
+   - Untuk alur multi-langkah
+   - Navigasi antara step
+   - Validasi antar step
+
+2. **Dashboard**
+   - Koleksi widget dan metrik
+   - Layout grid yang responsif
+   - Customizable views
+
+3. **Explorer/Viewer**
+   - Fokus pada tampilan data
+   - Navigasi dan filter yang kuat
+   - Detail view yang interaktif
 
 ## Komponen Container dan Isinya
 
@@ -54,34 +103,139 @@ Setiap container memiliki peran khusus dan berisi komponen-komponen tertentu. Be
 
 ### 1. Header Container
 
-Container ini menampilkan judul halaman, subtitle, dan panel status.
+Container untuk menampilkan judul halaman, subtitle, dan panel status yang konsisten di seluruh aplikasi.
 
-**Komponen di dalamnya:**
-- **Header** - Menampilkan judul utama, subtitle, dan ikon opsional
-- **Status Panel** - Menampilkan pesan status dengan tipe (info, success, warning, error)
+**Fitur Utama:**
+- Menampilkan judul utama dan subjudul
+- Panel status yang dapat diperbarui dengan berbagai tipe pesan
+- Dukungan untuk ikon opsional
+- Tampilan yang responsif
 
-**Contoh penggunaan:**
+**Contoh Penggunaan Dasar:**
 ```python
-header_container = create_header_container(
-    title="Dataset Preprocessing",
-    subtitle="Preprocessing dataset dengan YOLO normalization dan real-time progress",
-    icon="🚀"
+from smartcash.ui.components.header_container import create_header_container
+
+# Membuat header container dengan status panel
+header = create_header_container(
+    title="🚀 Environment Setup",
+    subtitle="Configure environment for SmartCash YOLOv5-EfficientNet",
+    status_message="Ready to configure environment",
+    status_type="info"
 )
+
+# Menampilkan header
+display(header.container)
+
+# Memperbarui status
+header.update_status(
+    message="Environment configured successfully",
+    status_type="success"
+)
+
+# Menyembunyikan/menampilkan status panel
+header.toggle_status_panel(show=False)
 ```
+
+**Metode yang Tersedia:**
+- `update_status(message: str, status_type: str = "info")` - Memperbarui pesan status
+- `toggle_status_panel(show: bool = None)` - Menyembunyikan/menampilkan panel status
+- `set_title(title: str)` - Mengatur judul
+- `set_subtitle(subtitle: str)` - Mengatur subjudul
+
+**Parameter Pembuatan:**
+- `title`: Judul utama (string)
+- `subtitle`: Subjudul (string, opsional)
+- `icon`: Ikon opsional (emoji atau karakter unicode)
+- `status_message`: Pesan status awal
+- `status_type`: Tipe status ("info", "success", "warning", "error")
+- `show_status_panel`: Menampilkan/menyembunyikan panel status (default: True)
+- `**style_options`: Opsi gaya tambahan (margin, padding, dll.)
 
 ### 2. Form Container
 
-Container ini berisi form input dan opsi konfigurasi yang dikelompokkan secara logis, serta tombol save/reset jika diperlukan.
+Container fleksibel untuk membuat form dengan berbagai tipe input dan tata letak yang responsif.
 
-**Komponen di dalamnya:**
-- **Form** - Form input yang dikelompokkan dalam section
-- **Save/Reset Buttons** - Tombol untuk menyimpan atau mengatur ulang konfigurasi
+**Fitur Utama:**
+- Mendukung tata letak kolom, baris, atau grid
+- Validasi input otomatis
+- Pengelompokan field yang logis
+- Tampilan yang responsif
+- Dukungan untuk berbagai tipe input
 
-**Contoh penggunaan:**
+**Contoh Penggunaan Dasar:**
 ```python
-form_container = create_form_container()
-form_container['form_container'].children = (input_options,)
+from smartcash.ui.components.form_container import create_form_container, LayoutType
+import ipywidgets as widgets
+
+# Membuat form container dengan tata letak kolom
+form = create_form_container(
+    layout_type=LayoutType.COLUMN,
+    container_margin="16px 0",
+    container_padding="16px",
+    gap="12px"
+)
+
+# Menambahkan field ke form
+form['add_item'](
+    widgets.IntText(description="Batch Size:", value=32),
+    align_items='center',
+    margin='0 0 8px 0'
+)
+
+form['add_item'](
+    widgets.Dropdown(
+        options=['CPU', 'GPU', 'TPU'],
+        value='GPU',
+        description='Device:'
+    ),
+    align_items='center'
+)
+
+# Menampilkan form
+display(form['container'])
 ```
+
+**Contoh dengan Grid Layout:**
+```python
+# Membuat form dengan tata letak grid
+grid_form = create_form_container(
+    layout_type=LayoutType.GRID,
+    grid_columns=2,  # 2 kolom
+    gap="12px"
+)
+
+# Menambahkan field ke grid
+for i in range(4):
+    grid_form['add_item'](
+        widgets.FloatText(description=f"Parameter {i+1}:", value=0.5),
+        grid_area=f"item{i+1}"  # Posisi di grid
+    )
+
+# Mengubah tata letak secara dinamis
+grid_form['set_layout'](grid_columns=3)  # Ubah ke 3 kolom
+```
+
+**Metode yang Tersedia:**
+- `add_item(widget, **layout_options)` - Menambahkan widget ke form
+- `set_layout(**layout_options)` - Mengubah tata letak form
+- `clear()` - Menghapus semua item dari form
+
+**Opsi Tata Letak:**
+- `layout_type`: `LayoutType.COLUMN`, `LayoutType.ROW`, atau `LayoutType.GRID`
+- `gap`: Jarak antar item (contoh: "8px")
+- `container_margin`: Margin container luar
+- `container_padding`: Padding container dalam
+- `grid_columns`: Jumlah kolom untuk tata letak grid
+- `grid_template_areas`: Template area untuk tata letak grid
+- `align_items`: Penyelarasan vertikal item
+- `justify_content`: Penyelarasan horizontal item
+
+**Kelas FormItem:**
+Membungkus widget form dengan opsi tata letak tambahan:
+- `widget`: Widget yang dibungkus
+- `align_items`: Penyelarasan vertikal
+- `margin`: Margin di sekitar item
+- `grid_area`: Area grid untuk penempatan (hanya untuk tata letak grid)
 
 ### 3. Summary Container
 
@@ -99,34 +253,118 @@ summary_container.children = (summary_stats_widget,)
 
 ### 4. Action Container
 
-Container ini berisi tombol-tombol aksi utama, progress tracker, dan area konfirmasi.
+Container untuk mengelola tombol aksi dengan dukungan fase dan status yang berbeda. Khususnya berguna untuk alur kerja multi-tahap seperti penyiapan lingkungan atau pelatihan model.
 
-**Komponen di dalamnya:**
-- **Action Buttons** - Tombol-tombol untuk melakukan operasi utama
-- **Progress Tracker** - Menampilkan progress operasi yang sedang berjalan
-- **Confirmation Area** - Area untuk konfirmasi tindakan penting
+**Fitur Utama:**
+- Tombol aksi dengan dukungan fase (phases)
+- Status tombol yang dapat disesuaikan (enabled/disabled)
+- Tooltip dan ikon opsional
+- Tampilan yang konsisten di seluruh aplikasi
 
-**Contoh penggunaan:**
+**Contoh Penggunaan Dasar:**
 ```python
+from smartcash.ui.components.action_container import create_action_container
+
+# Membuat action container
 action_container = create_action_container(
     buttons=[
         {
-            "button_id": "preprocess",
-            "text": "🚀 Mulai Preprocessing",
+            "button_id": "setup_env",
+            "text": "🚀 Setup Environment",
             "style": "primary",
-            "order": 1
+            "order": 1,
+            "tooltip": "Initialize the development environment"
         },
         {
-            "button_id": "check",
-            "text": "🔍 Check Dataset",
-            "style": "info",
-            "order": 2
+            "button_id": "train_model",
+            "text": "🤖 Train Model",
+            "style": "success",
+            "order": 2,
+            "disabled": True
         }
-    ],
-    title="🚀 Preprocessing Operations",
-    alignment="left"
+    ]
 )
 
+# Mendapatkan referensi ke tombol
+setup_btn = action_container.get_button('setup_env')
+train_btn = action_container.get_button('train_model')
+
+# Menambahkan event handler
+def on_setup_click(button):
+    button.disabled = True
+    # Lakukan inisialisasi...
+    train_btn.disabled = False  # Aktifkan tombol train setelah setup selesai
+
+setup_btn.on_click(on_setup_click)
+
+# Menampilkan container
+display(action_container.container)
+```
+
+**Contoh dengan Fase Otomatis:**
+```python
+# Mendefinisikan fase-fase untuk tombol
+phases = {
+    'initial': {
+        'text': '🚀 Initialize',
+        'style': 'primary',
+        'disabled': False
+    },
+    'processing': {
+        'text': '⏳ Processing...',
+        'style': 'info',
+        'disabled': True
+    },
+    'completed': {
+        'text': '✅ Completed',
+        'style': 'success',
+        'disabled': False
+    }
+}
+
+# Membuat action container dengan fase
+action = create_action_container(phases=phases)
+
+# Mengubah fase secara dinamis
+action.set_phase('processing')
+# ... lakukan pekerjaan ...
+action.set_phase('completed')
+```
+
+**Metode yang Tersedia:**
+- `get_button(button_id)` - Mendapatkan referensi ke tombol
+- `set_phase(phase_id)` - Mengubah fase tombol
+- `enable_all()` - Mengaktifkan semua tombol
+- `disable_all()` - Menonaktifkan semua tombol
+- `set_all_buttons_enabled(enabled)` - Mengatur status aktif/tidak aktif semua tombol
+
+**Fase Bawaan untuk Setup Environment:**
+1. `initial` - Fase awal
+2. `init` - Sedang menginisialisasi
+3. `drive` - Sedang memounting Google Drive
+4. `symlink` - Membuat symlink
+5. `folders` - Membuat struktur folder
+6. `dependencies` - Menginstal dependensi
+7. `models` - Mengunduh model
+8. `verifying` - Memverifikasi setup
+9. `ready` - Siap digunakan
+10. `error` - Terjadi kesalahan
+
+**Contoh Penggunaan Fase Bawaan:**
+```python
+# Menggunakan fase bawaan untuk setup environment
+action = create_action_container()
+
+# Atur fase secara berurutan
+action.set_phase('initial')
+# ... lakukan inisialisasi ...
+action.set_phase('drive')
+# ... mount drive ...
+action.set_phase('ready')
+
+# Atau langsung ke fase error jika terjadi masalah
+action.set_phase('error')
+```
 # Progress Tracker dalam Main Container
 progress_tracker = ProgressTracker(
     operation="Dataset Preprocessing",
@@ -159,42 +397,305 @@ def on_preprocess_click(b):
         cancel_text="Batal"
     )
 
-# Hubungkan handler dengan tombol
-preprocess_btn = action_container['buttons']['preprocess']
-preprocess_btn.on_click(on_preprocess_click)
+# Membuat progress indicator
+progress_indicator = ProgressIndicator(
+    value=0,
+    min=0,
+    max=100,
+    description='Progress:',
+    bar_style='info',
+    style={'bar_color': '#0078d4'},
+    orientation='horizontal'
+)
+
+# Membuat log accordion
+log_accordion = LogAccordion(
+    title="Training Logs",
+    max_lines=1000,
+    auto_scroll=True,
+    timestamp_format="%H:%M:%S"
+)
+
+# Membuat confirmation area
+confirmation_area = ConfirmationArea(
+    confirm_text="Confirm",
+    cancel_text="Cancel",
+    style="warning"
+)
+
+# Menambahkan komponen ke operation container
+operation_container.add_component(progress_indicator, "progress")
+operation_container.add_component(log_accordion, "logs")
+operation_container.add_component(confirmation_area, "confirmation")
+
+# Contoh penggunaan
+log_accordion.append("Starting training process...")
+progress_indicator.value = 10
+
+# Update progress secara bertahap
+def update_progress():
+    for i in range(10, 100, 10):
+        progress_indicator.value = i
+        log_accordion.append(f"Progress: {i}%")
+        time.sleep(0.5)
+    log_accordion.append("Training completed successfully!")
+    progress_indicator.bar_style = 'success'
+
+# Menjalankan update progress
+import threading
+progress_thread = threading.Thread(target=update_progress)
+progress_thread.start()
+
+# Contoh penggunaan confirmation area
+def on_confirm():
+    log_accordion.append("Action confirmed!")
+
+def on_cancel():
+    log_accordion.append("Action cancelled!")
+
+confirmation_area.on_confirm = on_confirm
+confirmation_area.on_cancel = on_cancel
+
+# Menampilkan operation container
+display(operation_container.container)
+
+### 5. Operation Container
+
+Container untuk mengelola operasi yang membutuhkan pelacakan progress, logging, dan dialog konfirmasi. Sangat berguna untuk operasi yang berjalan lama seperti pelatihan model atau pemrosesan data.
+
+**Fitur Utama:**
+- Multiple progress levels (primary, secondary, tertiary)
+- Logging terintegrasi dengan berbagai level
+- Dialog konfirmasi dan informasi
+- Tampilan yang responsif dan terorganisir
+
+**Contoh Penggunaan Dasar:**
+```python
+from smartcash.ui.components.operation_container import create_operation_container
+from smartcash.ui.components.log_accordion import LogLevel
+from IPython.display import display
+
+# Membuat operation container
+operation = create_operation_container(
+    show_progress=True,
+    show_dialog=True,
+    show_logs=True,
+    log_module_name="Training"
+)
+
+# Menampilkan container
+display(operation['container'])
+
+# Contoh penggunaan progress tracking
+operation.update_progress(
+    progress=25,
+    message="Loading training data...",
+    level="primary"
+)
+
+# Contoh logging
+operation.log("Starting training process...", LogLevel.INFO)
+operation.warning("Low GPU memory detected!")
+
+# Contoh dialog konfirmasi
+def on_confirm():
+    operation.log("Operation confirmed!")
+    
+operation['show_dialog'](
+    title="Confirm Action",
+    message="Are you sure you want to continue?",
+    on_confirm=on_confirm,
+    confirm_text="Yes, Continue",
+    cancel_text="Cancel"
+)
 ```
 
-### 5. Footer Container
-
-Container ini berisi log accordion dan info box.
-
-**Komponen di dalamnya:**
-- **Log Accordion** - Menampilkan log operasi dalam format accordion yang dapat diperluas
-- **Info Box** - Menampilkan tips dan informasi penting
-
-**Contoh penggunaan:**
+**Contoh dengan Multiple Progress Levels:**
 ```python
-# Log Accordion
-log_accordion = create_log_accordion(
-    module_name='preprocessing',
-    height='200px'
+# Update progress level primer
+operation.update_progress(
+    progress=30,
+    message="Processing dataset...",
+    level="primary"
 )
 
-# Footer Container dengan Log Accordion dan Info Box
-footer_container = create_footer_container(
-    show_buttons=False,
-    log_accordion=log_accordion,
-    info_box=widgets.HTML(
-        value="""<div style="padding: 10px; background-color: #f8f9fa; border-left: 4px solid #17a2b8; margin: 10px 0;">
-            <h5>ℹ️ Tips</h5>
-            <ul>
-                <li>Gunakan resolusi yang sesuai dengan model target</li>
-                <li>Min-Max normalization (0-1) direkomendasikan untuk YOLO</li>
-                <li>Aktifkan validasi untuk memastikan dataset berkualitas</li>
-            </ul>
-        </div>"""
+# Update progress level sekunder
+operation.update_progress(
+    progress=75,
+    message="Augmenting images...",
+    level="secondary"
+)
+
+# Sembunyikan progress level tertentu
+operation.set_progress_visibility("secondary", False)
+
+# Tandai progress selesai
+operation.complete_progress(
+    message="Dataset processed successfully!",
+    level="primary"
+)
+```
+
+**Metode yang Tersedia:**
+- `update_progress(progress, message, level)` - Memperbarui progress
+- `complete_progress(message, level)` - Menandai progress selesai
+- `error_progress(message, level)` - Menandai error pada progress
+- `reset_progress(level)` - Mereset progress
+- `log(message, level)` - Mencatat pesan log
+- `show_dialog()` - Menampilkan dialog konfirmasi
+- `show_info()` - Menampilkan dialog informasi
+- `clear_dialog()` - Menutup dialog yang sedang aktif
+
+**Level Log yang Didukung:**
+- `LogLevel.DEBUG` - Pesan debugging
+- `LogLevel.INFO` - Informasi umum
+- `LogLevel.WARNING` - Peringatan
+- `LogLevel.ERROR` - Kesalahan
+- `LogLevel.CRITICAL` - Kesalahan kritis
+
+**Contoh Penanganan Error:**
+```python
+try:
+    # Kode yang mungkin menyebabkan error
+    operation.update_progress(50, "Processing...")
+    raise ValueError("Something went wrong!")
+except Exception as e:
+    operation.error_progress(f"Error: {str(e)}")
+    operation.log(f"Error details: {str(e)}", LogLevel.ERROR)
+```
+
+### 6. Footer Container
+
+Container fleksibel untuk menampilkan berbagai panel informasi di bagian bawah antarmuka. Mendukung berbagai tipe panel seperti InfoBox dan InfoAccordion dengan tata letak yang dapat disesuaikan.
+
+**Fitur Utama:**
+- Mendukung multiple panel dengan tipe berbeda
+- Tata letak fleksibel dengan flexbox
+- Responsif terhadap ukuran layar
+- Dukungan untuk accordion yang dapat diperluas
+- Gaya yang dapat disesuaikan
+
+**Contoh Penggunaan Dasar:**
+```python
+from smartcash.ui.components.footer_container import (
+    create_footer_container,
+    PanelConfig,
+    PanelType
+)
+
+# Membuat footer dengan dua panel
+footer = create_footer_container(
+    panels=[
+        PanelConfig(
+            panel_type=PanelType.INFO_BOX,
+            title="ℹ️ Informasi",
+            content="""
+            <div style="padding: 8px;">
+                <p>Versi Aplikasi: <strong>1.0.0</strong></p>
+                <p>Status: <span style="color: green;">✓ Berjalan dengan baik</span></p>
+            </div>
+            """,
+            style="info",
+            flex="1",
+            min_width="250px"
+        ),
+        PanelConfig(
+            panel_type=PanelType.INFO_ACCORDION,
+            title="📊 Statistik",
+            content="""
+            <div style="padding: 8px;">
+                <p>Total Data: <strong>1,245</strong> sampel</p>
+                <p>Training: <strong>1,000</strong> (80%)</p>
+                <p>Validation: <strong>200</strong> (16%)</p>
+                <p>Test: <strong>45</strong> (4%)</p>
+            </div>
+            """,
+            style="primary",
+            flex="1",
+            min_width="250px",
+            open_by_default=False
+        )
+    ],
+    # Gaya tambahan untuk container
+    style={
+        "border_top": "1px solid #dee2e6",
+        "padding": "12px",
+        "background": "#f8f9fa"
+    },
+    # Konfigurasi tata letak
+    flex_flow="row wrap",
+    justify_content="space-between",
+    align_items="flex-start"
+)
+
+# Menambahkan panel secara dinamis
+footer.add_panel(
+    PanelConfig(
+        panel_type=PanelType.INFO_ACCORDION,
+        title="🔧 Pengaturan Cepat",
+        content="""
+        <div style="padding: 8px;">
+            <button class="btn btn-sm btn-outline-secondary">Reset Pengaturan</button>
+            <button class="btn btn-sm btn-outline-primary">Simpan Konfigurasi</button>
+        </div>
+        """,
+        style="secondary",
+        flex="1",
+        min_width="300px"
     )
 )
+
+# Menampilkan footer
+display(footer.container)
+```
+
+**Metode yang Tersedia:**
+- `add_panel(panel_config)` - Menambahkan panel baru
+- `remove_panel(panel_id)` - Menghapus panel berdasarkan ID
+- `update_panel(panel_id, **updates)` - Memperbarui panel yang ada
+- `clear_panels()` - Menghapus semua panel
+- `toggle_panel(panel_id, is_open)` - Membuka/menutup panel accordion
+
+**Opsi Panel:**
+- `panel_type`: `PanelType.INFO_BOX` atau `PanelType.INFO_ACCORDION`
+- `title`: Judul panel
+- `content`: Konten HTML panel
+- `style`: Gaya tampilan ("info", "primary", "success", "warning", "danger")
+- `flex`: Nilai flex untuk tata letak
+- `min_width`: Lebar minimum panel
+- `open_by_default`: Buka accordion secara default (hanya untuk INFO_ACCORDION)
+
+**Contoh Lanjutan dengan Event Handling:**
+```python
+# Membuat panel dengan konten interaktif
+def on_reset_clicked(b):
+    print("Pengaturan direset!")
+
+def on_save_clicked(b):
+    print("Konfigurasi disimpan!")
+
+# Buat tombol dengan event handler
+reset_btn = widgets.Button(description="Reset Pengaturan", 
+                          layout={"width": "48%", "margin": "0 1% 0 0"})
+save_btn = widgets.Button(description="Simpan Konfigurasi",
+                         button_style="primary",
+                         layout={"width": "48%", "margin": "0 0 0 1%"})
+
+reset_btn.on_click(on_reset_clicked)
+save_btn.on_click(on_save_clicked)
+
+# Tambahkan ke dalam panel
+footer.add_panel(
+    PanelConfig(
+        panel_type=PanelType.INFO_BOX,
+        title="🎛️ Kontrol Cepat",
+        content=widgets.HBox([reset_btn, save_btn]),
+        style="light",
+        flex="1",
+        min_width="350px"
+    )
+)
+```
 ```
 
 ## Contoh Layout dari Preprocessing Components

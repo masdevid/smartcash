@@ -11,6 +11,7 @@ Initialization Flow:
 
 from typing import Dict, Any, List, Optional
 from smartcash.ui.core.initializers.module_initializer import ModuleInitializer
+from smartcash.ui.core.initializers.display_initializer import DisplayInitializer
 from smartcash.ui.dataset.downloader.components.downloader_ui import create_downloader_ui_components
 from smartcash.ui.dataset.downloader.configs.downloader_config_handler import DownloaderConfigHandler
 from smartcash.ui.dataset.downloader.operations.manager import DownloaderOperationManager
@@ -187,8 +188,36 @@ class DownloaderInitializer(ModuleInitializer):
 # Global instance dan public API
 _downloader_initializer = DownloaderInitializer()
 
-def initialize_downloader_ui(env=None, config=None, **kwargs) -> Dict[str, Any]:
-    """Factory function untuk downloader UI dengan parent module support
+class DownloaderDisplayInitializer(DisplayInitializer):
+    """DisplayInitializer wrapper for downloader module"""
+    
+    def __init__(self):
+        super().__init__(module_name="downloader", parent_module="dataset")
+        self._downloader_initializer = DownloaderInitializer()
+    
+    def _initialize_impl(self, **kwargs) -> Dict[str, Any]:
+        """Implementation using existing DownloaderInitializer"""
+        return self._downloader_initializer._initialize_impl(**kwargs)
+
+# Global display initializer instance
+_downloader_display_initializer = DownloaderDisplayInitializer()
+
+def initialize_downloader_ui(env=None, config=None, **kwargs) -> None:
+    """Initialize and display downloader UI using DisplayInitializer
+
+    Args:
+        env: Optional environment context
+        config: Optional configuration dictionary
+        **kwargs: Additional arguments
+    
+    Note:
+        This function displays the UI directly and returns None.
+        Use get_downloader_components() if you need access to the components dictionary.
+    """
+    _downloader_display_initializer.initialize_and_display(config=config, env=env, **kwargs)
+
+def get_downloader_components(env=None, config=None, **kwargs) -> Dict[str, Any]:
+    """Get downloader components dictionary without displaying UI
 
     Args:
         env: Optional environment context
@@ -196,6 +225,16 @@ def initialize_downloader_ui(env=None, config=None, **kwargs) -> Dict[str, Any]:
         **kwargs: Additional arguments
 
     Returns:
-        Dictionary of UI components with 'ui' as the main component
+        Dictionary of UI components
     """
     return _downloader_initializer.initialize(config=config, env=env, **kwargs)
+
+def display_downloader_ui(env=None, config=None, **kwargs) -> None:
+    """Display downloader UI (alias for initialize_downloader_ui)
+
+    Args:
+        env: Optional environment context
+        config: Optional configuration dictionary
+        **kwargs: Additional arguments
+    """
+    initialize_downloader_ui(env=env, config=config, **kwargs)

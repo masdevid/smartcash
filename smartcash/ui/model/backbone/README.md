@@ -7,7 +7,7 @@ Module untuk konfigurasi backbone model YOLOv5 dengan EfficientNet-B4.
 ```
 backbone/
 ├── __init__.py
-├── backbone_init.py         # Main initializer extending ConfigCellInitializer
+├── backbone_initializer.py  # Main initializer extending ConfigCellInitializer
 ├── components/              # UI components
 │   ├── __init__.py
 │   ├── ui_components.py    # Main UI assembly

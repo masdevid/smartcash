@@ -30,6 +30,62 @@ Components for displaying operation progress and status.
 Components for displaying and managing application logs.
 - Reference: [Logging Documentation](../components/LOGGING.md)
 
+## Initializer Patterns
+
+### Module Initializer Standards
+All UI modules follow standardized initializer patterns for consistency and maintainability:
+
+#### File Naming Convention
+- **Standard**: `[module]_initializer.py`
+- **Examples**: `downloader_initializer.py`, `augment_initializer.py`, `training_initializer.py`
+
+#### Function Naming Convention
+- **Standard**: `initialize_[module]_ui()`
+- **Examples**: `initialize_downloader_ui()`, `initialize_augment_ui()`, `initialize_training_ui()`
+
+#### Base Classes
+1. **ModuleInitializer** (from `core.initializers.module_initializer`)
+   - **Use for**: Complex modules with configuration, handlers, and lifecycle management
+   - **Features**: Complete module lifecycle, config management, handler setup
+   - **Examples**: `downloader`, `preprocess`, `augment`, `backbone`, `training`
+
+2. **DisplayInitializer** (from `core.initializers.display_initializer`)
+   - **Use for**: Simple display-only modules
+   - **Features**: Automatic UI display, logging suppression, error handling
+   - **Examples**: `visualization`, `evaluation`, `split`
+
+#### Implementation Standards
+```python
+# For complex modules (use ModuleInitializer)
+class DownloaderInitializer(ModuleInitializer):
+    def __init__(self):
+        super().__init__(
+            module_name='downloader',
+            config_handler_class=DownloaderConfigHandler
+        )
+    
+    def _initialize_impl(self, **kwargs) -> Dict[str, Any]:
+        # Implementation logic
+        pass
+
+# For display-only modules (use DisplayInitializer)
+class VisualizationInitializer(DisplayInitializer):
+    def __init__(self, config: Optional[Dict[str, Any]] = None):
+        super().__init__(module_name='visualization', parent_module='dataset')
+    
+    def create_ui_components(self, config: Optional[Dict[str, Any]] = None, **kwargs) -> Dict[str, Any]:
+        # Implementation logic
+        pass
+```
+
+### Cell Integration Pattern
+All cells follow the same minimal pattern:
+```python
+# smartcash/ui/cells/cell_[number]_[module].py
+from smartcash.ui.[category].[module] import initialize_[module]_ui
+initialize_[module]_ui()
+```
+
 ## Implementation Guidelines
 
 ### Component Naming

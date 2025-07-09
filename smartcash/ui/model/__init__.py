@@ -3,7 +3,7 @@ File: smartcash/ui/model/__init__.py
 Deskripsi: Model UI module exports
 """
 
-from .backbone.backbone_init import BackboneInitializer
+from .backbone.backbone_initializer import BackboneInitializer
 from .backbone.components import (
     create_backbone_child_components,
     create_model_form,

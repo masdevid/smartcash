@@ -1,5 +1,5 @@
 """
-File: smartcash/ui/model/backbone/backbone_init.py
+File: smartcash/ui/model/backbone/backbone_initializer.py
 Description: Backbone Model Configuration Initializer following core UI structure
 """
 

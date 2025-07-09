@@ -138,12 +138,12 @@ def test_direct_function_calls():
         ("Colab UI", "smartcash.ui.setup.colab.colab_initializer", "initialize_colab_ui"),
         ("Dependency UI", "smartcash.ui.setup.dependency.dependency_initializer", "initialize_dependency_ui"),
         ("Download UI", "smartcash.ui.dataset.downloader.downloader_initializer", "initialize_downloader_ui"),
-        ("Split UI", "smartcash.ui.dataset.split.split_initializer", "init_split_ui"),
-        ("Preprocess UI", "smartcash.ui.dataset.preprocess.preprocess_initializer", "initialize_preprocessing_ui"),
-        ("Augment UI", "smartcash.ui.dataset.augment.augment_initializer", "init_augment_ui"),
-        ("Visualize UI", "smartcash.ui.dataset.visualization.visualization_initializer", "init_visualization_ui"),
+        ("Split UI", "smartcash.ui.dataset.split.split_initializer", "initialize_split_ui"),
+        ("Preprocess UI", "smartcash.ui.dataset.preprocess.preprocess_initializer", "initialize_preprocess_ui"),
+        ("Augment UI", "smartcash.ui.dataset.augment.augment_initializer", "initialize_augment_ui"),
+        ("Visualize UI", "smartcash.ui.dataset.visualization.visualization_initializer", "initialize_visualization_ui"),
         ("Pretrained UI", "smartcash.ui.model.pretrained.pretrained_initializer", "initialize_pretrained_ui"),
-        ("Backbone UI", "smartcash.ui.model.backbone.backbone_init", "initialize_backbone_ui"),
+        ("Backbone UI", "smartcash.ui.model.backbone.backbone_initializer", "initialize_backbone_ui"),
         ("Train UI", "smartcash.ui.model.train.training_initializer", "initialize_training_ui"),
         ("Evaluate UI", "smartcash.ui.model.evaluate.evaluation_initializer", "initialize_evaluation_ui")
     ]

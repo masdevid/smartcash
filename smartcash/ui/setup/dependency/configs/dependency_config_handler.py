@@ -3,7 +3,7 @@ File: smartcash/ui/setup/dependency/configs/dependency_config_handler.py
 Deskripsi: Config handler untuk dependency menggunakan proper inheritance
 """
 
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 from pathlib import Path
 import copy
 

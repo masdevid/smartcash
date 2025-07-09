@@ -8,7 +8,7 @@ initialization while preserving all original business logic.
 
 from typing import Dict, Any, Optional
 import logging
-from smartcash.ui.core.initializers.base_initializer import BaseInitializer
+from smartcash.ui.core.initializers.module_initializer import ModuleInitializer
 from smartcash.ui.core.errors.handlers import handle_ui_errors
 from smartcash.ui.core.errors.decorators import handle_errors
 
@@ -18,12 +18,12 @@ from .configs.augment_config_handler import AugmentConfigHandler
 from .constants import UI_CONFIG
 
 
-class AugmentInitializer(BaseInitializer):
+class AugmentInitializer(ModuleInitializer):
     """
     Main initializer for augment module with core inheritance patterns.
     
     Features:
-    - 🏗️ Inherits from core BaseInitializer
+    - 🏗️ Inherits from core ModuleInitializer
     - 🎨 Preserved original business logic
     - 🔄 Container-based UI architecture
     - ✅ Comprehensive error handling
@@ -158,7 +158,7 @@ class AugmentInitializer(BaseInitializer):
 
 # Factory function for creating augment UI (backward compatibility)
 @handle_ui_errors(error_component_title="Augment UI Creation Error")
-def init_augment_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> Dict[str, Any]:
+def initialize_augment_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> Dict[str, Any]:
     """
     Factory function to initialize augment UI.
     

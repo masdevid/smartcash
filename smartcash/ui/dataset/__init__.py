@@ -49,7 +49,7 @@ preprocessing = safe_import('preprocessing', '.preprocess')
 initialize_preprocessing_ui = safe_import('preprocessing_ui', '.preprocess', 'initialize_preprocess_ui')
 
 augmentation = safe_import('augmentation', '.augment')
-initialize_augmentation_ui = safe_import('augmentation_ui', '.augment', 'init_augment_ui')
+initialize_augmentation_ui = safe_import('augmentation_ui', '.augment', 'initialize_augment_ui')
 
 # Define public API
 __all__ = [

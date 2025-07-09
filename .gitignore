@@ -41,7 +41,7 @@ scripts/
 # Project root markdown files
 /*.md
 !README.md
-
+!PLANNING.md
 # IDE specific files
 .idea/
 .vscode/

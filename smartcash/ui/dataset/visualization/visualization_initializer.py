@@ -78,9 +78,21 @@ class VisualizationInitializer(DisplayInitializer):
         # Register refresh button handler if it exists
         if 'refresh_button' in self.ui_components and hasattr(self.handler, 'refresh_data'):
             self.ui_components['refresh_button'].on_click(self.handler.refresh_data)
+    
+    def _initialize_impl(self, **kwargs) -> Dict[str, Any]:
+        """
+        Implementation of the abstract _initialize_impl method.
+        
+        Args:
+            **kwargs: Additional arguments
+            
+        Returns:
+            Dictionary of UI components
+        """
+        return self.create_ui_components(**kwargs)
 
 
-def init_visualization_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> None:
+def initialize_visualization_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> None:
     """
     Initialize and display the visualization UI.
     
@@ -92,4 +104,4 @@ def init_visualization_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> 
         **kwargs: Additional arguments passed to the initializer
     """
     initializer = VisualizationInitializer(config=config)
-    initializer.initialize_ui(**kwargs)
+    initializer.initialize(**kwargs)

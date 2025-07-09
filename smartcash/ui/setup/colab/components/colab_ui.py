@@ -17,7 +17,7 @@ from smartcash.ui.components.main_container import (
 from smartcash.ui.components.header_container import create_header_container
 from smartcash.ui.components.action_container import create_action_container
 from smartcash.ui.components.operation_container import create_operation_container
-from smartcash.ui.components.footer_container import create_footer_container, PanelConfig, PanelType
+from smartcash.ui.components.footer_container import create_footer_container
 from smartcash.ui.components.form_container import create_form_container, LayoutType
 from smartcash.ui.components.save_reset_buttons import create_save_reset_buttons
 
@@ -85,20 +85,26 @@ def create_colab_ui_components(config: Optional[Dict[str, Any]] = None, **kwargs
     )
     
     # 5. Create Footer Container
-    footer_container = create_footer_container(
-        left_text="SmartCash Environment Setup v1.0",
-        right_text=f" 2023-{datetime.now().year} SmartCash Team"
+    footer_container = widgets.HTML(
+        value=f"""
+        <div style="display: flex; justify-content: space-between; align-items: center; 
+                    padding: 10px; border-top: 1px solid #e0e0e0; margin-top: 20px; 
+                    background-color: #f9f9f9; font-size: 0.9em; color: #666;">
+            <span>SmartCash Environment Setup v1.0</span>
+            <span>2023-{datetime.now().year} SmartCash Team</span>
+        </div>
+        """
     )
     
     # 6. Create Main Container and assemble all components
     main_container = create_main_container(
-        header=header_container['container'],
+        header=header_container.container,
         content=widgets.VBox([
             form_container['container'],
             action_container['container'],
             operation_container['container']
         ]),
-        footer=footer_container['container'],
+        footer=footer_container,
         container_config={
             'margin': '0 auto',
             'max_width': '1200px',
@@ -112,13 +118,13 @@ def create_colab_ui_components(config: Optional[Dict[str, Any]] = None, **kwargs
     # Prepare the components dictionary
     ui_components = {
         'main_container': main_container,
-        'header_container': header_container['container'],
+        'header_container': header_container.container,
         'form_container': form_container['container'],
         'action_container': action_container['container'],
         'setup_button': action_container.get('primary_button'),
         'action_container_manager': action_container,
         'operation_container': operation_container['container'],
-        'footer_container': footer_container['container'],
+        'footer_container': footer_container,
         'env_info_panel': env_info_panel,
         'tips_panel': tips_panel,
         'setup_summary': setup_summary,
@@ -274,176 +280,3 @@ def create_setup_form(config: Dict[str, Any]) -> Dict[str, Any]:
     
     return components
 
-def create_colab_ui_components(config: Optional[Dict[str, Any]] = None, **kwargs) -> Dict[str, Any]:
-    """
-    Create colab UI components following dependency pattern with operation_container integration.
-    
-    Args:
-        config: Configuration for UI components
-        **kwargs: Additional arguments
-        
-    Returns:
-        Dictionary containing all created UI components
-    """
-    current_config = config or {}
-    child_components = {}
-    
-    # 1. Create Header Container
-    header_container = create_header_container(
-        title="🚀 Environment Setup",
-        subtitle="Configure environment for SmartCash YOLOv5-EfficientNet",
-        status_message="Ready to setup environment",
-        status_type="info"
-    )
-    child_components['header_container'] = header_container.container
-    
-    # 2. Create Operation Container (centralized progress and logging)
-    operation_container = create_operation_container(
-        component_name="colab_operation_container",
-        show_progress=True,
-        show_logs=True,
-        initial_message="Environment setup ready to begin...",
-        log_height="200px"
-    )
-    child_components['operation_container'] = operation_container['container']
-    child_components['operation_manager'] = operation_container
-    
-    # 3. Create Environment Form Components
-    environment_form = create_environment_form(current_config)
-    child_components.update(environment_form)
-    
-    # 4. Create Setup Form Components  
-    setup_form = create_setup_form(current_config)
-    child_components.update(setup_form)
-    
-    # 5. Create two-column layout for forms with save/reset buttons
-    form_column = widgets.VBox([
-        widgets.HTML("<h4>⚙️ Configuration</h4>"),
-        widgets.HBox([
-            widgets.Box(
-                [environment_form['environment_form']],
-                layout=widgets.Layout(width='50%', padding='0 5px 0 0')
-            ),
-            widgets.Box(
-                [setup_form['setup_form']],
-                layout=widgets.Layout(width='50%', padding='0 0 0 5px')
-            )
-        ], layout=widgets.Layout(
-            display='flex',
-            gap='10px',
-            width='100%',
-            align_items='flex-start'
-        )),
-        widgets.HTML("<hr style='margin: 15px 0; border: 0; border-top: 1px solid #eee;'>"),
-        widgets.HBox([
-            widgets.HTML("<div style='flex-grow:1;'></div>"),
-            widgets.Button(
-                description='🔄 Reset',
-                button_style='',
-                layout=widgets.Layout(width='100px', margin='0 5px')
-            ),
-            widgets.Button(
-                description='💾 Save Config',
-                button_style='primary',
-                layout=widgets.Layout(width='120px', margin='0 5px')
-            )
-        ], layout=widgets.Layout(width='100%'))
-    ], layout=widgets.Layout(
-        padding='15px',
-        border='1px solid #e0e0e0',
-        border_radius='5px',
-        margin='0 0 15px 0'
-    ))
-    
-    # 6. Create status summary
-    status_summary = create_setup_summary()
-    child_components['status_summary'] = status_summary
-    
-    # 7. Create Action Container with single main action button using phases
-    action_container = create_action_container(
-        buttons=[],
-        title="🚀 Setup Actions",
-        alignment="center",
-        phases=[
-            'init', 'drive', 'symlink', 'folders', 
-            'config', 'env', 'verify', 'complete', 'error'
-        ]
-    )
-    
-    # 8. Create Environment Info Panel
-    env_info_panel = create_env_info_panel()
-    
-    # 9. Create main layout
-    main_content = widgets.VBox([
-        form_column,
-        action_container['container'],
-        operation_container['container'],
-        env_info_panel,
-        status_summary
-    ], layout=widgets.Layout(
-        width='100%',
-        gap='15px'
-    ))
-    
-    # 10. Create Footer Container
-    footer_container = create_footer_container(
-        left_text=f"SmartCash Environment Setup v1.0 • {datetime.now().year}",
-        right_text="""
-        <div style="font-size: 0.9em; color: #666;">
-            <strong>💡 Tips:</strong> 
-            Single click runs: INIT → DRIVE → SYMLINK → FOLDERS → CONFIG → ENV → VERIFY → COMPLETE
-        </div>
-        """
-    )
-    
-    # 11. Assemble all components
-    main_container = widgets.VBox([
-        header_container['container'],
-        widgets.VBox([
-            main_content
-        ], layout=widgets.Layout(
-            padding='15px',
-            margin='0 auto',
-            max_width='1200px',
-            width='100%'
-        )),
-        footer_container['container']
-    ], layout=widgets.Layout(
-        width='100%',
-        height='100%',
-        overflow='auto'
-    ))
-    
-    # Store references to all components
-    child_components.update({
-        'main_container': main_container,
-        'form_container': form_column,
-        'action_container': action_container['container'],
-        'setup_button': action_container.get('primary_button'),
-        'action_container_manager': action_container,
-        'footer_container': footer_container['container'],
-        'env_info_panel': env_info_panel,
-        'ui': main_container
-    })
-    
-    # Store button references
-    save_button = form_column.children[3].children[2]
-    reset_button = form_column.children[3].children[1]
-    child_components.update({
-        'save_button': save_button,
-        'reset_button': reset_button
-    })
-    
-    # Add click handlers
-    def on_save_clicked(b):
-        # Save configuration logic here
-        operation_container['log']("Configuration saved successfully", "success")
-    
-    def on_reset_clicked(b):
-        # Reset form logic here
-        operation_container['log']("Form reset to default values", "info")
-    
-    save_button.on_click(on_save_clicked)
-    reset_button.on_click(on_reset_clicked)
-    
-    return child_components

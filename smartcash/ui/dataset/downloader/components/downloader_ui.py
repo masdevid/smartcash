@@ -106,56 +106,22 @@ def create_downloader_ui_components(config: Optional[Dict[str, Any]] = None, **k
     )
     components['operation'] = operation
     
-    # 5. Create Footer Container
-    footer = create_footer_container(
-        panels=[
-            {
-                'panel_type': 'info_box',
-                'title': '💡 Tips',
-                'content': """
-                <div style="padding: 8px; font-size: 0.9em;">
-                    <p><strong>Dataset Download Tips:</strong></p>
-                    <ul style="margin: 5px 0 0 15px; padding: 0;">
-                        <li>API Key otomatis terdeteksi dari Colab Secrets</li>
-                        <li>UUID renaming untuk konsistensi nama file</li>
-                        <li>Validasi otomatis setelah download</li>
-                        <li>Backup data existing sebelum replace</li>
-                    </ul>
-                </div>
-                """,
-                'style': 'info',
-                'flex': '1',
-                'min_width': '300px'
-            },
-            {
-                'panel_type': 'info_accordion',
-                'title': 'ℹ️ Format Output',
-                'content': """
-                <div style="padding: 8px;">
-                    <p>Struktur folder yang dihasilkan:</p>
-                    <pre>
-dataset/
-├── train/
-│   ├── images/
-│   └── labels/
-├── valid/
-│   ├── images/
-│   └── labels/
-└── data.yaml
-                    </pre>
-                </div>
-                """,
-                'style': 'light',
-                'flex': '1',
-                'min_width': '300px',
-                'open_by_default': False
-            }
-        ],
-        style={
-            'border_top': '1px solid #dee2e6',
-            'padding': '12px',
-            'background': '#f8f9fa'
-        }
+    # 5. Create Footer Container with Download Info
+    from smartcash.ui.info_boxes.download_info import get_download_info
+    
+    # Get the download info accordion
+    download_info = get_download_info(open_by_default=False)
+    
+    # Create a container for the footer
+    footer = widgets.VBox(
+        [download_info],
+        layout=widgets.Layout(
+            border_top='1px solid #dee2e6',
+            padding='12px',
+            background='#f8f9fa',
+            width='100%',
+            margin='20px 0 0 0'
+        )
     )
     components['footer'] = footer
     

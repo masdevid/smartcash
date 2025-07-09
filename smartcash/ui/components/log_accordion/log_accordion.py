@@ -120,10 +120,10 @@ class LogAccordion(BaseUIComponent):
         
         # Create the accordion
         self._ui_components['accordion'] = widgets.Accordion(
-            children=[self._ui_components['log_container']]
+            children=[self._ui_components['log_container']],
+            selected_index=0  # Start expanded
         )
         self._ui_components['accordion'].set_title(0, f"{self.module_name.upper()} LOGS")
-        self._ui_components['accordion'].selected_index = None  # Start collapsed
         
         # Add CSS for the log container
         self._add_css_styles()

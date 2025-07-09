@@ -163,7 +163,7 @@ def create_backbone_child_components(config: Optional[Dict[str, Any]] = None) ->
         alignment="left",
         with_confirmation=True
     )
-    child_components['action_container'] = action_container.container
+    child_components['action_container'] = action_container['container']
     
     # === 4. FOOTER CONTAINER ===
     

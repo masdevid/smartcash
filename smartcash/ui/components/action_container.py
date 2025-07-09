@@ -179,13 +179,15 @@ class ActionContainer:
         self.set_phases(COLAB_PHASES)
         
         # Create the container
-        self.container = widgets.VBox(
+        self.container = widgets.HBox(
             layout=widgets.Layout(
                 width='100%',
                 margin=container_margin,
                 display='flex',
-                flex_direction='column',
-                align_items='stretch'
+                flex_flow='row wrap',
+                align_items='center',
+                justify_content='flex-start',
+                gap='8px'
             )
         )
         
@@ -397,13 +399,34 @@ class ActionContainer:
         
     def _update_container(self):
         """Update the container's children based on current buttons."""
-        # Filter out None buttons and sort by order
         children = []
-        for btn_id, btn in sorted(self.buttons.items(), key=lambda x: getattr(x[1], '_order', 0)):
+        
+        # Add primary button if exists
+        if self.buttons['primary']:
+            children.append(widgets.Box(
+                [self.buttons['primary']],
+                layout=widgets.Layout(margin='0 8px 0 0')
+            ))
+            
+        # Add save/reset buttons if they exist
+        if self.buttons['save_reset']:
+            children.append(widgets.Box(
+                [self.buttons['save_reset']],
+                layout=widgets.Layout(margin='0 8px 0 0')
+            ))
+            
+        # Add action buttons in order
+        action_buttons = [btn for btn in self.buttons['action'].values() if btn is not None]
+        action_buttons.sort(key=lambda x: x.order if hasattr(x, 'order') else 0)
+        
+        # Add each action button with spacing
+        for btn in action_buttons:
             if btn is not None:
-                children.append(btn)
-                
-        # Update container children
-        self.container.children = children
+                children.append(widgets.Box(
+                    [btn],
+                    layout=widgets.Layout(margin='0 8px 0 0')
+                ))
+        
+        self.container.children = [widgets.HBox(children=children)]
     
     # Note: Dialog methods have been removed. Use OperationContainer for dialog functionality.

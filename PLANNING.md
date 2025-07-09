@@ -143,13 +143,51 @@ smartcash/ui/core/
    - Initialize logging and error handling
    - Load shared configurations
 
-2. **Module Initialization**
+## Testing Strategy
+
+### Test Organization
+
+1. **Test Directory Structure**
+   - Semua test harus diorganisir dalam folder `tests/` dengan struktur yang mencerminkan struktur kode utama
+   - Gunakan pola mirror untuk test files (contoh: `smartcash/ui/model/backbone.py` -> `tests/ui/model/test_backbone.py`)
+   - Kelompokkan test terkait dalam folder yang sesuai (unit, integration, e2e)
+
+2. **Test Naming Convention**
+   - Nama file test harus diawali dengan `test_`
+   - Nama fungsi test harus deskriptif dan menjelaskan behavior yang di-test
+   - Gunakan format: `test_<method>_<scenario>_<expected_behavior>`
+
+3. **Comprehensive Test Suite**
+   - Gunakan `tests/test_all_module_comprehensive.py` untuk menjalankan seluruh test suite
+   - Pastikan test suite dapat dijalankan secara terpisah untuk setiap modul
+   - Gunakan marker atau kategori untuk mengelompokkan test yang terkait
+
+4. **Test Dependencies**
+   - Gunakan `conftest.py` untuk shared test fixtures
+   - Pisahkan test data dari kode test
+   - Gunakan factory pattern untuk membuat test data yang kompleks
+
+5. **Test Coverage**
+   - Targetkan minimal 80% code coverage untuk kode inti
+   - Prioritaskan test untuk UI, critical paths dan business logic
+
+6. **Test Documentation**
+   - Dokumentasikan asumsi dan skenario test yang kompleks
+   - Gunakan docstring untuk menjelaskan tujuan test
+   - Sertakan contoh input/output yang diharapkan untuk test yang kompleks
+
+7. **Test Maintenance**
+   - Update test ketika ada perubahan requirements
+   - Refactor test yang redundan
+   - Review test secara berkala untuk memastikan relevansi
+
+8. **Module Initialization**
    - Load module-specific configurations
    - Initialize UI components
    - Set up event handlers
    - Register with core services
 
-3. **Runtime**
+9. **Runtime**
    - Handle user interactions
    - Process operations
    - Update UI state

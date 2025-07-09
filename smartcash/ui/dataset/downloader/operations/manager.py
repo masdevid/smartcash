@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/downloader/operations/manager.py
-Operation manager for dataset downloader that extends OperationHandler following colab/dependency pattern
+Unified operation manager for dataset downloader with UI integration
 """
 
 from typing import Dict, Any, Optional, Callable, List
@@ -11,7 +11,7 @@ from .check_operation import CheckOperationHandler
 from .cleanup_operation import CleanupOperationHandler
 
 class DownloaderOperationManager(OperationHandler):
-    """Operation manager for dataset downloader that extends OperationHandler."""
+    """Base operation manager for dataset downloader that extends OperationHandler."""
     
     def __init__(self, config: Dict[str, Any], operation_container=None, **kwargs):
         """Initialize the downloader operation manager."""
@@ -34,17 +34,32 @@ class DownloaderOperationManager(OperationHandler):
         
         # Initialize operation handlers with UI components
         ui_components = getattr(self, '_ui_components', {})
-        if hasattr(self.operation_container, 'get_ui_components'):
-            ui_components.update(self.operation_container.get_ui_components())
+        # Access operation container (may be stored as _operation_container in parent class)
+        operation_container = getattr(self, 'operation_container', None) or getattr(self, '_operation_container', None)
+        if operation_container and hasattr(operation_container, 'get_ui_components'):
+            ui_components.update(operation_container.get_ui_components())
         
         # Ensure operation container is available
-        ui_components['operation_container'] = self.operation_container
+        ui_components['operation_container'] = operation_container
         
         self.download_handler = DownloadOperationHandler(ui_components=ui_components)
         self.check_handler = CheckOperationHandler(ui_components=ui_components)
         self.cleanup_handler = CleanupOperationHandler(ui_components=ui_components)
         
         self.logger.info("✅ Downloader operation manager initialization complete")
+    
+    def handle_error(self, error_msg: str, **kwargs):
+        """Handle errors with proper logging and UI feedback."""
+        self.logger.error(f"❌ {error_msg}")
+        if hasattr(self, 'operation_container') or hasattr(self, '_operation_container'):
+            # Log error to operation container if available
+            operation_container = getattr(self, 'operation_container', None) or getattr(self, '_operation_container', None)
+            if operation_container and hasattr(operation_container, 'log_error'):
+                operation_container.log_error(error_msg)
+    
+    def log_error(self, error_msg: str):
+        """Log error to operation container."""
+        self.handle_error(error_msg)
     
     def get_operations(self) -> Dict[str, Callable]:
         """Get available operations."""
@@ -144,11 +159,146 @@ class DownloaderOperationManager(OperationHandler):
         except Exception as e:
             self.logger.error(f"❌ Failed to update operation summary: {e}")
 
-# DownloadHandlerManager class has been moved to download_manager.py to avoid circular imports
+
+class DownloadHandlerManager(DownloaderOperationManager):
+    """Enhanced operation manager with UI integration and button management."""
+    
+    @handle_ui_errors(error_component_title="Download Handler Manager Error", log_error=True)
+    def __init__(self, ui_components: Optional[Dict[str, Any]] = None, config: Optional[Dict[str, Any]] = None, **kwargs):
+        """Initialize download handler manager with UI components.
         
-        # Ensure summary container exists
-        if 'summary_container' not in self.ui_components:
-            from ipywidgets import HTML
-            self.ui_components['summary_container'] = HTML(value="")
+        Args:
+            ui_components: Dictionary UI components
+            config: Configuration dictionary
+            **kwargs: Additional arguments passed to parent class
+        """
+        # Initialize parent with proper parameters
+        config = config or {}
+        operation_container = ui_components.get('operation_container') if ui_components else None
+        super().__init__(config=config, operation_container=operation_container, **kwargs)
         
-        return self.ui_components
+        # Store UI components
+        self._ui_components = ui_components or {}
+        
+        # Initialize operation handlers
+        self.initialize()
+        
+        # Button references for enabling/disabling during operations
+        self._buttons = {}
+        self._get_button_references()
+    
+    def _get_button_references(self) -> None:
+        """Get references to buttons for enabling/disabling during operations."""
+        if not self._ui_components:
+            self.logger.warning("⚠️ No UI components available for button references")
+            return
+            
+        # Get button references from UI components
+        button_keys = ['download_button', 'check_button', 'cleanup_button']
+        for key in button_keys:
+            if key in self._ui_components:
+                self._buttons[key] = self._ui_components[key]
+                
+        self.logger.debug(f"📋 Found {len(self._buttons)} button references")
+    
+    def disable_buttons(self) -> None:
+        """Disable buttons during operation execution."""
+        for button in self._buttons.values():
+            if hasattr(button, 'disabled'):
+                button.disabled = True
+    
+    def enable_buttons(self) -> None:
+        """Enable buttons after operation execution."""
+        for button in self._buttons.values():
+            if hasattr(button, 'disabled'):
+                button.disabled = False
+    
+    def _reset_progress_tracker(self) -> None:
+        """Reset progress tracker after operation."""
+        operation_container = getattr(self, 'operation_container', None) or getattr(self, '_operation_container', None)
+        if operation_container and hasattr(operation_container, 'reset_progress'):
+            operation_container.reset_progress()
+    
+    @handle_ui_errors(error_component_title="Download Operation Error", log_error=True)
+    def _execute_download_operation(self) -> None:
+        """Execute download operation with UI feedback."""
+        # Disable buttons during operation
+        self.disable_buttons()
+        
+        try:
+            # Execute download
+            self.download_handler.execute_download()
+            
+            # Reset progress tracker
+            self._reset_progress_tracker()
+            
+        finally:
+            # Always enable buttons after operation
+            self.enable_buttons()
+    
+    @handle_ui_errors(error_component_title="Check Operation Error", log_error=True)
+    def _execute_check_operation(self) -> None:
+        """Execute check operation with UI feedback."""
+        # Disable buttons during operation
+        self.disable_buttons()
+        
+        try:
+            # Execute check
+            self.check_handler.execute_check()
+            
+            # Reset progress tracker
+            self._reset_progress_tracker()
+            
+        finally:
+            # Always enable buttons after operation
+            self.enable_buttons()
+    
+    @handle_ui_errors(error_component_title="Cleanup Operation Error", log_error=True)
+    def _execute_cleanup_operation(self, targets: List[str]) -> None:
+        """Execute cleanup operation with UI feedback.
+        
+        Args:
+            targets: List of targets to clean up
+        """
+        # Disable buttons during operation
+        self.disable_buttons()
+        
+        try:
+            # Execute cleanup
+            self.cleanup_handler.execute_cleanup(targets)
+            
+            # Reset progress tracker
+            self._reset_progress_tracker()
+            
+        finally:
+            # Always enable buttons after operation
+            self.enable_buttons()
+    
+    def register_button_callbacks(self) -> None:
+        """Register button callbacks for download, check, and cleanup operations."""
+        try:
+            # Register download button callback
+            if 'download_button' in self._ui_components:
+                self._ui_components['download_button'].on_click(
+                    lambda _: self._execute_download_operation()
+                )
+                self.logger.info("✅ Registered download button callback")
+            
+            # Register check button callback
+            if 'check_button' in self._ui_components:
+                self._ui_components['check_button'].on_click(
+                    lambda _: self._execute_check_operation()
+                )
+                self.logger.info("✅ Registered check button callback")
+            
+            # Register cleanup button callback with targets
+            if 'cleanup_button' in self._ui_components and 'cleanup_targets' in self._ui_components:
+                self._ui_components['cleanup_button'].on_click(
+                    lambda _: self._execute_cleanup_operation(
+                        self._ui_components['cleanup_targets'].value
+                    )
+                )
+                self.logger.info("✅ Registered cleanup button callback")
+                
+        except Exception as e:
+            self.logger.error(f"❌ Failed to register button callbacks: {e}")

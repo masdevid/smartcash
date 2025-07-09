@@ -14,7 +14,7 @@ from smartcash.ui.core.initializers.module_initializer import ModuleInitializer
 from smartcash.ui.dataset.downloader.components.downloader_ui import create_downloader_ui_components
 from smartcash.ui.dataset.downloader.configs.downloader_config_handler import DownloaderConfigHandler
 from smartcash.ui.dataset.downloader.operations.manager import DownloaderOperationManager
-from smartcash.ui.dataset.downloader.operations.download_manager import DownloadHandlerManager
+from smartcash.ui.dataset.downloader.operations.manager import DownloadHandlerManager
 from smartcash.ui.core.errors.handlers import create_error_response
 
 class DownloaderInitializer(ModuleInitializer):
@@ -102,9 +102,7 @@ class DownloaderInitializer(ModuleInitializer):
                 self.logger.warning("⚠️ Operation container not found, using legacy handler")
                 
                 # Fallback to legacy handler
-                handler_manager = DownloadHandlerManager(ui_components, config, env)
-                # Initialize the handler manager
-                handler_manager.initialize()
+                handler_manager = DownloadHandlerManager(ui_components=ui_components)
                 # Store the handler manager in UI components
                 ui_components['download_handler_manager'] = handler_manager
 

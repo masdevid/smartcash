@@ -77,7 +77,7 @@ def create_downloader_ui_components(config: Optional[Dict[str, Any]] = None, **k
         container_padding="16px",
         gap="12px"
     )
-    form_container['form_container'].children = (input_options,)
+    form_container['container'].children = (input_options,)
     child_components['form_container'] = form_container['container']
     
     # 5. Create Save/Reset buttons for configurations

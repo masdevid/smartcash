@@ -63,7 +63,7 @@ class DownloaderService:
             Progress callback function
         """
         try:
-            from smartcash.ui.dataset.downloader.services.progress_utils import create_progress_callback
+            from smartcash.ui.dataset.downloader.handlers.utils import create_progress_callback
             return create_progress_callback(progress_tracker)
         except Exception as e:
             self.logger.error(f"Error creating progress callback: {e}")

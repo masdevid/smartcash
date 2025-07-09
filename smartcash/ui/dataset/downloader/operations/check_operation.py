@@ -72,7 +72,7 @@ class CheckOperationHandler(BaseDownloaderHandler):
     @handle_ui_errors(error_component_title="UI Operation Error", log_error=True)
     def _display_check_results(self, result: Dict[str, Any]):
         """Display check results di UI."""
-        from smartcash.ui.dataset.downloader.services.ui_utils import display_check_results
+        from smartcash.ui.dataset.downloader.handlers.utils import display_check_results
         display_check_results(self.ui_components, result)
         
     @handle_ui_errors(error_component_title="Summary Update Error", log_error=True)

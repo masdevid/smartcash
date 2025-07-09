@@ -25,8 +25,6 @@ from smartcash.ui.components.header_container import create_header_container
 from smartcash.ui.components.form_container import create_form_container, LayoutType
 from smartcash.ui.components.operation_container import create_operation_container
 from smartcash.ui.components.action_container import create_action_container
-from smartcash.ui.components.footer_container import create_footer_container
-from smartcash.ui.components.save_reset_buttons import create_save_reset_buttons
 
 # Import downloader specific components
 from .input_options import create_downloader_input_options
@@ -59,7 +57,7 @@ def create_downloader_ui_components(config: Optional[Dict[str, Any]] = None, **k
     # 2. Create Form Container
     form = create_form_container(
         layout_type=LayoutType.COLUMN,
-        container_padding="16px",
+        container_padding="0", # no need padding to span the same width
         gap="12px"
     )
     
@@ -70,6 +68,7 @@ def create_downloader_ui_components(config: Optional[Dict[str, Any]] = None, **k
     
     # 3. Create Action Buttons
     action_buttons = create_action_container(
+        title="Download Actions",
         buttons=[
             {
                 'button_id': 'download',
@@ -95,8 +94,8 @@ def create_downloader_ui_components(config: Optional[Dict[str, Any]] = None, **k
         ],
         alignment="left"
     )
-    components['actions'] = action_buttons
-    
+    components['actions'] = action_buttons.get('action')
+    components['save_reset'] = action_buttons.get('save_reset')
     # 4. Create Operation Container
     operation = create_operation_container(
         show_progress=True,
@@ -117,10 +116,9 @@ def create_downloader_ui_components(config: Optional[Dict[str, Any]] = None, **k
         [download_info],
         layout=widgets.Layout(
             border_top='1px solid #dee2e6',
-            padding='12px',
             background='#f8f9fa',
             width='100%',
-            margin='20px 0 0 0'
+            margin='20px 0'
         )
     )
     components['footer'] = footer

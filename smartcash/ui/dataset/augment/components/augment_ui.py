@@ -14,7 +14,6 @@ from smartcash.ui.components.form_container import create_form_container
 from smartcash.ui.components.action_container import create_action_container
 from smartcash.ui.components.operation_container import create_operation_container
 from smartcash.ui.components.footer_container import create_footer_container
-from smartcash.ui.components.log_accordion import create_log_accordion
 
 from .basic_options import create_basic_options_widget
 from .advanced_options import create_advanced_options_widget
@@ -106,28 +105,28 @@ def create_augment_ui(config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]
     # 3. Action Container with augment-specific buttons
     action_buttons = [
         {
-            "button_id": "augment",
+            "id": "augment",
             "text": BUTTON_CONFIG['augment']['text'],
             "style": BUTTON_CONFIG['augment']['style'],
             "tooltip": BUTTON_CONFIG['augment']['tooltip'],
             "order": BUTTON_CONFIG['augment']['order']
         },
         {
-            "button_id": "check", 
+            "id": "check", 
             "text": BUTTON_CONFIG['check']['text'],
             "style": BUTTON_CONFIG['check']['style'],
             "tooltip": BUTTON_CONFIG['check']['tooltip'],
             "order": BUTTON_CONFIG['check']['order']
         },
         {
-            "button_id": "cleanup",
+            "id": "cleanup",
             "text": BUTTON_CONFIG['cleanup']['text'],
             "style": BUTTON_CONFIG['cleanup']['style'],
             "tooltip": BUTTON_CONFIG['cleanup']['tooltip'],
             "order": BUTTON_CONFIG['cleanup']['order']
         },
         {
-            "button_id": "preview",
+            "id": "preview",
             "text": BUTTON_CONFIG['preview']['text'],
             "style": BUTTON_CONFIG['preview']['style'],
             "tooltip": BUTTON_CONFIG['preview']['tooltip'],
@@ -142,17 +141,23 @@ def create_augment_ui(config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]
     )
     ui_components['action_container'] = action_container['container']
     
-    # 4. Operation Container for status and progress
+    # 4. Operation Container for status, progress, and logging
     operation_container = create_operation_container(
         title="📊 Augmentation Status",
         show_progress=True,
-        show_status=True
+        show_logs=True,
+        log_module_name="Augment"
     )
-    ui_components['operation_container'] = operation_container.container
+    ui_components['operation_container'] = operation_container['container']
     
-    # 5. Footer Container with logging
-    log_components = create_log_accordion('augment', '250px')
+    # Store operation container functions for use by handlers
+    ui_components['log_message'] = operation_container['log_message']
+    ui_components['update_progress'] = operation_container['update_progress']
+    ui_components['show_dialog'] = operation_container['show_dialog']
+    ui_components['show_info_dialog'] = operation_container['show_info_dialog']
+    ui_components['clear_dialog'] = operation_container['clear_dialog']
     
+    # 5. Footer Container with info only
     info_html = f"""
     <div class="alert alert-info" style="font-size: 0.9em; padding: 8px 12px; 
          background: {SECTION_STYLES['basic_options']['background']}; 
@@ -168,7 +173,6 @@ def create_augment_ui(config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]
     """
     
     footer_container = create_footer_container(
-        log_output=log_components['log_output'],
         info_box=widgets.HTML(info_html)
     )
     ui_components['footer_container'] = footer_container.container
@@ -229,7 +233,7 @@ def create_augment_ui(config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]
     ))
     
     # Place custom form layout in form container
-    form_container['form_container'].children = (widgets.VBox([row1, row2]),)
+    form_container['container'].children = (widgets.VBox([row1, row2]),)
     ui_components['form_container'] = form_container['container']
     
     # === MAIN UI ASSEMBLY ===
@@ -238,8 +242,8 @@ def create_augment_ui(config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]
     main_ui = widgets.VBox([
         header_container.container,
         form_container['container'],
-        action_container.container,
-        operation_container.container,
+        action_container['container'],
+        operation_container['container'],
         footer_container.container
     ], layout=widgets.Layout(
         width='100%',

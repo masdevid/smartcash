@@ -59,6 +59,10 @@ class AugmentConfigHandler(ConfigHandler):
         
         self.logger.info(f"🎨 AugmentConfigHandler initialized with {len(self._config)} config sections")
     
+    def get_config(self) -> Dict[str, Any]:
+        """Get current configuration."""
+        return self._config.copy()
+    
     def validate_config(self, config: Dict[str, Any]) -> Tuple[bool, List[str]]:
         """
         Validate augment configuration with business logic.

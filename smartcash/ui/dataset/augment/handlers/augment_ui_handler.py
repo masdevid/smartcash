@@ -41,9 +41,11 @@ class AugmentUIHandler(BaseHandler):
         """
         super().__init__(
             module_name='augment',
-            parent_module='dataset', 
-            ui_components=ui_components
+            parent_module='dataset'
         )
+        
+        # Store UI components
+        self.ui_components = ui_components or {}
         
         # Initialize config handler
         self.config_handler = AugmentConfigHandler()

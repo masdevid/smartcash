@@ -73,13 +73,13 @@ def create_operation_summary_widget() -> Dict[str, Any]:
     widgets_dict = {
         # Status indicators
         'operation_status': widgets.HTML(
-            value=_create_status_badge('pending', 'Ready')._dom_classes,
+            value="<div style='font-size: 12px; color: #666;'>Status: Ready</div>",
             layout=widgets.Layout(width='100%', margin='4px 0')
         ),
         
         # Progress tracking
         'operation_progress': widgets.HTML(
-            value=_create_progress_bar(0.0, 'Waiting for operation...')._dom_classes,
+            value="<div style='font-size: 12px; color: #666;'>Progress: Waiting for operation...</div>",
             layout=widgets.Layout(width='100%', margin='4px 0')
         ),
         

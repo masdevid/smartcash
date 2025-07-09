@@ -116,6 +116,24 @@ class ColabOperationManager(OperationHandler):
         
         self._executor.shutdown(wait=False)
         self.logger.info("✅ Colab operation manager cleanup complete")
+        
+    def update_status(self, message: str, level: str = 'info') -> None:
+        """Update operation status with a message.
+        
+        Args:
+            message: Status message to display
+            level: Message level ('info', 'warning', 'error', 'success')
+        """
+        # Log the message
+        log_method = getattr(self.logger, level, self.logger.info)
+        log_method(f"Status update: {message}")
+        
+        # Update operation container if available
+        if hasattr(self, 'operation_container') and self.operation_container is not None:
+            if hasattr(self.operation_container, 'update_status'):
+                self.operation_container.update_status(message, level=level)
+            elif hasattr(self.operation_container, 'log'):
+                self.operation_container.log(message, level=level)
     
     def _init_operation(self, progress_callback: Optional[Callable] = None) -> Dict[str, Any]:
         """Execute initialization operation."""

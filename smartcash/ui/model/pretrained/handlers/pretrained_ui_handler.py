@@ -101,18 +101,31 @@ class PretrainedUIHandler(ModuleUIHandler):
         Extract configuration from UI components.
         
         Returns:
-            Dictionary containing configuration for download operation
+            Dictionary containing configuration values
         """
-        # Get input components
+        config = {}
+        
+        # Get values from input components
         input_options = self.ui_components.get('input_options', {})
-        
-        # Extract values from input widgets
-        config = DEFAULT_CONFIG.copy()
-        
+        for key, widget in input_options.items():
+            # Skip button widgets as they don't have config values
+            if isinstance(widget, widgets.Button):
+                continue
+                
+            # Handle different widget types
+            if hasattr(widget, 'value'):
+                config[key] = widget.value
+            elif hasattr(widget, 'options'):
+                # Handle dropdowns and similar widgets
+                if hasattr(widget, 'index'):
+                    config[key] = widget.options[widget.index] if widget.index is not None else None
+                else:
+                    config[key] = widget.value
+                    
         # Get models directory
         model_dir_input = input_options.get('model_dir_input')
         if model_dir_input and hasattr(model_dir_input, 'value'):
-            config['models_dir'] = model_dir_input.value or config['models_dir']
+            config['models_dir'] = model_dir_input.value or config.get('models_dir', DEFAULT_CONFIG['models_dir'])
         
         # Get custom URLs
         yolo_url_input = input_options.get('yolo_url_input')

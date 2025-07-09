@@ -111,6 +111,11 @@ class EvaluationInitializer(DisplayInitializer):
         Returns:
             Dictionary containing initialization results
         """
+        # Check if already initialized and return cached result
+        if self._is_initialized and self._initialization_result:
+            self.logger.debug("Evaluation module already initialized, returning cached result")
+            return self._initialization_result
+            
         self.logger.info("🚀 Initializing evaluation module")
         
         try:
@@ -135,6 +140,10 @@ class EvaluationInitializer(DisplayInitializer):
                 "message": "Evaluation module initialized successfully"
             }
             
+            # Cache the result
+            self._initialization_result = result
+            self._is_initialized = True
+            
             self.logger.info("🎉 Evaluation module initialization completed successfully")
             return result
             
@@ -147,10 +156,7 @@ class EvaluationInitializer(DisplayInitializer):
             }
             
             self.logger.error(f"❌ Evaluation module initialization failed: {e}")
-            
-            # Display error UI
-            self.handle_error(f"Module initialization failed: {str(e)}", exc_info=True)
-            
+            self.handle_error(f"Evaluation module initialization failed: {str(e)}", exc_info=True)
             return error_result
     
     def get_ui_handler(self) -> Optional[EvaluationUIHandler]:
@@ -185,11 +191,17 @@ class EvaluationInitializer(DisplayInitializer):
             
         except Exception as e:
             self.logger.error(f"❌ Error during evaluation module cleanup: {e}")
+    
+    def reset_state(self) -> None:
+        """Reset the evaluation initializer state."""
+        self._is_initialized = False
+        self._initialization_result = None
+        self.ui_handler = None
+        self._ui_components.clear()
 
 
 # Global initializer instance
 _evaluation_initializer: Optional[EvaluationInitializer] = None
-
 
 def get_evaluation_initializer() -> EvaluationInitializer:
     """Get or create evaluation initializer instance.
@@ -202,6 +214,20 @@ def get_evaluation_initializer() -> EvaluationInitializer:
         _evaluation_initializer = EvaluationInitializer()
     return _evaluation_initializer
 
+def reset_evaluation_initializer() -> bool:
+    """Reset the evaluation initializer instance.
+    
+    This is useful for testing or when you need to force reinitialization.
+    
+    Returns:
+        bool: True if reset was successful, False otherwise
+    """
+    global _evaluation_initializer
+    if _evaluation_initializer is not None:
+        _evaluation_initializer.reset_state()
+        _evaluation_initializer = None
+        return True
+    return False
 
 def initialize_evaluation_ui(**kwargs) -> Dict[str, Any]:
     """Initialize evaluation UI module.
@@ -238,6 +264,9 @@ def init_evaluation_ui(**kwargs):
     
     Args:
         **kwargs: Additional initialization parameters
+        
+    Returns:
+        Dictionary containing initialization results and UI components
     """
     try:
         # Suppress early logging
@@ -255,20 +284,22 @@ def init_evaluation_ui(**kwargs):
             initializer = EvaluationInitializer()
             ui_result = initializer.initialize_full(**kwargs)
             
-            # Restore logging
-            root_logger.setLevel(original_level)
-            smartcash_logger.setLevel(original_smartcash_level)
-            
             # Display UI components if available
             if ui_result and 'ui_components' in ui_result:
                 ui_components = ui_result['ui_components']
                 if 'main_container' in ui_components:
                     display(ui_components['main_container'])
                     
+            return ui_result
+                    
         except Exception as e:
-            # Restore logging
-            root_logger.setLevel(original_level)
-            smartcash_logger.setLevel(original_smartcash_level)
+            # Create error result
+            error_result = {
+                "success": False,
+                "module": "evaluate",
+                "error": str(e),
+                "message": f"Failed to initialize evaluation UI: {str(e)}"
+            }
             
             # Display error
             from IPython.display import HTML
@@ -277,11 +308,23 @@ def init_evaluation_ui(**kwargs):
                         margin: 10px 0; background: rgba(244, 67, 54, 0.05); border-radius: 4px;">
                 <strong>🚨 Evaluation Initialization Error</strong><br>
                 <div style="margin-top: 8px; font-family: monospace; font-size: 13px;">
-                    Failed to initialize evaluation UI: {str(e)}
+                    {str(e)}
                 </div>
             </div>
             """
             display(HTML(error_html))
+            return error_result
+            
+        finally:
+            # Always restore logging levels
+            root_logger.setLevel(original_level)
+            smartcash_logger.setLevel(original_smartcash_level)
             
     except Exception as e:
         print(f"❌ Critical error in evaluation initialization: {e}")
+        return {
+            "success": False,
+            "module": "evaluate",
+            "error": str(e),
+            "message": f"Critical error in evaluation initialization: {str(e)}"
+        }

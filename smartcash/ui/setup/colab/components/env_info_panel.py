@@ -82,7 +82,7 @@ def _format_env_info_content(env_info: Dict[str, Any]) -> str:
         storage_status = _format_enhanced_storage_info(storage_info)
         
         # Dapatkan informasi GPU
-        gpu_info = _format_gpu_info(env_info)
+        gpu_info = _format_gpu_info(env_info.get('gpu_info', {}))
         
         # Dapatkan status drive
         drive_status = _get_enhanced_drive_status(env_info)

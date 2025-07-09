@@ -6,15 +6,15 @@ Description: Initializer for the visualization module
 from typing import Dict, Any, Optional
 
 # Import core components
-from smartcash.ui.core.initializers.base_initializer import BaseInitializer
+from smartcash.ui.core.initializers.display_initializer import DisplayInitializer
 from smartcash.ui.core.errors import SmartCashUIError
 
 # Import visualization components and handlers
 from .handlers import VisualizationUIHandler
 from .components.visualization_ui import create_visualization_ui
 
-class VisualizationInitializer(BaseInitializer):
-    """Initializer for the visualization module."""
+class VisualizationInitializer(DisplayInitializer):
+    """Initializer for the visualization module with display capabilities."""
     
     def __init__(self, config: Optional[Dict[str, Any]] = None):
         """Initialize the visualization module.
@@ -22,7 +22,7 @@ class VisualizationInitializer(BaseInitializer):
         Args:
             config: Optional configuration for initialization
         """
-        # Initialize parent class
+        # Initialize parent class with module info
         super().__init__(module_name='visualization', parent_module='dataset')
         
         # Initialize config
@@ -40,26 +40,15 @@ class VisualizationInitializer(BaseInitializer):
         self.ui_components = {}
         self.handler = None
 
-    def pre_initialize_checks(self) -> None:
-        """Perform pre-initialization checks with fail-fast."""
-        super().pre_initialize_checks()
-        # Add any module-specific pre-initialization checks here
-        self.logger.debug("✅ Pre-initialization checks passed")
-
-    def post_initialize_cleanup(self) -> None:
-        """Perform post-initialization cleanup."""
-        super().post_initialize_cleanup()
-        # Add any module-specific cleanup here
-        self.logger.debug("✅ Post-initialization cleanup complete")
+    def create_ui_components(self, config: Optional[Dict[str, Any]] = None, **kwargs) -> Dict[str, Any]:
+        """Create and return the UI components for the visualization module.
         
-    def _initialize_impl(self, **kwargs) -> Dict[str, Any]:
-        """Implementation of the initialization process.
-        
-        Returns:
-            Dict with initialization status and UI components
+        Args:
+            config: Configuration dictionary
+            **kwargs: Additional arguments
             
-        Raises:
-            SmartCashUIError: If initialization fails
+        Returns:
+            Dictionary of UI components
         """
         try:
             # Initialize UI components
@@ -74,37 +63,33 @@ class VisualizationInitializer(BaseInitializer):
             # Register handlers
             self._register_handlers()
             
-            return {
-                'status': 'success',
-                'ui_components': self.ui_components,
-                'handler': self.handler
-            }
+            return self.ui_components
             
         except Exception as e:
-            error_msg = f"Error initializing visualization module: {str(e)}"
+            error_msg = f"Error creating visualization UI components: {str(e)}"
             self.handle_error(error_msg, exc_info=True)
             raise SmartCashUIError(error_msg) from e
     
     def _register_handlers(self) -> None:
         """Register event handlers for UI components."""
-        if not self.handler or not self.ui_components:
+        if not getattr(self, 'handler', None) or not getattr(self, 'ui_components', None):
             return
             
         # Register refresh button handler if it exists
-        if 'refresh_button' in self.ui_components:
+        if 'refresh_button' in self.ui_components and hasattr(self.handler, 'refresh_data'):
             self.ui_components['refresh_button'].on_click(self.handler.refresh_data)
 
 
-def init_visualization_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> Dict[str, Any]:
+def init_visualization_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> None:
     """
-    Initialize visualization UI module.
+    Initialize and display the visualization UI.
+    
+    This function uses DisplayInitializer to handle the UI display with proper
+    error handling and logging.
     
     Args:
         config: Configuration dictionary
-        **kwargs: Additional arguments
-        
-    Returns:
-        Dictionary of UI components
+        **kwargs: Additional arguments passed to the initializer
     """
     initializer = VisualizationInitializer(config=config)
-    return initializer._initialize_impl(**kwargs)
+    initializer.initialize_ui(**kwargs)

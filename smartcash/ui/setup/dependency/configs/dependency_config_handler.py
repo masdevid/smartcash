@@ -13,8 +13,10 @@ from .dependency_defaults import get_default_dependency_config
 class DependencyConfigHandler(SharedConfigHandler):
     """Handler untuk dependency config dengan shared config support"""
     
-    def __init__(self):
-        default_config = get_default_dependency_config()
+    def __init__(self, default_config: Optional[Dict[str, Any]] = None):
+        # Use provided default_config or fall back to default dependency config
+        if default_config is None:
+            default_config = get_default_dependency_config()
         
         super().__init__(
             module_name='dependency',

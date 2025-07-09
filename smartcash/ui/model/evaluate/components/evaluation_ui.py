@@ -43,8 +43,8 @@ def create_evaluation_ui() -> Dict[str, Any]:
     summary_container = create_summary_container(
         title="Evaluation Overview"
     )
-    # Add the content widget to the container
-    summary_container.add_content(ui_components["evaluation_summary"])
+    # Set the content of the container
+    summary_container.set_content(ui_components["evaluation_summary"].value)
     ui_components["summary_container"] = summary_container
     
     # 3. Form Container - Scenario and Model Selection

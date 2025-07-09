@@ -13,10 +13,21 @@ class DependencyUIHandler(ModuleUIHandler):
     """Enhanced UI handler for dependency management with operation container integration."""
     
     def __init__(self, module_name: str = 'dependency', parent_module: str = 'setup', **kwargs):
-        super().__init__(module_name, parent_module, **kwargs)
+        # Extract parameters that ModuleUIHandler doesn't expect
+        default_config = kwargs.pop('default_config', None)
+        auto_setup_handlers = kwargs.pop('auto_setup_handlers', True)
+        enable_sharing = kwargs.pop('enable_sharing', True)
         
-        self.config_handler = DependencyConfigHandler()
+        # Call parent with only the parameters it expects
+        super().__init__(module_name, parent_module)
+        
+        # Initialize config handler with default config if provided
+        self.config_handler = DependencyConfigHandler(default_config=default_config)
         self._status_messages = []
+        
+        # Store additional parameters
+        self.auto_setup_handlers = auto_setup_handlers
+        self.enable_sharing = enable_sharing
         
         # Operation container and handler will be set up in setup() method
         self.operation_container = None

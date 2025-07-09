@@ -5,14 +5,14 @@ Description: Preprocessing initializer with modern UI container structure
 
 from typing import Dict, Any, List, Optional
 from smartcash.ui.core.initializers.module_initializer import ModuleInitializer
-from smartcash.ui.core.initializers.display_initializer import create_ui_display_function
+from smartcash.ui.core.initializers.display_initializer import DisplayInitializer, create_ui_display_function
 from smartcash.ui.dataset.preprocess.constants import UI_CONFIG, MODULE_METADATA
 from smartcash.ui.dataset.preprocess.configs.preprocess_config_handler import PreprocessConfigHandler
 from smartcash.ui.dataset.preprocess.components.preprocess_ui import create_preprocessing_main_ui
 from smartcash.ui.dataset.preprocess.handlers.preprocess_ui_handler import PreprocessUIHandler
 
 
-class PreprocessInitializer(ModuleInitializer):
+class PreprocessInitializer(DisplayInitializer):
     """
     Preprocessing initializer with modern UI container structure.
     
@@ -33,43 +33,11 @@ class PreprocessInitializer(ModuleInitializer):
         
         # Store module metadata
         self.module_metadata = MODULE_METADATA
-    
-    def _initialize_impl(self, config: Optional[Dict[str, Any]] = None, **kwargs) -> Dict[str, Any]:
-        """Implementation of the initialization logic.
         
-        Args:
-            config: Optional configuration dictionary
-            **kwargs: Additional arguments
-            
-        Returns:
-            Dictionary containing initialization results
-        """
-        if config is None:
-            config = {}
-            
-        try:
-            self.logger.info("🚀 Starting preprocessing module initialization...")
-            
-            # Create UI components
-            ui_components = self.create_ui_components(config, **kwargs)
-            
-            # Store components
-            self._ui_components = ui_components
-            
-            # Setup handlers if auto_setup is enabled
-            if hasattr(self, '_auto_setup_handlers') and self._auto_setup_handlers:
-                self.setup_handlers(ui_components)
-                
-            self.logger.info("✅ Preprocessing module initialized successfully")
-            return {
-                'status': 'success',
-                'components': ui_components,
-                'config': config
-            }
-            
-        except Exception as e:
-            self.logger.error(f"❌ Failed to initialize preprocessing module: {str(e)}", exc_info=True)
-            raise
+        # Add logger for compatibility
+        import logging
+        self.logger = logging.getLogger(f"smartcash.ui.{UI_CONFIG['parent_module']}.{UI_CONFIG['module_name']}")
+    
     
     def create_ui_components(self, config: Dict[str, Any], **kwargs) -> Dict[str, Any]:
         """
@@ -185,34 +153,33 @@ class PreprocessInitializer(ModuleInitializer):
             **kwargs: Additional arguments
             
         Returns:
-            Dictionary of UI components
+            Dictionary of UI components for display
         """
         try:
             # Get configuration
             config = kwargs.get('config', {})
             
             # Create UI components
-            ui_components = self.create_ui_components(config, **kwargs)
+            # Remove config from kwargs to avoid conflict
+            ui_kwargs = {k: v for k, v in kwargs.items() if k != 'config'}
+            ui_components = self.create_ui_components(config, **ui_kwargs)
             
             # Create config handler if needed
             if not hasattr(self, 'config_handler'):
                 self.config_handler = self.create_config_handler(**kwargs)
                 
-            # Load configuration
-            loaded_config = self.config_handler.load_config()
-            
-            # Update UI with loaded configuration
-            self.config_handler.update_ui(ui_components, loaded_config)
+            # Load configuration (for potential future use)
+            # loaded_config = self.config_handler.get_config()
             
             # Setup handlers
             ui_components = self.setup_handlers(ui_components, **kwargs)
             
-            # Return UI components
-            return {
-                'status': 'success',
-                'message': 'Preprocessing UI initialized successfully',
-                'components': ui_components
-            }
+            # Add ui key for DisplayInitializer
+            if 'main_container' in ui_components:
+                ui_components['ui'] = ui_components['main_container']
+            
+            # Return UI components directly for DisplayInitializer
+            return ui_components
             
         except Exception as e:
             self.logger.error(f"❌ Failed to initialize preprocessing UI: {str(e)}", exc_info=True)
@@ -231,19 +198,19 @@ class PreprocessInitializer(ModuleInitializer):
             module_handler: Module handler instance
         """
         # Setup button click handlers
-        if 'preprocess_btn' in ui_components:
+        if 'preprocess_btn' in ui_components and ui_components['preprocess_btn'] is not None:
             ui_components['preprocess_btn'].on_click(
-                lambda btn: module_handler.handle_preprocess_click()
+                lambda _: module_handler.handle_preprocess_click()
             )
         
-        if 'check_btn' in ui_components:
+        if 'check_btn' in ui_components and ui_components['check_btn'] is not None:
             ui_components['check_btn'].on_click(
-                lambda btn: module_handler.handle_check_click()
+                lambda _: module_handler.handle_check_click()
             )
         
-        if 'cleanup_btn' in ui_components:
+        if 'cleanup_btn' in ui_components and ui_components['cleanup_btn'] is not None:
             ui_components['cleanup_btn'].on_click(
-                lambda btn: module_handler.handle_cleanup_click()
+                lambda _: module_handler.handle_cleanup_click()
             )
         
         # Setup configuration change handlers
@@ -272,14 +239,14 @@ class PreprocessInitializer(ModuleInitializer):
         """
         # Check if we're in a supported environment
         try:
-            import IPython
+            import IPython  # noqa: F401
             # Additional checks can be added here
         except ImportError:
             raise RuntimeError("Dataset preprocessing requires IPython environment")
         
         # Check if required backend modules are available
         try:
-            import smartcash.dataset.preprocessor
+            import smartcash.dataset.preprocessor  # noqa: F401
         except ImportError:
             raise RuntimeError("Backend preprocessing module not available")
 

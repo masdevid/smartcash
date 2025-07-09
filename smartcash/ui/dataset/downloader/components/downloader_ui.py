@@ -128,7 +128,7 @@ def create_downloader_ui_components(config: Optional[Dict[str, Any]] = None, **k
     # 6. Create Main Container
     main_container = create_main_container(
         components=[
-            {'component': header, 'type': 'header'},
+            {'component': header.container, 'type': 'header'},
             {'component': form['container'], 'type': 'form'},
             {'component': action_buttons['container'], 'type': 'action'},
             {'component': operation['container'], 'type': 'operation'},

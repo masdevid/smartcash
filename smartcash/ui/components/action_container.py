@@ -178,11 +178,22 @@ class ActionContainer:
         # Set default Colab environment setup phases
         self.set_phases(COLAB_PHASES)
         
-        # Create the container
-        self.container = widgets.HBox(
+        # Create the container with vertical layout
+        self.container = widgets.VBox(
             layout=widgets.Layout(
                 width='100%',
                 margin=container_margin,
+                display='flex',
+                flex_flow='column nowrap',
+                align_items='stretch',
+                gap='8px'
+            )
+        )
+        
+        # Create a horizontal container for buttons
+        self.buttons_container = widgets.HBox(
+            layout=widgets.Layout(
+                width='100%',
                 display='flex',
                 flex_flow='row wrap',
                 align_items='center',
@@ -411,42 +422,85 @@ class ActionContainer:
         
     def _update_container(self):
         """Update the container's children based on current buttons."""
-        children = []
+        # Create a list to hold all vertical sections
+        vertical_sections = []
         
-        # Add primary button if exists
-        if self.buttons['primary']:
-            children.append(widgets.Box(
-                [self.buttons['primary']],
-                layout=widgets.Layout(margin='0 8px 0 0')
-            ))
-            
-        # Add save/reset buttons if they exist
+        # 1. Save/Reset buttons (horizontal)
+        save_reset_section = []
         if self.buttons['save_reset']:
-            children.append(widgets.Box(
+            save_reset_section.append(widgets.Box(
                 [self.buttons['save_reset']],
                 layout=widgets.Layout(margin='0 8px 0 0')
             ))
+        
+        # Add save/reset section if not empty
+        if save_reset_section:
+            save_reset_container = widgets.HBox(
+                children=save_reset_section,
+                layout=widgets.Layout(
+                    width='100%',
+                    justify_content='flex-start',
+                    margin='0 0 10px 0'
+                )
+            )
+            vertical_sections.append(save_reset_container)
             
-        # Handle action buttons
+            # Add divider after save/reset
+            divider = widgets.HTML(
+                value='<hr style="border: 0.5px solid #e0e0e0; width: 100%; margin: 10px 0;">',
+                layout=widgets.Layout(width='100%', margin='5px 0')
+            )
+            vertical_sections.append(divider)
+        
+        # 2. Big Primary button (centered)
+        if self.buttons['primary']:
+            primary_container = widgets.HBox(
+                children=[self.buttons['primary']],
+                layout=widgets.Layout(
+                    width='100%',
+                    justify_content='center',
+                    margin='10px 0 15px 0'
+                )
+            )
+            vertical_sections.append(primary_container)
+            
+            # Add operation label below primary button
+            op_label = widgets.HTML(
+                value='<div style="text-align: center; color: #666; font-weight: 500; margin: 5px 0 10px 0;">Operation</div>',
+                layout=widgets.Layout(width='100%')
+            )
+            vertical_sections.append(op_label)
+        
+        # 3. Action Buttons (horizontal)
+        action_buttons = []
         if isinstance(self.buttons['action'], dict):
             # Old style: action is a dictionary of buttons
             action_buttons = [btn for btn in self.buttons['action'].values() if btn is not None]
-            action_buttons.sort(key=lambda x: x.order if hasattr(x, 'order') else 0)
-            
-            # Add each action button with spacing
-            for btn in action_buttons:
-                if btn is not None:
-                    children.append(widgets.Box(
-                        [btn],
-                        layout=widgets.Layout(margin='0 8px 0 0')
-                    ))
+            action_buttons.sort(key=lambda x: getattr(x, 'order', 0))
         elif self.buttons['action'] is not None:
             # New style: action is a single button
-            children.append(widgets.Box(
-                [self.buttons['action']],
-                layout=widgets.Layout(margin='0 8px 0 0')
-            ))
+            action_buttons = [self.buttons['action']]
         
-        self.container.children = [widgets.HBox(children=children)]
+        # Add action buttons with proper spacing
+        if action_buttons:
+            action_container = widgets.HBox(
+                children=[
+                    widgets.Box(
+                        [btn],
+                        layout=widgets.Layout(margin='0 8px 0 0')
+                    ) for btn in action_buttons if btn is not None
+                ],
+                layout=widgets.Layout(
+                    width='100%',
+                    justify_content='flex-start',
+                    flex_wrap='wrap',
+                    gap='8px',
+                    margin='5px 0 10px 0'
+                )
+            )
+            vertical_sections.append(action_container)
+        
+        # Update the main container with all sections
+        self.container.children = vertical_sections
     
     # Note: Dialog methods have been removed. Use OperationContainer for dialog functionality.

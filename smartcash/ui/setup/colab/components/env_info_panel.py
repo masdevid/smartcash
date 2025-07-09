@@ -608,12 +608,13 @@ def _format_additional_info(env_info: Dict[str, Any]) -> str:
             return ''
         
         # Gabungkan semua bagian informasi tambahan
+        info_content = '\n'.join(additional_info)
         return f'''
         <div style="margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 6px; border: 1px solid #e0e0e0;">
             <div style="display: flex; align-items: center; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid #dee2e6;">
                 <span style="font-size: 1.1em; font-weight: 600; color: #495057;">ℹ️ Informasi Tambahan</span>
             </div>
-            {'\n'.join(additional_info)}
+            {info_content}
         </div>
         '''
         

@@ -395,7 +395,19 @@ class ActionContainer:
         Returns:
             The button widget or None if not found
         """
-        return self.buttons.get(button_id)
+        # Check if the button is stored directly
+        if button_id in self.buttons:
+            return self.buttons[button_id]
+            
+        # For backwards compatibility, check if it's the single action button
+        if button_id == 'action' and not isinstance(self.buttons['action'], dict) and self.buttons['action'] is not None:
+            return self.buttons['action']
+            
+        # Check if it's in the action buttons dictionary (old style)
+        if isinstance(self.buttons.get('action'), dict) and button_id in self.buttons['action']:
+            return self.buttons['action'][button_id]
+            
+        return None
         
     def _update_container(self):
         """Update the container's children based on current buttons."""
@@ -415,17 +427,25 @@ class ActionContainer:
                 layout=widgets.Layout(margin='0 8px 0 0')
             ))
             
-        # Add action buttons in order
-        action_buttons = [btn for btn in self.buttons['action'].values() if btn is not None]
-        action_buttons.sort(key=lambda x: x.order if hasattr(x, 'order') else 0)
-        
-        # Add each action button with spacing
-        for btn in action_buttons:
-            if btn is not None:
-                children.append(widgets.Box(
-                    [btn],
-                    layout=widgets.Layout(margin='0 8px 0 0')
-                ))
+        # Handle action buttons
+        if isinstance(self.buttons['action'], dict):
+            # Old style: action is a dictionary of buttons
+            action_buttons = [btn for btn in self.buttons['action'].values() if btn is not None]
+            action_buttons.sort(key=lambda x: x.order if hasattr(x, 'order') else 0)
+            
+            # Add each action button with spacing
+            for btn in action_buttons:
+                if btn is not None:
+                    children.append(widgets.Box(
+                        [btn],
+                        layout=widgets.Layout(margin='0 8px 0 0')
+                    ))
+        elif self.buttons['action'] is not None:
+            # New style: action is a single button
+            children.append(widgets.Box(
+                [self.buttons['action']],
+                layout=widgets.Layout(margin='0 8px 0 0')
+            ))
         
         self.container.children = [widgets.HBox(children=children)]
     

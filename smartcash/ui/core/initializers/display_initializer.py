@@ -63,26 +63,40 @@ class DisplayInitializer(BaseInitializer):
             ui_result: Result from _initialize_impl - either dict or widget
         """
         if isinstance(ui_result, dict):
-            # Try to find the main UI component to display
+            # First check if this is a nested result with ui_components
+            if 'ui_components' in ui_result and isinstance(ui_result['ui_components'], dict):
+                ui_components = ui_result['ui_components']
+                # Try to find the main UI component in the nested structure
+                for key in ['ui', 'main_container', 'container']:
+                    if key in ui_components:
+                        component = ui_components[key]
+                        if self._is_displayable_widget(component):
+                            return  # _is_displayable_widget already calls display()
+                
+                # Look for any displayable widget in ui_components
+                for key, component in ui_components.items():
+                    if key not in ['operation_container', 'log_accordion', 'progress_tracker']:
+                        if self._is_displayable_widget(component):
+                            return  # _is_displayable_widget already calls display()
+            
+            # Try to find the main UI component in top-level result
             for key in ['ui', 'main_container', 'container']:
                 if key in ui_result:
                     component = ui_result[key]
                     if self._is_displayable_widget(component):
-                        display(component)
-                        return
+                        return  # _is_displayable_widget already calls display()
             
             # Look for any displayable widget (but avoid operation_container to prevent duplicate displays)
             for key, component in ui_result.items():
-                if key not in ['operation_container', 'log_accordion', 'progress_tracker']:
+                if key not in ['operation_container', 'log_accordion', 'progress_tracker', 'ui_components']:
                     if self._is_displayable_widget(component):
-                        display(component)
-                        return
+                        return  # _is_displayable_widget already calls display()
                     
             self.logger.warning(f"⚠️ No displayable UI component found in {self.module_name} initialization")
                     
         elif self._is_displayable_widget(ui_result):
-            # Direct widget
-            display(ui_result)
+            # Direct widget - _is_displayable_widget already calls display()
+            pass
         else:
             self.logger.warning(f"⚠️ Unexpected UI result type in {self.module_name}: {type(ui_result)}")
     
@@ -93,12 +107,13 @@ class DisplayInitializer(BaseInitializer):
             
         # Direct ipywidgets
         if hasattr(component, 'children') or hasattr(component, 'layout'):
+            display(component)
             return True
         
-        # Custom container classes with .container attribute
+        # Custom container classes with .container attribute (like MainContainer)
         if hasattr(component, 'container'):
             container = component.container
-            if hasattr(container, 'children') or hasattr(container, 'layout'):
+            if container is not None and (hasattr(container, 'children') or hasattr(container, 'layout')):
                 display(container)
                 return True
         
@@ -263,7 +278,23 @@ class DisplayInitializer(BaseInitializer):
     def _display_ui_component_static(ui_result: Union[Dict[str, Any], Any]) -> None:
         """Static version of _display_ui_component for use in factory function"""
         if isinstance(ui_result, dict):
-            # Try to find the main UI component to display
+            # First check if this is a nested result with ui_components
+            if 'ui_components' in ui_result and isinstance(ui_result['ui_components'], dict):
+                ui_components = ui_result['ui_components']
+                # Try to find the main UI component in the nested structure
+                for key in ['ui', 'main_container', 'container']:
+                    if key in ui_components:
+                        component = ui_components[key]
+                        if DisplayInitializer._is_displayable_widget_static(component):
+                            return
+                
+                # Look for any displayable widget in ui_components
+                for key, component in ui_components.items():
+                    if key not in ['operation_container', 'log_accordion', 'progress_tracker']:
+                        if DisplayInitializer._is_displayable_widget_static(component):
+                            return
+            
+            # Try to find the main UI component in top-level result
             for key in ['ui', 'main_container', 'container']:
                 if key in ui_result:
                     component = ui_result[key]
@@ -272,7 +303,7 @@ class DisplayInitializer(BaseInitializer):
             
             # Look for any displayable widget (but avoid operation_container to prevent duplicate displays)
             for key, component in ui_result.items():
-                if key not in ['operation_container', 'log_accordion', 'progress_tracker']:
+                if key not in ['operation_container', 'log_accordion', 'progress_tracker', 'ui_components']:
                     if DisplayInitializer._is_displayable_widget_static(component):
                         return
                         
@@ -291,10 +322,10 @@ class DisplayInitializer(BaseInitializer):
             display(component)
             return True
         
-        # Custom container classes with .container attribute
+        # Custom container classes with .container attribute (like MainContainer)
         if hasattr(component, 'container'):
             container = component.container
-            if hasattr(container, 'children') or hasattr(container, 'layout'):
+            if container is not None and (hasattr(container, 'children') or hasattr(container, 'layout')):
                 display(container)
                 return True
         

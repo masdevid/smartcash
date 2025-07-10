@@ -28,11 +28,11 @@ def get_colab_initializer() -> 'ColabInitializer':
     if _colab_initializer is None:
         # Import here to prevent circular imports
         from .handlers.colab_ui_handler import ColabUIHandler
-        from .components import create_colab_ui_components
+        from .components import create_colab_ui
         
         # Set the global components for the module
         globals()['ColabUIHandler'] = ColabUIHandler
-        globals()['create_colab_ui_components'] = create_colab_ui_components
+        globals()['create_colab_ui'] = create_colab_ui
         
         # Create the initializer
         _colab_initializer = ColabInitializer()
@@ -42,7 +42,7 @@ def get_colab_initializer() -> 'ColabInitializer':
 # Lazy imports to prevent circular imports and automatic setup
 if TYPE_CHECKING:
     from .handlers.colab_ui_handler import ColabUIHandler
-    from .components.colab_ui import create_colab_ui_components
+    from .components.colab_ui import create_colab_ui
 
 # Legacy support
 get_colab_env_initializer = get_colab_initializer
@@ -140,10 +140,10 @@ class ColabInitializer(ModuleInitializer):
             self.logger.info("🔧 Creating colab UI components")
             
             # Create UI components
-            ui_components = create_colab_ui_components(config=config, **kwargs)
+            ui_components = create_colab_ui(config=config, **kwargs)
             
             if not isinstance(ui_components, dict):
-                raise ValueError("create_colab_ui_components() did not return a dictionary")
+                raise ValueError("create_colab_ui() did not return a dictionary")
                 
             # Ensure required components exist
             required_components = ['main_container', 'operation_container']
@@ -304,7 +304,7 @@ class ColabInitializer(ModuleInitializer):
         """Pre-initialization validation checks."""
         # Check if required imports are available
         try:
-            from .components import create_colab_ui_components
+            from .components import create_colab_ui
             from .handlers.colab_ui_handler import ColabUIHandler
         except ImportError as e:
             raise RuntimeError(f"Missing required components: {e}")

@@ -62,7 +62,7 @@ def create_preprocessing_input_options(config: Optional[Dict[str, Any]] = None) 
     )
     
     normalization_section = widgets.VBox([
-        widgets.HTML("<div style='font-weight:bold;color:#2196F3;margin-bottom:6px;'>🎨 Normalisasi YOLO</div>"),
+        widgets.HTML(value="<div style='font-weight:bold;color:#2196F3;margin-bottom:6px;'>🎨 Normalisasi YOLO</div>"),
         resolution_dropdown,
         normalization_dropdown, 
         preserve_aspect_checkbox
@@ -92,7 +92,7 @@ def create_preprocessing_input_options(config: Optional[Dict[str, Any]] = None) 
     )
     
     processing_section = widgets.VBox([
-        widgets.HTML("<div style='font-weight:bold;color:#FF9800;margin-bottom:6px;'>⚡ Processing</div>"),
+        widgets.HTML(value="<div style='font-weight:bold;color:#FF9800;margin-bottom:6px;'>⚡ Processing</div>"),
         target_splits_select,
         batch_size_input
     ], layout=widgets.Layout(width='48%', padding='8px'))
@@ -121,7 +121,7 @@ def create_preprocessing_input_options(config: Optional[Dict[str, Any]] = None) 
     )
     
     validation_section = widgets.VBox([
-        widgets.HTML("<div style='font-weight:bold;color:#4CAF50;margin-bottom:6px;'>✅ Validasi</div>"),
+        widgets.HTML(value="<div style='font-weight:bold;color:#4CAF50;margin-bottom:6px;'>✅ Validasi</div>"),
         validation_checkbox,
         move_invalid_checkbox,
         invalid_dir_input
@@ -146,7 +146,7 @@ def create_preprocessing_input_options(config: Optional[Dict[str, Any]] = None) 
     )
     
     cleanup_section = widgets.VBox([
-        widgets.HTML("<div style='font-weight:bold;color:#F44336;margin-bottom:6px;'>🧹 Cleanup</div>"),
+        widgets.HTML(value="<div style='font-weight:bold;color:#F44336;margin-bottom:6px;'>🧹 Cleanup</div>"),
         cleanup_target_dropdown,
         backup_checkbox
     ], layout=widgets.Layout(width='48%', padding='8px'))
@@ -160,7 +160,7 @@ def create_preprocessing_input_options(config: Optional[Dict[str, Any]] = None) 
         layout=widgets.Layout(width='100%', justify_content='space-between'))
     
     options_container = widgets.VBox([
-        widgets.HTML("<h5 style='margin:8px 0;color:#495057;border-bottom:2px solid #28a745;padding-bottom:4px;'>⚙️ Konfigurasi Preprocessing</h5>"),
+        widgets.HTML(value="<h5 style='margin:8px 0;color:#495057;border-bottom:2px solid #28a745;padding-bottom:4px;'>⚙️ Konfigurasi Preprocessing</h5>"),
         top_row,
         bottom_row
     ], layout=widgets.Layout(

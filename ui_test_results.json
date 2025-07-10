@@ -223,7 +223,7 @@
         "warnings": [],
         "info": [
           "\u2705 All required imports present",
-          "\u2705 Main UI function found: create_colab_ui_components",
+          "\u2705 Main UI function found: create_colab_ui",
           "\u2705 Config parameter present",
           "\u2705 All required containers present",
           "\u2705 ui_components dictionary found",

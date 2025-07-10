@@ -36,11 +36,13 @@ class AugmentInitializer(ModuleInitializer):
         """Initialize the augment module."""
         super().__init__(
             module_name=UI_CONFIG['module_name'],
+            parent_module=UI_CONFIG['parent_module'],
             config_handler_class=AugmentConfigHandler
         )
         self.ui_handler: Optional[AugmentUIHandler] = None
         self.logger = logging.getLogger(f"smartcash.ui.{UI_CONFIG['parent_module']}.{UI_CONFIG['module_name']}")
         self.logger.info(f"🎨 {UI_CONFIG['title']} initializer created")
+        self._is_initialized = False  # Initialize the attribute explicitly
     
     def _create_ui_components(self, config: Dict[str, Any], env=None, **kwargs) -> Dict[str, Any]:
         """

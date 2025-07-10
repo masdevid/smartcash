@@ -304,11 +304,12 @@ def create_colab_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> Dict[s
     # === 5. OPERATION CONTAINER ===
     # Progress tracking, dialog, and logging
     operation_container = create_operation_container(
-        title=f"📊 {UI_CONFIG['title']} Status",
+        title=f"📊 {UI_CONFIG['module_name']} Status",
         show_progress=True,
         show_dialog=True,
         show_logs=True,
-        log_module_name=UI_CONFIG['module_name']
+        log_module_name=UI_CONFIG['module_name'],
+        log_namespace_filter='colab'  # Filter logs for colab namespace only
     )
     ui_components['operation_container'] = operation_container['container']
     
@@ -482,7 +483,7 @@ def update_colab_config(ui_components: Dict[str, Any]) -> Dict[str, Any]:
 
 
 # === EXPORT FUNCTIONS ===
-def create_colab_ui_components(config: Optional[Dict[str, Any]] = None, **kwargs) -> Dict[str, Any]:
+def create_colab_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> Dict[str, Any]:
     """
     Alias for create_colab_ui for backward compatibility.
     

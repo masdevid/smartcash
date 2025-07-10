@@ -204,6 +204,9 @@ class DependencyOperationManager(OperationHandler):
             if 'containers' in ui_components and 'operation' in ui_components['containers']:
                 operation_container = ui_components['containers']['operation']
         
+        # Remove logger from kwargs to prevent passing it to OperationHandler.__init__
+        kwargs.pop('logger', None)
+        
         super().__init__(
             module_name='dependency_operation_manager',
             parent_module='dependency',

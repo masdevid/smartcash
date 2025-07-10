@@ -51,7 +51,7 @@ class TestColabInitializer:
         assert 'setup' in config
         assert config['environment']['type'] == 'colab'
     
-    @patch('smartcash.ui.setup.colab.colab_initializer.create_colab_ui_components')
+    @patch('smartcash.ui.setup.colab.colab_initializer.create_colab_ui')
     def test_initialize_impl_success(self, mock_create_components, initializer, sample_config):
         """Test successful initialization implementation."""
         # Mock UI components
@@ -75,7 +75,7 @@ class TestColabInitializer:
         assert result['config'] == sample_config
         mock_create_components.assert_called_once_with(sample_config)
     
-    @patch('smartcash.ui.setup.colab.colab_initializer.create_colab_ui_components')
+    @patch('smartcash.ui.setup.colab.colab_initializer.create_colab_ui')
     def test_initialize_impl_ui_components_failure(self, mock_create_components, initializer):
         """Test initialization failure when UI components creation fails."""
         mock_create_components.return_value = None
@@ -85,7 +85,7 @@ class TestColabInitializer:
         assert result['success'] is False
         assert 'Failed to create UI components' in result['error']
     
-    @patch('smartcash.ui.setup.colab.colab_initializer.create_colab_ui_components')
+    @patch('smartcash.ui.setup.colab.colab_initializer.create_colab_ui')
     def test_initialize_impl_exception_handling(self, mock_create_components, initializer):
         """Test initialization exception handling."""
         mock_create_components.side_effect = Exception("Test error")
@@ -139,7 +139,7 @@ class TestColabInitializer:
         # Should not crash, manager should be None
         assert initializer._environment_manager is None
     
-    @patch('smartcash.ui.setup.colab.colab_initializer.create_colab_ui_components')
+    @patch('smartcash.ui.setup.colab.colab_initializer.create_colab_ui')
     def test_setup_handlers(self, mock_create_components, initializer):
         """Test handlers setup."""
         mock_ui_components = {

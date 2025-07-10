@@ -182,10 +182,12 @@ def create_preprocessing_main_ui(config: Optional[Dict[str, Any]] = None, **kwar
         
         # 5. Create Operation Container (includes progress tracker, dialogs, log accordion)
         operation_container = create_operation_container(
+            title=f"📊 {UI_CONFIG['module_name']} Status",
             show_progress=True,
             show_dialog=True,
             show_logs=True,
-            log_module_name=UI_CONFIG['module_name']
+            log_module_name=UI_CONFIG['module_name'],
+            log_namespace_filter='preprocess'  # Filter logs for preprocess namespace only
         )
         ui_components['operation_container'] = operation_container
         

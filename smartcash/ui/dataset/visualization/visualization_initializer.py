@@ -345,36 +345,15 @@ class VisualizationInitializer(ModuleInitializer):
             if not self._initialize_handlers(ui_components, **kwargs):
                 raise RuntimeError("Failed to initialize visualization handlers")
             
-            return ui_components
-            
-        except Exception as e:
-            error_msg = f"Failed to initialize visualization module: {str(e)}"
-            self.logger.error(error_msg, exc_info=True)
-            return self.ui_components
-            
-        except Exception as e:
-            error_msg = f"Failed to create visualization UI: {str(e)}"
-            self.logger.error(error_msg, exc_info=True)
-            raise SmartCashUIError(error_msg) from e
-            
-    def display(self, **kwargs):
-        """Display the visualization UI.
-        
-        Args:
-            **kwargs: Additional arguments to pass to the display function
-        """
-        try:
-            if not self.ui_components:
-                self.create_ui_components(**kwargs)
-                
             # Get the main container from UI components
-            main_container = self.ui_components.get('main_container')
+            main_container = ui_components.get('main_container')
             if main_container:
+                from IPython.display import display
                 display(main_container, **kwargs)
             else:
                 self.logger.warning("Main container not found in UI components")
-                
-            return self.ui_components
+            
+            return ui_components
                 
         except Exception as e:
             error_msg = f"Failed to display visualization UI: {str(e)}"

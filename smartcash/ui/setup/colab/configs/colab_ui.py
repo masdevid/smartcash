@@ -21,7 +21,7 @@ from smartcash.ui.setup.colab.components.setup_summary import create_setup_summa
 from smartcash.ui.setup.colab.components.env_info_panel import create_env_info_panel
 from smartcash.ui.setup.colab.components.tips_panel import create_tips_requirements
 
-def create_colab_ui_components(config: Optional[Dict[str, Any]] = None, **kwargs) -> Dict[str, Any]:
+def create_colab_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> Dict[str, Any]:
     """
     Buat komponen UI untuk konfigurasi Colab dengan container baru
     
@@ -104,7 +104,6 @@ def create_colab_ui_components(config: Optional[Dict[str, Any]] = None, **kwargs
             }
         ],
         title="🔧 Environment Actions",
-        alignment="center"
     )
     
     # 4. Create Operation Container

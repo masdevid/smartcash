@@ -148,10 +148,8 @@ def create_action_container(
         # Store reference to the button
         button_widgets[btn_id] = action_container.get_button(btn_id)
     
-    # Add title if provided
-    if title:
-        title_widget = widgets.HTML(f"<h4 style='margin: 0 0 10px 0;'>{title}</h4>")
-        action_container.container.children = (title_widget,) + action_container.container.children
+    # Store title to be added after container is initialized
+    action_container._title = title
     
     # Return container and utility methods
     return {
@@ -267,6 +265,42 @@ class ActionContainer:
         self.save_button = save_reset_buttons['save_button']
         self.reset_button = save_reset_buttons['reset_button']
         
+    def _get_button_colors(self, style_name: str) -> tuple:
+        """Get button background and text color based on style name.
+        
+        Args:
+            style_name: Name of the button style
+            
+        Returns:
+            tuple: (background_color, text_color)
+        """
+        colors = {
+            'primary': ('#007bff', '#ffffff'),    # Blue with white text
+            'success': ('#28a745', '#ffffff'),    # Green with white text
+            'info': ('#17a2b8', '#ffffff'),       # Cyan with white text
+            'warning': ('#ffc107', '#212529'),    # Yellow with dark text
+            'danger': ('#dc3545', '#ffffff'),     # Red with white text
+            'secondary': ('#6c757d', '#ffffff'),  # Gray with white text
+            'light': ('#f8f9fa', '#212529'),      # Light gray with dark text
+            'dark': ('#343a40', '#ffffff')        # Dark gray with white text
+        }
+        return colors.get(style_name.lower(), colors['primary'])
+        
+    def _init_buttons(self):
+        """Initialize all button widgets if they don't exist."""
+        # Create save/reset buttons using the dedicated component
+        save_reset_buttons = create_save_reset_buttons(
+            save_text='💾 Save',
+            reset_text='🔄 Reset',
+            container_width='auto',
+            with_sync_info=False,
+            show_icons=True,
+            alignment='left'
+        )
+        self.buttons['save_reset'] = save_reset_buttons['container']
+        self.save_button = save_reset_buttons['save_button']
+        self.reset_button = save_reset_buttons['reset_button']
+        
         # Create action buttons using the dedicated component
         if self.buttons['primary'] is None:
             action_buttons = create_action_buttons(
@@ -285,7 +319,7 @@ class ActionContainer:
             self.buttons['action'] = action_buttons['container']
         else:
             self.buttons['action'] = None
-        
+            
         # Add buttons to container, filtering out None values
         children = []
         
@@ -348,9 +382,12 @@ class ActionContainer:
                 if prop == 'text':
                     self.buttons['primary'].description = value
                 elif prop == 'style' or prop == 'color':
+                    # Get predefined colors based on style
+                    bg_color, text_color = self._get_button_colors(phase_config.get('style', 'primary'))
                     style = ButtonStyle()
-                    style.button_color = phase_config.get('color', '#007bff')  # Default blue
+                    style.button_color = phase_config.get('color', bg_color)
                     style.font_weight = 'bold'
+                    style.text_color = text_color
                     self.buttons['primary'].style = style
                 elif hasattr(self.buttons['primary'], prop):
                     setattr(self.buttons['primary'], prop, value)
@@ -470,13 +507,23 @@ class ActionContainer:
         if icon and not icon.startswith('fa-'):
             icon = f'fa-{icon}'
             
-        style = ButtonStyle()
-        style.button_color = self._get_button_color(style)
+        # Get colors based on button style
+        bg_color, text_color = self._get_button_colors(style)
+        button_style = ButtonStyle()
+        button_style.button_color = bg_color
+        button_style.font_weight = 'bold'
+        button_style.text_color = text_color
+        
         button = widgets.Button(
             description=f"{text}",
-            layout=widgets.Layout(width='auto'),
+            layout=widgets.Layout(
+                width='auto',
+                min_width='120px',  # Ensure minimum width for better appearance
+                padding='8px 16px',  # Add padding for better clickability
+                margin='2px'         # Add small margin between buttons
+            ),
             disabled=disabled,
-            style=style,
+            style=button_style,
             **kwargs
         )
         
@@ -541,9 +588,11 @@ class ActionContainer:
             return self.current_phase in self.phases
             
         return True
-
+        
     def _update_container(self):
-        """Update the container's children with fixed layout order: save_reset (right), divider, primary (center), actions (left)."""
+        """Update the container's children with fixed layout order: 
+        save_reset (top, right-aligned), divider, title, primary (center)/actions (left).
+        """
         # Ensure all buttons are initialized
         self._init_buttons()
         
@@ -570,16 +619,22 @@ class ActionContainer:
                 )
             )
             container_sections.append(save_reset_section)
-        
-        # 2. Divider (if we have multiple sections)
-        if has_save_reset and (has_primary or has_action):
+            
+            # Add divider after save/reset
             divider = widgets.HTML(
-                '<hr style="margin: 0; border: 0; border-top: 1px solid #eee;">',
-                layout=widgets.Layout(width='100%', margin='5px 0')
+                '<hr style="margin: 10px 0; border: 0; border-top: 1px solid #e0e0e0;">',
+                layout=widgets.Layout(width='100%')
             )
             container_sections.append(divider)
         
-        # 3. Primary button section (center-aligned) OR Action buttons section (left-aligned)
+        # 2. Add title after divider if it exists
+        if hasattr(self, '_title') and self._title:
+            title_section = widgets.HTML(
+                f"<h4 style='margin: 0 0 15px 0;'>{self._title}</h4>"
+            )
+            container_sections.append(title_section)
+        
+        # 3. Primary button section (center-aligned)
         if has_primary:
             primary_section = widgets.HBox(
                 [self.buttons['primary']],
@@ -590,6 +645,7 @@ class ActionContainer:
                 )
             )
             container_sections.append(primary_section)
+        # 4. Action buttons section (left-aligned) - only if no primary button
         elif has_action:
             action_section = widgets.HBox(
                 [self.buttons['action']],
@@ -601,15 +657,7 @@ class ActionContainer:
             )
             container_sections.append(action_section)
         
-        # 4. Another divider after primary/actions if needed
-        if (has_primary or has_action) and len(container_sections) > 1:
-            final_divider = widgets.HTML(
-                '<hr style="margin: 0; border: 0; border-top: 1px solid #eee;">',
-                layout=widgets.Layout(width='100%', margin='5px 0')
-            )
-            container_sections.append(final_divider)
-        
-        # If no buttons are set, create default primary button
+        # If no buttons are set, create a default primary button
         if not container_sections:
             style = ButtonStyle()
             style.button_color = '#007bff'  # Default blue
@@ -641,7 +689,7 @@ class ActionContainer:
             )
             container_sections.append(primary_section)
         
-        # Update container with proper layout - no float customization allowed
+        # Update container with proper layout
         self.container = widgets.VBox(
             children=container_sections,
             layout=widgets.Layout(
@@ -671,14 +719,29 @@ class ActionContainer:
             disabled: Whether the button is initially disabled
             **kwargs: Additional arguments to pass to Button constructor
         """
-        if icon and not icon.startswith('fa-'):
-            icon = f'fa-{icon}'
-            
+        # Get colors based on button style
+        bg_color, text_color = self._get_button_colors(style)
+        button_style = ButtonStyle()
+        button_style.button_color = bg_color
+        button_style.font_weight = 'bold'
+        button_style.text_color = text_color
+        
+        # Add icon if provided
+        if icon:
+            if not icon.startswith('fa-'):
+                icon = f'fa-{icon}'
+            text = f"<i class='fa {icon} fa-fw'></i> {text}"
+        
         button = widgets.Button(
-            description=f"{text}",
-            layout=widgets.Layout(width='auto'),
+            description=text,
+            layout=widgets.Layout(
+                width='auto',
+                min_width='120px',  # Ensure minimum width for better appearance
+                padding='8px 16px',  # Add padding for better clickability
+                margin='2px'         # Add small margin between buttons
+            ),
             disabled=disabled,
-            button_style=style,
+            style=button_style,
             **kwargs
         )
         

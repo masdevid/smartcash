@@ -16,14 +16,14 @@ class LogLevel(Enum):
     CRITICAL = 'critical'
 
 
-# Define log level styles
+# Define log level styles with better colors and icons
 LOG_LEVEL_STYLES: Dict[LogLevel, Dict[str, Any]] = {
-    LogLevel.DEBUG: {'color': '#6c757d', 'bg': '#f8f9fa', 'icon': '🔍'},
-    LogLevel.INFO: {'color': '#0d6efd', 'bg': '#e7f1ff', 'icon': 'ℹ️'},
-    LogLevel.SUCCESS: {'color': '#198754', 'bg': '#e7f8f0', 'icon': '✅'},
-    LogLevel.WARNING: {'color': '#ffc107', 'bg': '#fff8e6', 'icon': '⚠️'},
-    LogLevel.ERROR: {'color': '#dc3545', 'bg': '#fdf0f2', 'icon': '❌'},
-    LogLevel.CRITICAL: {'color': '#dc3545', 'bg': '#fdf0f2', 'icon': '🔥'}
+    LogLevel.DEBUG: {'color': '#6c757d', 'bg': '#f8f9fa', 'icon': '🔹', 'border': '1px solid #dee2e6'},
+    LogLevel.INFO: {'color': '#0d6efd', 'bg': '#e7f1ff', 'icon': 'ℹ️', 'border': '1px solid #b3d1ff'},
+    LogLevel.SUCCESS: {'color': '#198754', 'bg': '#e7f8f0', 'icon': '✓', 'border': '1px solid #a3cfbb'},
+    LogLevel.WARNING: {'color': '#ff9800', 'bg': '#fff3e0', 'icon': '⚠️', 'border': '1px solid #ffe0b2'},
+    LogLevel.ERROR: {'color': '#d32f2f', 'bg': '#ffebee', 'icon': '✗', 'border': '1px solid #ffcdd2'},
+    LogLevel.CRITICAL: {'color': '#b71c1c', 'bg': '#ffebee', 'icon': '🔥', 'border': '1px solid #ffcdd2'}
 }
 
 

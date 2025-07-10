@@ -33,7 +33,8 @@ class LogAccordion(BaseUIComponent):
         auto_scroll: bool = True,
         enable_deduplication: bool = True,
         duplicate_window_ms: Optional[int] = None,
-        max_duplicate_count: Optional[int] = None
+        max_duplicate_count: Optional[int] = None,
+        namespace_filter: Optional[str] = None
     ) -> None:
         """Initialize the LogAccordion.
         
@@ -62,11 +63,17 @@ class LogAccordion(BaseUIComponent):
         self.duplicate_window_ms = duplicate_window_ms or self.DEFAULT_DUPLICATE_WINDOW_MS
         self.max_duplicate_count = max_duplicate_count or self.DEFAULT_MAX_DUPLICATE_COUNT
         
+        # Namespace filtering
+        self.namespace_filter = namespace_filter
+        
         # Initialize state
         self.log_entries: List[LogEntry] = []
         self.last_entry: Optional[LogEntry] = None
         self.duplicate_count: int = 0
         self.log_id = f'log-container-{uuid.uuid4().hex}'
+        
+        # Cache for filtered entries to improve performance
+        self._filtered_entries: List[LogEntry] = []
         
         # Initialize UI components
         self._ui_components: Dict[str, Any] = {}
@@ -99,18 +106,20 @@ class LogAccordion(BaseUIComponent):
         # Add custom class for JavaScript targeting
         self._ui_components['log_container'].add_class('smartcash-log-container')
         
-        # Create entries container
+        # Create entries container with better spacing and scrolling
         self._ui_components['entries_container'] = widgets.VBox(
             layout=widgets.Layout(
                 width='100%',
                 display='flex',
                 flex_flow='column',
                 align_items='stretch',
-                gap='4px',
+                gap='2px',
                 margin='0',
-                padding='8px',
+                padding='4px 8px',
                 overflow_y='auto',
-                overflow_x='hidden'
+                overflow_x='hidden',
+                max_height=self.height,
+                min_height='100px'
             )
         )
         
@@ -145,24 +154,112 @@ class LogAccordion(BaseUIComponent):
                 overflow-x: hidden !important;
                 max-height: 100% !important;
                 width: 100% !important;
-                padding: 8px !important;
+                padding: 4px 0 !important;
                 margin: 0 !important;
+                font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace !important;
+                font-size: 12.5px !important;
+                line-height: 1.4 !important;
             }}
             
-            /* Ensure log entries are visible and properly formatted */
-            .{self.log_id} .p-Widget.panel-widgets-box > div {{
-                margin-bottom: 4px;
-                width: 100%;
-                box-sizing: border-box;
-            }}
-            
-            /* Style for log entries */
+            /* Log entry styling */
             .log-entry {{
                 width: 100% !important;
                 max-width: 100% !important;
                 overflow: visible !important;
                 word-wrap: break-word !important;
                 white-space: pre-wrap !important;
+                padding: 4px 8px !important;
+                margin: 1px 0 !important;
+                border-radius: 3px !important;
+                border-left: 3px solid transparent !important;
+                transition: all 0.15s ease !important;
+            }}
+            
+            /* Hover effect for log entries */
+            .log-entry:hover {{
+                background-color: rgba(0, 0, 0, 0.02) !important;
+            }}
+            
+            /* Log entry content */
+            .log-content {{
+                display: flex !important;
+                align-items: flex-start !important;
+                gap: 6px !important;
+            }}
+            
+            /* Timestamp */
+            .log-timestamp {{
+                color: #6c757d !important;
+                font-size: 11px !important;
+                white-space: nowrap !important;
+                opacity: 0.8 !important;
+                flex-shrink: 0 !important;
+                padding-top: 1px !important;
+            }}
+            
+            /* Log level badge */
+            .log-level {{
+                font-weight: 600 !important;
+                font-size: 11px !important;
+                padding: 1px 4px !important;
+                border-radius: 3px !important;
+                margin-right: 2px !important;
+                text-transform: uppercase !important;
+                letter-spacing: 0.5px !important;
+                flex-shrink: 0 !important;
+                line-height: 1.3 !important;
+            }}
+            
+            /* Namespace badge */
+            .log-namespace {{
+                color: #6c757d !important;
+                background: rgba(108, 117, 125, 0.1) !important;
+                border-radius: 3px !important;
+                padding: 0 4px !important;
+                font-size: 11px !important;
+                font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace !important;
+                white-space: nowrap !important;
+                overflow: hidden !important;
+                text-overflow: ellipsis !important;
+                max-width: 200px !important;
+                display: inline-block !important;
+                vertical-align: middle !important;
+                line-height: 1.4 !important;
+                margin-right: 4px !important;
+            }}
+            
+            /* Log message */
+            .log-message {{
+                flex: 1 !important;
+                min-width: 0 !important;
+                word-break: break-word !important;
+                white-space: pre-wrap !important;
+            }}
+            
+            /* Error traceback */
+            .error-traceback {{
+                margin-top: 4px !important;
+                margin-left: 16px !important;
+                padding-left: 8px !important;
+                border-left: 2px solid rgba(220, 53, 69, 0.2) !important;
+                display: none !important;
+            }}
+            
+            .show-traceback .error-traceback {{
+                display: block !important;
+            }}
+            
+            .toggle-traceback {{
+                color: #6c757d !important;
+                cursor: pointer !important;
+                font-size: 11px !important;
+                margin-top: 2px !important;
+                display: inline-block !important;
+                user-select: none !important;
+            }}
+            
+            .toggle-traceback:hover {{
+                text-decoration: underline !important;
             }}
             
             /* Scrollbar styling */
@@ -172,12 +269,25 @@ class LogAccordion(BaseUIComponent):
             }}
             
             .{self.log_id}::-webkit-scrollbar-thumb {{
-                background-color: rgba(0, 0, 0, 0.2);
-                border-radius: 3px;
+                background-color: rgba(0, 0, 0, 0.2) !important;
+                border-radius: 3px !important;
             }}
             
             .{self.log_id}::-webkit-scrollbar-track {{
-                background: transparent;
+                background: transparent !important;
+            }}
+            
+            /* Duplicate counter */
+            .duplicate-counter {{
+                background: #6c757d !important;
+                color: white !important;
+                border-radius: 10px !important;
+                font-size: 10px !important;
+                padding: 0 5px !important;
+                margin-left: 4px !important;
+                display: inline-block !important;
+                vertical-align: middle !important;
+                line-height: 1.4 !important;
             }}
         </style>
         
@@ -248,123 +358,157 @@ class LogAccordion(BaseUIComponent):
         # Update the display
         self._update_log_display()
     
+    def _get_filtered_entries(self) -> List[LogEntry]:
+        """Get log entries filtered by namespace if filter is set."""
+        if not self.namespace_filter:
+            return self.log_entries
+            
+        # Filter entries by namespace
+        return [entry for entry in self.log_entries 
+                if entry.namespace and entry.namespace.startswith(self.namespace_filter)]
+    
     def _update_log_display(self) -> None:
         """Update the log display with current entries."""
         if not self._initialized:
+            self.initialize()
+            
+        # Get filtered entries
+        filtered_entries = self._get_filtered_entries()
+        
+        # Only update if entries changed
+        if hasattr(self, '_last_filtered_count') and \
+           len(filtered_entries) == self._last_filtered_count:
             return
             
-        entries_container = self._ui_components['entries_container']
+        self._last_filtered_count = len(filtered_entries)
         
-        # For duplicate entries, just refresh the last widget
-        if self.last_entry and self.last_entry.count > 1:
-            entries_container.children = tuple(list(entries_container.children)[:-1] + [self._create_log_widget(self.last_entry)])
-        else:
-            # Create widgets for new entries
-            current_count = len(entries_container.children)
-            new_entries = self.log_entries[current_count:]
-            
-            if new_entries:
-                new_widgets = [self._create_log_widget(entry) for entry in new_entries]
-                entries_container.children = list(entries_container.children) + new_widgets
+        # Clear existing entries
+        entries = []
+        
+        # Add log entries
+        for entry in filtered_entries:
+            entries.append(self._create_log_widget(entry))
+        
+        # Update the display
+        self._ui_components['entries_container'].children = entries
         
         # Auto-scroll if enabled
         if self.auto_scroll:
             self._scroll_to_bottom()
     
+    def _shorten_namespace(self, namespace: Optional[str]) -> str:
+        """Shorten long namespace paths for better readability."""
+        if not namespace:
+            return ""
+            
+        # Common prefixes to shorten
+        replacements = {
+            'smartcash.': '',
+            'smartcash.ui.': 'ui.',
+            'smartcash.ui.core.': 'core.',
+            'smartcash.ui.core.shared.': 'core.',
+            'smartcash.ui.components.': 'components.',
+            'smartcash.ui.setup.': 'setup.',
+            'smartcash.ui.setup.colab.': 'colab.'
+        }
+        
+        # Apply replacements
+        short_ns = namespace
+        for old, new in replacements.items():
+            if short_ns.startswith(old):
+                short_ns = new + short_ns[len(old):]
+                break
+                
+        return short_ns
+
     def _create_log_widget(self, entry: LogEntry) -> widgets.HTML:
-        """Create an HTML widget for a log entry."""
-        style = get_log_level_style(entry.level)
-        
-        # Format timestamp
-        timestamp_html = self._format_timestamp(entry.timestamp) if self.show_timestamps else ''
-        
-        # Create namespace badge
-        ns_badge = self._create_namespace_badge(entry.namespace or entry.module)
-        
-        # Add duplicate count if applicable
-        count_badge = f'<span style="margin-left:4px;color:#868e96;font-size:0.8em;">(x{entry.count})</span>' if entry.count > 1 else ''
-        
-        # Add border for duplicate messages
-        border_style = '2px solid #e9ecef' if entry.show_duplicate_indicator else 'none'
-        
-        # Build the HTML for the log entry with row layout
-        level_icon = f'<span style="margin-right:4px;">{style["icon"]}</span>' if self.show_level_icons else ''
-        
-        html = f"""
-        <div class="log-entry" style="
-            margin:0 0 1px 0;
-            padding:4px 8px;
-            border-radius:2px;
-            display:flex;
-            background-color:{style['bg']};
-            border-left:2px solid {style['color']};
-            font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;
-            font-size:12px;
-            line-height:1.5;
-            word-break:break-word;
-            white-space:pre-wrap;
-            overflow-wrap:break-word;
-            border-right:{border_style};
-        ">
-            <div style="display:flex;flex-direction:column;width:100%;">
-                <div style="display:flex;align-items:flex-start;">
-                    {level_icon}
-                    {ns_badge}
-                    <div style="flex:1;min-width:0;">
-                        <span style="color:{style['color']};font-weight:500;">{entry.message}</span>
-                        {count_badge}
+        """Create an HTML widget for a log entry with enhanced styling."""
+        try:
+            # Get style for the log level
+            style = get_log_level_style(entry.level)
+            
+            # Format timestamp if enabled
+            timestamp = f"<span class='log-timestamp'>{self._format_timestamp(entry.timestamp)}</span>" if self.show_timestamps else ""
+            
+            # Create level badge with consistent styling
+            level_icon = f"{style['icon']} " if self.show_level_icons else ""
+            level_badge = f"<span class='log-level' style='background: {style['bg']}; color: {style['color']}; border: {style['border']}'>{level_icon}{entry.level.value.upper()}</span>"
+            
+            # Create namespace badge if provided
+            namespace = self._shorten_namespace(entry.namespace)
+            namespace_badge = f"<span class='log-namespace' title='{entry.namespace}'>{namespace}</span>" if namespace else ""
+            
+            # Add duplicate counter if needed
+            duplicate_counter = f"<span class='duplicate-counter'>{entry.count}</span>" if entry.show_duplicate_indicator else ""
+            
+            # Check if this is an error with traceback
+            has_traceback = '\n' in entry.message and entry.level in [LogLevel.ERROR, LogLevel.CRITICAL]
+            traceback_id = f"traceback-{id(entry)}" if has_traceback else ""
+            
+            if has_traceback:
+                # Split message and traceback
+                message, traceback = entry.message.split('\n', 1)
+                traceback = traceback.strip()
+                
+                # Create expandable traceback
+                trace_html = f"""
+                <div class='toggle-traceback' onclick='document.getElementById("{traceback_id}").classList.toggle("show-traceback")'>
+                    ▼ Show traceback
+                </div>
+                <div class='error-traceback' id='{traceback_id}'>
+                    <pre style='margin:0; white-space:pre-wrap;'>{traceback}</pre>
+                </div>
+                """.format(traceback_id=traceback_id, traceback=traceback)
+            else:
+                message = entry.message
+                trace_html = ""
+            
+            # Create the log entry HTML with enhanced structure
+            html = f"""
+            <div class='log-entry' style='border-left-color: {color} !important;'>
+                <div class='log-content'>
+                    {timestamp}
+                    {level_badge}
+                    {namespace_badge}
+                    <div class='log-message'>
+                        {message}{duplicate_counter}
+                        {trace_html}
                     </div>
-                    {timestamp_html}
                 </div>
             </div>
-        </div>
-        """
-        
-        return widgets.HTML(html, layout=widgets.Layout(width='100%', margin='0', padding='0'))
-    
-    def _format_timestamp(self, timestamp: datetime) -> str:
-        """Format timestamp with error handling."""
-        if not timestamp:
-            return ''
-        
-        try:
-            ts = timestamp
-            if not isinstance(ts, datetime):
-                if isinstance(ts, (int, float)):
-                    ts = datetime.fromtimestamp(ts)
-                else:
-                    ts = datetime.fromisoformat(str(ts))
-            
-            # Ensure timezone-aware
-            if ts.tzinfo is None:
-                ts = pytz.utc.localize(ts)
-            
-            # Convert to local timezone
-            local_ts = ts.astimezone()
-            timestamp_str = local_ts.strftime('%H:%M:%S %Z')
-            return f"<span style='color:#6c757d;font-size:10px;font-family:monospace;margin-left:4px;white-space:nowrap;'>{timestamp_str}</span>"
-            
-        except Exception:
-            # Fallback to current time if timestamp is invalid
-            timestamp_str = datetime.now().astimezone().strftime('%H:%M:%S %Z')
-            return f"<span style='color:#6c757d;font-size:10px;font-family:monospace;margin-left:4px;white-space:nowrap;'>{timestamp_str}</span>"
-    
-    def _create_namespace_badge(self, namespace: Optional[str]) -> str:
-        """Create namespace badge with error handling."""
-        if not namespace:
-            return ''
-        
-        try:
-            from smartcash.ui.logger.namespace import KNOWN_NAMESPACES
-            ns_display = KNOWN_NAMESPACES.get(namespace, namespace.split('.')[-1])
-            return (
-                f'<span style="display:inline-block;padding:1px 4px;margin:1px 4px 0 0;align-self:flex-start;'
-                f'background-color:#f1f3f5;color:#5f3dc4;border-radius:2px;'
-                f'font-size:10px;font-weight:500;line-height:1.2;white-space:nowrap;'
-                f'">{ns_display}</span>'
+            """.format(
+                color=style['color'],
+                timestamp=timestamp,
+                level_badge=level_badge,
+                namespace_badge=namespace_badge,
+                message=message,
+                duplicate_counter=duplicate_counter,
+                trace_html=trace_html
             )
-        except (ImportError, AttributeError):
-            return ''
+            
+            return widgets.HTML(html)
+            
+        except Exception as e:
+            self._logger.error(f"Error creating log widget: {str(e)}")
+            return widgets.HTML(f"<div class='log-entry' style='color: #dc3545;'>Error displaying log: {str(e)}</div>")
+
+    def _format_timestamp(self, timestamp: datetime) -> str:
+        """Format timestamp with error handling and timezone awareness."""
+        try:
+            # Make timezone aware if not already
+            if timestamp.tzinfo is None:
+                timestamp = timestamp.astimezone()
+            return timestamp.strftime("%H:%M:%S")
+        except Exception:
+            return ""
+
+    def _create_namespace_badge(self, namespace: Optional[str]) -> str:
+        """Create namespace badge with error handling.
+        
+        Note: This method is kept for backward compatibility but the actual
+        namespace badge is now created in _create_log_widget for better styling.
+        """
+        return ""
     
     def _scroll_to_bottom(self) -> None:
         """Scroll the log container to the bottom using JavaScript."""

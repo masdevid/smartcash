@@ -26,6 +26,7 @@ def create_operation_container(
     show_dialog: bool = True,
     show_logs: bool = True,
     log_module_name: str = "Operation",
+    log_namespace_filter: Optional[str] = None,
     **kwargs
 ) -> Dict[str, Any]:
     """Create an operation container with the specified components.
@@ -35,6 +36,7 @@ def create_operation_container(
         show_dialog: Whether to enable dialog functionality
         show_logs: Whether to show the log accordion
         log_module_name: Name to display in the log accordion header
+        log_namespace_filter: Optional namespace prefix to filter logs (e.g. 'preprocess')
         **kwargs: Additional arguments to pass to OperationContainer
         
     Returns:
@@ -45,6 +47,7 @@ def create_operation_container(
         show_dialog=show_dialog,
         show_logs=show_logs,
         log_module_name=log_module_name,
+        log_namespace_filter=log_namespace_filter,
         **kwargs
     )
     
@@ -80,6 +83,7 @@ class OperationContainer(BaseUIComponent):
                  progress_config: Optional[ProgressConfig] = None,
                  log_module_name: str = "Operation",
                  log_height: str = "300px",
+                 log_namespace_filter: Optional[str] = None,
                  **kwargs):
         """Initialize the OperationContainer.
         
@@ -92,6 +96,7 @@ class OperationContainer(BaseUIComponent):
             progress_config: Configuration for the progress tracker
             log_module_name: Name of the module for logging
             log_height: Height of the log accordion
+            log_namespace_filter: Optional namespace prefix to filter logs (e.g. 'preprocess')
             **kwargs: Additional arguments for BaseUIComponent (logger, error_handler)
         """
         # Filter out unexpected kwargs for BaseUIComponent
@@ -107,6 +112,7 @@ class OperationContainer(BaseUIComponent):
         self.show_dialog = show_dialog
         self.log_module_name = log_module_name
         self.log_height = log_height
+        self.log_namespace_filter = log_namespace_filter
         
         # Initialize components
         self.progress_tracker = None
@@ -156,10 +162,12 @@ class OperationContainer(BaseUIComponent):
         # Create log accordion if enabled
         if self.show_logs:
             self.log_accordion = LogAccordion(
-                component_name=f"{self.component_name}_logs",
+                component_name=f"{self.component_name}_log_accordion",
                 module_name=self.log_module_name,
-                height=self.log_height
+                height=self.log_height,
+                namespace_filter=self.log_namespace_filter
             )
+            self.log_accordion.initialize()
         
         # Create main container
         self._create_container()

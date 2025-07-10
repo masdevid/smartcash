@@ -12,7 +12,7 @@ Initialization Flow:
 from typing import Dict, Any, List, Optional
 from smartcash.ui.core.initializers.module_initializer import ModuleInitializer
 from smartcash.ui.core.initializers.display_initializer import DisplayInitializer
-from smartcash.ui.dataset.downloader.components.downloader_ui import create_downloader_ui_components
+from smartcash.ui.dataset.downloader.components.downloader_ui import create_downloader_ui
 from smartcash.ui.dataset.downloader.configs.downloader_config_handler import DownloaderConfigHandler
 from smartcash.ui.dataset.downloader.operations.manager import DownloaderOperationManager
 from smartcash.ui.dataset.downloader.operations.manager import DownloadHandlerManager
@@ -46,9 +46,11 @@ class DownloaderInitializer(ModuleInitializer):
         """
         try:
             self.logger.info("🔧 Creating downloader UI components with operation container")
-            ui_components = create_downloader_ui_components(config, **kwargs)
-
-            # Add metadata following the established pattern
+            
+            # Create UI components with the new structure
+            ui_components = create_downloader_ui(config=config, **kwargs)
+            
+            # Add module-specific metadata
             ui_components.update({
                 'downloader_initialized': True,
                 'module_name': 'downloader',

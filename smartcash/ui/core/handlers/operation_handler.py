@@ -593,7 +593,7 @@ class OperationHandler(BaseHandler):
     def shutdown(self, wait: bool = True) -> None:
         """Shutdown executor."""
         self._executor.shutdown(wait=wait)
-        self.logger.info("⚡ Executor shutdown")
+        self.logger.debug("⚡ Executor shutdown")
     
     def __del__(self):
         """Cleanup executor saat delete."""

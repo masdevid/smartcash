@@ -5,14 +5,14 @@ Description: Preprocessing initializer with modern UI container structure
 
 from typing import Dict, Any, List, Optional
 from smartcash.ui.core.initializers.module_initializer import ModuleInitializer
-from smartcash.ui.core.initializers.display_initializer import DisplayInitializer, create_ui_display_function
+from smartcash.ui.core.initializers.display_initializer import DisplayInitializer
 from smartcash.ui.dataset.preprocess.constants import UI_CONFIG, MODULE_METADATA
 from smartcash.ui.dataset.preprocess.configs.preprocess_config_handler import PreprocessConfigHandler
 from smartcash.ui.dataset.preprocess.components.preprocess_ui import create_preprocessing_main_ui
 from smartcash.ui.dataset.preprocess.handlers.preprocess_ui_handler import PreprocessUIHandler
 
 
-class PreprocessInitializer(DisplayInitializer):
+class PreprocessInitializer(ModuleInitializer):
     """
     Preprocessing initializer with modern UI container structure.
     
@@ -28,94 +28,137 @@ class PreprocessInitializer(DisplayInitializer):
         """Initialize preprocessing initializer."""
         super().__init__(
             module_name=UI_CONFIG['module_name'],
-            parent_module=UI_CONFIG['parent_module']
+            config_handler_class=PreprocessConfigHandler
         )
         
         # Store module metadata
         self.module_metadata = MODULE_METADATA
         
-        # Add logger for compatibility
-        import logging
-        self.logger = logging.getLogger(f"smartcash.ui.{UI_CONFIG['parent_module']}.{UI_CONFIG['module_name']}")
+        # Initialize handlers
+        self._module_handler = None
     
     
     def create_ui_components(self, config: Dict[str, Any], **kwargs) -> Dict[str, Any]:
         """
-        Create UI components for preprocessing module.
+        Create preprocessing UI components.
         
         Args:
             config: Configuration dictionary
             **kwargs: Additional arguments
             
         Returns:
-            Dictionary of UI components
+            Dictionary containing UI components and module state
         """
-        self.logger.info("🎯 Creating preprocessing UI components")
-        
-        # Create UI components using modern container structure
-        ui_components = create_preprocessing_main_ui(config)
-        
-        # Add module metadata
-        ui_components.update({
-            'module_name': self.module_name,
-            'parent_module': self.parent_module,
-            'module_metadata': self.module_metadata,
-            'data_dir': config.get('data', {}).get('dir', 'data')
-        })
-        
-        self.logger.info(f"✅ Created {len(ui_components)} UI components")
-        return ui_components
+        try:
+            self.logger.info("🎯 Starting preprocessing module initialization")
+            
+            # Filter out any kwargs that create_preprocessing_main_ui doesn't expect
+            filtered_kwargs = {k: v for k, v in kwargs.items() 
+                             if k not in ['env']}
+            
+            # Create main UI components
+            self.logger.info("🎯 Creating preprocessing UI components")
+            ui_components = create_preprocessing_main_ui(config=config, **filtered_kwargs)
+            
+            if not ui_components:
+                raise ValueError("Failed to create UI components: create_preprocessing_main_ui returned None")
+                
+            # Add module metadata to UI components
+            ui_components['module_metadata'] = self.module_metadata
+            self.logger.info("✅ Created UI components")
+            
+            # Create module handler
+            self._module_handler = self.create_module_handler(ui_components, **kwargs)
+            if not self._module_handler:
+                raise ValueError("Failed to create module handler")
+            self.logger.info("✅ Created module handler")
+            
+            # Prepare result dictionary
+            result = {
+                'ui_components': ui_components,
+                'module_handler': self._module_handler,
+                'ui': ui_components.get('ui')  # For backward compatibility
+            }
+            
+            # Add UI components to top level for backward compatibility
+            if isinstance(ui_components, dict):
+                result.update(ui_components)
+                
+            self.logger.info("✅ Preprocessing module initialization complete")
+            return result
+            
+        except Exception as e:
+            error_msg = f"❌ Failed to initialize preprocessing module: {str(e)}"
+            self.logger.error(error_msg, exc_info=True)
+            raise RuntimeError(error_msg) from e
     
-    def create_config_handler(self, **kwargs) -> PreprocessConfigHandler:
+    def _connect_handlers(self, module_handler: 'PreprocessUIHandler', ui_components: Dict[str, Any]) -> None:
         """
-        Create config handler for preprocessing module.
+        Connect UI components with their respective handlers.
         
         Args:
-            **kwargs: Additional arguments
-            
-        Returns:
-            PreprocessConfigHandler instance
+            module_handler: The module handler instance
+            ui_components: Dictionary of UI components
         """
-        self.logger.info("🎯 Creating preprocessing config handler")
-        
-        # Get persistence and sharing settings
-        persistence_enabled = kwargs.get('persistence_enabled', True)
-        enable_sharing = kwargs.get('enable_sharing', True)
-        
-        # Create config handler
-        config_handler = PreprocessConfigHandler(
-            module_name=self.module_name,
-            parent_module=self.parent_module,
-            persistence_enabled=persistence_enabled,
-            enable_sharing=enable_sharing
-        )
-        
-        self.logger.info("✅ Created preprocessing config handler")
-        return config_handler
-    
+        try:
+            # Get UI components
+            button_run = ui_components.get('button_run')
+            button_reset = ui_components.get('button_reset')
+            
+            # Connect button click handlers
+            if button_run and hasattr(module_handler, 'on_run_clicked'):
+                button_run.on_click(module_handler.on_run_clicked)
+                
+            if button_reset and hasattr(module_handler, 'on_reset_clicked'):
+                button_reset.on_click(module_handler.on_reset_clicked)
+                
+            # Connect other UI components as needed
+            # Example:
+            # if 'some_dropdown' in ui_components and hasattr(module_handler, 'on_dropdown_change'):
+            #     ui_components['some_dropdown'].observe(module_handler.on_dropdown_change, 'value')
+                
+            self.logger.info("✅ Connected UI event handlers")
+            
+        except Exception as e:
+            error_msg = f"❌ Failed to connect UI event handlers: {str(e)}"
+            self.logger.error(error_msg, exc_info=True)
+            raise RuntimeError(error_msg) from e
+            
     def create_module_handler(self, ui_components: Dict[str, Any], **kwargs) -> PreprocessUIHandler:
         """
         Create module handler for preprocessing module.
         
         Args:
             ui_components: Dictionary of UI components
-            **kwargs: Additional arguments
+            **kwargs: Additional arguments (filtered to only include expected args)
             
         Returns:
             PreprocessUIHandler instance
         """
-        self.logger.info("🎯 Creating preprocessing module handler")
-        
-        # Create module handler
-        module_handler = PreprocessUIHandler(
-            ui_components=ui_components,
-            config_handler=self.config_handler,
-            module_name=self.module_name,
-            parent_module=self.parent_module
-        )
-        
-        self.logger.info("✅ Created preprocessing module handler")
-        return module_handler
+        try:
+            # Filter kwargs to only include expected parameters
+            expected_kwargs = {
+                'module_name': self.module_name,
+                'parent_module': self.parent_module
+            }
+            
+            # Create our specific handler class directly
+            module_handler = PreprocessUIHandler(
+                ui_components=ui_components,
+                config_handler=self.config_handler,
+                **expected_kwargs
+            )
+            
+            # Connect event handlers
+            self._connect_handlers(module_handler, ui_components)
+            
+            self.logger.info("✅ Created preprocessing module handler")
+            return module_handler
+            
+        except Exception as e:
+            error_msg = f"❌ Failed to create preprocessing module handler: {str(e)}"
+            self.logger.error(error_msg, exc_info=True)
+            raise RuntimeError(error_msg) from e
     
     def setup_handlers(self, ui_components: Dict[str, Any], **kwargs) -> Dict[str, Any]:
         """
@@ -251,15 +294,6 @@ class PreprocessInitializer(DisplayInitializer):
             raise RuntimeError("Backend preprocessing module not available")
 
 
-# ==================== DISPLAY FUNCTION ====================
-
-# Create display function using DisplayInitializer pattern
-initialize_preprocess_ui = create_ui_display_function(
-    module_name=UI_CONFIG['module_name'],
-    parent_module=UI_CONFIG['parent_module'],
-)
-
-
 # ==================== FACTORY FUNCTION ====================
 
 def create_preprocessing_initializer() -> PreprocessInitializer:
@@ -270,6 +304,25 @@ def create_preprocessing_initializer() -> PreprocessInitializer:
         PreprocessInitializer instance
     """
     return PreprocessInitializer()
+
+
+# ==================== DISPLAY INITIALIZER ====================
+
+class PreprocessDisplayInitializer(DisplayInitializer):
+    """DisplayInitializer wrapper for preprocessing module"""
+    
+    def __init__(self):
+        super().__init__(module_name=UI_CONFIG['module_name'], 
+                         parent_module=UI_CONFIG['parent_module'])
+        self._preprocess_initializer = PreprocessInitializer()
+    
+    def _initialize_impl(self, **kwargs) -> Dict[str, Any]:
+        """Implementation using existing PreprocessInitializer"""
+        return self._preprocess_initializer.initialize(**kwargs)
+
+
+# Global display initializer instance
+_preprocess_display_initializer = PreprocessDisplayInitializer()
 
 
 # ==================== GLOBAL INSTANCE ====================
@@ -286,3 +339,19 @@ def get_preprocessing_initializer() -> PreprocessInitializer:
         PreprocessInitializer instance
     """
     return _preprocessing_initializer
+
+
+def initialize_preprocess_ui(env=None, config=None, **kwargs) -> None:
+    """
+    Initialize and display preprocessing UI using DisplayInitializer
+
+    Args:
+        env: Optional environment context
+        config: Optional configuration dictionary
+        **kwargs: Additional arguments
+    
+    Note:
+        This function displays the UI directly and returns None.
+        Use get_preprocessing_initializer() if you need access to the components dictionary.
+    """
+    _preprocess_display_initializer.initialize_and_display(config=config, env=env, **kwargs)

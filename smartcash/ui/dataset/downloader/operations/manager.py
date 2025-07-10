@@ -29,22 +29,37 @@ class DownloaderOperationManager(OperationHandler):
         self.cleanup_handler = None
     
     def initialize(self) -> None:
-        """Initialize the downloader operation manager."""
+        """Initialize the downloader operation manager with the latest UI structure."""
         self.logger.info("🚀 Initializing Downloader operation manager")
         
-        # Initialize operation handlers with UI components
+        # Get UI components from instance or parent
         ui_components = getattr(self, '_ui_components', {})
-        # Access operation container (may be stored as _operation_container in parent class)
-        operation_container = getattr(self, 'operation_container', None) or getattr(self, '_operation_container', None)
-        if operation_container and hasattr(operation_container, 'get_ui_components'):
-            ui_components.update(operation_container.get_ui_components())
         
-        # Ensure operation container is available
-        ui_components['operation_container'] = operation_container
+        # Get operation container from various possible locations
+        operation_container = (
+            getattr(self, 'operation_container', None) or
+            getattr(self, '_operation_container', None) or
+            ui_components.get('operation_container')
+        )
         
+        # Update operation container reference if not already set
+        if operation_container and 'operation_container' not in ui_components:
+            ui_components['operation_container'] = operation_container
+            
+        # Store the updated components back to the instance
+        self._ui_components = ui_components
+        
+        # Initialize operation handlers with the updated components
         self.download_handler = DownloadOperationHandler(ui_components=ui_components)
         self.check_handler = CheckOperationHandler(ui_components=ui_components)
         self.cleanup_handler = CleanupOperationHandler(ui_components=ui_components)
+        
+        # Store references to buttons if they exist in the UI components
+        self._buttons = {
+            'download': ui_components.get('download_button'),
+            'check': ui_components.get('check_button'),
+            'cleanup': ui_components.get('cleanup_button')
+        }
         
         self.logger.info("✅ Downloader operation manager initialization complete")
     

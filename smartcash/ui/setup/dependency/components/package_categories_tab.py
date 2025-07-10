@@ -11,7 +11,7 @@ from ..configs.dependency_defaults import get_default_package_categories, get_pa
 from ..services.package_status_tracker import PackageStatusTracker
 
 def create_package_categories_tab(config: Dict[str, Any], logger=None) -> widgets.VBox:
-    """Create enhanced tab for package categories with compact responsive design."""
+    """Create enhanced tab for package categories with full-width compact design."""
     
     # Get package categories and load custom packages
     categories = get_default_package_categories()
@@ -29,38 +29,35 @@ def create_package_categories_tab(config: Dict[str, Any], logger=None) -> widget
         card = create_enhanced_category_card(category_key, category_info, selected_packages, status_tracker, logger)
         category_cards.append(card)
     
-    # Create responsive grid container
-    form_container = create_form_container(
-        layout_type=LayoutType.GRID,
-        grid_columns='repeat(auto-fit, minmax(350px, 1fr))',  # More compact minimum width
-        gap='16px',  # Smaller gap for tighter layout
-        container_padding='16px'  # Reduced padding
-    )
-    
-    # Add category cards to the grid
-    for card in category_cards:
-        form_container['add_item'](card, height='auto')
-    
-    # Create compact header
-    header = widgets.HTML("""
-    <div style="margin-bottom: 16px; padding: 0 16px;">
-        <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 8px;">
-            <span style="font-size: 24px;">📦</span>
-            <div>
-                <h3 style="color: #333; margin: 0; font-size: 1.25rem;">Package Categories</h3>
-                <p style="color: #666; margin: 0; font-size: 0.9rem;">Select packages from predefined categories. Default packages (⭐) are recommended.</p>
+    # Create full width container
+    container = widgets.VBox([
+        # Header
+        widgets.HTML("""
+        <div style="margin-bottom: 16px; padding: 0 16px;">
+            <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 8px;">
+                <span style="font-size: 24px;">📦</span>
+                <div>
+                    <h3 style="color: #333; margin: 0; font-size: 1.25rem;">Package Categories</h3>
+                    <p style="color: #666; margin: 0; font-size: 0.9rem;">Select packages from predefined categories. Default packages (⭐) are recommended.</p>
+                </div>
             </div>
         </div>
-    </div>
-    """)
-    
-    # Create container with better responsive layout
-    container = widgets.VBox([
-        header,
-        form_container['container']
+        """),
+        
+        # Category cards in a scrollable container
+        widgets.VBox(
+            category_cards,
+            layout=widgets.Layout(
+                width='100%',
+                overflow_y='auto',
+                padding='0 16px 16px 16px',
+                gap='16px'
+            )
+        )
     ], layout=widgets.Layout(
         width='100%',
-        overflow='visible'
+        height='100%',
+        overflow='hidden'
     ))
     
     # Store status tracker for external access
@@ -70,7 +67,7 @@ def create_package_categories_tab(config: Dict[str, Any], logger=None) -> widget
     return container
 
 def create_enhanced_category_card(category_key: str, category_info: Dict[str, Any], selected_packages: List[str], status_tracker: PackageStatusTracker, logger) -> widgets.VBox:
-    """Create enhanced compact card for package category."""
+    """Create enhanced compact card for package category with full width layout."""
     
     icon = category_info.get('icon', '📦')
     name = category_info.get('name', category_key)
@@ -83,58 +80,52 @@ def create_enhanced_category_card(category_key: str, category_info: Dict[str, An
     <div style="
         background: linear-gradient(135deg, {color}15, {color}08);
         border-left: 3px solid {color};
-        padding: 12px 16px;
-        margin-bottom: 12px;
-        border-radius: 6px;
+        padding: 10px 16px;
+        border-radius: 6px 6px 0 0;
         border: 1px solid {color}30;
+        border-bottom: none;
     ">
         <div style="display: flex; align-items: center; gap: 10px;">
-            <span style="font-size: 20px;">{icon}</span>
+            <span style="font-size: 18px;">{icon}</span>
             <div style="flex: 1; min-width: 0;">
-                <h4 style="margin: 0; color: {color}; font-size: 1.1rem; font-weight: 600;">{name}</h4>
-                <p style="margin: 2px 0 0 0; color: #666; font-size: 0.85rem; line-height: 1.2;">{description}</p>
-            </div>
-            <div style="
-                background: {color}20;
-                color: {color};
-                padding: 2px 8px;
-                border-radius: 12px;
-                font-size: 0.75rem;
-                font-weight: 500;
-            ">
-                {len(packages)} packages
+                <h4 style="margin: 0; color: {color}; font-size: 1rem; font-weight: 600; line-height: 1.2;">
+                    {name} <span style="color: #666; font-weight: 400; font-size: 0.9rem;">{len(packages)} packages</span>
+                </h4>
+                {f'<p style="margin: 2px 0 0 0; color: #666; font-size: 0.8rem; line-height: 1.2;">{description}</p>' if description else ''}
             </div>
         </div>
     </div>
     """)
     
-    # Create compact package list
+    # Create compact package list in a grid layout (3 columns)
     package_widgets = []
     for pkg in packages:
         pkg_widget = create_compact_package_widget(pkg, pkg['name'] in selected_packages, status_tracker, logger)
         package_widgets.append(pkg_widget)
     
-    # Create scrollable container for packages if there are many
-    package_container = widgets.VBox(
-        package_widgets, 
+    # Create grid layout for packages (3 columns)
+    grid = widgets.GridBox(
+        children=package_widgets,
         layout=widgets.Layout(
-            gap='8px',
-            max_height='400px' if len(packages) > 6 else 'auto',
-            overflow_y='auto' if len(packages) > 6 else 'visible',
-            padding='0 4px'
+            width='100%',
+            grid_template_columns='repeat(auto-fill, minmax(300px, 1fr))',
+            grid_gap='8px',
+            padding='12px',
+            overflow='visible'
         )
     )
     
-    # Create card with improved styling
+    # Create card with full width and no shadow for cleaner look
     card = widgets.VBox([
         header,
-        package_container
+        grid
     ], layout=widgets.Layout(
+        width='100%',
         border='1px solid #e0e0e0',
         border_radius='8px',
         padding='0',
         background_color='white',
-        box_shadow='0 2px 4px rgba(0,0,0,0.1)',
+        margin='0',
         overflow='visible'
     ))
     
@@ -193,13 +184,11 @@ def create_category_card(category_key: str, category_info: Dict[str, Any], selec
     
     return card
 
-def create_compact_package_widget(pkg: Dict[str, Any], is_selected: bool, status_tracker: PackageStatusTracker, logger) -> widgets.HBox:
-    """Create compact widget for package with modern design."""
+def create_compact_package_widget(pkg: Dict[str, Any], is_selected: bool, status_tracker: PackageStatusTracker, logger) -> widgets.VBox:
+    """Create ultra-compact widget for package with name, version, and action buttons."""
     
     name = pkg.get('name', '')
     version = pkg.get('version', '')
-    description = pkg.get('description', '')
-    size = pkg.get('size', '')
     is_default = pkg.get('is_default', False)
     
     # Selection checkbox with smaller size
@@ -209,35 +198,52 @@ def create_compact_package_widget(pkg: Dict[str, Any], is_selected: bool, status
         layout=widgets.Layout(width='24px', height='24px')
     )
     
-    # Package info with compact layout
-    info_html = widgets.HTML(f"""
-    <div style="flex: 1; min-width: 0; padding: 0 8px;">
-        <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 2px;">
-            <span style="font-weight: 600; color: #333; font-size: 0.9rem;">{name}</span>
-            {f'<span style="color: #666; font-size: 0.75rem;">v{version}</span>' if version else ''}
-            {'<span style="color: #ff9800; font-size: 0.8rem;">⭐</span>' if is_default else ''}
-        </div>
-        <div style="color: #666; font-size: 0.8rem; line-height: 1.2; margin-bottom: 1px;">{description[:60] + '...' if len(description) > 60 else description}</div>
-        {f'<div style="color: #999; font-size: 0.7rem;">{size}</div>' if size else ''}
+    # Package name and version in a single line
+    name_html = widgets.HTML(f"""
+    <div style="display: flex; align-items: center; gap: 6px; line-height: 1.2;">
+        <span style="font-weight: 600; color: #333; font-size: 0.85rem;">{name}</span>
+        {f'<span style="color: #666; font-size: 0.75rem;">v{version}</span>' if version else ''}
+        {'<span style="color: #ff9800; font-size: 0.8rem;" title="Default package">⭐</span>' if is_default else ''}
     </div>
     """)
     
-    # Compact status widget
-    status_widget = status_tracker.create_compact_status_widget(name)
-    
-    # Compact action buttons
+    # Create action buttons in a horizontal layout below the package name
     action_buttons = create_compact_action_buttons(pkg, status_tracker, logger)
     
-    # Create container with responsive design
-    container = widgets.HBox(
-        [selection_checkbox, info_html, status_widget, action_buttons],
+    # Create a container for the action buttons
+    button_container = widgets.HBox(
+        [widgets.HTML("<div style='width: 24px;'></div>"), action_buttons],
         layout=widgets.Layout(
+            width='100%',
+            justify_content='flex-start',
+            padding='2px 0 0 0',
+            margin='0'
+        )
+    )
+    
+    # Create main container with vertical layout
+    container = widgets.VBox(
+        [
+            widgets.HBox(
+                [selection_checkbox, name_html],
+                layout=widgets.Layout(
+                    width='100%',
+                    justify_content='space-between',
+                    align_items='center',
+                    padding='0',
+                    margin='0'
+                )
+            ),
+            button_container
+        ],
+        layout=widgets.Layout(
+            width='100%',
             border='1px solid #e8e8e8',
             border_radius='6px',
             padding='8px',
-            background_color='#fafafa' if is_selected else 'white',
-            margin='0 0 2px 0',
-            align_items='center'
+            background_color='#f8fff8' if is_selected else 'white',
+            margin='0',
+            align_items='flex-start'
         )
     )
     
@@ -255,7 +261,6 @@ def create_compact_package_widget(pkg: Dict[str, Any], is_selected: bool, status
     # Store references
     container.package_info = pkg
     container.selection_checkbox = selection_checkbox
-    container.status_widget = status_widget
     container.is_selected = is_selected
     
     return container

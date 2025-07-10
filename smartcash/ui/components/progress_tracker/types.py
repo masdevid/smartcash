@@ -72,3 +72,18 @@ class ProgressConfig:
         """Get configurations untuk progress bars berdasarkan level"""
         from .progress_config import get_level_configs
         return get_level_configs(self.level)
+    
+    def get_level_config(self, level_name: str) -> Dict[str, Any]:
+        """Get configuration for a specific progress bar level"""
+        from .progress_config import ProgressBarConfig
+        
+        level_configs = self.get_level_configs()
+        for config in level_configs:
+            if isinstance(config, ProgressBarConfig):
+                if config.name == level_name:
+                    return config
+            elif isinstance(config, dict) and config.get('name') == level_name:
+                return config
+        
+        # Return a default configuration if not found
+        return ProgressBarConfig(level_name, level_name.title(), "📊", "#28a745", 0)

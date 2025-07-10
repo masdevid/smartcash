@@ -114,23 +114,23 @@ class ProgressTracker(BaseUIComponent):
     
     def _update_container_height(self) -> None:
         """Update container height based on visible components."""
-        if not hasattr(self, '_ui_components'):
+        if not hasattr(self, '_ui_components') or 'container' not in self._ui_components:
             return
             
         # Base height for header and status
         base_height = 60  # px for header + status + padding
         bar_height = 30   # px per progress bar
         
-        # Count visible progress bars
-        visible_bars = sum(1 for level in self._active_levels 
-                          if self._config.get_level_config(level).visible)
+        # Count visible progress bars based on level
+        visible_bars = self._config.level.value
         
         # Calculate total height
         total_height = base_height + (visible_bars * bar_height)
         
         # Update container height
-        self._ui_components['container'].layout.height = f'{total_height}px'
-        self._ui_components['container'].layout.min_height = f'{total_height}px'
+        container = self._ui_components['container']
+        container.layout.height = f'{total_height}px'
+        container.layout.min_height = f'{total_height}px'
     
     def _assemble_container(self) -> None:
         """Assemble the container with appropriate widgets based on config level."""
@@ -171,14 +171,17 @@ class ProgressTracker(BaseUIComponent):
     
     def _sync_progress_state(self, level: str, progress: int, message: str) -> None:
         """Synchronize progress state with UI."""
-        if self.tqdm_manager:
+        if self.tqdm_manager and hasattr(self.tqdm_manager, 'update_bar'):
             self.tqdm_manager.update_bar(level, progress, message)
     
     def _delayed_hide(self, delay: int = 1) -> None:
         """Hide the progress tracker after a delay."""
         if self._config.auto_hide and self._config.auto_hide_delay > 0:
-            time.sleep(delay)
-            self.hide()
+            import threading
+            def hide_after_delay():
+                time.sleep(delay)
+                self.hide()
+            threading.Thread(target=hide_after_delay, daemon=True).start()
     
     # Public API methods
     def show(self, operation: str = None, steps: List[str] = None, 

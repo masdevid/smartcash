@@ -55,25 +55,18 @@ def create_preprocessing_main_ui(config: Optional[Dict[str, Any]] = None) -> Dic
     form_container['get_form_container']().children = (input_options,)
     ui_components['form_container'] = form_container['container']
     
-    # 4. Create Action Container
+    # 4. Create Action Container with primary button for main preprocess action
     action_container = create_action_container(
         buttons=[
             {
-                "button_id": "preprocess",
-                "text": BUTTON_CONFIG['preprocess']['text'],
-                "style": BUTTON_CONFIG['preprocess']['style'],
-                "tooltip": BUTTON_CONFIG['preprocess']['tooltip'],
-                "order": BUTTON_CONFIG['preprocess']['order']
-            },
-            {
-                "button_id": "check",
+                "id": "check",
                 "text": BUTTON_CONFIG['check']['text'],
                 "style": BUTTON_CONFIG['check']['style'],
                 "tooltip": BUTTON_CONFIG['check']['tooltip'],
                 "order": BUTTON_CONFIG['check']['order']
             },
             {
-                "button_id": "cleanup",
+                "id": "cleanup",
                 "text": BUTTON_CONFIG['cleanup']['text'],
                 "style": BUTTON_CONFIG['cleanup']['style'],
                 "tooltip": BUTTON_CONFIG['cleanup']['tooltip'],
@@ -81,9 +74,20 @@ def create_preprocessing_main_ui(config: Optional[Dict[str, Any]] = None) -> Dic
             }
         ],
         title="🚀 Preprocessing Operations",
-        alignment="left"
+        alignment="left",
+        show_save_reset=True  # Use default save/reset buttons
     )
+    
+    # Configure the primary button for main preprocessing action
+    primary_button = action_container['primary_button']
+    if primary_button:
+        primary_button.description = BUTTON_CONFIG['preprocess']['text']
+        primary_button.tooltip = BUTTON_CONFIG['preprocess']['tooltip']
+    
     ui_components['action_container'] = action_container
+    ui_components['preprocess_btn'] = primary_button
+    ui_components['check_btn'] = action_container['buttons'].get('check')
+    ui_components['cleanup_btn'] = action_container['buttons'].get('cleanup')
     
     # 5. Create Operation Container (includes progress tracker, dialogs, log accordion)
     operation_container = create_operation_container(

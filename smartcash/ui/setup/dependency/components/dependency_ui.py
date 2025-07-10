@@ -12,8 +12,7 @@ from smartcash.ui.components import (
     create_action_container,
     create_operation_container,
     create_footer_container,
-    create_form_container,
-    create_save_reset_buttons
+    create_form_container
 )
 from smartcash.ui.components.form_container import LayoutType
 
@@ -67,29 +66,11 @@ def create_dependency_ui_components(config: Optional[Dict[str, Any]] = None, **k
     form_container['container'].children = (dependency_tabs,)
     child_components['form_container'] = form_container['container']
     
-    # 5. Create Save/Reset buttons for configurations
-    try:
-        save_reset_components = create_save_reset_buttons(
-            save_label="💾 Save Config",
-            reset_label="🔄 Reset",
-            with_sync_info=True
-        )
-        child_components['save_reset_buttons'] = save_reset_components
-        child_components['save_button'] = save_reset_components.get('save_button')
-        child_components['reset_button'] = save_reset_components.get('reset_button')
-    except Exception:
-        # Fallback buttons
-        import ipywidgets as widgets
-        save_button = widgets.Button(description="💾 Save Config", button_style='primary')
-        reset_button = widgets.Button(description="🔄 Reset", button_style='warning')
-        child_components['save_button'] = save_button
-        child_components['reset_button'] = reset_button
-    
-    # 6. Create Action Container with multiple operation buttons
+    # 5. Create Action Container with multiple operation buttons and default save/reset
     action_container = create_action_container(
         buttons=[
             {
-                'button_id': 'install_button',
+                'id': 'install_button',
                 'text': '📥 Install',
                 'style': 'success',
                 'icon': 'download',
@@ -97,7 +78,7 @@ def create_dependency_ui_components(config: Optional[Dict[str, Any]] = None, **k
                 'order': 1
             },
             {
-                'button_id': 'check_button', 
+                'id': 'check_button', 
                 'text': '🔍 Check & Updates',
                 'style': 'info',
                 'icon': 'refresh',
@@ -105,7 +86,7 @@ def create_dependency_ui_components(config: Optional[Dict[str, Any]] = None, **k
                 'order': 2
             },
             {
-                'button_id': 'uninstall_button',
+                'id': 'uninstall_button',
                 'text': '🗑️ Uninstall',
                 'style': 'danger',
                 'icon': 'trash',
@@ -114,13 +95,18 @@ def create_dependency_ui_components(config: Optional[Dict[str, Any]] = None, **k
             }
         ],
         title="🚀 Package Operations", 
-        alignment="center"
+        alignment="center",
+        show_save_reset=True  # Use default save/reset buttons
     )
     child_components['action_container'] = action_container['container']
-    child_components['install_button'] = action_container.get('install_button')
-    child_components['check_button'] = action_container.get('check_button')
-    child_components['uninstall_button'] = action_container.get('uninstall_button')
+    child_components['install_button'] = action_container['buttons'].get('install_button')
+    child_components['check_button'] = action_container['buttons'].get('check_button')
+    child_components['uninstall_button'] = action_container['buttons'].get('uninstall_button')
     child_components['action_container_manager'] = action_container  # For button management
+    
+    # Access save/reset buttons through action container
+    child_components['save_button'] = action_container['action_container'].save_button
+    child_components['reset_button'] = action_container['action_container'].reset_button
     
     # 7. Create Footer Container with enhanced tips
     import ipywidgets as widgets

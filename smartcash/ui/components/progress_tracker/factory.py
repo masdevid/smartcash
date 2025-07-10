@@ -15,7 +15,7 @@ def create_single_progress_tracker(operation: str = "Process", auto_hide: bool =
         steps=["Progress"],
         auto_hide=auto_hide
     )
-    return ProgressTracker(config)
+    return ProgressTracker("single_progress_tracker", config)
 
 def create_dual_progress_tracker(operation: str = "Process", auto_hide: bool = False) -> ProgressTracker:
     """Create dual-level progress tracker dengan optional auto hide"""
@@ -25,7 +25,7 @@ def create_dual_progress_tracker(operation: str = "Process", auto_hide: bool = F
         steps=["Overall", "Current"],
         auto_hide=auto_hide
     )
-    return ProgressTracker(config)
+    return ProgressTracker("dual_progress_tracker", config)
 
 def create_triple_progress_tracker(operation: str = "Process", 
                                  steps: List[str] = None,
@@ -41,8 +41,8 @@ def create_triple_progress_tracker(operation: str = "Process",
         step_weights=step_weights or {},
         auto_hide=auto_hide
     )
-    return ProgressTracker(config)
+    return ProgressTracker("triple_progress_tracker", config)
 
 def create_flexible_tracker(config: ProgressConfig) -> ProgressTracker:
     """Create tracker dengan custom configuration"""
-    return ProgressTracker(config)
+    return ProgressTracker("flexible_tracker", config)

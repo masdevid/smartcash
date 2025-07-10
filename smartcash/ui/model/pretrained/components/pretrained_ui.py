@@ -46,19 +46,21 @@ def create_pretrained_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> D
     ui_components['form_container'] = form_container['container']
     ui_components['input_options'] = input_components
     
-    # 3. Action Container with single download button
+    # 3. Action Container with default primary button for download
     action_container = create_action_container(
-        buttons=[{
-            "button_id": "download",
-            "text": "📥 Download Models", 
-            "style": "primary",
-            "order": 1
-        }],
+        buttons=[],  # No additional buttons, use default primary
         title="🤖 Model Operations",
-        alignment="center"
+        alignment="center",
+        show_save_reset=True  # Keep default save/reset buttons
     )
     ui_components['action_container'] = action_container['container']
-    ui_components['download_button'] = action_container['buttons'].get('download')
+    
+    # Configure the primary button for download
+    primary_button = action_container['primary_button']
+    if primary_button:
+        primary_button.description = "📥 Download Models"
+        primary_button.tooltip = "Download selected pretrained models"
+    ui_components['download_button'] = primary_button
     
     # 4. Summary Container
     summary_container = create_summary_container(

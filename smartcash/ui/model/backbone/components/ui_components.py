@@ -16,7 +16,6 @@ from smartcash.ui.components.header_container import create_header_container
 from smartcash.ui.components.form_container import create_form_container
 from smartcash.ui.components.footer_container import create_footer_container
 from smartcash.ui.components.action_container import create_action_container
-from smartcash.ui.components import create_save_reset_buttons
 from smartcash.ui.components.progress_tracker.progress_tracker import ProgressTracker
 from smartcash.ui.components.progress_tracker.progress_config import ProgressLevel
 
@@ -108,51 +107,34 @@ def create_backbone_child_components(config: Optional[Dict[str, Any]] = None) ->
     # Store the two-column layout for reference
     child_components['two_column_layout'] = two_column_layout
     
-    # === 2. CONFIG BUTTONS SECTION ===
+    # === 2. ACTION CONTAINER WITH CONSOLIDATED BUTTONS ===
     
-    # Create save/reset buttons with standard approach
-    save_reset_components = create_save_reset_buttons(
-        save_label="💾 Simpan",
-        reset_label="🔄 Reset", 
-        with_sync_info=True
-    )
-    child_components['save_reset_buttons'] = save_reset_components
-    
-    # Create config buttons container with proper styling
-    config_buttons_container = widgets.Box(
-        [save_reset_components['container']], 
-        layout=widgets.Layout(display='flex', justify_content='flex-end', width='100%', margin='8px 0')
-    )
-    child_components['config_buttons_container'] = config_buttons_container
-    
-    # === 3. ACTION CONTAINER ===
-    
-    # Create action container with new operations structure
+    # Create action container with multiple operations and default save/reset
     action_container = create_action_container(
         buttons=[
             {
-                "button_id": "validate",
+                "id": "validate",
                 "text": "🔍 Validate",
                 "style": "info",
                 "order": 1,
                 "tooltip": "Validate backbone configuration"
             },
             {
-                "button_id": "load",
+                "id": "load",
                 "text": "📥 Load Model",
                 "style": "primary",
                 "order": 2,
                 "tooltip": "Load backbone model with current configuration"
             },
             {
-                "button_id": "build",
+                "id": "build",
                 "text": "🏗️ Build",
                 "style": "success",
                 "order": 3,
                 "tooltip": "Build backbone architecture"
             },
             {
-                "button_id": "summary",
+                "id": "summary",
                 "text": "📊 Summary", 
                 "style": "warning",
                 "order": 4,
@@ -161,9 +143,15 @@ def create_backbone_child_components(config: Optional[Dict[str, Any]] = None) ->
         ],
         title="🚀 Backbone Operations",
         alignment="left",
-        with_confirmation=True
+        show_save_reset=True  # Use default save/reset buttons
     )
     child_components['action_container'] = action_container['container']
+    
+    # Access save/reset buttons through action container
+    child_components['save_reset_buttons'] = {
+        'save_button': action_container['action_container'].save_button,
+        'reset_button': action_container['action_container'].reset_button
+    }
     
     # === 4. FOOTER CONTAINER ===
     

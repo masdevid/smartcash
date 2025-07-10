@@ -66,36 +66,40 @@ def create_downloader_ui_components(config: Optional[Dict[str, Any]] = None, **k
     form['add_item'](input_options, "input_options")
     components['form'] = form
     
-    # 3. Create Action Buttons
+    # 3. Create Action Buttons with primary button for main download action
     action_buttons = create_action_container(
         title="Download Actions",
         buttons=[
             {
-                'button_id': 'download',
-                'text': '📥 Download',
-                'style': 'primary',
-                'tooltip': 'Download dataset from Roboflow',
-                'order': 1
-            },
-            {
-                'button_id': 'check', 
+                'id': 'check', 
                 'text': '🔍 Check',
                 'style': 'info',
                 'tooltip': 'Check dataset status and integrity',
-                'order': 2
+                'order': 1
             },
             {
-                'button_id': 'cleanup',
+                'id': 'cleanup',
                 'text': '🗑️ Cleanup',
                 'style': 'danger',
                 'tooltip': 'Remove dataset files from local storage',
-                'order': 3
+                'order': 2
             }
         ],
-        alignment="left"
+        alignment="left",
+        show_save_reset=True  # Use default save/reset buttons
     )
-    components['actions'] = action_buttons.get('action')
-    components['save_reset'] = action_buttons.get('save_reset')
+    
+    # Configure the primary button for main download action
+    primary_button = action_buttons['primary_button']
+    if primary_button:
+        primary_button.description = "📥 Download"
+        primary_button.tooltip = "Download dataset from Roboflow"
+    
+    components['actions'] = action_buttons
+    components['download_button'] = primary_button
+    components['check_button'] = action_buttons['buttons'].get('check')
+    components['cleanup_button'] = action_buttons['buttons'].get('cleanup')
+    components['save_reset'] = action_buttons['action_container']
     # 4. Create Operation Container
     operation = create_operation_container(
         show_progress=True,

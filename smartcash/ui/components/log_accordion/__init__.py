@@ -14,4 +14,4 @@ from .log_level import LogLevel, get_log_level_style
 from .log_entry import LogEntry
 from .legacy import create_log_accordion
 
-__all__ = ['LogAccordion', 'LogLevel', 'LogEntry', 'get_log_level_style' 'create_log_accordion']
+__all__ = ['LogAccordion', 'LogLevel', 'LogEntry', 'get_log_level_style', 'create_log_accordion']

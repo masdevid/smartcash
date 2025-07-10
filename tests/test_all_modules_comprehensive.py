@@ -375,7 +375,7 @@ def run_augmentation_module_tests():
             
             # Try to import the module
             try:
-                from smartcash.ui.dataset.augment.augment_initializer import init_augment_ui
+                from smartcash.ui.dataset.augment.augment_initializer import initialize_augment_ui
                 print("✅ Augmentation initializer imports successfully")
                 return True, 85.0
             except:
@@ -617,9 +617,9 @@ def run_full_integration_validation():
         # Phase 3: Model modules integration
         print("🤖 Testing model modules integration...")
         try:
-            from smartcash.ui.model.backbone.backbone_init import init_backbone_ui
-            from smartcash.ui.model.train.training_initializer import init_training_ui
-            from smartcash.ui.model.evaluate.evaluation_initializer import init_evaluation_ui
+            from smartcash.ui.model.backbone.backbone_initializer import initialize_backbone_ui
+            from smartcash.ui.model.train.training_initializer import initialize_training_ui
+            from smartcash.ui.model.evaluate.evaluation_initializer import initialize_evaluation_ui
             print("✅ Core model modules integration successful")
             validations.append(True)
         except Exception as e:

@@ -81,31 +81,17 @@ def create_split_ui_components(config: Optional[Dict[str, Any]] = None, **kwargs
         **kwargs
     )
     
-    # Create action buttons
+    # Create action container with default save/reset buttons
     action_buttons = create_action_container(
-        buttons=[
-            {
-                'button_id': 'save_button',
-                'text': '💾 Save',
-                'style': 'success',
-                'tooltip': 'Save the current configuration',
-                'order': 1
-            },
-            {
-                'button_id': 'reset_button',
-                'text': '🔄 Reset',
-                'style': 'warning',
-                'tooltip': 'Reset to default values',
-                'order': 2
-            }
-        ],
+        buttons=[],  # No additional buttons, use defaults
+        show_save_reset=True,  # Use default save/reset buttons
         **kwargs
     )
     
-    # Add action buttons to components
+    # Add action buttons to components (access through action_container)
     components.update({
-        'save_button': action_buttons['buttons'].get('save_button'),
-        'reset_button': action_buttons['buttons'].get('reset_button')
+        'save_button': action_buttons['action_container'].save_button,
+        'reset_button': action_buttons['action_container'].reset_button
     })
     
     # Create footer with log accordion

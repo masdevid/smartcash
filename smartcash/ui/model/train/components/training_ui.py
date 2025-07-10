@@ -50,36 +50,36 @@ def create_training_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> Dic
     ui_components['form_container'] = form_container['container']
     ui_components['input_options'] = input_components
     
-    # 4. Action Container with training operations
+    # 4. Action Container with training operations and primary button
     action_container = create_action_container(
         buttons=[
             {
-                "button_id": "start",
-                "text": "🚀 Start Training",
-                "style": "success",
-                "order": 1,
-                "tooltip": "Start model training with current configuration"
-            },
-            {
-                "button_id": "stop", 
+                "id": "stop", 
                 "text": "🛑 Stop Training",
                 "style": "danger",
-                "order": 2,
+                "order": 1,
                 "tooltip": "Stop current training process"
             },
             {
-                "button_id": "resume",
+                "id": "resume",
                 "text": "🔄 Resume Training", 
                 "style": "warning",
-                "order": 3,
+                "order": 2,
                 "tooltip": "Resume training from checkpoint"
             }
         ],
         title="🎯 Training Operations",
-        alignment="center"
+        alignment="center",
+        show_save_reset=True  # Use default save/reset buttons
     )
+    
+    # Configure the primary button for main start training action
+    primary_button = action_container['primary_button']
+    if primary_button:
+        primary_button.description = "🚀 Start Training"
+        primary_button.tooltip = "Start model training with current configuration"
     ui_components['action_container'] = action_container['container']
-    ui_components['start_button'] = action_container['buttons'].get('start')
+    ui_components['start_button'] = primary_button
     ui_components['stop_button'] = action_container['buttons'].get('stop')
     ui_components['resume_button'] = action_container['buttons'].get('resume')
     

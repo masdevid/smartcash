@@ -102,7 +102,7 @@ def create_augment_ui(config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]
     # 2. Form Container (will contain custom form layout)
     form_container = create_form_container()
     
-    # 3. Action Container with augment-specific buttons
+    # 3. Action Container with augment-specific action buttons for multi-operation
     action_buttons = [
         {
             "id": "augment",
@@ -134,6 +134,7 @@ def create_augment_ui(config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]
         }
     ]
     
+    # Use action buttons for multi-operation scenario (augment module has multiple operations)
     action_container = create_action_container(
         buttons=action_buttons,
         title="🚀 Augmentation Operations",

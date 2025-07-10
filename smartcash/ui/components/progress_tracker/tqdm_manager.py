@@ -96,8 +96,9 @@ class TqdmManager:
                 bar.close()
                 # Clear specific output widget
                 output_attr = self.output_mapping.get(bar_name)
-                if output_attr and hasattr(self.ui_manager, output_attr):
-                    output_widget = getattr(self.ui_manager, output_attr)
+                if (output_attr and hasattr(self.ui_manager, '_ui_components') and 
+                    output_attr in self.ui_manager._ui_components):
+                    output_widget = self.ui_manager._ui_components[output_attr]
                     with output_widget:
                         clear_output(wait=True)
             except Exception:
@@ -121,6 +122,9 @@ class TqdmManager:
     @staticmethod
     def _clean_message(message: str) -> str:
         """Clean message dari emoji duplikat dan format tidak perlu"""
+        if not message:
+            return message
+            
         # Remove leading emojis yang akan ditambahkan ulang
         cleaned = re.sub(r'^[📊🔄⚡🔍📥☁️✅❌🚀💾🧹📁🔤🔄⚠️ℹ️]+\s*', '', message)
         # Remove progress indicators seperti (1/10), [50%], dll

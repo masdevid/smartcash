@@ -8,7 +8,6 @@ import ipywidgets as widgets
 from IPython.display import display, HTML, Javascript
 import uuid
 import pytz
-from threading import Timer
 
 from smartcash.ui.components.base_component import BaseUIComponent
 from .log_level import LogLevel, get_log_level_style
@@ -255,15 +254,18 @@ class LogAccordion(BaseUIComponent):
             return
             
         entries_container = self._ui_components['entries_container']
-        current_count = len(entries_container.children)
-        new_entries = self.log_entries[current_count:]
         
-        if not new_entries:
-            return
+        # For duplicate entries, just refresh the last widget
+        if self.last_entry and self.last_entry.count > 1:
+            entries_container.children = tuple(list(entries_container.children)[:-1] + [self._create_log_widget(self.last_entry)])
+        else:
+            # Create widgets for new entries
+            current_count = len(entries_container.children)
+            new_entries = self.log_entries[current_count:]
             
-        # Create widgets for new entries
-        new_widgets = [self._create_log_widget(entry) for entry in new_entries]
-        entries_container.children = list(entries_container.children) + new_widgets
+            if new_entries:
+                new_widgets = [self._create_log_widget(entry) for entry in new_entries]
+                entries_container.children = list(entries_container.children) + new_widgets
         
         # Auto-scroll if enabled
         if self.auto_scroll:
@@ -271,108 +273,98 @@ class LogAccordion(BaseUIComponent):
     
     def _create_log_widget(self, entry: LogEntry) -> widgets.HTML:
         """Create an HTML widget for a log entry."""
-        # Get style for the log level
         style = get_log_level_style(entry.level)
         
         # Format timestamp
-        timestamp_html = ''
-        if self.show_timestamps and entry.timestamp:
-            try:
-                ts = entry.timestamp
-                if not isinstance(ts, datetime):
-                    if isinstance(ts, (int, float)):
-                        ts = datetime.fromtimestamp(ts)
-                    else:
-                        ts = datetime.fromisoformat(str(ts))
-                
-                # Ensure timezone-aware
-                if ts.tzinfo is None:
-                    ts = pytz.utc.localize(ts)
-                
-                # Convert to local timezone
-                local_ts = ts.astimezone()
-                timestamp_str = local_ts.strftime('%H:%M:%S %Z')
-                timestamp_html = f"<span style='color:#6c757d;font-size:10px;font-family:monospace;margin-left:4px;white-space:nowrap;'>{timestamp_str}</span>"
-                
-            except Exception as e:
-                # Fallback to current time if timestamp is invalid
-                timestamp_str = datetime.now().astimezone().strftime('%H:%M:%S %Z')
-                timestamp_html = f"<span style='color:#6c757d;font-size:10px;font-family:monospace;margin-left:4px;white-space:nowrap;'>{timestamp_str}</span>"
+        timestamp_html = self._format_timestamp(entry.timestamp) if self.show_timestamps else ''
         
-        # Create namespace badge if available
-        ns_badge = ''
-        try:
-            ns = entry.namespace or entry.module
-            if ns:
-                # Try to get namespace from KNOWN_NAMESPACES first
-                from smartcash.ui.logger.namespace import KNOWN_NAMESPACES
-                ns_display = KNOWN_NAMESPACES.get(ns, ns.split('.')[-1])
-                ns_badge = (
-                    f'<span style="display:inline-block;padding:1px 4px;margin:1px 4px 0 0;align-self:flex-start;'
-                    f'background-color:#f1f3f5;color:#5f3dc4;border-radius:2px;'
-                    f'font-size:10px;font-weight:500;line-height:1.2;white-space:nowrap;'
-                    f'"'  # Close the style attribute
-                    f'>{ns_display}</span>'
-                )
-        except (ImportError, AttributeError):
-            pass
+        # Create namespace badge
+        ns_badge = self._create_namespace_badge(entry.namespace or entry.module)
         
         # Add duplicate count if applicable
-        count_badge = ''
-        if entry.count > 1:
-            count_badge = f'<span style="margin-left:4px;color:#868e96;font-size:0.8em;">(x{entry.count})</span>'
+        count_badge = f'<span style="margin-left:4px;color:#868e96;font-size:0.8em;">(x{entry.count})</span>' if entry.count > 1 else ''
         
         # Add border for duplicate messages
         border_style = '2px solid #e9ecef' if entry.show_duplicate_indicator else 'none'
         
         # Build the HTML for the log entry with row layout
         level_icon = f'<span style="margin-right:4px;">{style["icon"]}</span>' if self.show_level_icons else ''
-        bg_color = style['bg']
-        color = style['color']
-        message = entry.message
         
-        # Build the HTML string with all variables defined
         html = f"""
         <div class="log-entry" style="
             margin:0 0 1px 0;
             padding:4px 8px;
             border-radius:2px;
             display:flex;
-            background-color:{bg_color};
-            border-left:2px solid {color};
-            font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+            background-color:{style['bg']};
+            border-left:2px solid {style['color']};
+            font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;
             font-size:12px;
             line-height:1.5;
             word-break:break-word;
             white-space:pre-wrap;
             overflow-wrap:break-word;
             border-right:{border_style};
-            border-left:{border_style};
         ">
             <div style="display:flex;flex-direction:column;width:100%;">
                 <div style="display:flex;align-items:flex-start;">
                     {level_icon}
                     {ns_badge}
                     <div style="flex:1;min-width:0;">
-                        <span style="color:{color};font-weight:500;">{message}</span>
+                        <span style="color:{style['color']};font-weight:500;">{entry.message}</span>
                         {count_badge}
                     </div>
                     {timestamp_html}
                 </div>
             </div>
         </div>
-        """.format(
-            color=color,
-            bg_color=bg_color,
-            level_icon=level_icon,
-            ns_badge=ns_badge,
-            message=message,
-            count_badge=count_badge,
-            timestamp=timestamp_html,
-            border_style=border_style
-        )
+        """
         
         return widgets.HTML(html, layout=widgets.Layout(width='100%', margin='0', padding='0'))
+    
+    def _format_timestamp(self, timestamp: datetime) -> str:
+        """Format timestamp with error handling."""
+        if not timestamp:
+            return ''
+        
+        try:
+            ts = timestamp
+            if not isinstance(ts, datetime):
+                if isinstance(ts, (int, float)):
+                    ts = datetime.fromtimestamp(ts)
+                else:
+                    ts = datetime.fromisoformat(str(ts))
+            
+            # Ensure timezone-aware
+            if ts.tzinfo is None:
+                ts = pytz.utc.localize(ts)
+            
+            # Convert to local timezone
+            local_ts = ts.astimezone()
+            timestamp_str = local_ts.strftime('%H:%M:%S %Z')
+            return f"<span style='color:#6c757d;font-size:10px;font-family:monospace;margin-left:4px;white-space:nowrap;'>{timestamp_str}</span>"
+            
+        except Exception:
+            # Fallback to current time if timestamp is invalid
+            timestamp_str = datetime.now().astimezone().strftime('%H:%M:%S %Z')
+            return f"<span style='color:#6c757d;font-size:10px;font-family:monospace;margin-left:4px;white-space:nowrap;'>{timestamp_str}</span>"
+    
+    def _create_namespace_badge(self, namespace: Optional[str]) -> str:
+        """Create namespace badge with error handling."""
+        if not namespace:
+            return ''
+        
+        try:
+            from smartcash.ui.logger.namespace import KNOWN_NAMESPACES
+            ns_display = KNOWN_NAMESPACES.get(namespace, namespace.split('.')[-1])
+            return (
+                f'<span style="display:inline-block;padding:1px 4px;margin:1px 4px 0 0;align-self:flex-start;'
+                f'background-color:#f1f3f5;color:#5f3dc4;border-radius:2px;'
+                f'font-size:10px;font-weight:500;line-height:1.2;white-space:nowrap;'
+                f'">{ns_display}</span>'
+            )
+        except (ImportError, AttributeError):
+            return ''
     
     def _scroll_to_bottom(self) -> None:
         """Scroll the log container to the bottom using JavaScript."""

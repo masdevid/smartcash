@@ -5,11 +5,10 @@ Description: Colab Environment Configuration Initializer following dependency pa
 Note: This module uses lazy loading to prevent automatic setup on import.
 """
 
-import contextlib
-from typing import Dict, Any, Optional, TYPE_CHECKING, cast
-from pathlib import Path
+from typing import Dict, Any, Optional, TYPE_CHECKING
 
 from smartcash.ui.core.initializers.module_initializer import ModuleInitializer
+from smartcash.ui.core.logging import suppress_ui_initialization_logs, setup_ui_logging
 from .configs.colab_defaults import get_default_colab_config
 
 # Global instance (lazy initialized)
@@ -191,8 +190,9 @@ class ColabInitializer(ModuleInitializer):
             if not operation_container:
                 raise ValueError("Missing operation_container in UI components")
             
-            # Setup custom logging handler to route logs to UI log_output only
-            self._setup_ui_logging_handler(ui_components)
+            # Setup global UI logging handler to route logs to UI log_output only
+            if 'log_message' in ui_components:
+                setup_ui_logging('colab', ui_components['log_message'])
             
             # Setup module handlers with UI components but don't execute setup
             self.setup_handlers(ui_components)
@@ -225,71 +225,6 @@ class ColabInitializer(ModuleInitializer):
                     pass
             raise
     
-    def _setup_ui_logging_handler(self, ui_components: Dict[str, Any]) -> None:
-        """Setup custom logging handler to route all logs to UI log_output component."""
-        import logging
-        
-        log_message_func = ui_components.get('log_message')
-        if not log_message_func:
-            return  # No log function available
-        
-        class UILogHandler(logging.Handler):
-            """Custom logging handler that routes logs to UI log_output."""
-            
-            def __init__(self, log_function):
-                super().__init__()
-                self.log_function = log_function
-                
-            def emit(self, record):
-                """Emit a log record to the UI log_output."""
-                try:
-                    # Format the message
-                    message = self.format(record)
-                    
-                    # Map logging levels to UI log levels
-                    level_mapping = {
-                        logging.DEBUG: 'DEBUG',
-                        logging.INFO: 'INFO', 
-                        logging.WARNING: 'WARNING',
-                        logging.ERROR: 'ERROR',
-                        logging.CRITICAL: 'CRITICAL'
-                    }
-                    
-                    ui_level = level_mapping.get(record.levelno, 'INFO')
-                    
-                    # Send to UI log function
-                    self.log_function(message, ui_level)
-                    
-                except Exception:
-                    # Silently ignore errors in logging to prevent recursion
-                    pass
-        
-        # Create and configure the UI handler
-        ui_handler = UILogHandler(log_message_func)
-        ui_handler.setLevel(logging.INFO)  # Only route INFO and above to UI
-        
-        # Create a simple formatter
-        formatter = logging.Formatter('%(name)s: %(message)s')
-        ui_handler.setFormatter(formatter)
-        
-        # Add handler to relevant loggers and remove console handlers
-        loggers_to_configure = [
-            'smartcash.ui.setup.colab',
-            'smartcash.ui.components',
-            'smartcash.ui.core'
-        ]
-        
-        for logger_name in loggers_to_configure:
-            logger = logging.getLogger(logger_name)
-            
-            # Remove existing console handlers to prevent double logging
-            for handler in logger.handlers[:]:
-                if isinstance(handler, logging.StreamHandler):
-                    logger.removeHandler(handler)
-            
-            # Add our UI handler
-            logger.addHandler(ui_handler)
-            logger.setLevel(logging.INFO)
     
     def _initialize_impl(self, **kwargs) -> Dict[str, Any]:
         """Implementation of initialization logic
@@ -364,20 +299,6 @@ class ColabInitializer(ModuleInitializer):
                 'ui_components': ui_components or {},
                 'config': config or {}
             }
-            
-        except Exception as e:
-            from smartcash.ui.core.errors.handlers import get_error_handler
-            error_handler = get_error_handler()
-            error_handler.handle_exception(e, 'initialization', fail_fast=False)
-            self.logger.error(f"❌ Initialization failed: {str(e)}")
-            return {
-                'success': False,
-                'error': str(e),
-                'ui_components': {},
-                'module_handler': None,
-                'config_handler': None,
-                'operation_handlers': {}
-            }
     
     def pre_initialize_checks(self) -> None:
         """Pre-initialization validation checks."""
@@ -385,7 +306,6 @@ class ColabInitializer(ModuleInitializer):
         try:
             from .components import create_colab_ui_components
             from .handlers.colab_ui_handler import ColabUIHandler
-            from .configs.colab_config_handler import ColabConfigHandler
         except ImportError as e:
             raise RuntimeError(f"Missing required components: {e}")
     
@@ -558,52 +478,20 @@ class ColabDisplayInitializer:
         return result
         
     def display(self, config=None, **kwargs):
-        """Display the colab UI with comprehensive logging suppression.
+        """Display the colab UI with global logging suppression.
         
         Args:
             config: Optional configuration dictionary
             **kwargs: Additional arguments
         """
         from IPython.display import display, clear_output
-        import logging
-        from contextlib import contextmanager
-        
-        @contextmanager
-        def _suppress_all_logging():
-            """Context manager to suppress ALL logging during UI initialization."""
-            is_test_mode = kwargs.get('_test_mode', False)
-            
-            # Store original levels for restoration
-            loggers_to_suppress = [
-                logging.getLogger(),  # Root logger
-                logging.getLogger('smartcash'),  # Main project logger
-                logging.getLogger('smartcash.ui'),  # UI loggers
-                logging.getLogger('smartcash.ui.setup'),  # Setup loggers
-                logging.getLogger('smartcash.ui.setup.colab'),  # Colab specific
-                logging.getLogger('smartcash.ui.components'),  # Components
-                logging.getLogger('smartcash.ui.core')  # Core loggers
-            ]
-            
-            original_levels = []
-            for logger in loggers_to_suppress:
-                original_levels.append(logger.level)
-                if is_test_mode:
-                    logger.setLevel(logging.CRITICAL)
-                else:
-                    # In normal mode, only suppress INFO and below, keep WARNING and ERROR
-                    logger.setLevel(logging.WARNING)
-            
-            try:
-                yield
-            finally:
-                # Restore all original levels
-                for logger, original_level in zip(loggers_to_suppress, original_levels):
-                    logger.setLevel(original_level)
         
         # Clear any previous output to avoid caching issues
         clear_output(wait=True)
         
-        with _suppress_all_logging():
+        # Use global logging suppression
+        is_test_mode = kwargs.get('_test_mode', False)
+        with suppress_ui_initialization_logs(test_mode=is_test_mode):
             try:
                 result = self._colab_initializer.initialize(config=config, **kwargs)
                 if result and 'ui_components' in result:
@@ -615,14 +503,14 @@ class ColabDisplayInitializer:
                     if ui_widget:
                         display(ui_widget)
                     else:
-                        if not kwargs.get('_test_mode', False):
+                        if not is_test_mode:
                             print("⚠️ No displayable UI widget found in components")
                 else:
-                    if not kwargs.get('_test_mode', False):
+                    if not is_test_mode:
                         print("⚠️ No result or ui_components from initializer")
             except Exception as e:
                 # Only show errors if not in test mode
-                if not kwargs.get('_test_mode', False):
+                if not is_test_mode:
                     print(f"❌ Error displaying colab UI: {str(e)}")
                 raise
     

@@ -206,23 +206,11 @@ class OperationContainer(BaseUIComponent):
         if hasattr(self, 'dialog_area') and self.dialog_area is not None:
             children.append(self.dialog_area)
         
-        # 3. Add log accordion if enabled (bottom) - but don't show it during initialization
+        # 3. Add log accordion if enabled (bottom) - use helper for DRY approach
         if self.log_accordion:
-            try:
-                # Get the container widget without showing it immediately
-                log_widget = getattr(self.log_accordion, 'container', None)
-                if log_widget is not None:
-                    children.append(log_widget)
-                elif hasattr(self.log_accordion, 'show'):
-                    # Fallback: only call show() if no container property available
-                    log_widget = self.log_accordion.show()
-                    if log_widget is not None:
-                        children.append(log_widget)
-            except Exception as e:
-                # In test environments or when no container is available, gracefully skip
-                # Don't log during initialization to avoid early output
-                # Continue without log accordion in testing scenarios
-                pass
+            log_widget = self._get_log_accordion_widget()
+            if log_widget is not None:
+                children.append(log_widget)
         
         # Filter out None values from children and ensure they're valid widgets
         valid_children = []
@@ -284,6 +272,48 @@ class OperationContainer(BaseUIComponent):
         )
         
         # The dialog area will be added to the container in _create_container
+    
+    def _get_log_accordion_widget(self):
+        """Get log accordion widget in a DRY way, handling different component types.
+        
+        Returns:
+            Widget or None if not available
+        """
+        if not self.log_accordion:
+            return None
+            
+        try:
+            # Method 1: Try to get container property directly
+            if hasattr(self.log_accordion, 'container'):
+                widget = getattr(self.log_accordion, 'container', None)
+                if widget is not None:
+                    return widget
+            
+            # Method 2: Try initialized property check then container
+            if hasattr(self.log_accordion, '_initialized'):
+                if not self.log_accordion._initialized:
+                    # Initialize if not already done
+                    if hasattr(self.log_accordion, 'initialize'):
+                        self.log_accordion.initialize()
+                
+                # Now try container again
+                if hasattr(self.log_accordion, 'container'):
+                    widget = getattr(self.log_accordion, 'container', None)
+                    if widget is not None:
+                        return widget
+            
+            # Method 3: Try show() method as fallback (but avoid during initialization)
+            if hasattr(self.log_accordion, 'show') and callable(self.log_accordion.show):
+                # Only call show() if we're not in initialization phase
+                widget = self.log_accordion.show()
+                if widget is not None:
+                    return widget
+                    
+        except Exception:
+            # Silently handle any errors to avoid breaking initialization
+            pass
+            
+        return None
     
     # ===== Progress Tracking Methods =====
     

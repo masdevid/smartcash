@@ -266,7 +266,6 @@ def create_colab_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> Dict[s
             'tooltip': BUTTON_CONFIG['primary']['tooltip']
         }],
         title=f"🚀 {UI_CONFIG['title']} Operations",
-        alignment="center",
         show_save_reset=True  # Include save/reset for configuration
     )
     ui_components['action_container'] = action_container['container']

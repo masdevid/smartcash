@@ -299,3 +299,42 @@ class ColabOperationManager(OperationHandler):
             'remaining_stages': len(self.setup_stages) - self.current_stage,
             'progress_percent': (self.current_stage / len(self.setup_stages)) * 100
         }
+    
+    def reset_progress(self) -> None:
+        """Reset progress tracking to initial state."""
+        try:
+            self.current_stage = 0
+            self.logger.debug("Progress reset to initial state")
+            
+            # Reset progress in operation container if available
+            if hasattr(self, 'operation_container') and self.operation_container is not None:
+                if hasattr(self.operation_container, 'update_progress'):
+                    self.operation_container.update_progress(0, "Ready to start", "primary")
+                if hasattr(self.operation_container, 'clear_logs'):
+                    self.operation_container.clear_logs()
+                    
+        except Exception as e:
+            self.logger.error(f"Error resetting progress: {e}")
+    
+    def update_progress(self, progress: float, message: str = "", level: str = "primary") -> None:
+        """Update progress information.
+        
+        Args:
+            progress: Progress percentage (0-100)
+            message: Progress message
+            level: Progress level ('primary', 'secondary', 'tertiary')
+        """
+        try:
+            # Update operation container if available
+            if hasattr(self, 'operation_container') and self.operation_container is not None:
+                if hasattr(self.operation_container, 'update_progress'):
+                    self.operation_container.update_progress(int(progress), message, level)
+                    
+            # Update stage based on progress
+            new_stage = min(int((progress / 100) * len(self.setup_stages)), len(self.setup_stages) - 1)
+            if new_stage != self.current_stage:
+                self.current_stage = new_stage
+                self.logger.debug(f"Updated to stage {new_stage}: {self.setup_stages[new_stage] if new_stage < len(self.setup_stages) else 'complete'}")
+                
+        except Exception as e:
+            self.logger.error(f"Error updating progress: {e}")

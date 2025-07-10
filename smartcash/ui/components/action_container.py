@@ -92,12 +92,14 @@ COLAB_PHASES = {
 def create_action_container(
     buttons: List[Dict[str, Any]],
     title: str = None,
-    alignment: Literal['left', 'center', 'right'] = 'center',
     container_margin: str = "12px 0",
     show_save_reset: bool = True,
+    alignment: Literal['left', 'center', 'right'] = None,  # Deprecated, kept for compatibility
     **kwargs
 ) -> Dict[str, Any]:
-    """Create an action container with the specified buttons.
+    """Create an action container with fixed layout and the specified buttons.
+    
+    Layout is fixed as: Save/Reset (right) → Divider → Primary (center) → Actions (left)
     
     Args:
         buttons: List of button configurations. Each config should include:
@@ -108,9 +110,9 @@ def create_action_container(
             - tooltip: Optional tooltip text
             - disabled: Whether the button is initially disabled
         title: Optional title for the container
-        alignment: Alignment of buttons ('left', 'center', or 'right')
         container_margin: Margin around the container (e.g., '12px 0')
         show_save_reset: Whether to show save/reset buttons (default: True)
+        alignment: [DEPRECATED] This parameter is ignored - layout is now fixed
         **kwargs: Additional arguments to pass to ActionContainer
         
     Returns:
@@ -145,17 +147,6 @@ def create_action_container(
         
         # Store reference to the button
         button_widgets[btn_id] = action_container.get_button(btn_id)
-    
-    # Apply alignment with proper flexbox values
-    alignment_map = {
-        'left': 'flex-start',
-        'center': 'center',
-        'right': 'flex-end'
-    }
-    
-    # Default to 'center' if invalid alignment is provided
-    flex_align = alignment_map.get(alignment.lower() if alignment else 'center', 'center')
-    action_container.container.layout.align_items = flex_align
     
     # Add title if provided
     if title:

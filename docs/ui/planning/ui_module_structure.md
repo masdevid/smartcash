@@ -123,6 +123,8 @@ smartcash/ui/[group]/[module]/
         - Save/Reset Buttons (only if need persistence config) | (float right)
         - Big Primary Buttons (for single operation only) | (float center)
         - Action Buttons (for multiple operations) | (float left)
+        - Big Primary Buttons can't reside with Action Buttons.
+        - Don't use Primary Buttons if there are multiple main operations by click (save_reset operation excluded)
     - Summary Container (Custom to each module) (Nice to have)
     - Operation Container:
         - Progress Tracker (must)

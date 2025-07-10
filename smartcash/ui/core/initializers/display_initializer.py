@@ -71,11 +71,12 @@ class DisplayInitializer(BaseInitializer):
                         display(component)
                         return
             
-            # Look for any displayable widget
+            # Look for any displayable widget (but avoid operation_container to prevent duplicate displays)
             for key, component in ui_result.items():
-                if self._is_displayable_widget(component):
-                    display(component)
-                    return
+                if key not in ['operation_container', 'log_accordion', 'progress_tracker']:
+                    if self._is_displayable_widget(component):
+                        display(component)
+                        return
                     
             self.logger.warning(f"⚠️ No displayable UI component found in {self.module_name} initialization")
                     
@@ -269,10 +270,11 @@ class DisplayInitializer(BaseInitializer):
                     if DisplayInitializer._is_displayable_widget_static(component):
                         return
             
-            # Look for any displayable widget
+            # Look for any displayable widget (but avoid operation_container to prevent duplicate displays)
             for key, component in ui_result.items():
-                if DisplayInitializer._is_displayable_widget_static(component):
-                    return
+                if key not in ['operation_container', 'log_accordion', 'progress_tracker']:
+                    if DisplayInitializer._is_displayable_widget_static(component):
+                        return
                         
         elif DisplayInitializer._is_displayable_widget_static(ui_result):
             # Direct widget

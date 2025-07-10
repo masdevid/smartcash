@@ -15,10 +15,11 @@ from smartcash.ui.components.main_container import (
     ContainerConfig
 )
 from smartcash.ui.components.header_container import create_header_container
+from smartcash.ui.components.form_container import create_form_container, LayoutType
 from smartcash.ui.components.action_container import create_action_container
+from smartcash.ui.components.summary_container import create_summary_container
 from smartcash.ui.components.operation_container import create_operation_container
 from smartcash.ui.components.footer_container import create_footer_container
-from smartcash.ui.components.form_container import create_form_container, LayoutType
 from smartcash.ui.components.save_reset_buttons import create_save_reset_buttons
 
 # Import local colab components
@@ -28,14 +29,22 @@ from smartcash.ui.setup.colab.components.tips_panel import create_tips_requireme
 
 def create_colab_ui_components(config: Optional[Dict[str, Any]] = None, **kwargs) -> Dict[str, Any]:
     """
-    Create Colab UI components with new container
+    Create Colab UI components following standard container order.
+    
+    Standard Order (per docs/ui/planning/ui_module_structure.md):
+    1. Header Container (Header + Status Panel) - Required
+    2. Form Container (Custom to module) - Required  
+    3. Action Container (Save/Reset | Primary | Action Buttons) - Required
+    4. Summary Container (Custom, Nice to have) - Optional
+    5. Operation Container (Progress + Dialog + Log) - Required
+    6. Footer Container (Info Accordion + Tips) - Optional
     
     Args:
         config: Configuration for UI components
         **kwargs: Additional arguments
         
     Returns:
-        Dictionary containing all created UI components
+        Dictionary containing all created UI components in standard structure
     """
     current_config = config or {}
     
@@ -64,15 +73,12 @@ def create_colab_ui_components(config: Optional[Dict[str, Any]] = None, **kwargs
     # form_container['add_item'](tips_panel, height="auto")
     form_container['add_item'](setup_summary, height="auto")
     
-    # 3. Create Action Container
+    # 3. Create Action Container - use default phases (will be set to COLAB_PHASES automatically)
     action_container = create_action_container(
         buttons=[],  # No additional buttons, use the primary button with phases
         title="🚀 Environment Setup",
-        alignment="center",
-        phases=[
-            'init', 'drive', 'symlink', 'folders', 
-            'config', 'env', 'verify', 'complete', 'error'
-        ]
+        alignment="center"
+        # phases parameter removed - will use default COLAB_PHASES
     )
     
     # 4. Create Operation Container for progress and logs
@@ -96,15 +102,25 @@ def create_colab_ui_components(config: Optional[Dict[str, Any]] = None, **kwargs
         """
     )
     
-    # 6. Create Main Container and assemble all components
+    # 5. Create Summary Container (following standard order)
+    summary_container = create_summary_container(
+        title="Environment Overview",
+        theme="primary",
+        icon="📊"
+    )
+    # Set setup summary content - for now use HTML string, will integrate widget later
+    summary_container.set_content("Environment setup configuration and status will be displayed here.")
+    
+    # 6. Create Main Container and assemble all components (STANDARD ORDER)
     main_container = create_main_container(
         header=header_container.container,
         content=widgets.VBox([
-            form_container['container'],
-            action_container['container'],
-            operation_container['container']
+            form_container['container'],        # 2. Form Container
+            action_container['container'],      # 3. Action Container  
+            summary_container.container,        # 4. Summary Container
+            operation_container['container']    # 5. Operation Container
         ]),
-        footer=footer_container,
+        footer=footer_container,               # 6. Footer Container
         container_config={
             'margin': '0 auto',
             'max_width': '1200px',
@@ -115,20 +131,31 @@ def create_colab_ui_components(config: Optional[Dict[str, Any]] = None, **kwargs
         }
     )
     
-    # Prepare the components dictionary
+    # Prepare the components dictionary (STANDARD STRUCTURE)
     ui_components = {
-        'main_container': main_container,
-        'header_container': header_container.container,
-        'form_container': form_container['container'],
-        'action_container': action_container['container'],
+        # Core containers (standard order)
+        'ui': main_container,                           # Main UI reference
+        'main_container': main_container,               # 1. Main container
+        'header_container': header_container.container, # 2. Header container
+        'form_container': form_container['container'],  # 3. Form container
+        'action_container': action_container['container'], # 4. Action container
+        'summary_container': summary_container.container, # 5. Summary container
+        'operation_container': operation_container['container'], # 6. Operation container
+        'footer_container': footer_container,           # 7. Footer container
+        
+        # Action components
         'setup_button': action_container.get('primary_button'),
         'action_container_manager': action_container,
-        'operation_container': operation_container['container'],
-        'footer_container': footer_container,
+        
+        # Custom components
         'env_info_panel': env_info_panel,
         'tips_panel': tips_panel,
         'setup_summary': setup_summary,
-        'ui': main_container  # Main UI reference
+        
+        # Module metadata
+        'module_name': 'colab',
+        'parent_module': 'setup',
+        'ui_initialized': True
     }
     
     return ui_components

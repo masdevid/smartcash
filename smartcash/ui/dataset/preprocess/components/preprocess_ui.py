@@ -10,9 +10,10 @@ from typing import Dict, Any, Optional
 from smartcash.ui.components.main_container import create_main_container
 from smartcash.ui.components.header_container import create_header_container
 from smartcash.ui.components.form_container import create_form_container
-from smartcash.ui.components.footer_container import create_footer_container
 from smartcash.ui.components.action_container import create_action_container
+from smartcash.ui.components.summary_container import create_summary_container
 from smartcash.ui.components.operation_container import create_operation_container
+from smartcash.ui.components.footer_container import create_footer_container
 from smartcash.ui.components.progress_tracker.progress_config import ProgressLevel
 
 # Import preprocessing components
@@ -89,6 +90,15 @@ def create_preprocessing_main_ui(config: Optional[Dict[str, Any]] = None) -> Dic
     ui_components['check_btn'] = action_container['buttons'].get('check')
     ui_components['cleanup_btn'] = action_container['buttons'].get('cleanup')
     
+    # 4. Create Summary Container (STANDARD ORDER)
+    summary_container = create_summary_container(
+        title="Preprocessing Configuration",
+        theme="info",
+        icon="⚙️"
+    )
+    summary_container.set_content("Current preprocessing settings and YOLO preset configuration will be displayed here.")
+    ui_components['summary_container'] = summary_container.container
+    
     # 5. Create Operation Container (includes progress tracker, dialogs, log accordion)
     operation_container = create_operation_container(
         show_progress=True,
@@ -117,13 +127,14 @@ def create_preprocessing_main_ui(config: Optional[Dict[str, Any]] = None) -> Dic
     
     # === MAIN UI ASSEMBLY ===
     
-    # 8. Assemble Main Container
+    # 8. Assemble Main Container (STANDARD ORDER)
     main_container = create_main_container(
-        header_container=header_container.container,
-        form_container=form_container['container'],
-        action_container=action_container['container'],
-        operation_container=operation_container['container'],
-        footer_container=footer_container.container
+        header_container=header_container.container,     # 1. Header Container
+        form_container=form_container['container'],      # 2. Form Container  
+        action_container=action_container['container'],  # 3. Action Container
+        summary_container=summary_container.container,   # 4. Summary Container
+        operation_container=operation_container['container'], # 5. Operation Container
+        footer_container=footer_container.container      # 6. Footer Container
     )
     ui_components['main_container'] = main_container.container
     ui_components['ui'] = main_container.container  # Alias for compatibility

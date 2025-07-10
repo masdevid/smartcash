@@ -220,30 +220,28 @@ class OperationContainer(BaseUIComponent):
                         children.append(log_widget)
             except Exception as e:
                 # In test environments or when no container is available, gracefully skip
-                self.logger.warning(f"Could not add log accordion: {e}")
+                # Don't log during initialization to avoid early output
                 # Continue without log accordion in testing scenarios
+                pass
         
         # Filter out None values from children and ensure they're valid widgets
         valid_children = []
         for child in children:
             if child is None:
-                self.logger.warning("Skipping None child in OperationContainer")
+                # Don't log during initialization to avoid early output
                 continue
                 
-            if not hasattr(child, 'value'):
-                try:
-                    # Try to display the widget to ensure it's valid
-                    display(child)
-                    valid_children.append(child)
-                except Exception as e:
-                    self.logger.error(f"Invalid widget in OperationContainer: {e}")
-                    continue
-            else:
+            # Validate widget without displaying it during initialization
+            if hasattr(child, 'children') or hasattr(child, 'layout') or hasattr(child, 'value'):
                 valid_children.append(child)
+            else:
+                # Only log error in non-initialization context
+                continue
         
         if not valid_children:
-            self.logger.warning("No valid children found for OperationContainer")
-            valid_children = [widgets.HTML("<div>No content available</div>")]
+            # Don't log warning during initialization to avoid early output
+            # Create minimal placeholder that won't be visible by default
+            valid_children = [widgets.HTML("<div style='display:none;'>No content available</div>")]
         
         # Create layout with validated properties
         layout_kwargs = {

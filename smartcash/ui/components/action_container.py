@@ -244,14 +244,18 @@ class ActionContainer:
     
     def _init_buttons(self):
         """Initialize all button widgets if they don't exist."""
-        # Primary button (large, centered) with phase support
+        # Primary button (large, centered) with phase support and flexible styling
         self.buttons['primary'] = widgets.Button(
             layout=widgets.Layout(
                 width='auto',
+                height='auto',  # Allow height to be flexible
                 margin='12px auto',
-                padding='10px 24px',
+                padding='15px 30px',  # Increased padding for better text visibility
                 font_weight='bold',
-                min_width='200px'
+                min_width='200px',
+                max_width='400px',  # Prevent button from becoming too wide
+                border_radius='6px',
+                box_shadow='0 2px 4px rgba(0,0,0,0.1)'
             ),
             disabled=False
         )
@@ -548,9 +552,7 @@ class ActionContainer:
         return True
 
     def _update_container(self):
-        """Update the container's children based on current buttons and visibility."""
-        children = []
-        
+        """Update the container's children with fixed layout order: save_reset (right), divider, primary (center), actions (left)."""
         # Ensure all buttons are initialized
         self._init_buttons()
         
@@ -563,15 +565,61 @@ class ActionContainer:
                          self.buttons.get('save_reset') is not None and 
                          self._should_show_button('save_reset'))
         
-        # Raise error if both primary and action buttons are present
-        if has_primary and has_action:
-            raise ValueError(
-                "Invalid configuration: Cannot have both primary and action buttons. "
-                "Please use either a primary button or action buttons, not both."
+        # Create main container sections
+        container_sections = []
+        
+        # 1. Save/Reset section (top, right-aligned)
+        if has_save_reset:
+            save_reset_section = widgets.HBox(
+                [self.buttons['save_reset']],
+                layout=widgets.Layout(
+                    width='100%',
+                    justify_content='flex-end',  # Right alignment
+                    margin='0 0 10px 0'
+                )
             )
+            container_sections.append(save_reset_section)
+        
+        # 2. Divider (if we have multiple sections)
+        if has_save_reset and (has_primary or has_action):
+            divider = widgets.HTML(
+                '<hr style="margin: 0; border: 0; border-top: 1px solid #eee;">',
+                layout=widgets.Layout(width='100%', margin='5px 0')
+            )
+            container_sections.append(divider)
+        
+        # 3. Primary button section (center-aligned) OR Action buttons section (left-aligned)
+        if has_primary:
+            primary_section = widgets.HBox(
+                [self.buttons['primary']],
+                layout=widgets.Layout(
+                    width='100%',
+                    justify_content='center',  # Center alignment for primary
+                    margin='10px 0'
+                )
+            )
+            container_sections.append(primary_section)
+        elif has_action:
+            action_section = widgets.HBox(
+                [self.buttons['action']],
+                layout=widgets.Layout(
+                    width='100%',
+                    justify_content='flex-start',  # Left alignment for actions
+                    margin='10px 0'
+                )
+            )
+            container_sections.append(action_section)
+        
+        # 4. Another divider after primary/actions if needed
+        if (has_primary or has_action) and len(container_sections) > 1:
+            final_divider = widgets.HTML(
+                '<hr style="margin: 0; border: 0; border-top: 1px solid #eee;">',
+                layout=widgets.Layout(width='100%', margin='5px 0')
+            )
+            container_sections.append(final_divider)
         
         # If no buttons are set, create default primary button
-        if not any([has_primary, has_action, has_save_reset]):
+        if not container_sections:
             style = ButtonStyle()
             style.button_color = '#007bff'  # Default blue
             style.font_weight = 'bold'
@@ -580,47 +628,40 @@ class ActionContainer:
                 description='🔄 Default Action',
                 style=style,
                 disabled=False,
-                layout=widgets.Layout(width='auto', margin='0 0 10px 0')
+                layout=widgets.Layout(
+                    width='auto',
+                    height='auto',  # Flexible height
+                    min_width='200px',
+                    max_width='400px',  # Prevent too wide
+                    padding='15px 30px',  # Generous padding for text visibility
+                    border_radius='6px',
+                    box_shadow='0 2px 4px rgba(0,0,0,0.1)',
+                    font_weight='bold'
+                )
             )
-            children.append(self.buttons['primary'])
             
-            # Also create default save/reset buttons
-            default_save_reset = create_save_reset_buttons()
-            children.append(default_save_reset['container'])
-        else:
-            # Add primary button if exists (takes precedence over action button)
-            if has_primary:
-                children.append(self.buttons['primary'])
-            # Add action button only if no primary button is shown
-            elif has_action:
-                children.append(self.buttons['action'])
-            
-            # Add save/reset buttons if enabled and exist
-            if has_save_reset:
-                # Add a divider before save/reset buttons if there are other buttons
-                if children:
-                    divider = widgets.HTML(
-                        '<hr style="margin: 10px 0; border: 0; border-top: 1px solid #eee;">',
-                        layout=widgets.Layout(width='100%', margin='5px 0')
-                    )
-                    children.append(divider)
-                
-                # Add save/reset buttons container
-                children.append(self.buttons['save_reset'])
+            primary_section = widgets.HBox(
+                [self.buttons['primary']],
+                layout=widgets.Layout(
+                    width='100%',
+                    justify_content='center',
+                    margin='10px 0'
+                )
+            )
+            container_sections.append(primary_section)
         
-        # Update container with proper layout
+        # Update container with proper layout - no float customization allowed
         self.container = widgets.VBox(
-            children=children,
+            children=container_sections,
             layout=widgets.Layout(
                 width='100%',
-                align_items='flex-start',
+                align_items='stretch',
                 margin=self.container_margin if hasattr(self, 'container_margin') else '12px 0',
                 padding='0',
                 border='none',
                 display='flex',
                 flex_flow='column nowrap',
-                justify_content='flex-start',
-                gap='8px'
+                justify_content='flex-start'
             )
         )
         

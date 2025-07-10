@@ -161,8 +161,18 @@ class ColabUIHandler(ModuleUIHandler):
             # Get action container manager for phase updates
             action_manager = self._ui_components.get('action_container_manager')
             if not action_manager:
-                self.logger.error("Action container manager not found")
-                return
+                # Fallback to individual phase management functions
+                action_manager = {
+                    'set_phase': self._ui_components.get('set_phase'),
+                    'set_phases': self._ui_components.get('set_phases'),
+                    'enable_all': self._ui_components.get('enable_all'),
+                    'disable_all': self._ui_components.get('disable_all')
+                }
+                
+                # Validate at least set_phase is available
+                if not action_manager.get('set_phase'):
+                    self.logger.error("Action container manager and phase functions not found")
+                    return
             
             self.logger.info("🚀 Starting complete environment setup")
             

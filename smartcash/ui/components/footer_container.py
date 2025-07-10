@@ -54,9 +54,9 @@ class FooterContainer:
         self.style = style or {}
         self.layout_config = layout or {
             'display': 'flex',
-            'flex_flow': 'row wrap',
+            'flex_flow': 'column nowrap',  # Changed to column for vertical stacking
             'align_items': 'stretch',
-            'justify_content': 'space-between',
+            'justify_content': 'flex-start',  # Changed to flex-start for proper stacking
             'width': '100%',
             'border': '1px solid #e0e0e0',
             'margin': '10px 0 0 0',
@@ -96,11 +96,12 @@ class FooterContainer:
                 open_by_default=config.open_by_default
             )
         
-        # Configure panel layout
+        # Configure panel layout - fullwidth for stacked layout
         panel.layout = widgets.Layout(
-            flex=config.flex,
-            min_width=config.min_width,
-            margin='0 5px 10px 5px',
+            width='100%',  # Always fullwidth
+            flex='none',   # Disable flex for fullwidth behavior
+            min_width='100%',  # Ensure minimum width is 100%
+            margin='0 0 10px 0',  # Remove horizontal margins for fullwidth
             overflow='hidden'
         )
         
@@ -188,15 +189,15 @@ class FooterContainer:
         if not panel_widgets:
             return
             
-        # Create flex container for panels
-        flex_container = widgets.HBox(
+        # Create flex container for panels - using VBox for vertical stacking
+        flex_container = widgets.VBox(
             panel_widgets,
             layout=widgets.Layout(
                 width='100%',
-                flex_flow='row wrap',
+                flex_flow='column nowrap',
                 align_items='stretch',
                 justify_content='flex-start',
-                margin='0 -5px'  # Negative margin to counteract panel margins
+                margin='0'  # No margin needed for vertical stacking
             )
         )
         
@@ -399,12 +400,12 @@ def create_footer_container(
             justify_content="space-between"
         )
     """
-    # Create layout config from kwargs
+    # Create layout config from kwargs - default to vertical fullwidth layout
     layout = {
         'display': 'flex',
-        'flex_flow': 'row wrap',
+        'flex_flow': 'column nowrap',  # Default to vertical stacking
         'align_items': 'stretch',
-        'justify_content': 'space-between',
+        'justify_content': 'flex-start',  # Default to flex-start for proper stacking
         'width': '100%',
         'border': '1px solid #e0e0e0',
         'margin': '10px 0 0 0',

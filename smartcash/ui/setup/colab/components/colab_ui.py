@@ -325,9 +325,25 @@ def create_colab_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> Dict[s
     
     # === 6. FOOTER CONTAINER ===
     # Info accordion and helpful tips
+    from smartcash.ui.components.footer_container import PanelConfig, PanelType
+    
     footer_container = create_footer_container(
-        info_box=_create_module_info_box(),
-        tips_box=_create_module_tips_box()
+        panels=[
+            PanelConfig(
+                panel_type=PanelType.INFO_BOX,
+                title="Environment Setup Info",
+                content=_create_module_info_box().value,  # Extract HTML value
+                flex="1",
+                min_width="300px"
+            ),
+            PanelConfig(
+                panel_type=PanelType.INFO_BOX,
+                title="Setup Tips",
+                content=_create_module_tips_box().value,  # Extract HTML value
+                flex="1",
+                min_width="300px"
+            )
+        ]
     )
     ui_components['footer_container'] = footer_container.container
     

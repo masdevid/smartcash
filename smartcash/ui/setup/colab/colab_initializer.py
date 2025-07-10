@@ -471,6 +471,7 @@ class ColabDisplayInitializer:
         # Don't initialize the base class with parameters
         # as we're not actually inheriting from DisplayInitializer
         self._colab_initializer = get_colab_initializer()
+        self._cached_components = None
     
     def _initialize_impl(self, **kwargs):
         """Implementation using existing ColabInitializer
@@ -494,9 +495,39 @@ class ColabDisplayInitializer:
             config: Optional configuration dictionary
             **kwargs: Additional arguments
         """
-        result = self._colab_initializer.initialize(config=config, **kwargs)
-        if result and 'ui_components' in result and 'container' in result['ui_components']:
-            display(result['ui_components']['container'])
+        from IPython.display import display, clear_output
+        import logging
+        
+        # Clear any previous output to avoid caching issues
+        clear_output(wait=True)
+        
+        # Temporarily suppress logging during display to avoid cluttering output
+        original_level = logging.getLogger('smartcash.ui.setup.colab').level
+        is_test_mode = kwargs.get('_test_mode', False)
+        
+        try:
+            if is_test_mode:
+                # Suppress all logs during testing
+                logging.getLogger('smartcash.ui.setup.colab').setLevel(logging.CRITICAL)
+            
+            result = self._colab_initializer.initialize(config=config, **kwargs)
+            if result and 'ui_components' in result:
+                ui_components = result['ui_components']
+                # Cache the components
+                self._cached_components = ui_components
+                # Try different possible UI widget keys
+                ui_widget = ui_components.get('ui') or ui_components.get('main_container') or ui_components.get('container')
+                if ui_widget:
+                    display(ui_widget)
+                else:
+                    if not is_test_mode:
+                        print("⚠️ No displayable UI widget found in components")
+            else:
+                if not is_test_mode:
+                    print("⚠️ No result or ui_components from initializer")
+        finally:
+            # Restore original logging level
+            logging.getLogger('smartcash.ui.setup.colab').setLevel(original_level)
     
     def get_components(self, config=None, **kwargs):
         """Get the UI components without displaying them.
@@ -540,7 +571,9 @@ def get_colab_components(config: Optional[Dict[str, Any]] = None, **kwargs) -> D
     Returns:
         Dictionary of UI components
     """
-    return _colab_display_initializer.get_components(config=config, **kwargs)
+    # Create a new display initializer to avoid widget caching
+    display_initializer = ColabDisplayInitializer()
+    return display_initializer.get_components(config=config, **kwargs)
 
 
 def display_colab_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> None:

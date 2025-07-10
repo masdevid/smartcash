@@ -43,7 +43,7 @@ downloader = safe_import('downloader', '.downloader')
 initialize_downloader_ui = safe_import('downloader', '.downloader', 'initialize_downloader_ui')
 
 split = safe_import('split', '.split')
-initialize_split_ui = safe_import('split_ui', '.split', 'init_split_ui')
+initialize_split_ui = safe_import('split_ui', '.split', 'initialize_split_ui')
 
 preprocessing = safe_import('preprocessing', '.preprocess')
 initialize_preprocessing_ui = safe_import('preprocessing_ui', '.preprocess', 'initialize_preprocess_ui')

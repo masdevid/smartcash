@@ -135,3 +135,44 @@ STAGE_WEIGHTS: dict[SetupStage, int] = {
 assert (
     sum(STAGE_WEIGHTS[stage] for stage in SetupStage) == 100
 ), "Stage weights must sum to 100"
+
+# ===========================================================================
+# UI Configuration
+# ===========================================================================
+
+# UI Configuration
+UI_CONFIG = {
+    'module_name': 'Colab Environment Setup',
+    'module_description': 'Configure Google Colab environment for SmartCash',
+    'version': '1.0.0',
+    'parent_module': 'setup',
+    'icon': '🚀'
+}
+
+# Button Configuration
+BUTTON_CONFIG = {
+    'setup': {
+        'text': '🚀 Setup Environment',
+        'style': 'primary',
+        'tooltip': 'Start setting up the Colab environment',
+        'order': 1
+    },
+    'save': {
+        'text': '💾 Save',
+        'style': 'success',
+        'tooltip': 'Save current configuration',
+        'order': 2
+    },
+    'reset': {
+        'text': '🔄 Reset',
+        'style': 'warning',
+        'tooltip': 'Reset to default values',
+        'order': 3
+    }
+}
+
+# Validation rules for form fields
+VALIDATION_RULES = {
+    'project_name': {'required': True, 'min_length': 1},
+    'environment_type': {'required': True, 'allowed_values': ['colab', 'kaggle', 'local']}
+}

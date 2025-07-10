@@ -26,46 +26,16 @@ from smartcash.ui.core.errors.handlers import handle_ui_errors
 
 # Import downloader specific components
 from .input_options import create_downloader_input_options
+from smartcash.ui.dataset.downloader.constants import (
+    UI_CONFIG,
+    BUTTON_CONFIG,
+    VALIDATION_RULES
+)
 
-# Module configuration constants
-UI_CONFIG = {
-    'title': "📥 Dataset Downloader",
-    'subtitle': "Download dataset Roboflow untuk SmartCash dengan UUID renaming dan validasi otomatis",
-    'icon': "📥",
-    'module_name': "downloader",
-    'parent_module': "dataset",
-    'version': "1.0.0"
-}
-
-# Button configuration
-BUTTON_CONFIG = {
-    'download': {
-        'text': '📥 Download',
-        'style': 'primary',
-        'tooltip': 'Download dataset from Roboflow',
-        'order': 1
-    },
-    'check': {
-        'text': '🔍 Check',
-        'style': 'info',
-        'tooltip': 'Check dataset status and integrity',
-        'order': 2
-    },
-    'cleanup': {
-        'text': '🗑️ Cleanup',
-        'style': 'danger',
-        'tooltip': 'Remove dataset files from local storage',
-        'order': 3
-    }
-}
-
-# Validation rules for form fields
-VALIDATION_RULES = {
-    'workspace': {'required': True, 'min_length': 1},
-    'project': {'required': True, 'min_length': 1},
-    'version': {'required': True, 'min_length': 1},
-    'api_key': {'required': True, 'min_length': 10}
-}
+# Re-export constants to maintain backward compatibility and satisfy validation
+UI_CONFIG = UI_CONFIG
+BUTTON_CONFIG = BUTTON_CONFIG
+VALIDATION_RULES = VALIDATION_RULES
 
 
 @handle_ui_errors(error_component_title="Dataset Downloader UI Creation Error")
@@ -160,42 +130,145 @@ def create_downloader_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> D
         }
     )
     
-    # Store references to all components
-    components.update({
-        # Main UI components
-        'ui': main_container,
-        'container': main_container,
+    # Create the UI components dictionary following the standard structure
+    ui_components = {
+        # Main containers
+        'main_container': main_container,
         'header_container': header_container.container,
         'form_container': form_container['container'],
         'action_container': action_container['container'],
         'operation_container': operation_container['container'],
         'footer_container': footer_container.container,
         
-        # Input components
-        'workspace_input': getattr(input_options, 'workspace_input', None),
-        'project_input': getattr(input_options, 'project_input', None),
-        'version_input': getattr(input_options, 'version_input', None),
-        'api_key_input': getattr(input_options, 'api_key_input', None),
-        'validate_checkbox': getattr(input_options, 'validate_checkbox', None),
-        'backup_checkbox': getattr(input_options, 'backup_checkbox', None),
+        # Form widgets
+        'form_widgets': {
+            'workspace_input': getattr(input_options, 'workspace_input', None),
+            'project_input': getattr(input_options, 'project_input', None),
+            'version_input': getattr(input_options, 'version_input', None),
+            'api_key_input': getattr(input_options, 'api_key_input', None),
+            'validate_checkbox': getattr(input_options, 'validate_checkbox', None),
+            'backup_checkbox': getattr(input_options, 'backup_checkbox', None),
+        },
         
-        # Button references
-        'download_button': action_container['primary_button'],
-        'check_button': action_container['buttons'].get('check'),
-        'cleanup_button': action_container['buttons'].get('cleanup'),
-        'save_button': action_container.get('save_button'),
-        'reset_button': action_container.get('reset_button'),
+        # Buttons
+        'buttons': {
+            'download': action_container['primary_button'],
+            'check': action_container['buttons'].get('check'),
+            'cleanup': action_container['buttons'].get('cleanup'),
+            'save': action_container.get('save_button'),
+            'reset': action_container.get('reset_button'),
+        },
         
         # Operation functions
-        'log_message': operation_container['log_message'],
-        'update_progress': operation_container['update_progress'],
-        'show_dialog': operation_container['show_dialog'],
+        'operations': {
+            'log_message': operation_container['log_message'],
+            'update_progress': operation_container['update_progress'],
+            'show_dialog': operation_container['show_dialog'],
+        },
         
-        # Mark as initialized
-        'ui_initialized': True
-    })
+        # Module info
+        'module_info': {
+            'name': UI_CONFIG['module_name'],
+            'parent': UI_CONFIG['parent_module'],
+            'version': UI_CONFIG['version'],
+            'initialized': True
+        }
+    }
+    
+    # Store the main container as 'ui' for backward compatibility
+    components = {
+        'ui': main_container,
+        'ui_components': ui_components,
+        'ui_initialized': True,
+        'module_name': UI_CONFIG['module_name'],
+        'parent_module': UI_CONFIG['parent_module'],
+        'version': UI_CONFIG['version'],
+        'config': config.copy()
+    }
     
     return components
 
-# Maintain backward compatibility
-create_downloader_ui_components = create_downloader_ui
+def _create_module_form_widgets(config: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Create module-specific form widgets.
+    
+    Args:
+        config: Configuration dictionary for the form widgets
+        
+    Returns:
+        Dictionary containing the form UI and widget references
+    """
+    from .input_options import create_downloader_input_options
+    
+    # Create input options
+    input_options = create_downloader_input_options(config)
+    
+    return {
+        'container': input_options,
+        'widgets': {
+            'workspace_input': getattr(input_options, 'workspace_input', None),
+            'project_input': getattr(input_options, 'project_input', None),
+            'version_input': getattr(input_options, 'version_input', None),
+            'api_key_input': getattr(input_options, 'api_key_input', None),
+            'validate_checkbox': getattr(input_options, 'validate_checkbox', None),
+            'backup_checkbox': getattr(input_options, 'backup_checkbox', None),
+        }
+    }
+
+
+def _create_module_summary_content(config: Dict[str, Any]) -> widgets.Widget:
+    """
+    Create summary content for the module.
+    
+    Args:
+        config: Configuration dictionary
+        
+    Returns:
+        Widget containing the summary content
+    """
+    summary = widgets.HTML(
+        value="<h4>Dataset Download Summary</h4>"
+             "<p>Configure your dataset download settings and click 'Download' to begin.</p>"
+             "<ul>"
+             f"<li>Workspace: {config.get('workspace', 'Not set')}</li>"
+             f"<li>Project: {config.get('project', 'Not set')}</li>"
+             f"<li>Version: {config.get('version', 'Not set')}</li>"
+             "</ul>",
+        layout=widgets.Layout(margin='10px 0')
+    )
+    return summary
+
+
+def _create_module_info_box() -> widgets.Widget:
+    """
+    Create the info box content for the footer.
+    
+    Returns:
+        Widget containing the info box content
+    """
+    from smartcash.ui.info_boxes.download_info import get_download_info
+    return get_download_info(open_by_default=False)
+
+
+def _create_module_tips_box() -> widgets.Widget:
+    """
+    Create the tips box content for the footer.
+    
+    Returns:
+        Widget containing the tips content
+    """
+    tips = [
+        "💡 Pastikan koneksi internet stabil saat mendownload dataset",
+        "🔍 Selalu periksa status dataset sebelum mendownload",
+        "⚠️ Simpan API key Anda dengan aman dan jangan membagikannya",
+        "🔄 Gunakan tombol 'Check' untuk memverifikasi dataset sebelum download"
+    ]
+    
+    return widgets.VBox([
+        widgets.HTML("<h4>Tips & Best Practices</h4>"),
+        widgets.VBox([
+            widgets.HTML(f"<div style='margin: 5px 0;'>{tip}</div>")
+            for tip in tips
+        ])
+    ])
+

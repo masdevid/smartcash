@@ -81,15 +81,34 @@ class EvaluationInitializer(DisplayInitializer):
         self.logger.info("🖥️ Displaying evaluation UI")
         
         try:
+            # Get the main container from the UI components
+            main_container = None
+            
+            # Check if main_container is in the root
             if 'main_container' in ui_components:
-                display(ui_components['main_container'])
+                main_container = ui_components['main_container']
+            # Check if it's in the ui_components dictionary
+            elif 'ui_components' in ui_components and 'main_container' in ui_components['ui_components']:
+                main_container = ui_components['ui_components']['main_container']
+            # Check if it's in the containers
+            elif 'containers' in ui_components and 'main' in ui_components['containers']:
+                main_container = ui_components['containers']['main']
+            
+            if main_container is not None:
+                display(main_container.container if hasattr(main_container, 'container') else main_container)
                 self.logger.info("✅ Evaluation UI displayed successfully")
             else:
+                # For debugging: Log available keys
+                available_keys = list(ui_components.keys())
+                if 'ui_components' in ui_components:
+                    available_keys.extend(f"ui_components['{k}']" for k in ui_components['ui_components'].keys())
+                self.logger.warning(f"Available UI component keys: {available_keys}")
                 raise ValueError("Main container not found in UI components")
                 
         except Exception as e:
             self.logger.error(f"❌ Failed to display evaluation UI: {e}")
             self.handle_error(f"Failed to display evaluation UI: {str(e)}", exc_info=True)
+            raise
     
     def _initialize_impl(self, **kwargs) -> Dict[str, Any]:
         """Implementation of initialization logic for DisplayInitializer.

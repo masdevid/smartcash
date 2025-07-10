@@ -38,7 +38,7 @@ class BackboneInitializer(ModuleInitializer):
         """Pre-initialization validation checks."""
         # Check if required imports are available
         try:
-            from .components.ui_components import create_backbone_ui_components
+            from .components.backbone_ui import create_backbone_ui
             from .handlers.backbone_ui_handler import BackboneUIHandler
         except ImportError as e:
             raise RuntimeError(f"Missing required components: {e}")
@@ -130,8 +130,8 @@ class BackboneInitializer(ModuleInitializer):
             self.pre_initialize_checks()
             
             # UI components phase
-            from .components.ui_components import create_backbone_ui_components
-            ui_components = create_backbone_ui_components(config)
+            from .components.backbone_ui import create_backbone_ui
+            ui_components = create_backbone_ui(config)
             if not ui_components:
                 raise RuntimeError("Failed to create UI components")
             self._ui_components = ui_components

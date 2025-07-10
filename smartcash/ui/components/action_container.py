@@ -563,14 +563,11 @@ class ActionContainer:
                          self.buttons.get('save_reset') is not None and 
                          self._should_show_button('save_reset'))
         
-        # Show warning if both primary and action buttons are present
+        # Raise error if both primary and action buttons are present
         if has_primary and has_action:
-            import warnings
-            warnings.warn(
-                "Both primary and action buttons are visible. "
-                "Only primary button will be shown. "
-                "Please use either primary button or action buttons, not both.",
-                UserWarning
+            raise ValueError(
+                "Invalid configuration: Cannot have both primary and action buttons. "
+                "Please use either a primary button or action buttons, not both."
             )
         
         # If no buttons are set, create default primary button

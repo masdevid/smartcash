@@ -102,15 +102,46 @@ DEFAULT_CONFIG = {
 
 # UI Configuration
 UI_CONFIG = {
-    "title": "Model Evaluation",
-    "subtitle": "Test model performance with scenario-based evaluation",
-    "icon": "🎯",
+    'module_name': 'evaluate',
+    'parent_module': 'model',
+    'title': '🎯 Model Evaluation',
+    'subtitle': 'Test model performance with scenario-based evaluation',
+    'icon': '🎯',
+    'version': '2.0.0',
     "theme": {
         "primary_color": "#28a745",
         "secondary_color": "#6c757d",
         "success_color": "#28a745",
         "warning_color": "#ffc107",
         "error_color": "#dc3545"
+    }
+}
+
+# Button Configuration
+BUTTON_CONFIG = {
+    'evaluate': {
+        'text': '🎯 Start Evaluation',
+        'style': 'primary',
+        'tooltip': 'Start evaluation with selected scenarios and models',
+        'order': 1
+    },
+    'load_checkpoint': {
+        'text': '📂 Load Checkpoint',
+        'style': 'info',
+        'tooltip': 'Load model checkpoint for evaluation',
+        'order': 2
+    },
+    'compare': {
+        'text': '📊 Compare Results',
+        'style': 'success',
+        'tooltip': 'Compare evaluation results across scenarios',
+        'order': 3
+    },
+    'export': {
+        'text': '📥 Export Report',
+        'style': 'warning',
+        'tooltip': 'Export evaluation results and metrics to files',
+        'order': 4
     }
 }
 

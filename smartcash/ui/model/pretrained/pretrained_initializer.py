@@ -61,8 +61,18 @@ class PretrainedInitializer(ModuleInitializer):
             # Update UI from config
             self.config_handler.update_ui_from_config(ui_components, validated_config)
             
-            # Perform post-initialization checks
-            asyncio.create_task(self._post_init_check(ui_components, validated_config))
+            # Perform post-initialization checks in a non-blocking way
+            try:
+                # Create an event loop if none exists
+                loop = asyncio.get_event_loop()
+                if loop.is_running():
+                    # If loop is running, schedule the task
+                    loop.create_task(self._post_init_check(ui_components, validated_config))
+                else:
+                    # If no loop is running, run the coroutine directly
+                    loop.run_until_complete(self._post_init_check(ui_components, validated_config))
+            except Exception as e:
+                logger.warning(f"Could not schedule post-init check: {str(e)}")
             
             return ui_components
             

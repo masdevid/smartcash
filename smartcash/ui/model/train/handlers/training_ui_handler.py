@@ -39,23 +39,33 @@ class TrainingUIHandler(ModuleUIHandler):
     def _setup_event_handlers(self) -> None:
         """Setup event handlers for UI components."""
         try:
+            # Get action container buttons
+            action_container = self.ui_components.get('containers', {}).get('actions', {})
+            
             # Start training button
-            if 'start_button' in self.ui_components:
-                self.ui_components['start_button'].on_click(self._on_start_training)
+            start_btn = action_container.get('start')
+            if start_btn and hasattr(start_btn, 'on_click'):
+                start_btn.on_click(self._on_start_training)
             
             # Stop training button
-            if 'stop_button' in self.ui_components:
-                self.ui_components['stop_button'].on_click(self._on_stop_training)
+            stop_btn = action_container.get('stop')
+            if stop_btn and hasattr(stop_btn, 'on_click'):
+                stop_btn.on_click(self._on_stop_training)
             
             # Resume training button
-            if 'resume_button' in self.ui_components:
-                self.ui_components['resume_button'].on_click(self._on_resume_training)
+            resume_btn = action_container.get('resume')
+            if resume_btn and hasattr(resume_btn, 'on_click'):
+                resume_btn.on_click(self._on_resume_training)
             
             # Configuration form changes
             self._setup_config_handlers()
             
+            # Update button states based on initial state
+            self._update_button_states()
+            
         except Exception as e:
             self.logger.error(f"Error setting up event handlers: {str(e)}")
+            raise
     
     def _setup_config_handlers(self) -> None:
         """Setup handlers for configuration form changes."""

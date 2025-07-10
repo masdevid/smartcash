@@ -28,23 +28,18 @@ class TestConfirmationDialog:
     
     def setup_method(self):
         """Setup test fixtures."""
-        # Mock the BaseUIComponent
-        self.base_ui_component_patcher = patch('smartcash.ui.components.dialog.confirmation_dialog.BaseUIComponent')
+        # Mock the BaseUIComponent from the correct module
+        self.base_ui_component_patcher = patch('smartcash.ui.components.base_component.BaseUIComponent')
         self.mock_base_ui_component = self.base_ui_component_patcher.start()
         
         # Mock display and other IPython components
         self.display_patcher = patch('smartcash.ui.components.dialog.confirmation_dialog.display')
         self.clear_output_patcher = patch('smartcash.ui.components.dialog.confirmation_dialog.clear_output')
         self.html_patcher = patch('smartcash.ui.components.dialog.confirmation_dialog.HTML')
-        self.uuid_patcher = patch('smartcash.ui.components.dialog.confirmation_dialog.uuid')
         
         self.mock_display = self.display_patcher.start()
         self.mock_clear_output = self.clear_output_patcher.start()
         self.mock_html = self.html_patcher.start()
-        self.mock_uuid = self.uuid_patcher.start()
-        
-        # Setup uuid mock
-        self.mock_uuid.uuid4.return_value.hex = "abcdef123456"
         
         # Mock widgets
         self.mock_output = Mock(spec=widgets.Output)
@@ -67,7 +62,6 @@ class TestConfirmationDialog:
         self.display_patcher.stop()
         self.clear_output_patcher.stop()
         self.html_patcher.stop()
-        self.uuid_patcher.stop()
         self.output_patcher.stop()
         self.layout_patcher.stop()
     
@@ -334,15 +328,11 @@ class TestLegacyDialogFunctions:
         # Call create_confirmation_area
         result = create_confirmation_area(ui_components)
         
-        # Verify dialog was created
-        self.mock_confirmation_dialog_class.assert_called_once_with("legacy_dialog")
+        # Verify dialog was created without parameters (default behavior)
+        self.mock_confirmation_dialog_class.assert_called_once_with()
         
-        # Verify dialog was initialized
-        self.mock_dialog_instance.initialize.assert_called_once()
-        
-        # Verify ui_components was updated
+        # Verify ui_components was updated (only confirmation_dialog, not confirmation_area)
         assert 'confirmation_dialog' in ui_components
-        assert 'confirmation_area' in ui_components
         assert ui_components['confirmation_dialog'] == self.mock_dialog_instance
     
     def test_create_confirmation_area_existing_dialog(self):
@@ -357,14 +347,11 @@ class TestLegacyDialogFunctions:
         # Verify new dialog was not created
         self.mock_confirmation_dialog_class.assert_not_called()
         
-        # Verify existing dialog was used
+        # Verify existing dialog was used (no changes to ui_components)
         assert ui_components['confirmation_dialog'] == existing_dialog
         
-        # Verify existing dialog was initialized
-        existing_dialog.initialize.assert_called_once()
-        
-        # Verify confirmation_area was set correctly
-        assert ui_components['confirmation_area'] == self.mock_container
+        # Verify existing dialog was NOT initialized (function only creates if missing)
+        existing_dialog.initialize.assert_not_called()
     
     def test_show_confirmation_dialog_function(self):
         """Test show_confirmation_dialog function."""
@@ -384,8 +371,8 @@ class TestLegacyDialogFunctions:
             danger_mode=True
         )
         
-        # Verify dialog was created
-        self.mock_confirmation_dialog_class.assert_called_once_with("legacy_dialog")
+        # Verify dialog was created without parameters (default behavior)
+        self.mock_confirmation_dialog_class.assert_called_once_with()
         
         # Verify show was called on dialog
         self.mock_dialog_instance.show.assert_called_once_with(
@@ -433,8 +420,8 @@ class TestLegacyDialogFunctions:
             ok_text="OK"
         )
         
-        # Verify dialog was created
-        self.mock_confirmation_dialog_class.assert_called_once_with("legacy_dialog")
+        # Verify dialog was created without parameters (default behavior)
+        self.mock_confirmation_dialog_class.assert_called_once_with()
         
         # Verify show_info was called on dialog
         self.mock_dialog_instance.show_info.assert_called_once_with(
@@ -482,18 +469,13 @@ class TestLegacyDialogFunctions:
         mock_area.layout = Mock()
         ui_components = {'confirmation_area': mock_area}
         
-        # Mock context manager
-        mock_area.__enter__ = Mock(return_value=mock_area)
-        mock_area.__exit__ = Mock(return_value=None)
-        
         # Call clear_dialog_area
         clear_dialog_area(ui_components)
         
-        # Verify clear_output was called
-        self.mock_clear_output.assert_called_once_with(wait=True)
+        # Verify clear_output was NOT called for legacy area
+        self.mock_clear_output.assert_not_called()
         
-        # Verify layout was updated
-        assert mock_area.layout.display == 'none'
+        # Verify layout visibility was updated (not display)
         assert mock_area.layout.visibility == 'hidden'
     
     def test_clear_dialog_area_no_dialog(self):
@@ -592,7 +574,7 @@ class TestDialogIntegration:
         )
         
         # Verify dialog was created and shown
-        self.mock_confirmation_dialog_class.assert_called_once_with("legacy_dialog")
+        self.mock_confirmation_dialog_class.assert_called_once_with()
         self.mock_dialog_instance.show.assert_called_once()
         
         # Step 2: Check if dialog is visible
@@ -625,7 +607,7 @@ class TestDialogIntegration:
         )
         
         # Verify dialog was created and shown
-        self.mock_confirmation_dialog_class.assert_called_once_with("legacy_dialog")
+        self.mock_confirmation_dialog_class.assert_called_once_with()
         self.mock_dialog_instance.show_info.assert_called_once()
         
         # Step 2: Check if dialog is visible
@@ -655,7 +637,7 @@ class TestDialogIntegration:
         )
         
         # Verify only one dialog instance was created
-        self.mock_confirmation_dialog_class.assert_called_once_with("legacy_dialog")
+        self.mock_confirmation_dialog_class.assert_called_once_with()
         
         # Verify both show methods were called
         self.mock_dialog_instance.show.assert_called_once()

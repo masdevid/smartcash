@@ -41,3 +41,43 @@ ROBOFLOW_FORMAT_YOLOV5 = 'yolov5'
 MODULE_NAME = 'downloader'
 MODULE_GROUP = 'dataset'
 MODULE_TITLE = '📥 Dataset Downloader'
+
+# UI Configuration
+UI_CONFIG = {
+    'title': MODULE_TITLE,
+    'subtitle': "Download dataset Roboflow untuk SmartCash dengan UUID renaming dan validasi otomatis",
+    'icon': "📥",
+    'module_name': MODULE_NAME,
+    'parent_module': MODULE_GROUP,
+    'version': "1.0.0"
+}
+
+# Button configuration
+BUTTON_CONFIG = {
+    'download': {
+        'text': '📥 Download',
+        'style': 'primary',
+        'tooltip': 'Download dataset from Roboflow',
+        'order': 1
+    },
+    'check': {
+        'text': '🔍 Check',
+        'style': 'info',
+        'tooltip': 'Check dataset status and integrity',
+        'order': 2
+    },
+    'cleanup': {
+        'text': '🗑️ Cleanup',
+        'style': 'danger',
+        'tooltip': 'Remove dataset files from local storage',
+        'order': 3
+    }
+}
+
+# Validation rules for form fields
+VALIDATION_RULES = {
+    'workspace': {'required': True, 'min_length': 1},
+    'project': {'required': True, 'min_length': 1},
+    'version': {'required': True, 'min_length': 1},
+    'api_key': {'required': True, 'min_length': 10}
+}

@@ -1,162 +1,228 @@
 """
-Dataset Split Initializer Module.
+File: smartcash/ui/dataset/split/split_initializer.py
+Deskripsi: Split initializer yang mewarisi CommonInitializer dengan clean dependency
 
-This module provides the main initialization code for the dataset split configuration UI,
-following the container-based pattern used throughout the SmartCash application.
+Initialization Flow:
+1. Load and validate configuration
+2. Create UI components
+3. Setup module handlers
+4. Return UI with proper error handling
 """
 
-from typing import Dict, Any, Optional, List
-import ipywidgets as widgets
-from IPython.display import display
-import logging
-
-# Core imports
+from typing import Dict, Any, List, Optional
+from smartcash.ui.core.initializers.module_initializer import ModuleInitializer
 from smartcash.ui.core.initializers.display_initializer import DisplayInitializer
-from smartcash.ui.core.errors.handlers import handle_ui_errors, create_error_response
-
-# Local imports
-from .components.split_ui import create_split_ui_components
-from .handlers.config_handler import SplitConfigHandler
+from smartcash.ui.dataset.split.components.split_ui import create_split_ui
+from smartcash.ui.dataset.split.handlers.config_handler import SplitConfigHandler
+from smartcash.ui.core.errors.handlers import create_error_response
 
 # Constants
 MODULE_NAME = "split_config"
 
-class SplitInitializer(DisplayInitializer):
-    """Dataset split configuration UI implementation following container-based pattern.
-    
-    This class implements the dataset split configuration UI using the container-based
-    pattern, providing a consistent user experience with other SmartCash modules.
-    
-    Features:
-    - Container-based UI following SmartCash design patterns
-    - Centralized configuration management
-    - Consistent error handling and logging
-    - Support for both interactive and programmatic usage
+class SplitInitializer(ModuleInitializer):
+    """Split initializer dengan complete UI dan backend service integration
+
+    Provides a structured approach to initializing the dataset split module with
+    proper error handling, logging, and UI component management. Follows the same
+    initialization flow as CommonInitializer with additional split-specific
+    functionality.
     """
+
+    def __init__(self):
+        super().__init__(
+            module_name=MODULE_NAME,
+            config_handler_class=SplitConfigHandler
+        )
+        self.logger.info("🔧 Initializing SplitInitializer")
+        self.components = {}
     
-    def __init__(self, config: Optional[Dict[str, Any]] = None, **kwargs):
-        """Initialize the dataset split configuration UI.
-        
-        Args:
-            config: Optional configuration dictionary for split settings
-            **kwargs: Additional arguments passed to the parent class
-        """
-        super().__init__(module_name=MODULE_NAME, parent_module='dataset.split')
-        self.config = config or {}
-        self.kwargs = kwargs
-        self.components: Dict[str, Any] = {}
-        self.config_handler = SplitConfigHandler(config)
-        
-        self.logger.debug(f"Initialized with config: {bool(config)}")
-            
-    def _initialize_impl(self, *args, **kwargs) -> Dict[str, Any]:
+    def _initialize_impl(self, config: Optional[Dict[str, Any]] = None, **kwargs) -> Dict[str, Any]:
         """Implementation of the initialization process.
         
         This method is called by the parent class's initialize() method.
         
         Args:
-            *args: Variable length argument list
-            **kwargs: Arbitrary keyword arguments
+            config: Optional configuration dictionary
+            **kwargs: Additional keyword arguments
             
         Returns:
-            Dict containing UI components for display
+            Dictionary containing UI components and other initialization data
         """
         try:
+            # Ensure we have a config
+            config = config or {}
+            
             # Create UI components
-            components = self._create_ui_components(self.config or {})
+            self.components = self._create_ui_components(config, **kwargs)
+            
+            # Set up module handlers
+            self._setup_module_handlers(self.components, config, **kwargs)
             
             # Mark as initialized
             self._is_initialized = True
             
-            # Return components directly for DisplayInitializer
-            return components
-            
-        except Exception as e:
-            error_msg = f"Failed to initialize SplitInitializer: {str(e)}"
-            self.logger.error(error_msg, exc_info=True)
-            return {
-                'status': 'error',
-                'message': error_msg,
-                'error': str(e)
-            }
-    
-    def _create_ui_components(self, config: Dict[str, Any]) -> Dict[str, Any]:
-        """Create and return UI components using the container-based pattern.
-        
-        Args:
-            config: Configuration dictionary
-            **kwargs: Additional keyword arguments
-            
-        Returns:
-            Dictionary containing all UI components
-        """
-        try:
-            # Create UI components using container pattern
-            ui_components = create_split_ui_components(config, **self.kwargs)
-            
-            # Store references to components
-            self.components = {
-                **ui_components,
-                'main_container': ui_components['main_container'],
-                'ui': ui_components['main_container'],  # Add ui key for DisplayInitializer
-                'form_components': ui_components.get('form_components', {})
-            }
-            
-            # Set up event handlers
-            self._setup_handlers()
-            
             return self.components
             
         except Exception as e:
-            error_msg = f"Gagal membuat komponen UI: {str(e)}"
-            self.logger.error(error_msg, exc_info=True)
-            raise RuntimeError(error_msg) from e
+            self.handle_error(f"Failed to initialize SplitInitializer: {str(e)}", exc_info=True)
+            return create_error_response("Gagal menginisialisasi modul split")
+            
+    def _create_ui_components(self, config: Dict[str, Any], env=None, **kwargs) -> Dict[str, Any]:
+        """Create split UI components following colab/dependency pattern
+
+        Args:
+            config: Loaded configuration
+            env: Optional environment context
+            **kwargs: Additional arguments
+
+        Returns:
+            Dictionary of UI components
+        """
+        try:
+            self.logger.info("🔧 Creating split UI components")
+            
+            # Create UI components with the new structure
+            ui_components = create_split_ui(config=config, **kwargs)
+            
+            # Add module-specific metadata
+            ui_components.update({
+                'split_initialized': True,
+                'module_name': MODULE_NAME,
+                'logger': self.logger,
+                'config': config,
+                'env': env
+            })
+
+            self.logger.info(f"✅ UI components created successfully: {len(ui_components)} components")
+            return ui_components
+            
+        except Exception as e:
+            self.handle_error(f"Failed to create UI components: {str(e)}", exc_info=True)
+            return create_error_response("Gagal membuat komponen UI split")
+    
+    def _setup_module_handlers(self, ui_components: Dict[str, Any], config: Dict[str, Any], env=None, **kwargs) -> Dict[str, Any]:
+        """Setup handlers following colab/dependency pattern
+
+        Args:
+            ui_components: Dictionary of UI components
+            config: Loaded configuration
+            env: Optional environment context
+            **kwargs: Additional arguments
+
+        Returns:
+            Updated UI components with handlers
+        """
+        try:
+            self.logger.info("🔧 Setting up split operation handlers")
+            
+            # Get buttons from components
+            buttons = ui_components.get('buttons', {})
+            
+            # Set up save button handler if available
+            save_button = buttons.get('save_button') or ui_components.get('save_button')
+            if save_button and hasattr(save_button, 'on_click'):
+                def on_save_clicked(_):
+                    try:
+                        self.save_config()
+                        self.logger.info("✅ Konfigurasi berhasil disimpan")
+                    except Exception as e:
+                        self.logger.error(f"Gagal menyimpan konfigurasi: {str(e)}", exc_info=True)
+                
+                save_button.on_click(on_save_clicked)
+            
+            # Set up reset button handler if available
+            reset_button = buttons.get('reset_button') or ui_components.get('reset_button')
+            if reset_button and hasattr(reset_button, 'on_click'):
+                def on_reset_clicked(_):
+                    try:
+                        self.reset_config()
+                        self.logger.info("🔄 Konfigurasi telah direset ke nilai default")
+                    except Exception as e:
+                        self.logger.error(f"Gagal mereset konfigurasi: {str(e)}", exc_info=True)
+                
+                reset_button.on_click(on_reset_clicked)
+            
+            self.logger.info("✅ Operation handlers set up successfully")
+            return ui_components
+            
+        except Exception as e:
+            self.handle_error(f"Failed to set up module handlers: {str(e)}", exc_info=True)
+            return ui_components
+    
+    def save_config(self) -> None:
+        """Save the current configuration.
+        
+        This method should be implemented by subclasses to handle saving
+        the current UI state to configuration.
+        """
+        self.logger.info("💾 Saving configuration...")
+        try:
+            # Get current values from UI components
+            config = {}
+            
+            # Update config with values from form components
+            form_components = getattr(self, 'components', {}).get('form_components', {})
+            for name, widget in form_components.items():
+                if hasattr(widget, 'value'):
+                    config[name] = widget.value
+            
+            # Save using config handler
+            if hasattr(self, 'config_handler') and self.config_handler:
+                self.config_handler.save(config)
+                self.logger.info("✅ Configuration saved successfully")
+            else:
+                self.logger.warning("No config handler available to save configuration")
+                
+        except Exception as e:
+            self.handle_error(f"Failed to save configuration: {str(e)}", exc_info=True)
+            raise
+    
+    def reset_config(self) -> None:
+        """Reset the configuration to default values.
+        
+        This method should be implemented by subclasses to handle resetting
+        the UI components to their default values.
+        """
+        self.logger.info("🔄 Resetting configuration to defaults...")
+        try:
+            # Get default config
+            default_config = {}
+            if hasattr(self, 'config_handler') and self.config_handler:
+                default_config = self.config_handler.get_default_config()
+            
+            # Reset form components to default values
+            form_components = getattr(self, 'components', {}).get('form_components', {})
+            for name, widget in form_components.items():
+                if hasattr(widget, 'value') and name in default_config:
+                    widget.value = default_config[name]
+            
+            self.logger.info("✅ Configuration reset successfully")
+            
+        except Exception as e:
+            self.handle_error(f"Failed to reset configuration: {str(e)}", exc_info=True)
+            raise
     
     def display(self) -> None:
-        """Display the UI using the container-based pattern."""
-        if not hasattr(self, 'components') or 'main_container' not in self.components:
-            self._create_ui_components(self.config, **self.kwargs)
-            
-        if 'main_container' in self.components:
-            from IPython.display import display
-            display(self.components['main_container'])
-        else:
-            self.logger.error("Main container not found in components")
-    
-    def _setup_handlers(self) -> None:
-        """Set up event handlers for UI components.
+        """Display the UI components.
         
-        This method connects UI components to their respective handlers,
-        including save/reset buttons and any custom event handlers.
+        This method displays the main UI container if it exists.
         """
-        if not hasattr(self, 'components') or not self.components:
-            return
-            
-        form_components = self.components.get('form_components', {})
-        
-        # Set up save button handler
-        save_button = form_components.get('save_button')
-        if save_button and hasattr(self, 'save_config'):
-            def on_save_clicked(_):
-                try:
-                    self.save_config()
-                    self._log_success("Konfigurasi berhasil disimpan")
-                except Exception as e:
-                    self._log_error(f"Gagal menyimpan konfigurasi: {str(e)}")
-            
-            save_button.on_click(on_save_clicked)
-        
-        # Set up reset button handler
-        reset_button = form_components.get('reset_button')
-        if reset_button and hasattr(self, 'reset_ui'):
-            def on_reset_clicked(_):
-                try:
-                    self.reset_ui()
-                    self._log_success("UI berhasil direset ke nilai default")
-                except Exception as e:
-                    self._log_error(f"Gagal me-reset UI: {str(e)}")
-            
-            reset_button.on_click(on_reset_clicked)
+        try:
+            if not hasattr(self, 'components'):
+                self.logger.warning("No components to display")
+                return
+                
+            main_container = self.components.get('main_container')
+            if main_container:
+                from IPython.display import display
+                display(main_container)
+                self.logger.info("✅ UI displayed successfully")
+            else:
+                self.logger.warning("No main container found to display")
+                
+        except Exception as e:
+            self.handle_error(f"Failed to display UI: {str(e)}", exc_info=True)
+            raise
     
     def _log_error(self, message: str) -> None:
         """Log an error message to the UI log output.
@@ -196,110 +262,75 @@ class SplitInitializer(DisplayInitializer):
             else:
                 print(message)
 
-@handle_ui_errors(error_component_title="Split Config Error", log_error=True)
-def create_split_config_cell(config: Optional[Dict[str, Any]] = None, **kwargs) -> None:
-    """Create and display dataset split configuration UI.
+
+# Global instance
+_split_initializer = SplitInitializer()
+
+
+class SplitDisplayInitializer(DisplayInitializer):
+    """DisplayInitializer wrapper for split module"""
     
-    This is the main entry point for users to create and display the dataset
-    split configuration UI in a notebook cell.
+    def __init__(self):
+        super().__init__(module_name=MODULE_NAME, parent_module="dataset")
+        self._split_initializer = SplitInitializer()
+    
+    def _initialize_impl(self, **kwargs):
+        """Implementation using existing SplitInitializer"""
+        return self._split_initializer.initialize(**kwargs)
+
+
+# Global display initializer instance
+_split_display_initializer = SplitDisplayInitializer()
+
+
+def initialize_split_ui(env=None, config=None, **kwargs):
+    """Initialize and display split UI using DisplayInitializer
     
     Args:
+        env: Optional environment context
         config: Optional configuration dictionary
-        **kwargs: Additional arguments passed to the initializer
+        **kwargs: Additional arguments
+    
+    Note:
+        This function displays the UI directly and returns None.
+        Use get_split_components() if you need access to the components dictionary.
     """
-    try:
-        initializer = SplitInitializer(config=config, **kwargs)
-        initializer.initialize()
-        initializer.display()
-    except Exception as e:
-        handle_ui_errors(e, "Gagal menginisialisasi UI konfigurasi split dataset")
+    return _split_display_initializer.initialize(env=env, config=config, **kwargs)
 
 
-@handle_ui_errors(error_component_title="Split Config Error", log_error=True)
-def get_split_config_components(
-    config: Optional[Dict[str, Any]] = None, 
-    **kwargs
-) -> Dict[str, Any]:
-    """Create split config UI and return components for programmatic access.
-    
-    This function creates the dataset split UI components and returns them
-    for programmatic access, without displaying the UI.
+def get_split_components(env=None, config=None, **kwargs):
+    """Get split components dictionary without displaying UI
     
     Args:
+        env: Optional environment context
         config: Optional configuration dictionary
-        **kwargs: Additional arguments passed to the initializer
-               
+        **kwargs: Additional arguments
+    
     Returns:
-        Dictionary containing all UI components and the initializer instance
+        Dictionary of UI components
     """
-    try:
-        initializer = SplitInitializer(config=config, **kwargs)
-        initializer.initialize()
-        
-        # Ensure UI components are created
-        if not hasattr(initializer, 'components') or not initializer.components:
-            initializer._create_ui_components(initializer.config, **kwargs)
-            
-        return {
-            'initializer': initializer,
-            'components': initializer.components,
-            'main_container': initializer.components.get('main_container'),
-            'form_components': initializer.components.get('form_components', {})
-        }
-        
-    except Exception as e:
-        error_msg = f"Gagal mendapatkan komponen UI split config: {str(e)}"
-        logging.error(error_msg, exc_info=True)
-        return create_error_response(
-            error_type="UI Initialization Error",
-            message=error_msg,
-            details=str(e)
-        )
+    return _split_initializer.initialize(env=env, config=config, **kwargs)
 
 
-# Standard entry point functions following UI module pattern
-
-def initialize_split_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> None:
-    """Initialize and display the split configuration UI.
+def display_split_ui(env=None, config=None, **kwargs):
+    """Display split UI (alias for initialize_split_ui)
     
     Args:
+        env: Optional environment context
         config: Optional configuration dictionary
-        **kwargs: Additional arguments passed to the initializer
+        **kwargs: Additional arguments
     """
-    initializer = get_split_initializer(config, **kwargs)
-    initializer.initialize_and_display(config)
-
-def init_split_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> None:
-    """Initialize and display the split configuration UI.
-    
-    Args:
-        config: Optional configuration dictionary
-        **kwargs: Additional arguments passed to the initializer
-    """
-    create_split_config_cell(config, **kwargs)
-
-
-def get_split_initializer(config: Optional[Dict[str, Any]] = None, **kwargs) -> SplitInitializer:
-    """Get a split initializer instance.
-    
-    Args:
-        config: Optional configuration dictionary
-        **kwargs: Additional arguments passed to the initializer
-        
-    Returns:
-        SplitInitializer instance
-    """
-    return SplitInitializer(config=config, **kwargs)
+    return initialize_split_ui(env=env, config=config, **kwargs)
 
 
 # Public API
 export_functions = [
     'SplitInitializer',
-    'create_split_config_cell',
-    'get_split_config_components',
-    'init_split_ui',
     'initialize_split_ui',
-    'get_split_initializer'
+    'get_split_components',
+    'display_split_ui'
 ]
+
+# No backward compatibility aliases - using new pattern only
 
 __all__ = export_functions

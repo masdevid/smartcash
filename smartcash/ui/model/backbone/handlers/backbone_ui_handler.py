@@ -153,7 +153,7 @@ class BackboneUIHandler(ModuleUIHandler):
                     names='value'
                 )
         
-        # Button handlers
+        # Button handlers - only include buttons that exist in the UI
         button_handlers = {
             'validate_btn': self._handle_validate_operation,
             'load_btn': self._handle_load_operation,
@@ -163,10 +163,18 @@ class BackboneUIHandler(ModuleUIHandler):
             'reset_button': self._handle_reset_config
         }
         
+        # Log available UI components for debugging
+        available_buttons = [name for name in button_handlers.keys() 
+                           if name in self._ui_components and self._ui_components[name] is not None]
+        self.logger.info(f"Available buttons: {available_buttons}")
+        
+        # Set up handlers for existing buttons
         for button_name, handler in button_handlers.items():
-            if button_name in self._ui_components:
-                button = self._ui_components[button_name]
+            button = self._ui_components.get(button_name)
+            if button is not None and hasattr(button, 'on_click'):
                 button.on_click(lambda b, h=handler: h())
+            else:
+                self.logger.warning(f"Button {button_name} not found or invalid in UI components")
         
         self.logger.info("✅ Event handlers setup complete")
     

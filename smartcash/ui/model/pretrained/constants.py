@@ -47,9 +47,12 @@ PROGRESS_STEPS = {
 # ==================== UI Configuration ====================
 
 UI_CONFIG = {
-    "title": "Pretrained Models",
-    "subtitle": "Download and manage pretrained models for currency detection",
-    "icon": "🤖",
+    'module_name': 'pretrained',
+    'parent_module': 'model',
+    'title': '🤖 Pretrained Models',
+    'subtitle': 'Download and manage pretrained models for currency detection',
+    'icon': '🤖',
+    'version': '2.0.0',
     "operations": [
         {
             "operation_id": "download",
@@ -58,6 +61,34 @@ UI_CONFIG = {
             "description": "Download YOLOv5s and EfficientNet-B4 pretrained models"
         }
     ]
+}
+
+# Button Configuration
+BUTTON_CONFIG = {
+    'download': {
+        'text': '📥 Download Models',
+        'style': 'primary',
+        'tooltip': 'Download YOLOv5s and EfficientNet-B4 pretrained models',
+        'order': 1
+    },
+    'validate': {
+        'text': '🔍 Validate Models',
+        'style': 'info',
+        'tooltip': 'Validate downloaded models and check integrity',
+        'order': 2
+    },
+    'refresh': {
+        'text': '🔄 Refresh Status',
+        'style': 'warning',
+        'tooltip': 'Refresh model status and directory contents',
+        'order': 3
+    },
+    'cleanup': {
+        'text': '🗑️ Clean Up',
+        'style': 'danger',
+        'tooltip': 'Remove corrupted or invalid model files',
+        'order': 4
+    }
 }
 
 # ==================== Model Information ====================

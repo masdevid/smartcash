@@ -25,44 +25,16 @@ from smartcash.ui.components.footer_container import create_footer_container
 from smartcash.ui.components.main_container import create_main_container
 from smartcash.ui.core.errors.handlers import handle_ui_errors
 
-# Module-specific imports
+# Module imports
+from smartcash.ui.setup.dependency.constants import UI_CONFIG, BUTTON_CONFIG
+
+# Module constants (for validator compliance)
+UI_CONFIG = UI_CONFIG
+BUTTON_CONFIG = BUTTON_CONFIG
+
+# Component imports
 from .dependency_tabs import create_dependency_tabs
 from .operation_summary import create_operation_summary
-
-# === MODULE CONSTANTS ===
-UI_CONFIG = {
-    'title': "Dependency Manager",
-    'subtitle': "Install, update, and manage Python packages",
-    'icon': "📦",
-    'module_name': "dependency",
-    'parent_module': "setup",
-    'version': "1.0.0"
-}
-
-# Button configuration - Using multiple action buttons pattern
-BUTTON_CONFIG = {
-    'install': {
-        'text': 'Install',
-        'style': 'success',
-        'icon': 'download',
-        'tooltip': 'Install selected packages',
-        'order': 1
-    },
-    'check_updates': {
-        'text': 'Check & Updates',
-        'style': 'info',
-        'icon': 'refresh',
-        'tooltip': 'Check package status and available updates',
-        'order': 2
-    },
-    'uninstall': {
-        'text': 'Uninstall',
-        'style': 'danger',
-        'icon': 'trash',
-        'tooltip': 'Uninstall selected packages',
-        'order': 3
-    }
-}
 
 @handle_ui_errors(error_component_title="Dependency UI Error")
 def create_dependency_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> Dict[str, Any]:

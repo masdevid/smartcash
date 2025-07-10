@@ -45,6 +45,41 @@ INSTALL_DEFAULTS = {
     'UPGRADE_STRATEGY': 'eager'
 }
 
+# UI Configuration
+UI_CONFIG = {
+    'title': "Dependency Manager",
+    'subtitle': "Install, update, and manage Python packages",
+    'icon': "📦",
+    'module_name': "dependency",
+    'parent_module': "setup",
+    'version': "1.0.0"
+}
+
+# Button configuration - Using multiple action buttons pattern
+BUTTON_CONFIG = {
+    'install': {
+        'text': 'Install',
+        'style': 'success',
+        'icon': 'download',
+        'tooltip': 'Install selected packages',
+        'order': 1
+    },
+    'check_updates': {
+        'text': 'Check & Updates',
+        'style': 'info',
+        'icon': 'refresh',
+        'tooltip': 'Check package status and available updates',
+        'order': 2
+    },
+    'uninstall': {
+        'text': 'Uninstall',
+        'style': 'danger',
+        'icon': 'trash',
+        'tooltip': 'Uninstall selected packages',
+        'order': 3
+    }
+}
+
 # Color scheme
 COLORS = {
     'SUCCESS': '#4CAF50',

@@ -102,10 +102,41 @@ DEFAULT_CONFIG = {
 
 # UI Configuration
 UI_CONFIG = {
-    "title": "🚀 Model Training",
-    "subtitle": "Train YOLOv5 models with real-time monitoring and metrics visualization",
-    "icon": "🤖",
+    'module_name': 'train',
+    'parent_module': 'model',
+    'title': '🚀 Model Training',
+    'subtitle': 'Train YOLOv5 models with real-time monitoring and metrics visualization',
+    'icon': '🚀',
+    'version': '2.0.0',
     "theme": "primary"
+}
+
+# Button Configuration
+BUTTON_CONFIG = {
+    'start': {
+        'text': '🚀 Start Training',
+        'style': 'primary',
+        'tooltip': 'Start model training with current configuration',
+        'order': 1
+    },
+    'stop': {
+        'text': '🛑 Stop Training',
+        'style': 'danger',
+        'tooltip': 'Stop current training process',
+        'order': 2
+    },
+    'resume': {
+        'text': '🔄 Resume Training',
+        'style': 'warning',
+        'tooltip': 'Resume training from checkpoint',
+        'order': 3
+    },
+    'validate': {
+        'text': '📊 Validate Model',
+        'style': 'info',
+        'tooltip': 'Run validation on current model',
+        'order': 4
+    }
 }
 
 # Chart configuration

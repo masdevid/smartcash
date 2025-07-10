@@ -35,6 +35,44 @@ UI_CONFIG = UI_CONFIG
 BUTTON_CONFIG = BUTTON_CONFIG
 
 
+def create_data_card(title: str, content: widgets.Widget, width: str = "100%") -> widgets.VBox:
+    """Create a styled card container for data visualization.
+    
+    Args:
+        title: Title of the card
+        content: Widget to be placed inside the card
+        width: Width of the card (default: "100%")
+        
+    Returns:
+        A VBox widget containing the card
+    """
+    card_header = widgets.HTML(
+        value=f'<div style="padding: 10px; background-color: #f8f9fa; border-bottom: 1px solid #dee2e6; border-radius: 5px 5px 0 0; font-weight: bold;">{title}</div>',
+        layout=widgets.Layout(width='100%')
+    )
+    
+    card_content = widgets.VBox(
+        [content],
+        layout=widgets.Layout(
+            padding='10px',
+            border='1px solid #dee2e6',
+            border_top='none',
+            border_radius='0 0 5px 5px',
+            width='100%',
+            overflow='auto'
+        )
+    )
+    
+    return widgets.VBox(
+        [card_header, card_content],
+        layout=widgets.Layout(
+            width=width,
+            margin='0 0 15px 0',
+            box_shadow='0 2px 4px rgba(0,0,0,0.1)'
+        )
+    )
+
+
 @handle_ui_errors(error_component_title="Visualization UI Error")
 def create_visualization_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> Dict[str, Any]:
     """

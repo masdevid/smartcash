@@ -126,15 +126,16 @@ class ColabUIHandler(ModuleUIHandler):
                     names='value'
                 )
         
-        # Button handlers
-        if 'save_button' in self._ui_components:
+        # Button handlers - handle save/reset buttons if they exist
+        # Note: These may be managed by ActionContainer
+        if 'save_button' in self._ui_components and self._ui_components['save_button'] is not None:
             self._ui_components['save_button'].on_click(self._handle_save_config)
         
-        if 'reset_button' in self._ui_components:
+        if 'reset_button' in self._ui_components and self._ui_components['reset_button'] is not None:
             self._ui_components['reset_button'].on_click(self._handle_reset_config)
         
-        # Main setup button handler - this is the key change!
-        if 'setup_button' in self._ui_components:
+        # Main setup button handler - this is the primary button
+        if 'setup_button' in self._ui_components and self._ui_components['setup_button'] is not None:
             self._ui_components['setup_button'].on_click(self._handle_main_setup)
         
         self.logger.info("✅ Event handlers setup complete")

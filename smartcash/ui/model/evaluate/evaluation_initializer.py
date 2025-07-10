@@ -1,82 +1,130 @@
 """
 File: smartcash/ui/model/evaluate/evaluation_initializer.py
-Description: Evaluation module initializer following DisplayInitializer pattern
+Description: Evaluation module initializer following ModuleInitializer pattern
+
+Initialization Flow:
+1. Load and validate configuration
+2. Create UI components
+3. Setup module handlers
+4. Return UI with proper error handling
 """
 
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, Type
 from IPython.display import display
 
+from smartcash.ui.core.initializers.module_initializer import ModuleInitializer
 from smartcash.ui.core.initializers.display_initializer import DisplayInitializer
 from smartcash.ui.logger import get_module_logger
 from .components.evaluation_ui import create_evaluation_ui
 from .handlers.evaluation_ui_handler import EvaluationUIHandler
-from .constants import UI_CONFIG
+from .configs.evaluation_config_handler import EvaluationConfigHandler
+from .operations.manager import EvaluationOperationManager
+from smartcash.ui.core.errors.handlers import create_error_response
 
 
-class EvaluationInitializer(DisplayInitializer):
-    """Initializer for evaluation module following UI standards."""
+class EvaluationInitializer(ModuleInitializer):
+    """Evaluation initializer with complete UI and backend service integration.
+    
+    Provides a structured approach to initializing the evaluation module with
+    proper error handling, logging, and UI component management.
+    """
     
     def __init__(self):
-        """Initialize evaluation initializer."""
+        """Initialize evaluation module with configuration and services."""
         super().__init__(
-            module_name="evaluate",
-            parent_module="model"
+            module_name='evaluate',
+            config_handler_class=EvaluationConfigHandler,
+            parent_module='model'
         )
-        self.logger = get_module_logger(__name__)
-        self.ui_handler: Optional[EvaluationUIHandler] = None
-        self._ui_components: Dict[str, Any] = {}
+        self.operation_manager = None
+        self.ui_handler = None
     
-    def create_ui_components(self) -> Dict[str, Any]:
+    def create_ui_components(self, config: Optional[Dict[str, Any]] = None, **kwargs) -> Dict[str, Any]:
         """Create evaluation UI components.
         
-        Returns:
-            Dictionary containing all UI components
-        """
-        self.logger.info("🎯 Creating evaluation UI components")
-        
-        try:
-            # Create UI components
-            self._ui_components = create_evaluation_ui()
+        Args:
+            config: Optional configuration dictionary
+            **kwargs: Additional arguments
             
-            self.logger.info(f"✅ Created {len(self._ui_components)} evaluation UI components")
-            return self._ui_components
+        Returns:
+            Dictionary of UI components
+        """
+        try:
+            self.logger.info("🔧 Creating evaluation UI components")
+            
+            # Create UI components
+            ui_components = create_evaluation_ui()
+            
+            # Initialize operation manager
+            self.operation_manager = EvaluationOperationManager(
+                config=config or {},
+                ui_components=ui_components,
+                logger=self.logger
+            )
+            
+            # Store operation manager in components for handler access
+            ui_components['_operation_manager'] = self.operation_manager
+            
+            # Setup UI handler if not already set
+            if not hasattr(self, '_ui_handler') or self._ui_handler is None:
+                self._ui_handler = EvaluationUIHandler(
+                    module_name=self.module_name,
+                    parent_module=self.parent_module,
+                    ui_components=ui_components,
+                    config_handler=self.config_handler,
+                    operation_manager=self.operation_manager
+                )
+                
+                # Setup event handlers with UI components
+                self._ui_handler.setup(ui_components=ui_components)
+            
+            self.logger.info(f"✅ Created {len(ui_components)} evaluation UI components")
+            return ui_components
             
         except Exception as e:
-            self.logger.error(f"❌ Failed to create evaluation UI components: {e}")
-            self.handle_error(f"Failed to create evaluation UI: {str(e)}", exc_info=True)
-            return {}
+            self.logger.error(f"❌ Failed to create evaluation UI components: {e}", exc_info=True)
+            raise RuntimeError(f"Failed to create evaluation UI: {str(e)}") from e
     
-    def initialize_handlers(self, ui_components: Dict[str, Any]) -> bool:
+    def _initialize_handlers(self, ui_components: Dict[str, Any], **kwargs) -> bool:
         """Initialize evaluation UI handlers.
         
         Args:
-            ui_components: UI components dictionary
+            ui_components: Dictionary of UI components
+            **kwargs: Additional initialization parameters
             
         Returns:
-            True if initialization successful, False otherwise
+            bool: True if initialization was successful, False otherwise
         """
-        self.logger.info("🔧 Initializing evaluation UI handlers")
-        
         try:
-            # Create UI handler
-            self.ui_handler = EvaluationUIHandler()
+            self.logger.info("🔧 Initializing evaluation UI handlers")
             
-            # Setup handler with UI components
-            self.ui_handler.setup(ui_components)
+            # Initialize UI handler
+            self.ui_handler = EvaluationUIHandler(
+                module_name="evaluate",
+                parent_module="model",
+                ui_components=ui_components,
+                config_handler=self.config_handler,
+                operation_manager=ui_components.get('_operation_manager')
+            )
+            
+            # Setup event handlers
+            self.ui_handler.setup()
+            
+            # Store handler reference in components
+            ui_components['_ui_handler'] = self.ui_handler
             
             self.logger.info("✅ Evaluation UI handlers initialized successfully")
             return True
             
         except Exception as e:
-            self.logger.error(f"❌ Failed to initialize evaluation handlers: {e}")
-            self.handle_error(f"Failed to initialize evaluation handlers: {str(e)}", exc_info=True)
-            return False
+            self.logger.error(f"❌ Failed to initialize evaluation UI handlers: {e}", exc_info=True)
+            raise RuntimeError(f"Failed to initialize evaluation handlers: {str(e)}") from e
     
     def display_ui(self, ui_components: Dict[str, Any]) -> None:
         """Display the evaluation UI.
         
         Args:
-            ui_components: UI components dictionary
+            ui_components: Dictionary of UI components
         """
         self.logger.info("🖥️ Displaying evaluation UI")
         
@@ -120,6 +168,39 @@ class EvaluationInitializer(DisplayInitializer):
             Dictionary containing initialization results
         """
         return self.initialize_full(**kwargs)
+    
+    def initialize_handlers(self, ui_components: Dict[str, Any]) -> bool:
+        """Initialize evaluation module handlers.
+        
+        Args:
+            ui_components: Dictionary of UI components
+            
+        Returns:
+            bool: True if initialization was successful, False otherwise
+        """
+        try:
+            self.logger.info("🔧 Initializing evaluation handlers")
+            
+            # Initialize UI handler if not already done
+            if not hasattr(self, '_ui_handler') or self._ui_handler is None:
+                self._ui_handler = EvaluationUIHandler(
+                    module_name=self.module_name,
+                    parent_module=self.parent_module,
+                    ui_components=ui_components,
+                    config_handler=self.config_handler,
+                    operation_manager=self.operation_manager
+                )
+                
+                # Setup event handlers
+                self._ui_handler.setup(ui_components=ui_components)
+            
+            self.logger.info("✅ Evaluation handlers initialized successfully")
+            return True
+            
+        except Exception as e:
+            self.logger.error(f"❌ Failed to initialize evaluation handlers: {e}")
+            self.handle_error(f"Failed to initialize evaluation handlers: {str(e)}", exc_info=True)
+            return False
     
     def initialize_full(self, **kwargs) -> Dict[str, Any]:
         """Initialize the complete evaluation module.
@@ -219,58 +300,80 @@ class EvaluationInitializer(DisplayInitializer):
         self._ui_components.clear()
 
 
-# Global initializer instance
-_evaluation_initializer: Optional[EvaluationInitializer] = None
+# Global instances
+_evaluation_initializer = EvaluationInitializer()
+
+
+class EvaluationDisplayInitializer(DisplayInitializer):
+    """DisplayInitializer wrapper for evaluation module"""
+    
+    def __init__(self):
+        super().__init__(module_name="evaluate", parent_module="model")
+        self._evaluation_initializer = EvaluationInitializer()
+    
+    def _initialize_impl(self, **kwargs):
+        """Implementation using existing EvaluationInitializer"""
+        return self._evaluation_initializer.initialize(**kwargs)
+
+
+# Global display initializer instance
+_evaluation_display_initializer = EvaluationDisplayInitializer()
 
 def get_evaluation_initializer() -> EvaluationInitializer:
-    """Get or create evaluation initializer instance.
+    """Get the global evaluation initializer instance.
     
     Returns:
-        EvaluationInitializer instance
+        EvaluationInitializer: The global evaluation initializer instance
     """
-    global _evaluation_initializer
-    if _evaluation_initializer is None:
-        _evaluation_initializer = EvaluationInitializer()
     return _evaluation_initializer
 
-def reset_evaluation_initializer() -> bool:
-    """Reset the evaluation initializer instance.
-    
-    This is useful for testing or when you need to force reinitialization.
-    
-    Returns:
-        bool: True if reset was successful, False otherwise
-    """
-    global _evaluation_initializer
-    if _evaluation_initializer is not None:
-        _evaluation_initializer.reset_state()
-        _evaluation_initializer = None
-        return True
-    return False
 
-def initialize_evaluation_ui(**kwargs) -> Dict[str, Any]:
-    """Initialize evaluation UI module.
+def initialize_evaluation_ui(env=None, config=None, **kwargs):
+    """Initialize and display evaluation UI using DisplayInitializer
     
     Args:
-        **kwargs: Additional initialization parameters
+        env: Optional environment context
+        config: Optional configuration dictionary
+        **kwargs: Additional arguments
         
-    Returns:
-        Dictionary containing initialization results
+    Note:
+        This function displays the UI directly and returns None.
+        Use get_evaluation_components() if you need access to the components dictionary.
     """
-    initializer = get_evaluation_initializer()
-    return initializer.initialize(**kwargs)
+    global _evaluation_display_initializer
+    _evaluation_display_initializer.initialize(env=env, config=config, **kwargs)
+
+
+def get_evaluation_components(env=None, config=None, **kwargs):
+    """Get evaluation components dictionary without displaying UI
+    
+    Args:
+        env: Optional environment context
+        config: Optional configuration dictionary
+        **kwargs: Additional arguments
+
+    Returns:
+        Dictionary of UI components
+    """
+    global _evaluation_initializer
+    result = _evaluation_initializer.initialize(env=env, config=config, **kwargs)
+    return result.get('ui_components', {})
+
+
+def display_evaluation_ui(env=None, config=None, **kwargs):
+    """Display evaluation UI (alias for initialize_evaluation_ui)
+    
+    Args:
+        env: Optional environment context
+        config: Optional configuration dictionary
+        **kwargs: Additional arguments
+    """
+    initialize_evaluation_ui(env=env, config=config, **kwargs)
 
 
 # Legacy function for backward compatibility
-def initialize_evaluate_ui(**kwargs) -> Dict[str, Any]:
-    """Initialize evaluation UI (legacy function name).
-    
-    Args:
-        **kwargs: Additional initialization parameters
-        
-    Returns:
-        Dictionary containing initialization results
-    """
+def initialize_evaluate_ui(**kwargs):
+    """Legacy function name for backward compatibility"""
     return initialize_evaluation_ui(**kwargs)
 
 

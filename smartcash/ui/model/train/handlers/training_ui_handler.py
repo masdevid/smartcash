@@ -15,12 +15,19 @@ from ..operations.resume_training_operation import ResumeTrainingOperation
 
 
 class TrainingUIHandler(ModuleUIHandler):
-    """Main UI handler for training module."""
+    """Main UI handler for training module.
     
-    def __init__(self, ui_components: Dict[str, Any]):
-        """Initialize the training UI handler."""
+    Handles UI interactions, state management, and coordinates with training operations.
+    """
+    
+    def __init__(self, ui_components: Optional[Dict[str, Any]] = None):
+        """Initialize the training UI handler.
+        
+        Args:
+            ui_components: Optional dictionary of UI components. Can be set later via setup().
+        """
         super().__init__(module_name="train", parent_module="model")
-        self.ui_components = ui_components
+        self.ui_components = ui_components or {}
         
         # Initialize services and operations
         self.training_service = TrainingService()
@@ -32,15 +39,35 @@ class TrainingUIHandler(ModuleUIHandler):
         self.current_config = DEFAULT_CONFIG.copy()
         self.training_active = False
         self.metrics_update_task = None
+        self._initialized = False
         
-        # Setup event handlers
+        # Setup event handlers if UI components were provided
+        if self.ui_components:
+            self.setup(self.ui_components)
+    
+    def setup(self, ui_components: Dict[str, Any]) -> None:
+        """Setup the handler with UI components.
+        
+        Args:
+            ui_components: Dictionary of UI components
+        """
+        self.ui_components = ui_components
         self._setup_event_handlers()
+        self._initialized = True
+        self.logger.info("✅ Training UI handler setup completed")
     
     def _setup_event_handlers(self) -> None:
         """Setup event handlers for UI components."""
+        if not self.ui_components:
+            self.logger.warning("No UI components available to setup event handlers")
+            return
+            
         try:
             # Get action container buttons
-            action_container = self.ui_components.get('containers', {}).get('actions', {})
+            action_container = self.ui_components.get('containers', {})
+            if not isinstance(action_container, dict):
+                action_container = {}
+            action_container = action_container.get('actions', {})
             
             # Start training button
             start_btn = action_container.get('start')
@@ -489,19 +516,14 @@ class TrainingUIHandler(ModuleUIHandler):
         except Exception as e:
             self.logger.error(f"Error logging message: {str(e)}")
     
-    def get_training_status(self) -> Dict[str, Any]:
-        """Get current training status."""
-        return {
-            "training_active": self.training_active,
-            "current_config": self.current_config,
-            "service_status": self.training_service.get_current_status()
-        }
-    
-    def initialize(self) -> None:
-        """Initialize the training UI handler.
+    async def check_training_status(self) -> Dict[str, Any]:
+        """Check the current training status.
         
-        Implements the abstract method required by ModuleUIHandler.
-        This method is called during handler setup to perform any
+        Returns:
+            Dictionary containing training status information with keys:
+            - is_running (bool): Whether training is currently running
+            - phase (str): Current training phase
+            - metrics (dict): Training metrics if available
         necessary initialization of the training UI components.
         """
         self.logger.info("🚀 Initializing Training UI Handler")

@@ -18,7 +18,7 @@ from IPython.display import display
 # SmartCash UI components
 from smartcash.ui.components.header_container import create_header_container
 from smartcash.ui.components.form_container import create_form_container, LayoutType
-from smartcash.ui.components.action_container import create_action_container
+from smartcash.ui.components.action_container import create_action_container, COLAB_PHASES
 from smartcash.ui.components.summary_container import create_summary_container
 from smartcash.ui.components.operation_container import create_operation_container
 from smartcash.ui.components.footer_container import create_footer_container
@@ -155,36 +155,34 @@ def create_colab_ui_components(config: Optional[Dict[str, Any]] = None, **kwargs
             gap="12px"
         )
         
-        # 4. Create action container with buttons
-        action_buttons = [
-            {
-                'name': 'setup_button',
-                'label': BUTTON_CONFIG['setup']['text'],
-                'button_style': BUTTON_CONFIG['setup']['style'],
-                'tooltip': BUTTON_CONFIG['setup']['tooltip'],
-                'icon': 'rocket'
-            },
-            {
-                'name': 'save_button',
-                'label': BUTTON_CONFIG['save']['text'],
-                'button_style': BUTTON_CONFIG['save']['style'],
-                'tooltip': BUTTON_CONFIG['save']['tooltip'],
-                'icon': 'save'
-            },
-            {
-                'name': 'reset_button',
-                'label': BUTTON_CONFIG['reset']['text'],
-                'button_style': BUTTON_CONFIG['reset']['style'],
-                'tooltip': BUTTON_CONFIG['reset']['tooltip'],
-                'icon': 'undo'
-            }
-        ]
-        
+        # 4. Create action container with primary setup button that supports phases
         action_container = create_action_container(
-            buttons=action_buttons,
-            title="Environment Actions",
-            alignment="center"
+            buttons=[
+                {
+                    'id': 'setup',  # Use 'id' instead of 'button_id' to match expected parameter
+                    'text': BUTTON_CONFIG['setup']['text'],
+                    'style': 'primary',
+                    'tooltip': BUTTON_CONFIG['setup']['tooltip'],
+                    'icon': 'rocket',
+                    'disabled': False,
+                    'order': 0
+                }
+            ],
+            title="Environment Setup",
+            alignment="center",
+            show_save_reset=True,  # Let the container handle save/reset buttons
+            phases=COLAB_PHASES    # Pass the phase configurations
         )
+        
+        # Store the container and button references
+        ui_components.update({
+            'action_container': action_container['container'],
+            'setup_button': action_container.get('primary_button')  # Safely get primary_button
+        })
+        
+        # Store the action container instance for phase management if available
+        if 'action_container' in action_container:
+            ui_components['_action_container_instance'] = action_container['action_container']
         
         # 5. Create operation container for logs and progress
         operation_container = create_operation_container(
@@ -234,9 +232,21 @@ def create_colab_ui_components(config: Optional[Dict[str, Any]] = None, **kwargs
         
         # Get buttons from action container
         buttons = {}
-        if hasattr(action_container, 'get'):
+        if hasattr(action_container, 'get_button'):
+            # Object-based action container
             for btn in action_buttons:
-                buttons[btn['name']] = action_container.get(btn['name'])
+                btn_name = btn['name']
+                btn_widget = action_container.get_button(btn_name)
+                if btn_widget:
+                    buttons[btn_name] = btn_widget
+                    ui_components[btn_name] = btn_widget
+        elif isinstance(action_container, dict) and 'widgets' in action_container:
+            # Dictionary-based action container
+            for btn in action_buttons:
+                btn_name = btn['name']
+                if btn_name in action_container['widgets']:
+                    buttons[btn_name] = action_container['widgets'][btn_name]
+                    ui_components[btn_name] = action_container['widgets'][btn_name]
         
         # Prepare the UI components dictionary
         ui_components.update({

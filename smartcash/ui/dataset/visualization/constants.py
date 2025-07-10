@@ -39,6 +39,22 @@ class DataSplit(Enum):
 # UI CONFIGURATION
 # =============================================================================
 
+# Default configuration for the visualization module
+DEFAULT_CONFIG = {
+    'chart_type': 'histogram',  # Default chart type
+    'data_split': 'all',        # Default data split to visualize
+    'show_stats': True,         # Whether to show statistics
+    'show_distribution': True,  # Whether to show class distribution
+    'show_samples': True,       # Whether to show sample images
+    'theme': 'default',         # UI theme
+    'auto_refresh': True,       # Auto-refresh data
+    'export_format': 'png',     # Default export format
+    'max_samples': 1000,        # Maximum samples to process
+    'batch_size': 32,           # Batch size for processing
+    'num_workers': 4,           # Number of worker threads
+    'random_seed': 42,          # Random seed for reproducibility
+}
+
 UI_CONFIG = {
     'module_name': 'visualization',
     'parent_module': 'dataset',

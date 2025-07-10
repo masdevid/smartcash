@@ -1,48 +1,59 @@
 """
 File: smartcash/ui/model/pretrained/pretrained_initializer.py
-Pretrained models initializer following core UI structure with DisplayInitializer pattern.
+Description: Pretrained models initializer following ModuleInitializer pattern
+
+Initialization Flow:
+1. Load and validate configuration
+2. Create UI components
+3. Setup module handlers
+4. Return UI with proper error handling
 """
 
 import asyncio
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, Type
+from IPython.display import display
 
 from smartcash.ui.core.initializers.module_initializer import ModuleInitializer
-from smartcash.ui.core.initializers.display_initializer import create_ui_display_function
-
+from smartcash.ui.core.initializers.display_initializer import DisplayInitializer
+from smartcash.ui.logger import get_module_logger
 from .components.pretrained_ui import create_pretrained_ui
 from .handlers.pretrained_ui_handler import PretrainedUIHandler
 from .configs.pretrained_config_handler import PretrainedConfigHandler
 from .services.pretrained_service import PretrainedService
 from .constants import DEFAULT_CONFIG
+from smartcash.ui.core.errors.handlers import create_error_response
 
 
 class PretrainedInitializer(ModuleInitializer):
-    """
-    Pretrained models initializer following core UI structure standard.
-    Manages YOLOv5s and EfficientNet-B4 pretrained model downloads.
+    """Pretrained models initializer with complete UI and backend service integration.
+    
+    Provides a structured approach to initializing the pretrained models module with
+    proper error handling, logging, and UI component management.
     """
     
     def __init__(self):
-        """Initialize the pretrained initializer."""
+        """Initialize pretrained module with configuration and services."""
         super().__init__(
-            module_name="pretrained",
-            parent_module="model",
-            config_handler_class=PretrainedConfigHandler
+            module_name='pretrained',
+            config_handler_class=PretrainedConfigHandler,
+            parent_module='model'
         )
         self.service = PretrainedService()
+        self.ui_handler = None
     
-    def _initialize_impl(self, config: Optional[Dict[str, Any]] = None, **kwargs) -> Dict[str, Any]:
-        """
-        Implementation of pretrained module initialization.
+    def create_ui_components(self, config: Optional[Dict[str, Any]] = None, **kwargs) -> Dict[str, Any]:
+        """Create pretrained models UI components.
         
         Args:
             config: Optional configuration dictionary
-            **kwargs: Additional parameters
+            **kwargs: Additional arguments
             
         Returns:
-            Dictionary containing UI components
+            Dictionary of UI components
         """
         try:
+            self.logger.info("🔧 Creating pretrained models UI components")
+            
             # Get default config and merge with provided config
             final_config = DEFAULT_CONFIG.copy()
             if config:
@@ -54,31 +65,68 @@ class PretrainedInitializer(ModuleInitializer):
             # Create UI components
             ui_components = create_pretrained_ui(validated_config, **kwargs)
             
-            # Initialize UI handler
-            ui_handler = PretrainedUIHandler(ui_components)
-            ui_components['ui_handler'] = ui_handler
+            # Setup UI handler if not already set
+            if not hasattr(self, '_ui_handler') or self._ui_handler is None:
+                self._ui_handler = PretrainedUIHandler(ui_components=ui_components)
+                
+                # Store service instance in the handler
+                self._ui_handler.service = self.service
             
             # Update UI from config
             self.config_handler.update_ui_from_config(ui_components, validated_config)
             
-            # Perform post-initialization checks in a non-blocking way
-            try:
-                # Create an event loop if none exists
-                loop = asyncio.get_event_loop()
-                if loop.is_running():
-                    # If loop is running, schedule the task
-                    loop.create_task(self._post_init_check(ui_components, validated_config))
-                else:
-                    # If no loop is running, run the coroutine directly
-                    loop.run_until_complete(self._post_init_check(ui_components, validated_config))
-            except Exception as e:
-                logger.warning(f"Could not schedule post-init check: {str(e)}")
+            # Schedule post-init check
+            self._schedule_post_init_check(ui_components, validated_config)
             
+            self.logger.info(f"✅ Created {len(ui_components)} pretrained models UI components")
             return ui_components
             
         except Exception as e:
-            error_msg = f"Failed to initialize pretrained module: {str(e)}"
-            return self._create_error_response(error_msg, str(e))
+            self.logger.error(f"❌ Failed to create pretrained models UI components: {e}", exc_info=True)
+            raise RuntimeError(f"Failed to create pretrained models UI: {str(e)}") from e
+    
+    def _initialize_handlers(self, ui_components: Dict[str, Any], **kwargs) -> bool:
+        """Initialize pretrained models UI handlers.
+        
+        Args:
+            ui_components: Dictionary of UI components
+            **kwargs: Additional initialization parameters
+            
+        Returns:
+            bool: True if initialization was successful, False otherwise
+        """
+        try:
+            self.logger.info("🔧 Initializing pretrained models UI handlers")
+            
+            # Initialize UI handler if not already done
+            if not hasattr(self, '_ui_handler') or self._ui_handler is None:
+                self._ui_handler = PretrainedUIHandler(ui_components=ui_components)
+                
+                # Store service instance in the handler
+                self._ui_handler.service = self.service
+            
+            self.logger.info("✅ Pretrained models handlers initialized successfully")
+            return True
+            
+        except Exception as e:
+            self.logger.error(f"❌ Failed to initialize pretrained models handlers: {e}", exc_info=True)
+            return False
+    
+    def _schedule_post_init_check(self, ui_components: Dict[str, Any], config: Dict[str, Any]) -> None:
+        """Schedule post-initialization checks.
+        
+        Args:
+            ui_components: UI components dictionary
+            config: Configuration dictionary
+        """
+        try:
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                loop.create_task(self._post_init_check(ui_components, config))
+            else:
+                loop.run_until_complete(self._post_init_check(ui_components, config))
+        except Exception as e:
+            self.logger.warning(f"Could not schedule post-init check: {str(e)}")
     
     async def _post_init_check(self, ui_components: Dict[str, Any], config: Dict[str, Any]) -> None:
         """
@@ -90,7 +138,7 @@ class PretrainedInitializer(ModuleInitializer):
         """
         try:
             # Get UI handler
-            ui_handler = ui_components.get('ui_handler')
+            ui_handler = self._ui_handler
             if not ui_handler:
                 return
             
@@ -98,65 +146,208 @@ class PretrainedInitializer(ModuleInitializer):
             models_status = await ui_handler.check_models_status()
             
             # Update log with status
-            log_output = ui_components.get('log_output')
-            if log_output and hasattr(log_output, 'log'):
-                total_found = models_status.get('total_found', 0)
-                total_models = 2  # YOLOv5s + EfficientNet-B4
-                
-                if models_status.get('all_present', False):
-                    log_output.log("✅ All pretrained models are available and ready to use!")
-                elif total_found > 0:
-                    log_output.log(f"📋 Found {total_found}/{total_models} pretrained models. Use download button to get missing models.")
-                else:
-                    log_output.log("📋 No pretrained models found. Use download button to download YOLOv5s and EfficientNet-B4.")
-                
-                # List found models
-                for model in models_status.get('models_found', []):
-                    size_mb = model.get('file_size_mb', 0)
-                    log_output.log(f"  ✓ {model['name']}: {size_mb} MB")
-                
-                # List missing models
-                for model in models_status.get('models_missing', []):
-                    log_output.log(f"  ❌ {model['name']}: Not found")
-                    
+            log = ui_components.get('log_output')
+            if log:
+                for model, status in models_status.items():
+                    if status['exists']:
+                        log.append_stdout(f"✅ {model} is already downloaded\n")
+                    else:
+                        log.append_stdout(f"ℹ️ {model} will be downloaded when needed\n")
+            
         except Exception as e:
-            # Don't fail initialization for post-init check errors
-            log_output = ui_components.get('log_output')
-            if log_output and hasattr(log_output, 'log'):
-                log_output.log(f"⚠️ Warning: Could not check models status: {str(e)}")
+            self.logger.error(f"❌ Error during post-init check: {e}", exc_info=True)
     
-    def _create_error_response(self, error_msg: str, details: str) -> Dict[str, Any]:
-        """
-        Create error response with error component.
+    def _initialize_impl(self, config: Optional[Dict[str, Any]] = None, **kwargs) -> Dict[str, Any]:
+        """Implementation of pretrained module initialization.
         
         Args:
-            error_msg: Main error message
-            details: Detailed error information
+            config: Optional configuration dictionary
+            **kwargs: Additional parameters
             
         Returns:
-            Dictionary containing error UI component
+            Dictionary containing UI components
         """
         try:
-            from smartcash.ui.components.error.error_component import create_error_component
-            error_ui = create_error_component(
-                error_msg, 
-                details, 
-                "Pretrained Models Error"
+            # Create UI components
+            ui_components = self.create_ui_components(config=config, **kwargs)
+            
+            # Initialize handlers
+            if not self._initialize_handlers(ui_components, **kwargs):
+                raise RuntimeError("Failed to initialize pretrained models handlers")
+            
+            return ui_components
+            
+        except Exception as e:
+            error_msg = f"Failed to initialize pretrained module: {str(e)}"
+            self.logger.error(error_msg, exc_info=True)
+            return create_error_response(
+                error_message=error_msg,
+                error_type="PretrainedInitializationError",
+                details=str(e),
+                module_name=self.module_name
             )
+
+
+# Global instances
+_pretrained_initializer = PretrainedInitializer()
+
+
+class PretrainedDisplayInitializer(DisplayInitializer):
+    """DisplayInitializer wrapper for pretrained models module"""
+    
+    def __init__(self):
+        super().__init__(module_name="pretrained", parent_module="model")
+        self._pretrained_initializer = PretrainedInitializer()
+    
+    def _initialize_impl(self, **kwargs):
+        """Implementation using existing PretrainedInitializer"""
+        return self._pretrained_initializer._initialize_impl(**kwargs)
+        
+    def display(self, **kwargs):
+        """Display the pretrained models UI.
+        
+        Args:
+            **kwargs: Additional arguments to pass to the initializer
+        """
+        try:
+            # Get the UI components
+            components = self._initialize_impl(**kwargs)
+            
+            # Display the main container if it exists
+            if 'container' in components:
+                from IPython.display import display as ipy_display
+                ipy_display(components['container'])
+                
+            return components
+            
+        except Exception as e:
+            error_msg = f"❌ Failed to display pretrained models UI: {str(e)}"
+            self.logger.error(error_msg, exc_info=True)
+            
+            # Display error message
+            from IPython.display import display as ipy_display, HTML
+            ipy_display(HTML(f'<div class="alert alert-danger">{error_msg}</div>'))
+            
             return {
-                'ui': error_ui,
-                'error': True,
-                'error_message': error_msg
+                'status': 'error',
+                'error': str(e),
+                'message': error_msg
             }
-        except Exception:
-            # Fallback error display
-            import ipywidgets as widgets
-            error_ui = widgets.HTML(f"<div style='color: red; padding: 20px;'><h3>❌ {error_msg}</h3><p>{details}</p></div>")
-            return {
-                'ui': error_ui,
-                'error': True,
-                'error_message': error_msg
-            }
+
+
+# Global display initializer instance
+_pretrained_display_initializer = PretrainedDisplayInitializer()
+
+
+def get_pretrained_initializer() -> PretrainedInitializer:
+    """Get the global pretrained initializer instance.
+    
+    Returns:
+        PretrainedInitializer: The global pretrained initializer instance
+    """
+    global _pretrained_initializer
+    if _pretrained_initializer is None:
+        _pretrained_initializer = PretrainedInitializer()
+    return _pretrained_initializer
+
+
+def initialize_pretrained_ui(env=None, config=None, **kwargs):
+    """Initialize and display pretrained models UI using DisplayInitializer
+    
+    Args:
+        env: Optional environment context
+        config: Optional configuration dictionary
+        **kwargs: Additional arguments
+        
+    Note:
+        This function displays the UI directly and returns None.
+        Use get_pretrained_components() if you need access to the components dictionary.
+    """
+    if env is not None:
+        kwargs['env'] = env
+    if config is not None:
+        kwargs['config'] = config
+    
+    # Display the UI and return None
+    _pretrained_display_initializer.display(**kwargs)
+
+
+def get_pretrained_components(env=None, config=None, **kwargs) -> Dict[str, Any]:
+    """Get pretrained models components dictionary without displaying UI
+    
+    Args:
+        env: Optional environment context
+        config: Optional configuration dictionary
+        **kwargs: Additional arguments
+
+    Returns:
+        Dictionary of UI components
+    """
+    if env is not None:
+        kwargs['env'] = env
+    if config is not None:
+        kwargs['config'] = config
+    
+    return _pretrained_display_initializer.get_components(**kwargs)
+
+
+def display_pretrained_ui(env=None, config=None, **kwargs):
+    """Display pretrained models UI (alias for initialize_pretrained_ui)
+    
+    Args:
+        env: Optional environment context
+        config: Optional configuration dictionary
+        **kwargs: Additional arguments
+    """
+    initialize_pretrained_ui(env=env, config=config, **kwargs)
+
+
+# Main entry point function for cell execution
+def init_pretrained_ui(**kwargs):
+    """Initialize and display pretrained models UI.
+    
+    This is the main entry point function that should be called from notebook cells.
+    It creates the pretrained models initializer and displays the UI directly.
+    
+    Args:
+        **kwargs: Additional initialization parameters
+        
+    Returns:
+        Dictionary containing initialization results and UI components
+    """
+    try:
+        # Get or create the global initializer
+        initializer = get_pretrained_initializer()
+        
+        # Initialize and get UI components
+        components = initializer.initialize_full(**kwargs)
+        
+        # Display the UI
+        if 'container' in components:
+            display(components['container'])
+        
+        # Log success
+        initializer.logger.info("✅ Pretrained models UI initialized successfully")
+        
+        return {
+            'status': 'success',
+            'components': components,
+            'initializer': initializer
+        }
+        
+    except Exception as e:
+        error_msg = f"❌ Failed to initialize pretrained models UI: {str(e)}"
+        get_module_logger('pretrained').error(error_msg, exc_info=True)
+        
+        # Display error message
+        from IPython.display import display, HTML
+        display(HTML(f'<div class="alert alert-danger">{error_msg}</div>'))
+        
+        return {
+            'status': 'error',
+            'error': str(e),
+            'message': error_msg
+        }
 
 
 def _pretrained_initialize_legacy(config: Optional[Dict[str, Any]] = None, **kwargs) -> Dict[str, Any]:
@@ -172,12 +363,3 @@ def _pretrained_initialize_legacy(config: Optional[Dict[str, Any]] = None, **kwa
     """
     initializer = PretrainedInitializer()
     return initializer._initialize_impl(config, **kwargs)
-
-
-# Create the standard UI display function using DisplayInitializer pattern
-initialize_pretrained_ui = create_ui_display_function(
-    module_name='pretrained',
-    parent_module='model',
-    initializer_class=PretrainedInitializer,
-    legacy_function=_pretrained_initialize_legacy
-)

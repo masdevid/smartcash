@@ -50,26 +50,51 @@ class VerifyOperation(OperationHandler):
         """
         try:
             if progress_callback:
-                progress_callback(10, "🔍 Verifying mount status...")
+                progress_callback(10, "🔍 Starting verification...")
             
             verification_results = {}
             issues = []
             
-            # Verify Drive mount
-            drive_verification = self._verify_drive_mount()
-            verification_results['drive_mount'] = drive_verification
-            if not drive_verification['mounted']:
-                issues.append("Google Drive not mounted")
+            # Only verify drive mount if explicitly requested in config
+            if self.config.get('check_drive', False):
+                if progress_callback:
+                    progress_callback(20, "🔍 Verifying drive mount status...")
+                
+                # Verify Drive mount with check_drive=True
+                drive_verification = self._verify_drive_mount()
+                verification_results['drive_mount'] = drive_verification
+                
+                # Add drive status to the config for other components to use
+                self.config['drive_mounted'] = drive_verification.get('mounted', False)
+                self.config['drive_path'] = drive_verification.get('path')
+                
+                if not drive_verification.get('mounted', False):
+                    issues.append("Google Drive is not mounted")
+                elif not drive_verification.get('write_access', False):
+                    issues.append("No write access to Google Drive")
             else:
-                self.log("✅ Google Drive mount verified", 'info')
+                # Skip drive verification if not requested
+                verification_results['drive_mount'] = {
+                    'status': 'skipped',
+                    'message': 'Drive verification skipped as check_drive=False'
+                }
             
-            if progress_callback:
-                progress_callback(30, "🔗 Verifying symlinks...")
-            
-            # Verify symlinks
-            symlink_verification = self._verify_symlinks()
-            verification_results['symlinks'] = symlink_verification
-            issues.extend(symlink_verification['issues'])
+            # Verify symlinks if drive is mounted
+            if self.config.get('drive_mounted', False):
+                if progress_callback:
+                    progress_callback(30, "🔗 Verifying symlinks...")
+                
+                symlink_verification = self._verify_symlinks()
+                verification_results['symlinks'] = symlink_verification
+                
+                if not symlink_verification.get('all_valid', False):
+                    issues.append("Some required symlinks are invalid")
+            else:
+                # Skip symlink verification if drive is not mounted
+                verification_results['symlinks'] = {
+                    'status': 'skipped',
+                    'message': 'Symlink verification skipped as drive is not mounted'
+                }
             
             if progress_callback:
                 progress_callback(50, "📁 Verifying folders...")
@@ -122,29 +147,36 @@ class VerifyOperation(OperationHandler):
         Returns:
             Dictionary with drive mount verification results
         """
-        drive_path = '/content/drive'
-        mydrive_path = '/content/drive/MyDrive'
+        # Use detect_environment_info with check_drive=True to get drive status
+        env_info = detect_environment_info(check_drive=True)
         
-        mounted = os.path.exists(mydrive_path)
+        drive_mounted = env_info.get('drive_mounted', False)
+        drive_path = env_info.get('drive_mount_path', '/content/drive')
+        mydrive_path = os.path.join(drive_path, 'MyDrive') if drive_path else '/content/drive/MyDrive'
+        
+        # Get write access status from the environment info if available
         write_access = False
-        
-        if mounted:
-            # Test write access
-            try:
-                test_file = os.path.join(mydrive_path, '.smartcash_verify_test')
-                with open(test_file, 'w') as f:
-                    f.write('test')
-                os.remove(test_file)
-                write_access = True
-            except Exception:
-                pass
+        if drive_mounted and drive_path:
+            # Test write access if not already available in env_info
+            if 'drive_write_access' in env_info:
+                write_access = env_info['drive_write_access']
+            else:
+                try:
+                    test_file = os.path.join(mydrive_path, '.smartcash_verify_test')
+                    with open(test_file, 'w') as f:
+                        f.write('test')
+                    os.remove(test_file)
+                    write_access = True
+                except Exception as e:
+                    self.logger.warning(f"Failed to verify write access to {mydrive_path}: {str(e)}")
         
         return {
-            'mounted': mounted,
-            'path': drive_path if mounted else None,
-            'mydrive_path': mydrive_path if mounted else None,
+            'mounted': drive_mounted,
+            'path': drive_path if drive_mounted else None,
+            'mydrive_path': mydrive_path if drive_mounted else None,
             'write_access': write_access,
-            'accessible': mounted and write_access
+            'accessible': drive_mounted and write_access,
+            'status': 'verified' if drive_mounted and write_access else 'not_verified'
         }
     
     def _verify_symlinks(self) -> Dict[str, Any]:

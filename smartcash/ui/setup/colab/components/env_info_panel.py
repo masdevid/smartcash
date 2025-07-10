@@ -14,21 +14,52 @@ from typing import Dict, Any, Optional, Union
 import ipywidgets as widgets
 from smartcash.ui.setup.colab.utils.env_detector import detect_environment_info
 
-def create_env_info_panel(env_info: Optional[Dict[str, Any]] = None) -> widgets.HTML:
-    """Buat panel informasi environment Colab.
+def create_env_info_panel(env_info: Optional[Dict[str, Any]] = None, lazy_load: bool = True) -> widgets.Widget:
+    """Buat panel informasi environment Colab dengan opsi lazy loading.
     
     Args:
         env_info: Informasi environment yang sudah diambil sebelumnya.
-                 Jika tidak disediakan, akan dideteksi otomatis.
+        lazy_load: Jika True, akan menampilkan tombol untuk memuat environment.
+                 Jika False, akan langsung memuat informasi environment.
                  
     Returns:
-        Widget HTML yang menampilkan informasi environment
+        Widget yang menampilkan informasi environment atau tombol untuk memuat
     """
-    try:
-        if env_info is None:
-            env_info = detect_environment_info()
-        
-        return widgets.HTML(
+    container = widgets.VBox(layout={'width': '100%'})
+    
+    def load_environment_info(button=None):
+        try:
+            with container.hold_trait_notifications():
+                container.children = [widgets.HTML(
+                    value='<div style="text-align: center; padding: 20px;">Memuat informasi environment...</div>',
+                    layout={'width': '100%'}
+                )]
+                
+                # Deteksi environment
+                env_data = detect_environment_info()
+                
+                # Tampilkan informasi
+                container.children = [widgets.HTML(
+                    value=_format_env_info_content(env_data),
+                    layout=widgets.Layout(
+                        width='100%',
+                        padding='15px',
+                        border='1px solid #e0e0e0',
+                        border_radius='6px',
+                        margin='10px 0',
+                        background='#f9f9f9',
+                        overflow='hidden'
+                    )
+                )]
+        except Exception as e:
+            container.children = [widgets.HTML(
+                value=f'<div style="color: #d32f2f; padding: 10px;">Gagal memuat informasi environment: {str(e)}</div>',
+                layout={'width': '100%'}
+            )]
+    
+    if env_info is not None and not lazy_load:
+        # Jika sudah ada data environment dan tidak lazy load, tampilkan langsung
+        container.children = [widgets.HTML(
             value=_format_env_info_content(env_info),
             layout=widgets.Layout(
                 width='100%',
@@ -39,12 +70,26 @@ def create_env_info_panel(env_info: Optional[Dict[str, Any]] = None) -> widgets.
                 background='#f9f9f9',
                 overflow='hidden'
             )
+        )]
+    elif lazy_load:
+        # Tampilkan tombol untuk memuat environment
+        load_button = widgets.Button(
+            description='🔍 Muat Informasi Environment',
+            button_style='info',
+            layout={'width': 'auto', 'margin': '10px 0'}
         )
-    except Exception as e:
-        return widgets.HTML(
-            value=f'<div style="color: #d32f2f; padding: 10px;">Gagal memuat informasi environment: {str(e)}</div>',
-            layout=widgets.Layout(width='100%')
-        )
+        load_button.on_click(load_environment_info)
+        
+        container.children = [
+            widgets.HTML(
+                value='<div style="text-align: center; padding: 15px; border: 1px dashed #e0e0e0; border-radius: 6px; margin: 10px 0;">'
+                     '<p>Informasi environment belum dimuat</p>',
+                layout={'width': '100%'}
+            ),
+            load_button
+        ]
+    
+    return container
 
 def _format_env_info_content(env_info: Dict[str, Any]) -> str:
     """Format informasi environment menjadi HTML.
@@ -319,6 +364,49 @@ def _get_enhanced_drive_status(env_info: Dict[str, Any]) -> str:
     Returns:
         String status drive yang sudah ditingkatkan dalam format HTML
     """
+    if not env_info.get('is_colab', False):
+        return '<span style="color: #666;">Tidak tersedia di luar Google Colab</span>'
+        
+    drive_mounted = env_info.get('drive_mounted')
+    drive_path = env_info.get('drive_mount_path', '')
+    drive_status = env_info.get('drive_status', 'unknown')
+    
+    # Handle case where drive status hasn't been checked yet
+    if drive_status == 'not_checked' or drive_mounted is None:
+        return ('<div style="color: #666; margin: 5px 0;">'
+                '❓ Status drive belum diperiksa. Klik tombol "Muat Informasi Environment" untuk memeriksa.'
+                '</div>')
+                
+    # Handle case where drive is not mounted
+    if not drive_mounted:
+        return ('<div style="color: #d32f2f; margin: 5px 0;">'
+                '❌ Google Drive belum di-mount. Gunakan tombol "Mount Drive" untuk melanjutkan.'
+                '</div>')
+    
+    # Handle case where drive is mounted
+    try:
+        import os
+        test_file = os.path.join(drive_path, 'test_write.txt')
+        with open(test_file, 'w') as f:
+            f.write('test')
+        os.remove(test_file)
+        write_access = True
+    except (IOError, OSError):
+        write_access = False
+    
+    status_icon = '✅' if write_access else '⚠️'
+    status_text = 'Akses tulis diizinkan' if write_access else 'Akses tulis ditolak - Periksa izin folder'
+    status_color = '#28a745' if write_access else '#ff9800'
+    
+    return (f'<div style="margin: 5px 0;">'
+            f'<p style="margin: 0 0 5px 0;">'
+            f'<strong>📁 Google Drive:</strong> Terpasang di <code>{drive_path}</code>'
+            f'</p>'
+            f'<p style="margin: 0; color: {status_color};">'
+            f'{status_icon} {status_text}'
+            f'</p>'
+            f'</div>')
+
     try:
         if not env_info.get('drive_mounted', False):
             return "<p>❌ <strong>Drive:</strong> Tidak terpasang</p>"

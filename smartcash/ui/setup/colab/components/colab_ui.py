@@ -80,8 +80,8 @@ def _create_module_form_widgets(config: Dict[str, Any]) -> Dict[str, Any]:
         layout={'width': '100%'}
     )
     
-    # Create environment info panel
-    env_info = env_info_panel.create_env_info_panel(config)
+    # Create environment info panel with lazy loading
+    env_info = env_info_panel.create_env_info_panel(config, lazy_load=True)
     
     # Create form layout
     form_ui = widgets.VBox([
@@ -483,7 +483,7 @@ def update_colab_config(ui_components: Dict[str, Any]) -> Dict[str, Any]:
 
 
 # === EXPORT FUNCTIONS ===
-def create_colab_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> Dict[str, Any]:
+def create_colab_ui_components(config: Optional[Dict[str, Any]] = None, **kwargs) -> Dict[str, Any]:
     """
     Alias for create_colab_ui for backward compatibility.
     

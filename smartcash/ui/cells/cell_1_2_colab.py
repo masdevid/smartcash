@@ -6,4 +6,6 @@ NOTE: Cell Code should remain minimalis (import and run initializer only).
 """
 
 from smartcash.ui.setup.colab.colab_initializer import initialize_colab_ui
+
+# Initialize and display the UI
 initialize_colab_ui()

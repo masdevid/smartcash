@@ -262,8 +262,8 @@ class ActionContainer:
             alignment='left'
         )
         self.buttons['save_reset'] = save_reset_buttons['container']
-        self.save_button = save_reset_buttons['save_button']
-        self.reset_button = save_reset_buttons['reset_button']
+        self.save_button = save_reset_buttons.get('save_button')
+        self.reset_button = save_reset_buttons.get('reset_button')
         
     def _get_button_colors(self, style_name: str) -> tuple:
         """Get button background and text color based on style name.
@@ -285,21 +285,6 @@ class ActionContainer:
             'dark': ('#343a40', '#ffffff')        # Dark gray with white text
         }
         return colors.get(style_name.lower(), colors['primary'])
-        
-    def _init_buttons(self):
-        """Initialize all button widgets if they don't exist."""
-        # Create save/reset buttons using the dedicated component
-        save_reset_buttons = create_save_reset_buttons(
-            save_label='💾 Save',
-            reset_label='🔄 Reset',
-            container_width='auto',
-            with_sync_info=False,
-            show_icons=True,
-            alignment='left'
-        )
-        self.buttons['save_reset'] = save_reset_buttons['container']
-        self.save_button = save_reset_buttons['save_button']
-        self.reset_button = save_reset_buttons['reset_button']
         
         # Create action buttons using the dedicated component
         if self.buttons['primary'] is None:

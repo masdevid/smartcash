@@ -8,6 +8,7 @@ import ipywidgets as widgets
 from IPython.display import display, HTML, Javascript
 import uuid
 import pytz
+import time
 
 from smartcash.ui.components.base_component import BaseUIComponent
 from .log_level import LogLevel, get_log_level_style
@@ -70,7 +71,13 @@ class LogAccordion(BaseUIComponent):
         self.log_entries: List[LogEntry] = []
         self.last_entry: Optional[LogEntry] = None
         self.duplicate_count: int = 0
-        self.log_id = f'log-container-{uuid.uuid4().hex}'
+        
+        # Generate log ID with fallback
+        try:
+            self.log_id = f'log-container-{uuid.uuid4().hex}'
+        except Exception:
+            # Fallback to timestamp-based ID if UUID fails
+            self.log_id = f'log-container-{int(time.time() * 1000)}'
         
         # Cache for filtered entries to improve performance
         self._filtered_entries: List[LogEntry] = []

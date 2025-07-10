@@ -9,7 +9,8 @@ import os
 
 try:
     from smartcash.common.logger import SmartCashLogger
-except ImportError:
+    from smartcash.ui.core.handlers.config_handler import ConfigHandler
+except ImportError as e:
     # Fallback for testing
     class SmartCashLogger:
         def __init__(self, name=None): pass
@@ -17,6 +18,12 @@ except ImportError:
         def error(self, msg): print(f"ERROR: {msg}")
         def warning(self, msg): print(f"WARNING: {msg}")
         def success(self, msg): print(f"SUCCESS: {msg}")
+    
+    class ConfigHandler:
+        def __init__(self, *args, **kwargs):
+            self.config = {}
+        def update_config(self, *args, **kwargs): pass
+        def get_config(self): return {}
 
 from .colab_defaults import (
     get_default_colab_config,
@@ -26,7 +33,7 @@ from .colab_defaults import (
 )
 
 
-class ColabConfigHandler:
+class ColabConfigHandler(ConfigHandler):
     """Configuration handler for colab module following dependency pattern."""
     
     def __init__(self, logger: Optional[SmartCashLogger] = None):
@@ -35,14 +42,22 @@ class ColabConfigHandler:
         Args:
             logger: Optional logger instance
         """
+        # Initialize with default config
+        super().__init__(
+            module_name='colab',
+            parent_module='setup',
+            default_config=get_default_colab_config()
+        )
+        
         self.logger = logger or SmartCashLogger('ColabConfigHandler')
-        self._config = get_default_colab_config()
         self._available_environments = get_available_environments()
         self._setup_stages = get_setup_stages_config()
         self._gpu_configurations = get_gpu_configurations()
         
         # Detect current environment
         self._detect_environment()
+        
+        self.logger.debug("✅ ColabConfigHandler initialized with in-memory configuration")
     
     def get_config(self) -> Dict[str, Any]:
         """Get current configuration.
@@ -50,28 +65,21 @@ class ColabConfigHandler:
         Returns:
             Current configuration dictionary
         """
-        return copy.deepcopy(self._config)
+        return super().config
     
-    def update_config(self, config: Dict[str, Any]) -> bool:
-        """Update configuration.
+    def update_config(self, new_config: Dict[str, Any], merge: bool = True) -> None:
+        """Update configuration with new values.
         
         Args:
-            config: New configuration to apply
-            
-        Returns:
-            True if update successful, False otherwise
+            new_config: Dictionary containing new configuration values
+            merge: If True, merge with existing config. If False, replace entire config.
         """
-        try:
-            # Validate configuration
-            if not self.validate_config(config):
-                return False
-            
-            # Deep merge configuration
-            self._config = self._deep_merge(self._config, config)
-            self.logger.info("✅ Configuration updated successfully")
-            return True
-            
-        except Exception as e:
+        if merge:
+            # Use parent class update_config which handles merging
+            super().update_config(new_config)
+        else:
+            # Replace entire config
+            self.config = new_config
             self.logger.error(f"❌ Failed to update configuration: {e}")
             return False
     

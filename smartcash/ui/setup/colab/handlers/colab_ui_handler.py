@@ -95,13 +95,18 @@ class ColabUIHandler(ModuleUIHandler):
             operation_container=self.operation_container
         )
         
-        # Setup event handlers
+        # Initialize with default config but don't sync UI yet
+        # This prevents any automatic setup from happening
+        self.config = self.config_handler.get_config()
+        
+        # Setup event handlers (this will set up the button click handler)
         self._setup_event_handlers()
         
-        # Initialize with default config
-        self.sync_ui_with_config()
+        # Log completion without triggering any UI updates
+        self.logger.info("✅ UI components initialized. Setup will run on button click.")
         
-        self.logger.info("✅ UI components setup complete for Colab UI Handler")
+        # Explicitly set setup_in_progress to False
+        self.setup_in_progress = False
     
     def _setup_event_handlers(self) -> None:
         """Setup event handlers for UI components."""

@@ -24,17 +24,25 @@ class ColabInitializer(ModuleInitializer):
             module_name: Name of the module
             parent_module: Parent module name
         """
+        # Initialize with no persistence and disable auto-setup
         super().__init__(
             module_name=module_name,
             parent_module=parent_module,
             handler_class=ColabUIHandler,
-            auto_setup_handlers=True,
-            enable_shared_config=False  # Disable shared config for colab (no persistence)
+            config_handler_class=None,  # Use default in-memory config handler
+            enable_shared_config=False,  # Disable shared config
+            auto_setup_handlers=False  # Disable auto-setup to prevent premature execution
         )
+        
+        # Initialize instance variables
         self._ui_components = None
         self._operation_handlers = {}
         self._environment_manager = None
+        
+        # Set default config
+        self.config = self.get_default_config()
         self.logger.info(f"🛠️ ColabInitializer created for module: {module_name}")
+        self.logger.debug("📋 Using in-memory configuration only (no persistence)")
     
     def get_default_config(self) -> Dict[str, Any]:
         """Get default colab configuration."""
@@ -52,7 +60,7 @@ class ColabInitializer(ModuleInitializer):
         Returns:
             True (always successful with default config)
         """
-        # Simply use default config - no file loading
+        # Always use default config - no persistence
         self.config = self.get_default_config()
         self.logger.debug("📋 Using default colab config (no persistence)")
         return True
@@ -68,49 +76,173 @@ class ColabInitializer(ModuleInitializer):
         self.logger.debug("📋 Colab config save disabled (no persistence)")
         return True
     
-    def _initialize_impl(self, *args, **kwargs) -> Dict[str, Any]:
-        """Implementation of initialization logic.
+    def _create_ui_components(self, config: Dict[str, Any], **kwargs) -> Dict[str, Any]:
+        """Create colab UI components
+        
+        Args:
+            config: Configuration dictionary
+            **kwargs: Additional arguments
+            
+        Returns:
+            Dictionary of UI components with required structure
+        """
+        try:
+            self.logger.info("🔧 Creating colab UI components")
+            
+            # Create UI components
+            ui_components = create_colab_ui_components(config=config, **kwargs)
+            
+            if not isinstance(ui_components, dict):
+                raise ValueError("create_colab_ui_components() did not return a dictionary")
+                
+            # Ensure required components exist
+            required_components = ['main_container', 'operation_container']
+            for comp in required_components:
+                if comp not in ui_components:
+                    raise ValueError(f"Missing required UI component: {comp}")
+            
+            # Add module-specific metadata
+            ui_components.update({
+                'colab_initialized': True,
+                'module_name': 'colab',
+                'logger': self.logger,
+                'config': config,
+                'ui': ui_components.get('main_container')  # Ensure 'ui' key exists
+            })
+            
+            self.logger.info(f"✅ UI components created successfully: {', '.join(ui_components.keys())}")
+            return ui_components
+            
+        except Exception as e:
+            self.logger.error(f"❌ Failed to create UI components: {str(e)}")
+            raise
+    
+    def _setup_module_handlers(self, ui_components: Dict[str, Any], config: Dict[str, Any], **kwargs) -> Dict[str, Any]:
+        """Setup module handlers
+        
+        Args:
+            ui_components: Dictionary of UI components
+            config: Configuration dictionary
+            **kwargs: Additional arguments
+            
+        Returns:
+            Updated UI components with handlers
+        """
+        try:
+            self.logger.info("🔧 Setting up colab module handlers")
+            
+            # Validate UI components
+            if not ui_components or not isinstance(ui_components, dict):
+                raise ValueError("Invalid UI components dictionary")
+                
+            # Ensure operation container exists
+            operation_container = ui_components.get('operation_container')
+            if not operation_container:
+                raise ValueError("Missing operation_container in UI components")
+            
+            # Setup module handlers with UI components but don't execute setup
+            self.setup_handlers(ui_components)
+            
+            # Initialize operation handlers without executing them
+            self.setup_operation_handlers()
+            
+            # Initialize environment manager if available
+            self.setup_environment_manager()
+            
+            # Ensure the module handler has the latest UI components
+            if hasattr(self, '_module_handler') and self._module_handler:
+                self._module_handler.ui_components = ui_components
+                
+            # Explicitly set setup_in_progress to False to ensure clean state
+            if hasattr(self, '_module_handler') and hasattr(self._module_handler, 'setup_in_progress'):
+                self._module_handler.setup_in_progress = False
+            
+            self.logger.info("✅ Module handlers setup complete")
+            return ui_components
+            
+        except Exception as e:
+            error_msg = f"❌ Failed to setup module handlers: {str(e)}"
+            self.logger.error(error_msg, exc_info=True)
+            # Try to log to operation container if available
+            if 'operation_container' in ui_components:
+                try:
+                    ui_components['operation_container'].log_error(error_msg)
+                except:
+                    pass
+            raise
+    
+    def _initialize_impl(self, **kwargs) -> Dict[str, Any]:
+        """Implementation of initialization logic
         
         Returns:
-            Dict containing initialization results with UI components
+            Dictionary containing initialization results with UI components
+            
+        Raises:
+            RuntimeError: If initialization fails
         """
-        # Extract config from args/kwargs
-        config = kwargs.get('config') or (args[0] if args else None) or self.get_default_config()
+        config = None
+        ui_components = None
         
         try:
+            # Get or create config
+            config = kwargs.get('config') or self.get_default_config()
+            if 'config' in kwargs:
+                kwargs.pop('config')
+            
             self.logger.info("🚀 Starting colab module initialization...")
             self.pre_initialize_checks()
             
-            # Create UI components first
-            self._ui_components = create_colab_ui_components(config=config)
+            # Create UI components
+            ui_components = self._create_ui_components(config=config, **kwargs)
+            if not ui_components:
+                raise RuntimeError("Failed to create UI components")
             
-            # Get the main container from components
-            main_container = self._ui_components.get('main_container')
-            if not main_container:
-                raise ValueError("No main container found in UI components")
-            
-            # Setup handlers with UI components
-            self.setup_handlers(self._ui_components)
-            
-            # Setup operation handlers
-            self.setup_operation_handlers()
-            
-            # Setup environment manager
-            self.setup_environment_manager()
+            # Setup module handlers
+            self._setup_module_handlers(ui_components=ui_components, config=config, **kwargs)
             
             # Post-initialization cleanup
             self.post_initialize_cleanup()
             
+            # Get the main container and operation container
+            main_container = ui_components.get('ui') or ui_components.get('main_container')
+            operation_container = ui_components.get('operation_container')
+            
+            if not main_container:
+                raise ValueError("No main container found in UI components")
+            
             self.logger.info("✅ Colab module initialized successfully")
             
             # Return components in the format expected by DisplayInitializer
-            return {
+            result = {
                 'success': True,
-                'ui': main_container,  # Main container widget for display
-                'ui_components': self._ui_components,  # All components for reference
-                'operation_container': self._ui_components.get('operation_container'),
-                'module_handler': self._module_handler,
+                'ui': main_container,
+                'ui_components': ui_components,
+                'operation_container': operation_container,
+                'module_handler': getattr(self, '_module_handler', None),
                 'config': config
+            }
+            
+            # Log the result structure for debugging
+            self.logger.debug(f"Initialization result keys: {', '.join(result.keys())}")
+            return result
+            
+        except Exception as e:
+            error_msg = f"❌ Failed to initialize colab module: {str(e)}"
+            self.logger.error(error_msg, exc_info=True)
+            
+            # Try to log to operation container if available
+            if ui_components and 'operation_container' in ui_components:
+                try:
+                    ui_components['operation_container'].log_error(error_msg)
+                except:
+                    pass
+                    
+            # Return error information in the expected format
+            return {
+                'success': False,
+                'error': error_msg,
+                'ui_components': ui_components or {},
+                'config': config or {}
             }
             
         except Exception as e:
@@ -153,24 +285,32 @@ class ColabInitializer(ModuleInitializer):
         
         Args:
             ui_components: Dictionary containing UI components
+            
+        Raises:
+            RuntimeError: If handler setup fails
         """
-        self.logger.info("🔧 Setting up colab module handlers...")
-        
-        # Validate input
-        if not ui_components:
-            error_msg = "No UI components provided for handler setup"
-            self.logger.error(error_msg)
-            raise ValueError(error_msg)
-        
         try:
+            self.logger.info("🔧 Setting up colab module handlers...")
+            
+            # Validate input
+            if not ui_components or not isinstance(ui_components, dict):
+                error_msg = "Invalid UI components provided for handler setup"
+                self.logger.error(error_msg)
+                raise ValueError(error_msg)
+            
+            # Store UI components reference
+            self._ui_components = ui_components
+            self.logger.debug(f"📦 Stored UI components: {', '.join(ui_components.keys())}")
+            
             # Create module handler if it doesn't exist
-            if not hasattr(self, '_module_handler') or self._module_handler is None:
-                self.logger.debug("Creating new module handler instance")
+            if not hasattr(self, '_module_handler') or not self._module_handler:
+                self.logger.info("🛠️ Creating new module handler instance")
                 self._module_handler = self.create_module_handler()
             
             # Setup handler with UI components
             self.logger.debug("Setting up module handler with UI components")
-            self._module_handler.setup(ui_components)
+            if hasattr(self._module_handler, 'setup'):
+                self._module_handler.setup(ui_components)
             
             # Initialize handlers dictionary
             if not hasattr(self, '_handlers') or not isinstance(self._handlers, dict):
@@ -184,9 +324,20 @@ class ColabInitializer(ModuleInitializer):
             
             self.logger.info(f"✅ Successfully set up {len(self._handlers)} handlers")
             
+            # Setup operation handlers now that we have a module handler
+            self.setup_operation_handlers()
+            
         except Exception as e:
-            error_msg = f"Failed to set up handlers: {str(e)}"
+            error_msg = f"❌ Failed to set up handlers: {str(e)}"
             self.logger.error(error_msg, exc_info=True)
+            
+            # Try to log to operation container if available
+            if 'operation_container' in ui_components:
+                try:
+                    ui_components['operation_container'].log_error(error_msg)
+                except:
+                    pass
+                    
             raise RuntimeError(error_msg) from e
     
     def setup_operation_handlers(self) -> None:
@@ -194,38 +345,67 @@ class ColabInitializer(ModuleInitializer):
         try:
             from .operations.factory import OperationHandlerFactory
             
+            # Skip if UI components are not yet initialized
+            if not hasattr(self, '_ui_components') or not self._ui_components:
+                self.logger.warning("⚠️ UI components not yet initialized, skipping operation handlers setup")
+                self._operation_handlers = {}
+                return
+                
             # Create operation handlers for colab-specific operations
             config = self.get_default_config()
-            self._operation_handlers = {
-                'environment_detection': OperationHandlerFactory.create_handler(
-                    'environment_detection', self._ui_components, config
-                ),
-                'drive_mount': OperationHandlerFactory.create_handler(
-                    'drive_mount', self._ui_components, config
-                ),
-                'gpu_setup': OperationHandlerFactory.create_handler(
-                    'gpu_setup', self._ui_components, config
-                ),
-                'folder_setup': OperationHandlerFactory.create_handler(
-                    'folder_setup', self._ui_components, config
-                ),
-                'config_sync': OperationHandlerFactory.create_handler(
-                    'config_sync', self._ui_components, config
-                ),
-                'verify': OperationHandlerFactory.create_handler(
-                    'verify', self._ui_components, config
-                )
-            }
             
-            self.logger.info("✅ Operation handlers setup complete")
+            # Initialize operation handlers dictionary
+            self._operation_handlers = {}
             
-        except ImportError:
-            self.logger.warning("⚠️ Operation handlers not available, creating minimal setup")
+            # Define the operation types we want to create handlers for
+            operation_types = [
+                'environment_detection',
+                'drive_mount',
+                'gpu_setup',
+                'folder_setup',
+                'config_sync',
+                'verify'
+            ]
+            
+            # Create handlers for each operation type
+            for op_type in operation_types:
+                try:
+                    self._operation_handlers[op_type] = OperationHandlerFactory.create_handler(
+                        op_type, self._ui_components, config
+                    )
+                    self.logger.debug(f"✅ Created operation handler for: {op_type}")
+                except Exception as e:
+                    self.logger.warning(f"⚠️ Failed to create operation handler for {op_type}: {str(e)}")
+            
+            if not self._operation_handlers:
+                self.logger.warning("⚠️ No operation handlers were created successfully")
+            else:
+                self.logger.info(f"✅ Successfully created {len(self._operation_handlers)} operation handlers")
+            
+        except ImportError as e:
+            self.logger.warning(f"⚠️ Operation handlers not available: {str(e)}")
             self._operation_handlers = {}
         except Exception as e:
-            from smartcash.ui.core.errors.handlers import get_error_handler
-            error_handler = get_error_handler()
-            error_handler.handle_exception(e, 'setting up operation handlers', fail_fast=False)
+            error_msg = f"❌ Failed to setup operation handlers: {str(e)}"
+            self.logger.error(error_msg, exc_info=True)
+            
+            # Try to log to operation container if available
+            if hasattr(self, '_ui_components') and self._ui_components and 'operation_container' in self._ui_components:
+                try:
+                    self._ui_components['operation_container'].log_error(error_msg)
+                except:
+                    pass
+                    
+            self._operation_handlers = {}
+            
+            # Try to log to operation container if available
+            if hasattr(self, '_ui_components') and self._ui_components and 'operation_container' in self._ui_components:
+                try:
+                    self._ui_components['operation_container'].log_error(error_msg)
+                except:
+                    pass
+                    
+            self._operation_handlers = {}
     
     def setup_environment_manager(self) -> None:
         """Setup environment manager for operations."""
@@ -255,8 +435,34 @@ class ColabDisplayInitializer(DisplayInitializer):
         self._colab_initializer = ColabInitializer()
     
     def _initialize_impl(self, **kwargs) -> Dict[str, Any]:
-        """Implementation using existing ColabInitializer"""
-        return self._colab_initializer._initialize_impl(**kwargs)
+        """Implementation using existing ColabInitializer
+        
+        Returns:
+            Dictionary containing UI components and initialization results
+        """
+        # Initialize and get UI components
+        result = self._colab_initializer.initialize(**kwargs)
+        
+        # Ensure the result has the expected structure
+        if not isinstance(result, dict):
+            self.logger.error("❌ Invalid initialization result format")
+            return {'success': False, 'error': 'Invalid initialization result format'}
+            
+        # Get the main container
+        main_container = result.get('ui')
+        if not main_container:
+            self.logger.error("❌ No main container found in initialization result")
+            return {'success': False, 'error': 'No main container found'}
+            
+        # Return the result with UI components
+        return {
+            'success': True,
+            'ui': main_container,
+            'ui_components': result.get('ui_components', {}),
+            'operation_container': result.get('operation_container'),
+            'module_handler': result.get('module_handler'),
+            'config': result.get('config', {})
+        }
 
 # Global display initializer instance
 _colab_display_initializer = ColabDisplayInitializer()

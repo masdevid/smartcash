@@ -135,8 +135,10 @@ class ColabUIHandler(ModuleUIHandler):
             self._ui_components['reset_button'].on_click(self._handle_reset_config)
         
         # Main setup button handler - this is the primary button
-        if 'setup_button' in self._ui_components and self._ui_components['setup_button'] is not None:
-            self._ui_components['setup_button'].on_click(self._handle_main_setup)
+        setup_button = self._ui_components.get('setup_button') or self._ui_components.get('primary_button')
+        if setup_button is not None:
+            setup_button.on_click(self._handle_main_setup)
+            self.logger.debug(f"Connected setup button handler to: {type(setup_button)}")
         
         self.logger.info("✅ Event handlers setup complete")
     

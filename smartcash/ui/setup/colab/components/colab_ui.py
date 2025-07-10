@@ -330,18 +330,20 @@ def create_colab_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> Dict[s
     footer_container = create_footer_container(
         panels=[
             PanelConfig(
-                panel_type=PanelType.INFO_BOX,
+                panel_type=PanelType.INFO_ACCORDION,
                 title="Environment Setup Info",
                 content=_create_module_info_box().value,  # Extract HTML value
                 flex="1",
-                min_width="300px"
+                min_width="300px",
+                open_by_default=False
             ),
             PanelConfig(
-                panel_type=PanelType.INFO_BOX,
-                title="Setup Tips",
+                panel_type=PanelType.INFO_ACCORDION,
+                title="Setup Tips", 
                 content=_create_module_tips_box().value,  # Extract HTML value
                 flex="1",
-                min_width="300px"
+                min_width="300px",
+                open_by_default=False
             )
         ]
     )

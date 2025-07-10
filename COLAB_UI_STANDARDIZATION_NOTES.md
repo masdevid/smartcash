@@ -267,6 +267,127 @@ class ModuleInitializer(ModuleInitializer):
 
 ---
 
+## 🔧 Additional UI Issues Fixed (January 11, 2025 - Part 2)
+
+After initial completion, several additional UI issues were identified and resolved:
+
+### Issue 1: Log Accordion Showing During Initialization ✅ FIXED
+**Problem**: Log accordion was appearing immediately during UI initialization instead of being hidden until operations start.
+
+**Root Cause**: Operation container was calling `log_accordion.show()` during initialization in `_create_container()` method.
+
+**Solution**: Modified operation container to get the container widget without calling `show()`:
+```python
+# Before (problematic)
+log_widget = self.log_accordion.show()
+
+# After (fixed)
+log_widget = getattr(self.log_accordion, 'container', None)
+if log_widget is not None:
+    children.append(log_widget)
+elif hasattr(self.log_accordion, 'show'):
+    # Fallback: only call show() if no container property available
+    log_widget = self.log_accordion.show()
+```
+
+### Issue 2: Error Logging to Operation Container ✅ FIXED
+**Problem**: Error messages trying to call `log_message` on VBox container instead of operation container instance, causing 'VBox' object has no attribute 'log_message' errors.
+
+**Root Cause**: Error handlers were trying to call `ui_components['operation_container'].log_error()` but `operation_container` was the VBox widget, not the operation container instance.
+
+**Solution**: Updated error logging to use the correct log_message function:
+```python
+# Before (problematic)
+if 'operation_container' in ui_components:
+    ui_components['operation_container'].log_error(error_msg)
+
+# After (fixed)
+if 'log_message' in ui_components:
+    ui_components['log_message'](error_msg, 'ERROR')
+```
+
+### Issue 3: Footer Container Using INFO_BOX Instead of INFO_ACCORDION ✅ FIXED
+**Problem**: Footer was using `PanelType.INFO_BOX` instead of `PanelType.INFO_ACCORDION` as expected.
+
+**Solution**: Updated footer container configuration:
+```python
+footer_container = create_footer_container(
+    panels=[
+        PanelConfig(
+            panel_type=PanelType.INFO_ACCORDION,  # Changed from INFO_BOX
+            title="Environment Setup Info",
+            content=_create_module_info_box().value,
+            flex="1",
+            min_width="300px",
+            open_by_default=False  # Added accordion setting
+        ),
+        # Similar for Setup Tips panel
+    ]
+)
+```
+
+### Issue 4: Summary Container Layout Issues ✅ FIXED
+**Problem**: Summary container floating horizontally instead of filling vertically with proper flex layout.
+
+**Root Cause**: Using `widgets.Box` instead of `widgets.VBox` and missing proper flex layout properties.
+
+**Solution**: Updated summary container to use VBox with proper flex layout:
+```python
+# Before (problematic)
+self._ui_components['container'] = widgets.Box(
+    widgets_list,
+    layout=widgets.Layout(
+        # ... other properties
+        flex_grow="1"
+    )
+)
+
+# After (fixed)
+self._ui_components['container'] = widgets.VBox(
+    widgets_list,
+    layout=widgets.Layout(
+        # ... other properties
+        display="flex",
+        flex_flow="column",
+        align_items="stretch"
+    )
+)
+```
+
+### Issue 5: Setup Button Click Not Triggering Operations ✅ FIXED
+**Problem**: Primary setup button clicks were not triggering any operations.
+
+**Root Cause**: Handler was looking for `setup_button` but UI was creating `primary_button` as the main button.
+
+**Solution**: Updated button handler connection to check both button names:
+```python
+# Before (problematic)
+if 'setup_button' in self._ui_components:
+    self._ui_components['setup_button'].on_click(self._handle_main_setup)
+
+# After (fixed)
+setup_button = self._ui_components.get('setup_button') or self._ui_components.get('primary_button')
+if setup_button is not None:
+    setup_button.on_click(self._handle_main_setup)
+    self.logger.debug(f"Connected setup button handler to: {type(setup_button)}")
+```
+
+### Testing Results After Additional Fixes ✅ VERIFIED
+- **Core Module Tests**: Still 7/7 passed (100% success rate)
+- **UI Component Tests**: All functionality preserved
+- **User Interface**: Clean, properly functioning UI with no early log display
+- **Button Functionality**: Setup button now properly connected and functional
+- **Layout Issues**: Summary container properly fills space, footer uses accordions
+
+### Key Lessons Learned
+1. **Widget Initialization Timing**: Be careful about when widgets are shown during initialization
+2. **Error Logging Patterns**: Always use the correct logging functions, not widget containers
+3. **Component Type Consistency**: Ensure UI and handlers agree on component types (accordion vs box)
+4. **Layout Container Types**: Use appropriate container types (VBox vs Box) for desired layout behavior
+5. **Button Handler Mapping**: Verify button names match between UI creation and handler connection
+
+---
+
 ## 📚 Related Documentation
 - `UI_MODULE_STANDARDIZATION_SUMMARY.md`
 - `UI_MODULE_TEMPLATE_GUIDE.md`

@@ -89,7 +89,7 @@ class SummaryContainer(BaseUIComponent):
         widgets_list.append(self._ui_components['content'])
         
         # Create the container with dynamic styling
-        self._ui_components['container'] = widgets.Box(
+        self._ui_components['container'] = widgets.VBox(
             widgets_list,
             layout=widgets.Layout(
                 width="100%",
@@ -99,7 +99,9 @@ class SummaryContainer(BaseUIComponent):
                 border_radius="8px",
                 background=self._theme_style["gradient"],
                 box_shadow="0 2px 5px rgba(0,0,0,0.05)",
-                flex_grow="1"
+                display="flex",
+                flex_flow="column",
+                align_items="stretch"
             )
         )
         

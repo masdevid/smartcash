@@ -215,9 +215,9 @@ class ColabInitializer(ModuleInitializer):
             error_msg = f"❌ Failed to setup module handlers: {str(e)}"
             self.logger.error(error_msg, exc_info=True)
             # Try to log to operation container if available
-            if 'operation_container' in ui_components:
+            if 'log_message' in ui_components:
                 try:
-                    ui_components['operation_container'].log_error(error_msg)
+                    ui_components['log_message'](error_msg, 'ERROR')
                 except:
                     pass
             raise
@@ -383,9 +383,9 @@ class ColabInitializer(ModuleInitializer):
             self.logger.error(error_msg, exc_info=True)
             
             # Try to log to operation container if available
-            if 'operation_container' in ui_components:
+            if 'log_message' in ui_components:
                 try:
-                    ui_components['operation_container'].log_error(error_msg)
+                    ui_components['log_message'](error_msg, 'ERROR')
                 except:
                     pass
                     
@@ -441,9 +441,9 @@ class ColabInitializer(ModuleInitializer):
             self.logger.error(error_msg, exc_info=True)
             
             # Try to log to operation container if available
-            if hasattr(self, '_ui_components') and self._ui_components and 'operation_container' in self._ui_components:
+            if hasattr(self, '_ui_components') and self._ui_components and 'log_message' in self._ui_components:
                 try:
-                    self._ui_components['operation_container'].log_error(error_msg)
+                    self._ui_components['log_message'](error_msg, 'ERROR')
                 except:
                     pass
                     

@@ -206,16 +206,21 @@ class OperationContainer(BaseUIComponent):
         if hasattr(self, 'dialog_area') and self.dialog_area is not None:
             children.append(self.dialog_area)
         
-        # 3. Add log accordion if enabled (bottom)
+        # 3. Add log accordion if enabled (bottom) - but don't show it during initialization
         if self.log_accordion:
             try:
-                # Use show() method to get the container widget (now available)
-                log_widget = self.log_accordion.show()
+                # Get the container widget without showing it immediately
+                log_widget = getattr(self.log_accordion, 'container', None)
                 if log_widget is not None:
                     children.append(log_widget)
+                elif hasattr(self.log_accordion, 'show'):
+                    # Fallback: only call show() if no container property available
+                    log_widget = self.log_accordion.show()
+                    if log_widget is not None:
+                        children.append(log_widget)
             except Exception as e:
                 # In test environments or when no container is available, gracefully skip
-                self.logger.warning(f"Could not show log accordion: {e}")
+                self.logger.warning(f"Could not add log accordion: {e}")
                 # Continue without log accordion in testing scenarios
         
         # Filter out None values from children and ensure they're valid widgets

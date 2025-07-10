@@ -72,50 +72,44 @@ class ColabInitializer(ModuleInitializer):
         """Implementation of initialization logic.
         
         Returns:
-            Dict containing initialization results
+            Dict containing initialization results with UI components
         """
         # Extract config from args/kwargs
-        config = None
-        if args:
-            config = args[0]
-        elif 'config' in kwargs:
-            config = kwargs['config']
-        
-        if config is None:
-            config = self.get_default_config()
+        config = kwargs.get('config') or (args[0] if args else None) or self.get_default_config()
         
         try:
             self.logger.info("🚀 Starting colab module initialization...")
-            
-            # Pre-initialization phase
             self.pre_initialize_checks()
             
-            # UI components phase
-            ui_components = create_colab_ui_components(config)
-            if not ui_components:
-                raise RuntimeError("Failed to create UI components")
-            self._ui_components = ui_components
+            # Create UI components first
+            self._ui_components = create_colab_ui_components(config=config)
             
-            # Handlers setup phase
-            self.setup_handlers(ui_components)
+            # Get the main container from components
+            main_container = self._ui_components.get('main_container')
+            if not main_container:
+                raise ValueError("No main container found in UI components")
             
-            # Operation handlers setup phase
+            # Setup handlers with UI components
+            self.setup_handlers(self._ui_components)
+            
+            # Setup operation handlers
             self.setup_operation_handlers()
             
-            # Environment manager setup phase
+            # Setup environment manager
             self.setup_environment_manager()
             
-            # Post-initialization phase
+            # Post-initialization cleanup
             self.post_initialize_cleanup()
             
             self.logger.info("✅ Colab module initialized successfully")
             
+            # Return components in the format expected by DisplayInitializer
             return {
                 'success': True,
-                'ui_components': self._ui_components,
+                'ui': main_container,  # Main container widget for display
+                'ui_components': self._ui_components,  # All components for reference
+                'operation_container': self._ui_components.get('operation_container'),
                 'module_handler': self._module_handler,
-                'config_handler': getattr(self, 'config_handler', None),
-                'operation_handlers': self._operation_handlers,
                 'config': config
             }
             

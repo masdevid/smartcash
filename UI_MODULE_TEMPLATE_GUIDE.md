@@ -47,7 +47,7 @@ Update the `UI_CONFIG` dictionary:
 UI_CONFIG = {
     'title': "Data Preprocessing",  # Module display title
     'subtitle': "Clean and prepare dataset for training",  # Module description
-    'icon': "🧹",  # Module icon
+    'icon': "",  # Module icon
     'module_name': "preprocess",  # Module name
     'parent_module': "dataset",  # Parent module name
     'version': "1.0.0"  # Module version
@@ -56,29 +56,219 @@ UI_CONFIG = {
 
 ### 4. Configure Action Buttons
 
-Update the `BUTTON_CONFIG` dictionary:
+Update the `BUTTON_CONFIG` dictionary. Choose ONE of the following patterns:
 
+#### Option 1: Single Primary Action (Recommended for single operation module)
+```python
+BUTTON_CONFIG = {
+    'primary': {
+        'text': 'Start Processing',
+        'style': 'primary',  # Only one primary button allowed
+        'tooltip': 'Start main operation',
+        'order': 1
+    }
+}
+```
+
+#### Option 2: Multiple Action Buttons (For modules with multiple operations)
 ```python
 BUTTON_CONFIG = {
     'process': {
-        'text': '🧹 Process Data',
-        'style': 'primary',
-        'tooltip': 'Start data preprocessing',
+        'text': 'Process',
+        'style': 'info',  # Use non-primary style for action buttons
+        'tooltip': 'Process the data',
         'order': 1
     },
     'validate': {
-        'text': '✅ Validate',
+        'text': 'Validate',
         'style': 'info',
-        'tooltip': 'Validate preprocessed data',
+        'tooltip': 'Validate the data',
         'order': 2
     },
     'export': {
-        'text': '📤 Export',
+        'text': 'Export',
         'style': 'success',
-        'tooltip': 'Export processed data',
+        'tooltip': 'Export the results',
         'order': 3
     }
 }
+```
+
+**Important Guidelines:**
+- Use either a single primary button OR multiple action buttons, but NOT both
+- Primary button (`style='primary'`) should be used for the main/single action
+- Action buttons should use non-primary styles like 'info', 'success', 'warning', etc.
+- The `order` property determines the left-to-right order of the buttons
+
+### Button Configuration
+
+The ActionContainer supports three distinct button types with specific use cases and behaviors:
+
+#### 1. Primary Button
+- **Purpose**: Single, prominent button for the main action
+- **Appearance**: Large, centered, with bold text
+- **Features**:
+  - Supports phase-based state changes
+  - Ideal for multi-step operations
+  - Cannot be used with action buttons
+- **Best for**: Main actions like "Run", "Process", or "Submit"
+
+#### 2. Action Buttons
+- **Purpose**: Multiple secondary action buttons
+- **Appearance**: Smaller, left-aligned
+- **Features**:
+  - Supports multiple buttons in a row
+  - Each button can have different styles and icons
+  - Cannot be used with primary button
+- **Best for**: Secondary actions like "Preview", "Reset", or "Export"
+
+#### 3. Save/Reset Buttons
+- **Purpose**: Standard form actions
+- **Appearance**: Paired buttons in the action area
+- **Features**:
+  - Can be toggled on/off
+  - Independent of primary/action buttons
+  - Consistent styling across the application
+- **Best for**: Form submissions and resets
+
+### Usage Rules
+
+1. **Exclusive Button Types**:
+   - Use either a Primary Button **OR** multiple Action Buttons
+   - These cannot be combined in the same container
+   - Save/Reset buttons can be used with either type
+
+2. **Button States**:
+   - Disabled state for non-applicable actions
+   - Loading states for async operations
+   - Success/error feedback after actions
+
+### Common Phases (Primary Button)
+
+Primary buttons support the following standard phases:
+
+| Phase ID | Default Text | Description |
+|----------|--------------|-------------|
+| `initial` | Initialize | Starting state |
+| `init` | Initializing... | Initial setup in progress |
+| `drive` | Mounting Drive... | Google Drive mounting |
+| `symlink` | Creating Symlinks... | Setting up symlinks |
+| `folders` | Creating Folders... | Directory setup |
+| `config` | Syncing Config... | Configuration sync |
+| `env` | Setting Environment... | Environment setup |
+| `verify` | Verifying Setup... | System verification |
+| `complete` | Environment Ready! | Success state |
+| `error` | Setup Failed | Error state |
+
+### Best Practices
+
+1. **Button Text**:
+   - Use clear, action-oriented verbs
+   - Keep it short (1-3 words)
+   - Be consistent with terminology
+
+2. **Icons**:
+   - Use standard Font Awesome icons
+   - Choose intuitive icons that match the action
+   - Include both icon and text for clarity
+
+3. **Accessibility**:
+   - Always provide tooltips
+   - Ensure sufficient color contrast
+   - Support keyboard navigation
+
+### Code Examples
+
+#### Primary Button with Phases
+```python
+# Initialize with default phases
+action_container = create_action_container(
+    buttons=[{
+        'button_id': 'setup',
+        'text': 'Initialize Environment',
+        'style': 'primary',
+        'tooltip': 'Start environment setup'
+    }],
+    show_save_reset=False
+)
+
+# Update phase during operation
+action_container.set_phase('init')  # Shows "Initializing..."
+# ... operation completes ...
+action_container.set_phase('complete')  # Shows "Environment Ready!"
+```
+
+#### Multiple Action Buttons
+```python
+action_container = create_action_container(
+    buttons=[
+        {
+            'button_id': 'process',
+            'text': 'Process Data',
+            'style': 'success',
+            'icon': 'play',
+            'tooltip': 'Start processing',
+            'order': 1
+        },
+        {
+            'button_id': 'export',
+            'text': 'Export',
+            'style': 'info',
+            'icon': 'download',
+            'tooltip': 'Export results',
+            'order': 2
+        }
+    ],
+    show_save_reset=True
+)
+
+# Access individual buttons
+process_btn = action_container.get_button('process')
+process_btn.on_click(handle_process)
+```
+
+#### Toggle Save/Reset Buttons
+```python
+# Initially hide save/reset
+action_container = create_action_container(
+    buttons=[...],
+    show_save_reset=False
+)
+
+# Show when needed
+action_container.set_save_reset_visible(True)
+
+# Access save/reset buttons
+save_btn = action_container.save_button
+reset_btn = action_container.reset_button
+```
+
+### Common Patterns
+
+#### Disabling During Operations
+```python
+def handle_operation():
+    action_container.disable_all()
+    try:
+        # Perform operation
+        action_container.set_phase('processing')
+        # ...
+        action_container.set_phase('complete')
+    except Exception as e:
+        action_container.set_error(str(e))
+    finally:
+        action_container.enable_all()
+```
+
+#### Error Handling
+```python
+try:
+    action_container.set_phase('processing')
+    # Risky operation
+    action_container.set_phase('complete')
+except Exception as e:
+    action_container.set_error(f"Operation failed: {str(e)}")
+    logger.error(f"Operation failed: {str(e)}")
 ```
 
 ### 5. Implement Form Widgets

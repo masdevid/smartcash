@@ -190,22 +190,46 @@ class OperationManager:
 class DependencyOperationManager(OperationHandler):
     """Operation manager for dependency management that extends OperationHandler."""
     
-    def __init__(self, config: Dict[str, Any], operation_container=None, **kwargs):
-        """Initialize the dependency operation manager."""
+    def __init__(self, config: Dict[str, Any], ui_components: Dict[str, Any] = None, **kwargs):
+        """Initialize the dependency operation manager.
+        
+        Args:
+            config: Configuration dictionary
+            ui_components: Dictionary of UI components
+            **kwargs: Additional keyword arguments
+        """
+        # Extract operation container from ui_components if not provided
+        operation_container = kwargs.pop('operation_container', None)
+        if operation_container is None and ui_components is not None:
+            if 'containers' in ui_components and 'operation' in ui_components['containers']:
+                operation_container = ui_components['containers']['operation']
+        
         super().__init__(
             module_name='dependency_operation_manager',
             parent_module='dependency',
             operation_container=operation_container,
             **kwargs
         )
+        
         self.config = config
-        self.operation_manager = OperationManager(ui_components={})
+        self.ui_components = ui_components or {}
+        self.operation_manager = OperationManager(ui_components=self.ui_components)
     
-    def initialize(self) -> None:
+    def initialize(self):
         """Initialize the dependency operation manager."""
-        self.logger.info("🚀 Initializing Dependency operation manager")
-        # No specific initialization needed
-        self.logger.info("✅ Dependency operation manager initialization complete")
+        self.logger.info("🔧 Initializing dependency operation manager")
+        
+        # Set up operation container if available
+        if hasattr(self, 'operation_container') and self.operation_container:
+            self.operation_container.clear_output()
+            
+        # Initialize operation handlers
+        self.operation_manager.initialize()
+        
+        # Set up UI event handlers if UI components are available
+        self._setup_ui_handlers()
+        
+        self.logger.info("✅ Dependency operation manager initialized")
     
     def get_operations(self) -> Dict[str, Callable]:
         """Get available operations."""
@@ -508,31 +532,138 @@ class DependencyOperationManager(OperationHandler):
                 'errors': [str(e)]
             }
 
-    async def _update_operation_summary(self, operation_type: str, result: Dict[str, Any]) -> None:
-        """Update operation summary with operation results."""
+    async def _update_operation_summary(self, operation_type: str, result: Dict[str, Any]):
+        """Update operation summary with operation results.
+        
+        Args:
+            operation_type: Type of operation ('install', 'uninstall', 'update')
+            result: Dictionary containing operation results
+        """
         try:
-            from ..components.operation_summary import update_operation_summary
+            # Find summary container in UI components
+            summary_container = None
+            if 'containers' in self.ui_components and 'summary' in self.ui_components['containers']:
+                summary_container = self.ui_components['containers']['summary']
             
-            # Get the operation summary widget from UI components
-            ui_components = getattr(self, '_ui_components', {})
-            if hasattr(self.operation_container, 'get_ui_components'):
-                ui_components.update(self.operation_container.get_ui_components())
+            # If no summary container is found, try to use the operation container
+            if summary_container is None and hasattr(self, 'operation_container'):
+                summary_container = self.operation_container
             
-            operation_summary = ui_components.get('operation_summary')
-            if operation_summary:
-                # Determine status type based on result
-                if result.get('cancelled'):
-                    status_type = 'warning'
-                elif result.get('success', result.get('overall_success', False)):
-                    status_type = 'success'
-                else:
-                    status_type = 'error'
-                
-                # Update the summary widget
-                update_operation_summary(operation_summary, operation_type, result, status_type)
-                self.logger.info(f"✅ Updated operation summary for {operation_type}")
+            if summary_container is None:
+                self.logger.warning("No summary container available to update")
+                return
+            
+            # Prepare summary content
+            summary = []
+            
+            # Add operation-specific header
+            if operation_type == 'install':
+                summary.append("### 📦 Installation Complete")
+            elif operation_type == 'uninstall':
+                summary.append("### 🗑️ Uninstallation Complete")
+            elif operation_type == 'update':
+                summary.append("### 🔄 Update Complete")
             else:
-                self.logger.warning("⚠️ Operation summary widget not found in UI components")
+                summary.append("### Operation Complete")
+            
+            # Add installed packages
+            if 'installed' in result and result['installed']:
+                summary.append("\n✅ Successfully installed packages:")
+                for pkg in result['installed']:
+                    summary.append(f"- {pkg}")
+            
+            # Add failed packages with errors
+            if 'failed' in result and result['failed']:
+                summary.append("\n❌ Failed to process packages:")
+                for pkg, error in result['failed'].items():
+                    summary.append(f"- {pkg}: {error}")
+            
+            # Add skipped packages
+            if 'skipped' in result and result['skipped']:
+                summary.append("\n⚠️ Skipped packages (already up to date):")
+                for pkg in result['skipped']:
+                    summary.append(f"- {pkg}")
+            
+            # Convert summary to markdown
+            summary_markdown = '\n'.join(summary)
+            
+            # Update the summary container based on its type
+            if hasattr(summary_container, 'value'):
+                # Handle widgets with value attribute (e.g., HTML, Textarea)
+                summary_container.value = summary_markdown
+            elif hasattr(summary_container, 'clear_output'):
+                # Handle output widgets
+                with summary_container:
+                    summary_container.clear_output()
+                    display(Markdown(summary_markdown))
+            else:
+                # Fallback to logging
+                self.logger.info("\n" + summary_markdown)
                 
         except Exception as e:
             self.logger.error(f"❌ Failed to update operation summary: {e}")
+            if hasattr(self, 'logger'):
+                import traceback
+                self.logger.error(f"Error details: {traceback.format_exc()}")
+    
+    def _setup_ui_handlers(self):
+        """Set up UI event handlers for operation buttons."""
+        try:
+            if 'widgets' not in self.ui_components:
+                return
+                
+            widgets = self.ui_components['widgets']
+            
+            # Set up install button handler
+            if 'install_button' in widgets:
+                def on_install_clicked(button):
+                    self.execute_install(self._get_selected_packages())
+                widgets['install_button'].on_click(on_install_clicked)
+            
+            # Set up update button handler
+            if 'update_button' in widgets:
+                def on_update_clicked(button):
+                    self.execute_update(self._get_selected_packages())
+                widgets['update_button'].on_click(on_update_clicked)
+            
+            # Set up uninstall button handler
+            if 'uninstall_button' in widgets:
+                def on_uninstall_clicked(button):
+                    self.execute_uninstall(self._get_selected_packages())
+                widgets['uninstall_button'].on_click(on_uninstall_clicked)
+                
+        except Exception as e:
+            self.logger.error(f"❌ Failed to set up UI handlers: {e}")
+    
+    def _get_selected_packages(self) -> List[str]:
+        """Get the list of selected packages from the UI.
+        
+        Returns:
+            List of selected package names
+        """
+        try:
+            if 'widgets' not in self.ui_components:
+                return []
+                
+            widgets = self.ui_components['widgets']
+            selected_packages = []
+            
+            # Get selected packages from categories
+            if 'package_categories' in widgets:
+                widget = widgets['package_categories']
+                if hasattr(widget, 'selected'):
+                    selected_packages.extend(widget.selected)
+                elif hasattr(widget, 'value'):
+                    selected_packages.extend(widget.value)
+            
+            # Get custom packages from text area
+            if 'custom_packages_input' in widgets:
+                custom_packages = widgets['custom_packages_input'].value.strip()
+                if custom_packages:
+                    selected_packages.extend([pkg.strip() for pkg in custom_packages.split('\n') if pkg.strip()])
+            
+            return list(set(selected_packages))  # Remove duplicates
+            
+        except Exception as e:
+            self.logger.error(f"❌ Error getting selected packages: {e}")
+            return []

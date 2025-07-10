@@ -48,26 +48,46 @@ UI_CONFIG = {
     'version': "1.0.0"
 }
 
+# Button configuration - Choose ONE of these patterns:
+# Note: You must choose either a single primary button OR multiple action buttons, but not both
+
+# 1. Single primary action (recommended for single operation modules):
+# BUTTON_CONFIG = {
+#     'primary': {  # The key must be 'primary' for single action mode
+#         'text': 'Start Processing',
+#         'style': 'primary',  # Must be 'primary' for main action
+#         'tooltip': 'Start the main operation',
+#         'order': 1
+#     }
+# }
+
+# 2. Multiple action buttons (for modules with multiple operations):
 BUTTON_CONFIG = {
-    'primary_action': {
-        'text': '🚀 Primary Action',
-        'style': 'primary',
-        'tooltip': 'Perform primary module operation',
-        'order': 1
+    'process': {  # Button ID (must be unique)
+        'text': 'Process',
+        'style': 'info',  # Must use non-primary style (info, success, warning, danger)
+        'tooltip': 'Process the data',
+        'order': 1,  # Determines left-to-right order
+        'icon': 'play'  # Optional: Font Awesome icon name (without 'fa-' prefix)
     },
-    'secondary_action': {
-        'text': '⚙️ Secondary Action',
+    'validate': {
+        'text': 'Validate',
         'style': 'info',
-        'tooltip': 'Perform secondary module operation',
-        'order': 2
+        'tooltip': 'Validate the data',
+        'order': 2,
+        'icon': 'check'
     },
-    'cleanup': {
-        'text': '🗑️ Cleanup',
-        'style': 'danger',
-        'tooltip': 'Clean up module resources',
-        'order': 3
+    'export': {
+        'text': 'Export',
+        'style': 'success',
+        'tooltip': 'Export the results',
+        'order': 3,
+        'icon': 'download'
     }
 }
+
+# Save/Reset buttons are controlled separately via show_save_reset parameter
+# when creating the action container
 
 VALIDATION_RULES = {
     'example_field': {
@@ -79,7 +99,7 @@ VALIDATION_RULES = {
 
 
 @handle_ui_errors(error_component_title="[Module] UI Creation Error")
-def create_[module]_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> Dict[str, Any]:
+def create_module_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> Dict[str, Any]:
     """
     Create [module] UI using standardized container architecture.
     
@@ -144,8 +164,16 @@ def create_[module]_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> Dic
     ui_components['form_widgets'] = form_widgets
     
     # === 3. ACTION CONTAINER ===
-    # Action buttons with save/reset, primary action, and additional operations
+    # Action buttons with save/reset, primary action, or multiple action buttons
     action_buttons = []
+    has_primary = any(btn.get('style') == 'primary' for btn in BUTTON_CONFIG.values())
+    
+    # Validate button configuration
+    if has_primary and len(BUTTON_CONFIG) > 1:
+        raise ValueError(
+            "Invalid button configuration: Cannot have multiple buttons when using a primary button. "
+            "Use either a single primary button or multiple non-primary action buttons."
+        )
     
     # Add module-specific action buttons
     for button_key, button_config in BUTTON_CONFIG.items():
@@ -157,22 +185,30 @@ def create_[module]_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> Dic
             "order": button_config['order']
         })
     
+    # Create action container with appropriate configuration
     action_container = create_action_container(
         buttons=action_buttons,
         title=f"🚀 {UI_CONFIG['title']} Operations",
         alignment="left",  # or "center", "right"
-        show_save_reset=True  # Standard save/reset buttons
+        show_save_reset=config.get('show_save_reset', True)  # Configurable save/reset
     )
     ui_components['action_container'] = action_container['container']
     
     # Extract button references
-    ui_components['primary_button'] = action_container['primary_button']
-    ui_components['save_button'] = action_container.get('save_button')
-    ui_components['reset_button'] = action_container.get('reset_button')
+    if has_primary:
+        ui_components['primary_button'] = action_container['primary_button']
     
-    # Extract action buttons
-    for button_key in BUTTON_CONFIG.keys():
-        ui_components[f'{button_key}_button'] = action_container.get_button(button_key)
+    # Save/Reset buttons (if enabled)
+    if config.get('show_save_reset', True):
+        ui_components['save_button'] = action_container.get('save_button')
+        ui_components['reset_button'] = action_container.get('reset_button')
+    
+    # Extract action buttons (only if not using primary button)
+    if not has_primary:
+        for button_key in BUTTON_CONFIG.keys():
+            btn = action_container.get_button(button_key)
+            if btn:
+                ui_components[f'{button_key}_button'] = btn
     
     # === 4. SUMMARY CONTAINER (Optional) ===
     # Custom summary container for displaying module status/results
@@ -269,8 +305,7 @@ def create_[module]_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> Dic
 
 
 def _create_module_form_widgets(config: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    Create module-specific form widgets.
+    """Create module-specific form widgets.
     
     This function should be customized for each module to create the appropriate
     form elements based on the module's requirements.
@@ -485,7 +520,6 @@ def update_module_config(ui_components: Dict[str, Any]) -> Dict[str, Any]:
 
 
 # === EXPORT FUNCTIONS ===
-
 def create_module_ui_components(config: Optional[Dict[str, Any]] = None, **kwargs) -> Dict[str, Any]:
     """
     Alias for create_[module]_ui for backward compatibility.
@@ -497,13 +531,14 @@ def create_module_ui_components(config: Optional[Dict[str, Any]] = None, **kwarg
     Returns:
         Dictionary containing all UI components
     """
-    return create_[module]_ui(config, **kwargs)
-
+    return create_module_ui(config, **kwargs)
 
 # === USAGE EXAMPLE ===
 
 if __name__ == "__main__":
-    # Example usage of the template
+    # Example usage
+    ui = create_module_ui()
+    display(ui['ui'])
     print("Module UI Template")
     print("================")
     print()

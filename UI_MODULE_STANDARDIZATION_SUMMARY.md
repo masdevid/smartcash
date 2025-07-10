@@ -48,6 +48,57 @@ All UI modules must follow this exact order:
 5. **Operation Container** (Progress + Dialog + Log) - **REQUIRED**
 6. **Footer Container** (Info Accordion + Tips) - **OPTIONAL**
 
+## Button Usage Patterns
+
+### Single Primary Action (Recommended for Single Operation Modules)
+- Use when there's one main action
+- Style: `'primary'`
+- Example:
+  ```python
+  BUTTON_CONFIG = {
+      'primary_action': {
+          'text': '🚀 Process Data',
+          'style': 'primary',
+          'tooltip': 'Start processing',
+          'order': 1
+      }
+  }
+  ```
+
+### Multiple Action Buttons (For Modules with Multiple Operations)
+- Use when there are multiple related actions
+- Styles: Use non-primary styles like 'info', 'success', 'warning', etc.
+- Example:
+  ```python
+  BUTTON_CONFIG = {
+      'process': {
+          'text': '🧹 Process',
+          'style': 'info',
+          'tooltip': 'Process the data',
+          'order': 1
+      },
+      'validate': {
+          'text': '✅ Validate',
+          'style': 'info',
+          'tooltip': 'Validate the data',
+          'order': 2
+      },
+      'export': {
+          'text': '📤 Export',
+          'style': 'success',
+          'tooltip': 'Export the results',
+          'order': 3
+      }
+  }
+  ```
+
+### Important Rules
+1. **Never mix** primary buttons with multiple action buttons
+2. Use primary style **only** for a single main action
+3. For multiple actions, use non-primary styles
+4. The `order` property determines left-to-right button arrangement
+5. Save/Reset buttons are handled separately and can be toggled with `show_save_reset`
+
 ## Key Standardization Features
 
 ### Consistent Imports

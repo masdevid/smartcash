@@ -6,7 +6,7 @@ Deskripsi: Dependency module initializer following downloader pattern with requi
 from typing import Dict, Any
 from smartcash.ui.core.initializers.module_initializer import ModuleInitializer
 from smartcash.ui.core.initializers.display_initializer import DisplayInitializer
-from smartcash.ui.setup.dependency.components.dependency_ui import create_dependency_ui_components
+from smartcash.ui.setup.dependency.components.dependency_ui import create_dependency_ui
 from smartcash.ui.setup.dependency.configs.dependency_config_handler import DependencyConfigHandler
 from smartcash.ui.setup.dependency.operations.operation_manager import DependencyOperationManager
 from smartcash.ui.core.errors.handlers import create_error_response
@@ -33,7 +33,7 @@ class DependencyInitializer(ModuleInitializer):
         return get_default_dependency_config()
     
     def _create_ui_components(self, config: Dict[str, Any], env=None, **kwargs) -> Dict[str, Any]:
-        """Create dependency UI components following downloader pattern
+        """Create dependency UI components following the new pattern
 
         Args:
             config: Loaded configuration
@@ -41,26 +41,128 @@ class DependencyInitializer(ModuleInitializer):
             **kwargs: Additional arguments
 
         Returns:
-            Dictionary of UI components
+            Dictionary of UI components with 'ui_components' key
         """
         try:
-            self.logger.info("🔧 Creating dependency UI components with operation container")
-            ui_components = create_dependency_ui_components(config, **kwargs)
-
-            # Add metadata following the established pattern
+            self.logger.info("🔧 Creating dependency UI with new pattern")
+            
+            # Create UI components
+            ui_result = create_dependency_ui(config, **kwargs)
+            
+            # Check if create_dependency_ui returned None or an error occurred
+            if ui_result is None:
+                error_msg = "Failed to create dependency UI: create_dependency_ui returned None"
+                self.logger.error(error_msg)
+                raise RuntimeError(error_msg)
+            
+            # Ensure ui_components has the required structure
+            if not isinstance(ui_result, dict):
+                error_msg = f"Expected create_dependency_ui to return a dict, got {type(ui_result).__name__}"
+                self.logger.error(error_msg)
+                raise TypeError(error_msg)
+            
+            # Handle case where ui_components is nested under 'ui_components' key
+            if 'ui_components' in ui_result:
+                ui_components = ui_result
+            else:
+                ui_components = {'ui_components': ui_result}
+            
+            # Ensure ui_components['ui_components'] is a dictionary
+            if not isinstance(ui_components['ui_components'], dict):
+                ui_components['ui_components'] = {}
+            
+            # Add metadata
             ui_components.update({
                 'dependency_initialized': True,
                 'module_name': 'dependency',
-                'logger': self.logger,
+                'parent_module': 'setup',
                 'config': config,
-                'env': env
+                'env': env or {}
             })
+            
+            # Ensure we have the required containers structure
+            if 'containers' not in ui_components['ui_components']:
+                ui_components['ui_components']['containers'] = {}
+            
+            try:
+                # Set up operation manager with UI components
+                self._setup_operation_manager(ui_components, config)
+                
+                # Initialize the operation manager if it exists
+                if hasattr(self, 'operation_manager') and self.operation_manager:
+                    if hasattr(self.operation_manager, 'initialize'):
+                        self.operation_manager.initialize()
+                
+                self.logger.info("✅ UI components created successfully")
+                return ui_components
+                
+            except Exception as e:
+                self.logger.error(f"❌ Failed to set up operation manager: {e}")
+                # Return the UI components even if operation manager setup fails
+                return ui_components
 
-            self.logger.info(f"✅ UI components created successfully: {len(ui_components)} components")
-            return ui_components
         except Exception as e:
-            self.handle_error(f"Failed to create UI components: {str(e)}", exc_info=True)
-            return create_error_response("Gagal membuat komponen UI dependency")
+            self.logger.error(f"❌ Failed to create dependency UI components: {e}")
+            import traceback
+            self.logger.error(f"Error details: {traceback.format_exc()}")
+            # Return a minimal UI with error message
+            return {
+                'ui_components': {
+                    'containers': {},
+                    'widgets': {}
+                },
+                'error': str(e),
+                'dependency_initialized': False
+            }
+
+    def _setup_operation_manager(self, ui_components: Dict[str, Any], config: Dict[str, Any]) -> None:
+        """Set up the operation manager for dependency operations.
+
+        Args:
+            ui_components: Dictionary of UI components
+            config: Loaded configuration
+        """
+        try:
+            # Ensure we have the ui_components dictionary
+            components = ui_components.get('ui_components', {})
+            
+            # Check if operation manager is already set up in UI components
+            if 'operation_manager' in components:
+                self.operation_manager = components['operation_manager']
+                self.logger.info("✅ Using existing operation manager from UI components")
+                return
+                
+            # Create a new operation manager if not provided
+            self.logger.info("🔧 Creating new operation manager")
+            
+            # Make sure we have the operation container
+            operation_container = None
+            if 'containers' in components and 'operation' in components['containers']:
+                operation_container = components['containers']['operation']
+            
+            # Create the operation manager with proper UI components
+            self.operation_manager = DependencyOperationManager(
+                config=config,
+                ui_components=components,
+                operation_container=operation_container,
+                logger=self.logger
+            )
+            
+            # Store the operation manager in the UI components
+            if 'ui_components' in ui_components:
+                ui_components['ui_components']['operation_manager'] = self.operation_manager
+            
+            # Register operation handlers if the method exists
+            if hasattr(self, '_register_handlers'):
+                self._register_handlers(ui_components)
+            
+            self.logger.info("✅ Operation manager setup complete")
+                
+        except Exception as e:
+            self.logger.error(f"❌ Failed to set up operation manager: {e}")
+            import traceback
+            self.logger.error(f"Error details: {traceback.format_exc()}")
+            raise
 
     def _setup_module_handlers(self, ui_components: Dict[str, Any], config: Dict[str, Any], **kwargs) -> Dict[str, Any]:
         """Setup handlers following downloader pattern with OperationHandler
@@ -75,30 +177,7 @@ class DependencyInitializer(ModuleInitializer):
             Updated UI components with handlers
         """
         try:
-            self.logger.info("🔧 Setting up dependency operation manager")
-
-            # Get operation container from UI components and set up operation handler
-            operation_container = ui_components.get('operation_manager')
-            if operation_container:
-                # Create operation manager with operation container
-                operation_manager = DependencyOperationManager(
-                    config=config,
-                    operation_container=operation_container
-                )
-                
-                # Store UI components reference in operation manager
-                operation_manager._ui_components = ui_components
-                
-                # Initialize the operation manager
-                operation_manager.initialize()
-                
-                # Store operation manager in UI components
-                ui_components['dependency_operation_manager'] = operation_manager
-                
-                self.logger.info("✅ Operation manager setup complete")
-            else:
-                self.logger.warning("⚠️ No operation container found in UI components")
-
+            # No changes needed here
             return ui_components
         except Exception as e:
             self.handle_error(f"Failed to setup module handlers: {str(e)}", exc_info=True)

@@ -96,8 +96,17 @@ class UIModuleValidator:
         return self._get_results()
     
     def _validate_imports(self):
-        """Validate that required imports are present."""
+        """Validate that required imports are present and no logger imports exist."""
         imports = []
+        
+        # Check for logger imports
+        for node in ast.walk(self.tree):
+            if isinstance(node, ast.Import):
+                for name in node.names:
+                    if name.name == 'logging' or name.name.startswith('logging.'):
+                        self.errors.append("UI components should not import 'logging' module. Use the error handler decorator for error reporting.")
+                    if name.name == 'logger' or name.name.endswith('.logger'):
+                        self.errors.append("UI components should not import logger instances. Use the error handler decorator for error reporting.")
         
         for node in ast.walk(self.tree):
             if isinstance(node, ast.ImportFrom):
@@ -113,16 +122,27 @@ class UIModuleValidator:
         if missing_imports:
             self.errors.append(f"Missing required imports: {', '.join(missing_imports)}")
         else:
-            self.info.append("✓ All required imports present")
+            self.info.append("✅ All required imports present")
     
     def _validate_main_function(self):
-        """Validate the main UI creation function."""
+        """Validate the main UI creation function and check for logger usage."""
+        functions = [node for node in ast.walk(self.tree) if isinstance(node, ast.FunctionDef)]
+        
+        # Check for logger usage in the entire file
+        for node in ast.walk(self.tree):
+            if isinstance(node, ast.Call) and hasattr(node.func, 'id') and 'log' in node.func.id.lower():
+                # Skip if this is part of an error handler decorator
+                if not (isinstance(node.parent, ast.Call) and 
+                       hasattr(node.parent.func, 'id') and 
+                       node.parent.func.id in ['handle_ui_errors']):
+                    self.errors.append("UI components should not contain direct logging calls. Use the error handler decorator for error reporting.")
+                    break
+        
         main_functions = []
         
-        for node in ast.walk(self.tree):
-            if isinstance(node, ast.FunctionDef):
-                if node.name.startswith('create_') and node.name.endswith('_ui'):
-                    main_functions.append(node)
+        for node in functions:
+            if node.name.startswith('create_') and node.name.endswith('_ui'):
+                main_functions.append(node)
         
         if not main_functions:
             self.errors.append("No main UI creation function found (should be create_[module]_ui)")
@@ -132,7 +152,7 @@ class UIModuleValidator:
             self.warnings.append(f"Multiple UI creation functions found: {[f.name for f in main_functions]}")
         
         main_func = main_functions[0]
-        self.info.append(f"✓ Main UI function found: {main_func.name}")
+        self.info.append(f"✅ Main UI function found: {main_func.name}")
         
         # Check function signature
         self._validate_function_signature(main_func)
@@ -157,7 +177,7 @@ class UIModuleValidator:
         if not config_param_found:
             self.errors.append("Main function missing 'config' parameter")
         else:
-            self.info.append("✓ Config parameter present")
+            self.info.append("✅ Config parameter present")
         
         # Check for **kwargs
         if not args.kwarg:
@@ -166,6 +186,7 @@ class UIModuleValidator:
     def _validate_container_creation(self, func_node: ast.FunctionDef):
         """Validate container creation in function body."""
         container_assignments = {}
+        action_container_nodes = []
         
         for node in ast.walk(func_node):
             if isinstance(node, ast.Assign):
@@ -173,6 +194,29 @@ class UIModuleValidator:
                     if isinstance(target, ast.Name):
                         if target.id.endswith('_container'):
                             container_assignments[target.id] = node
+                            
+                            # Check for action container creation
+                            if target.id == 'action_container':
+                                action_container_nodes.append(node)
+        
+        # Validate action container button configuration
+        for node in action_container_nodes:
+            if isinstance(node.value, ast.Call) and hasattr(node.value.func, 'id') and node.value.func.id == 'ActionContainer':
+                # Check for both primary and action buttons in the same container
+                has_primary = False
+                has_action = False
+                
+                for kw in node.value.keywords:
+                    if kw.arg == 'primary_buttons' and kw.value and isinstance(kw.value, (ast.List, ast.Tuple)) and len(kw.value.elts) > 0:
+                        has_primary = True
+                    elif kw.arg == 'action_buttons' and kw.value and isinstance(kw.value, (ast.List, ast.Tuple)) and len(kw.value.elts) > 0:
+                        has_action = True
+                
+                if has_primary and has_action:
+                    self.errors.append(
+                        "Action container should not have both primary_buttons and action_buttons. "
+                        "Choose one button type per container."
+                    )
         
         # Check for required containers
         missing_containers = []
@@ -183,7 +227,7 @@ class UIModuleValidator:
         if missing_containers:
             self.errors.append(f"Missing required containers: {', '.join(missing_containers)}")
         else:
-            self.info.append("✓ All required containers present")
+            self.info.append("✅ All required containers present")
         
         # Check container creation calls
         for container_name, assignment_node in container_assignments.items():
@@ -235,7 +279,7 @@ class UIModuleValidator:
             self.errors.append("ui_components dictionary not found")
             return
         
-        self.info.append("✓ ui_components dictionary found")
+        self.info.append("✅ ui_components dictionary found")
     
     def _validate_constants(self):
         """Validate module constants."""
@@ -257,7 +301,7 @@ class UIModuleValidator:
         if missing_constants:
             self.warnings.append(f"Missing recommended constants: {', '.join(missing_constants)}")
         else:
-            self.info.append("✓ Required constants present")
+            self.info.append("✅ Required constants present")
     
     def _validate_helper_functions(self):
         """Validate helper functions."""
@@ -282,7 +326,7 @@ class UIModuleValidator:
         if missing_helpers:
             self.warnings.append(f"Missing helper functions: {', '.join(missing_helpers)}")
         else:
-            self.info.append("✓ Helper functions present")
+            self.info.append("✅ Helper functions present")
     
     def _validate_docstrings(self):
         """Validate docstring presence."""
@@ -303,7 +347,7 @@ class UIModuleValidator:
             if docstring_ratio < 0.8:
                 self.warnings.append(f"Low docstring coverage: {docstring_ratio:.1%}")
             else:
-                self.info.append(f"✓ Good docstring coverage: {docstring_ratio:.1%}")
+                self.info.append(f"✅ Good docstring coverage: {docstring_ratio:.1%}")
     
     def _validate_error_handling(self):
         """Validate error handling decorator."""
@@ -322,7 +366,7 @@ class UIModuleValidator:
         if 'handle_ui_errors' not in decorators:
             self.warnings.append("Main function missing error handling decorator")
         else:
-            self.info.append("✓ Error handling decorator present")
+            self.info.append("✅ Error handling decorator present")
     
     def _get_results(self) -> Dict[str, Any]:
         """Get validation results."""
@@ -355,7 +399,7 @@ def print_validation_results(results: Dict[str, Any]):
     print(f"UI Module Validation Results")
     print(f"{'='*60}")
     print(f"File: {results['file_path']}")
-    print(f"Valid: {'✓ PASS' if results['valid'] else '✗ FAIL'}")
+    print(f"Valid: {'✅ PASS' if results['valid'] else '✗ FAIL'}")
     print(f"Score: {results['score']:.1f}%")
     print()
     

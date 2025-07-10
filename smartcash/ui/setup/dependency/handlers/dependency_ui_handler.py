@@ -38,60 +38,65 @@ class DependencyUIHandler(ModuleUIHandler):
         self.current_operation_type = None
     
     def extract_config_from_ui(self) -> Dict[str, Any]:
-        """Extract configuration dari UI components"""
+        """Extract configuration from UI components following the new structure.
+        
+        Returns:
+            Dict containing the extracted configuration
+        """
         try:
             config = self.config_handler.get_config().copy()
             
-            # Extract dari dependency tabs
-            if 'dependency_tabs' in self._ui_components:
-                tabs = self._ui_components['dependency_tabs']
+            # Extract from form widgets if available
+            if 'widgets' in self._ui_components and 'form' in self._ui_components['containers']:
+                form_widgets = self._ui_components['widgets']
                 
-                # Extract selected packages dari package categories tab
-                selected_packages = self._extract_selected_packages(tabs)
-                config['selected_packages'] = selected_packages
+                # Extract selected packages from package categories
+                if 'package_categories' in form_widgets:
+                    selected_packages = self._extract_selected_packages(form_widgets['package_categories'])
+                    config['selected_packages'] = selected_packages
                 
-                # Extract custom packages dari custom tab
-                custom_packages = self._extract_custom_packages(tabs)
-                config['custom_packages'] = custom_packages
+                # Extract custom packages from text area if available
+                if 'custom_packages_input' in form_widgets:
+                    custom_packages = form_widgets['custom_packages_input'].value.strip()
+                    if custom_packages:
+                        config['custom_packages'] = custom_packages
             
             return config
             
         except Exception as e:
-            self.logger.error(f"❌ Error extracting config dari UI: {e}")
+            self.logger.error(f"❌ Error extracting config from UI: {e}")
             return self.config_handler.get_config()
     
-    def _extract_selected_packages(self, tabs) -> list:
-        """Extract selected packages dari categories tab"""
+    def _extract_selected_packages(self, categories_widget) -> list:
+        """Extract selected packages from categories widget.
+        
+        Args:
+            categories_widget: The widget containing package categories
+            
+        Returns:
+            List of selected package names
+        """
         selected_packages = []
         
         try:
-            # Get first tab (package categories)
-            if hasattr(tabs, 'children') and len(tabs.children) > 0:
-                categories_tab = tabs.children[0]
-                
-                # Find package widgets dalam categories
-                for widget in self._find_package_widgets(categories_tab):
-                    if hasattr(widget, 'is_selected') and widget.is_selected:
-                        if hasattr(widget, 'package_info'):
-                            selected_packages.append(widget.package_info['name'])
+            if hasattr(categories_widget, 'selected'):
+                # Handle case where widget has a 'selected' attribute
+                return categories_widget.selected
+            elif hasattr(categories_widget, 'value'):
+                # Handle case where widget has a 'value' attribute
+                return categories_widget.value
+            elif hasattr(categories_widget, 'children'):
+                # Handle case where we need to traverse children
+                for child in categories_widget.children:
+                    if hasattr(child, 'selected') and child.selected:
+                        if hasattr(child, 'description'):
+                            selected_packages.append(child.description)
+                        elif hasattr(child, 'value'):
+                            selected_packages.append(child.value)
         except Exception as e:
             self.logger.error(f"❌ Error extracting selected packages: {e}")
         
         return selected_packages
-    
-    def _extract_custom_packages(self, tabs) -> str:
-        """Extract custom packages dari custom tab"""
-        try:
-            # Get second tab (custom packages)
-            if hasattr(tabs, 'children') and len(tabs.children) > 1:
-                custom_tab = tabs.children[1]
-                
-                if hasattr(custom_tab, 'packages_textarea'):
-                    return custom_tab.packages_textarea.value.strip()
-        except Exception as e:
-            self.logger.error(f"❌ Error extracting custom packages: {e}")
-        
-        return ""
     
     def _find_package_widgets(self, container, widgets_list=None):
         """Recursively find package widgets dalam container"""

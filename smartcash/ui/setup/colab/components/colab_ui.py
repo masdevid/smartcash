@@ -1,437 +1,479 @@
 """
-file_path: smartcash/ui/setup/colab/components/colab_ui.py
-Description: UI components for Colab environment configuration
+File: smartcash/ui/setup/colab/components/colab_ui.py
+Description: UI components for Colab environment setup following standardized container architecture
 
-This module provides a standardized UI for configuring the Google Colab environment
-for SmartCash. It follows the SmartCash UI component architecture and design patterns.
+This module provides UI components for the Colab setup interface, built using
+shared container components from the SmartCash UI library. It implements the visual
+representation and layout of the Colab environment setup functionality.
+
+Components:
+- Header Container (Header + Status Panel)
+- Form Container (Custom to each module)
+- Action Container (Save/Reset | Primary | Action Buttons)
+- Summary Container (Custom, Nice to have)
+- Operation Container (Progress + Dialog + Log)
+- Footer Container (Info Accordion + Tips)
+
+The module follows the standardized container-based architecture with consistent
+ordering and structure across all UI modules.
 """
 
-from __future__ import annotations
-
-from typing import Dict, Any, Optional, List, Tuple
-from datetime import datetime
-
-# Standard UI components
 import ipywidgets as widgets
-from IPython.display import display
+from typing import Dict, Any, Optional
 
-# SmartCash UI components
+# Core container imports - standardized across all modules
 from smartcash.ui.components.header_container import create_header_container
-from smartcash.ui.components.form_container import create_form_container, LayoutType
-from smartcash.ui.components.action_container import create_action_container, COLAB_PHASES
+from smartcash.ui.components.form_container import create_form_container
+from smartcash.ui.components.action_container import create_action_container
 from smartcash.ui.components.summary_container import create_summary_container
 from smartcash.ui.components.operation_container import create_operation_container
 from smartcash.ui.components.footer_container import create_footer_container
-from smartcash.ui.components.main_container import create_main_container
 
-# Error handling
+# Error handling import
 from smartcash.ui.core.errors.handlers import handle_ui_errors
-from smartcash.ui.core.errors.enums import ErrorLevel
 
-# Local imports
-from smartcash.ui.setup.colab.constants import UI_CONFIG, BUTTON_CONFIG
-from smartcash.ui.setup.colab.components.setup_summary import create_setup_summary
-from smartcash.ui.setup.colab.components.env_info_panel import create_env_info_panel
-from smartcash.ui.setup.colab.components.tips_panel import create_tips_requirements
+# Module-specific imports
+from smartcash.ui.setup.colab.components import env_info_panel
+from smartcash.ui.setup.colab.components import setup_summary
+from smartcash.ui.setup.colab.components import tips_panel
+from smartcash.ui.setup.colab.constants import UI_CONFIG, BUTTON_CONFIG, VALIDATION_RULES
 
 # Module constants (for validator compliance)
 UI_CONFIG = UI_CONFIG
 BUTTON_CONFIG = BUTTON_CONFIG
 
+
 def _create_module_form_widgets(config: Dict[str, Any]) -> Dict[str, Any]:
-    """Create form widgets for the Colab setup module.
+    """Create Colab-specific form widgets.
+    
+    This function should be customized for each module to create the appropriate
+    form elements based on the module's requirements.
     
     Args:
-        config: Configuration dictionary
+        config: Module configuration dictionary
         
     Returns:
-        Dictionary containing form widgets and rows
+        Dictionary containing form widgets and UI
     """
-    # Create form widgets
-    env_info_panel = create_env_info_panel()
-    tips_panel = create_tips_requirements()
-    setup_summary = create_setup_summary()
+    # Environment detection checkbox
+    auto_detect = widgets.Checkbox(
+        value=config.get('auto_detect', True),
+        description='Auto-detect environment',
+        style={'description_width': 'initial'}
+    )
     
-    # Create form rows
-    form_rows = [
-        [env_info_panel],
-        [setup_summary],
-        # [tips_panel]  # Uncomment if needed
-    ]
+    # Drive mount path
+    drive_path = widgets.Text(
+        value=config.get('drive_path', '/content/drive'),
+        description='Drive Mount Path:',
+        placeholder='Enter drive mount path',
+        style={'description_width': '120px'},
+        layout={'width': '100%'}
+    )
+    
+    # Project name
+    project_name = widgets.Text(
+        value=config.get('project_name', 'SmartCash'),
+        description='Project Name:',
+        placeholder='Enter project name',
+        style={'description_width': '120px'},
+        layout={'width': '100%'}
+    )
+    
+    # Create environment info panel
+    env_info = env_info_panel.create_env_info_panel(config)
+    
+    # Create form layout
+    form_ui = widgets.VBox([
+        widgets.HTML("<h4>🔧 Colab Environment Configuration</h4>"),
+        auto_detect,
+        drive_path,
+        project_name,
+        widgets.HTML("<h4>📊 Environment Information</h4>"),
+        env_info,
+        widgets.HTML(
+            "<div style='margin-top: 15px; padding: 10px; background: #f8f9fa; border-radius: 4px; font-size: 0.9em; color: #666;'>"
+            "<strong>💡 Configuration Tips:</strong><br>"
+            "• Auto-detect will automatically configure environment settings<br>"
+            "• Ensure drive path is correct for Google Drive mounting<br>"
+            "• Project name will be used for folder structure"
+            "</div>"
+        )
+    ])
     
     return {
-        'components': {
-            'env_info_panel': env_info_panel,
-            'tips_panel': tips_panel,
-            'setup_summary': setup_summary
-        },
-        'form_rows': form_rows
+        'ui': form_ui,
+        'auto_detect': auto_detect,
+        'drive_path': drive_path,
+        'project_name': project_name,
+        'env_info_panel': env_info
     }
 
 
-def _create_module_summary_content(components: Dict[str, Any]) -> str:
-    """Create summary content for the module.
-    
+def _create_module_summary_content(config: Dict[str, Any]) -> Optional[widgets.Widget]:
+    """
+    Create Colab-specific summary content.
+
+    This function should be customized for each module to display relevant
+    summary information, statistics, or previews.
+
     Args:
-        components: Dictionary of UI components
+        config: Module configuration dictionary
         
     Returns:
-        HTML string containing the summary content
+        Widget containing summary content or None if not applicable
     """
-    return "<p>Environment setup configuration and status will be displayed here.</p>"
+    summary_html = f"""
+    <div style="padding: 15px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+                border-radius: 8px; color: white; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+        <h4 style="margin: 0 0 10px 0; font-size: 1.1rem;">🚀 Colab Environment Summary</h4>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px;">
+            <div style="background: rgba(255,255,255,0.1); padding: 10px; border-radius: 6px;">
+                <div style="font-size: 0.8rem; opacity: 0.8;">Status</div>
+                <div style="font-size: 1rem; font-weight: 600;">Ready for Setup</div>
+            </div>
+            <div style="background: rgba(255,255,255,0.1); padding: 10px; border-radius: 6px;">
+                <div style="font-size: 0.8rem; opacity: 0.8;">Environment</div>
+                <div style="font-size: 1rem; font-weight: 600;">Google Colab</div>
+            </div>
+            <div style="background: rgba(255,255,255,0.1); padding: 10px; border-radius: 6px;">
+                <div style="font-size: 0.8rem; opacity: 0.8;">Configuration</div>
+                <div style="font-size: 1rem; font-weight: 600;">Default</div>
+            </div>
+        </div>
+    </div>
+    """
+    
+    return widgets.HTML(summary_html)
 
 
 def _create_module_info_box() -> widgets.Widget:
-    """Create an info box with module documentation.
-    
-    Returns:
-        Info box widget
     """
-    return widgets.HTML(
-        value="""
-        <div style="padding: 12px; background: #e3f2fd; border-radius: 4px; margin: 8px 0;">
-            <h4 style="margin-top: 0; color: #0d47a1;">Environment Setup Guide</h4>
-            <p>This module helps you set up your Google Colab environment for SmartCash.</p>
-            <ol style="margin: 8px 0 0 16px; padding-left: 8px;">
-                <li>Configure your environment settings</li>
-                <li>Click 'Setup Environment' to initialize</li>
-                <li>Follow the progress in the logs</li>
-            </ol>
-        </div>
-        """
-    )
+    Create Colab-specific info box for footer.
 
-
-@handle_ui_errors(
-    error_component_title=f"{UI_CONFIG['module_name']} Error",
-    log_error=True,
-    return_type=dict,
-    level=ErrorLevel.ERROR,
-    fail_fast=False,
-    create_ui=True
-)
-def create_colab_ui_components(config: Optional[Dict[str, Any]] = None, **kwargs) -> Dict[str, Any]:
-    """Create the Colab environment setup UI.
+    Returns:
+        Widget containing module information
+    """
+    info_html = f"""
+    <div class="alert alert-info" style="font-size: 0.9em; padding: 12px; margin: 0;">
+        <strong>💡 Colab Environment Setup Information:</strong>
+        <ul style="margin: 8px 0 0 15px; padding: 0;">
+            <li><strong>Purpose:</strong> Automatically configure Google Colab environment for SmartCash</li>
+            <li><strong>Configuration:</strong> Set drive mount path and project settings</li>
+            <li><strong>Operations:</strong> Mount drive, create folders, setup symlinks, sync configs</li>
+            <li><strong>Verification:</strong> Validate environment setup and dependencies</li>
+        </ul>
+    </div>
+    """
     
-    This function creates a complete UI for configuring the Colab environment
-    with the following sections:
-    - Environment information
-    - Setup summary
-    - Action buttons
+    return widgets.HTML(info_html)
+
+
+def _create_module_tips_box() -> widgets.Widget:
+    """
+    Create Colab-specific tips box for footer.
+
+    Returns:
+        Widget containing helpful tips
+    """
+    tips_html = f"""
+    <div class="alert alert-success" style="font-size: 0.9em; padding: 12px; margin: 0;">
+        <strong>💡 Colab Setup Tips:</strong>
+        <ul style="margin: 8px 0 0 15px; padding: 0;">
+            <li>Ensure you have Google Drive access before starting</li>
+            <li>The setup process will create necessary folder structures</li>
+            <li>Monitor the progress tracker for detailed status updates</li>
+            <li>Check logs if any errors occur during setup</li>
+        </ul>
+    </div>
+    """
+    
+    return widgets.HTML(tips_html)
+
+
+@handle_ui_errors(error_component_title="Colab UI Creation Error")
+def create_colab_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> Dict[str, Any]:
+    """
+    Create Colab UI using standardized container architecture.
+    
+    This function creates the complete UI for the Colab module following the
+    standardized container order and structure. It provides consistent layout,
+    styling, and functionality across all SmartCash UI modules.
+    
+    Container Order (standardized):
+    1. Header Container (Header + Status Panel)
+    2. Form Container (Custom to each module)
+    3. Action Container (Save/Reset | Primary | Action Buttons)
+    4. Summary Container (Custom, Nice to have)
+    5. Operation Container (Progress + Dialog + Log)
+    6. Footer Container (Info Accordion + Tips)
     
     Args:
-        config: Optional configuration dictionary with initial values
-        **kwargs: Additional keyword arguments passed to container components
+        config: Optional configuration dictionary
+        **kwargs: Additional keyword arguments for customization
         
     Returns:
-        Dictionary containing all UI components and containers
+        Dictionary containing all UI components and widgets with standardized keys:
+        - 'ui': Main UI widget
+        - 'header_container': Header container widget
+        - 'form_container': Form container widget
+        - 'action_container': Action container widget
+        - 'summary_container': Summary container widget (if enabled)
+        - 'operation_container': Operation container widget
+        - 'footer_container': Footer container widget
+        - Individual widget references for handlers
+        - Module metadata and configuration
     """
-    # Initialize config if not provided
     config = config or {}
-    
-    # Create UI components dictionary with error handling
     ui_components = {}
     
-    try:
-        # 1. Create form widgets
-        form_widgets = _create_module_form_widgets(config)
-        components = form_widgets['components']
-        form_rows = form_widgets['form_rows']
-        
-        # 2. Create header container
-        header_container = create_header_container(
-            title=f"{UI_CONFIG['icon']} {UI_CONFIG['module_name']}",
-            subtitle=UI_CONFIG['module_description'],
-            status_message="Ready to configure environment",
-            status_type="info"
-        )
-        
-        # 3. Create form container
-        form_container = create_form_container(
-            form_rows=form_rows,
-            layout_type=LayoutType.COLUMN,
-            container_margin="0",
-            container_padding="16px",
-            gap="12px"
-        )
-        
-        # 4. Create action container with primary setup button that supports phases
-        action_container = create_action_container(
-            buttons=[
-                {
-                    'id': 'setup',  # Use 'id' instead of 'button_id' to match expected parameter
-                    'text': BUTTON_CONFIG['setup']['text'],
-                    'style': 'primary',
-                    'tooltip': BUTTON_CONFIG['setup']['tooltip'],
-                    'icon': 'rocket',
-                    'disabled': False,
-                    'order': 0
-                }
-            ],
-            title="Environment Setup",
-            alignment="center",
-            show_save_reset=True,  # Let the container handle save/reset buttons
-            phases=COLAB_PHASES    # Pass the phase configurations
-        )
-        
-        # Store the container and button references
-        ui_components.update({
-            'action_container': action_container['container'],
-            'setup_button': action_container.get('primary_button')  # Safely get primary_button
-        })
-        
-        # Store the action container instance for phase management if available
-        if 'action_container' in action_container:
-            ui_components['_action_container_instance'] = action_container['action_container']
-        
-        # 5. Create operation container for logs and progress
-        operation_container = create_operation_container(
-            title="Setup Progress",
-            show_logs=True,
-            show_progress=True,
-            collapsible=True,
-            collapsed=False
-        )
-        
-        # 6. Create summary container
-        summary_content = _create_module_summary_content(components)
+    # === 1. HEADER CONTAINER ===
+    # Header with title, subtitle, and status indicator
+    header_container = create_header_container(
+        title=UI_CONFIG['title'],
+        subtitle=UI_CONFIG['subtitle'],
+        icon=UI_CONFIG['icon'],
+        status_text="Ready"
+    )
+    ui_components['header_container'] = header_container.container
+    
+    # === 2. FORM CONTAINER ===
+    # Custom form layout specific to the module
+    form_container = create_form_container(
+        title=f"⚙️ {UI_CONFIG['title']} Configuration",
+        layout_type="column",  # or "row", "grid" based on needs
+        container_padding="15px",
+        gap="12px"
+    )
+    
+    # Create module-specific form widgets
+    form_widgets = _create_module_form_widgets(config)
+    
+    # Add form widgets to container
+    if form_widgets:
+        form_container['add_item'](form_widgets['ui'], width='100%')
+    
+    ui_components['form_container'] = form_container['container']
+    ui_components['form_widgets'] = form_widgets
+    
+    # === 3. ACTION CONTAINER ===
+    # Primary button for Colab setup with phases - following single operation pattern
+    action_container = create_action_container(
+        buttons=[{
+            'id': 'primary',
+            'text': BUTTON_CONFIG['primary']['text'],
+            'style': BUTTON_CONFIG['primary']['style'],
+            'tooltip': BUTTON_CONFIG['primary']['tooltip']
+        }],
+        title=f"🚀 {UI_CONFIG['title']} Operations",
+        alignment="center",
+        show_save_reset=True  # Include save/reset for configuration
+    )
+    ui_components['action_container'] = action_container['container']
+    
+    # Extract button references
+    ui_components['primary_button'] = action_container['primary_button']
+    ui_components['setup_button'] = action_container['buttons'].get('primary')
+    
+    # Save/Reset buttons (access from action_container instance)
+    action_container_instance = action_container['action_container']
+    ui_components['save_button'] = getattr(action_container_instance, 'save_button', None)
+    ui_components['reset_button'] = getattr(action_container_instance, 'reset_button', None)
+    
+    # Expose phase management methods for primary button
+    ui_components['set_phase'] = action_container.get('set_phase')
+    ui_components['set_phases'] = action_container.get('set_phases')
+    ui_components['enable_all'] = action_container.get('enable_all')
+    ui_components['disable_all'] = action_container.get('disable_all')
+    
+    # === 4. SUMMARY CONTAINER (Optional) ===
+    # Custom summary container for displaying module status/results
+    summary_enabled = config.get('show_summary', True)
+    if summary_enabled:
         summary_container = create_summary_container(
-            title="Environment Overview",
-            theme="primary",
+            title=f"{UI_CONFIG['title']} Summary",
             icon="📊"
         )
-        summary_container.set_content(summary_content)
         
-        # 7. Create footer with info box
-        info_box = _create_module_info_box()
-        footer_container = create_footer_container(
-            info_box=info_box,
-            show_tips=True,
-            show_version=True
-        )
+        # Add module-specific summary content
+        summary_content = _create_module_summary_content(config)
+        if summary_content:
+            summary_container.set_content(summary_content.value)
         
-        # 8. Create main container and assemble all components
-        main_container = create_main_container(
-            header=header_container.container,
-            body=widgets.VBox([
-                form_container['container'],
-                action_container['container'],
-                summary_container.container,
-                operation_container['container']
-            ]),
-            footer=footer_container,
-            container_config={
-                'margin': '0 auto',
-                'max_width': '1200px',
-                'padding': '10px',
-                'border': '1px solid #e0e0e0',
-                'border_radius': '5px',
-                'box_shadow': '0 1px 3px rgba(0,0,0,0.1)'
-            }
-        )
-        
-        # Get buttons from action container
-        buttons = {}
-        if hasattr(action_container, 'get_button'):
-            # Object-based action container
-            for btn in action_buttons:
-                btn_name = btn['name']
-                btn_widget = action_container.get_button(btn_name)
-                if btn_widget:
-                    buttons[btn_name] = btn_widget
-                    ui_components[btn_name] = btn_widget
-        elif isinstance(action_container, dict) and 'widgets' in action_container:
-            # Dictionary-based action container
-            for btn in action_buttons:
-                btn_name = btn['name']
-                if btn_name in action_container['widgets']:
-                    buttons[btn_name] = action_container['widgets'][btn_name]
-                    ui_components[btn_name] = action_container['widgets'][btn_name]
-        
-        # Prepare the UI components dictionary
-        ui_components.update({
-            # Core containers
-            'ui': main_container,
-            'main_container': main_container,
-            'header_container': header_container.container,
-            'form_container': form_container['container'],
-            'action_container': action_container['container'],
-            'operation_container': operation_container['container'],
-            'summary_container': summary_container.container,
-            'footer_container': footer_container,
-            
-            # Form components
-            'form_components': components,
-            'form_rows': form_rows,
-            
-            # Buttons
-            'buttons': buttons,
-            'setup_button': buttons.get('setup_button'),
-            'save_button': buttons.get('save_button'),
-            'reset_button': buttons.get('reset_button'),
-            
-            # Additional UI elements
-            'summary_content': summary_content,
-            'info_box': info_box,
-            'log_accordion': operation_container.get('log_accordion'),
-            
-            # Module metadata
-            'module_name': UI_CONFIG['module_name'],
-            'parent_module': UI_CONFIG['parent_module'],
-            'version': UI_CONFIG['version'],
-            'ui_initialized': True
-        })
-        
-        return ui_components
+        ui_components['summary_container'] = summary_container.container
     
-    except Exception as e:
-        # The error will be handled by the @handle_ui_errors decorator
-        raise
+    # === 5. OPERATION CONTAINER ===
+    # Progress tracking, dialog, and logging
+    operation_container = create_operation_container(
+        title=f"📊 {UI_CONFIG['title']} Status",
+        show_progress=True,
+        show_dialog=True,
+        show_logs=True,
+        log_module_name=UI_CONFIG['module_name']
+    )
+    ui_components['operation_container'] = operation_container['container']
+    
+    # Store operation container functions for handlers
+    ui_components['log_message'] = operation_container['log_message']
+    ui_components['update_progress'] = operation_container['update_progress']
+    ui_components['show_dialog'] = operation_container['show_dialog']
+    ui_components['show_info_dialog'] = operation_container['show_info_dialog']
+    ui_components['clear_dialog'] = operation_container['clear_dialog']
+    ui_components['progress_tracker'] = operation_container.get('progress_tracker')
+    ui_components['log_output'] = operation_container.get('log_output')
+    ui_components['log_accordion'] = operation_container.get('log_accordion')
+    
+    # === 6. FOOTER CONTAINER ===
+    # Info accordion and helpful tips
+    footer_container = create_footer_container(
+        info_box=_create_module_info_box(),
+        tips_box=_create_module_tips_box()
+    )
+    ui_components['footer_container'] = footer_container.container
+    
+    # === MAIN UI ASSEMBLY ===
+    # Assemble all containers in standardized order, filtering out None values
+    main_components = []
+    
+    # Add containers in order, checking each one is not None
+    container_order = [
+        ui_components.get('header_container'),
+        ui_components.get('form_container'), 
+        ui_components.get('action_container')
+    ]
+    
+    # Add summary container if enabled
+    if summary_enabled and 'summary_container' in ui_components:
+        container_order.append(ui_components.get('summary_container'))
+    
+    # Add remaining containers
+    container_order.extend([
+        ui_components.get('operation_container'),
+        ui_components.get('footer_container')
+    ])
+    
+    # Filter out None values
+    main_components = [container for container in container_order if container is not None]
+    
+    # Create main UI container
+    main_ui = widgets.VBox(
+        main_components,
+        layout=widgets.Layout(
+            width='100%',
+            margin='10px 0',
+            border='1px solid #e0e0e0',
+            border_radius='8px',
+            background_color='#fafafa',
+            padding='15px'
+        )
+    )
+    
+    ui_components['ui'] = main_ui
+    ui_components['main_container'] = main_ui
+    
+    # === METADATA AND CONFIGURATION ===
+    # Add module metadata and configuration
+    ui_components.update({
+        'module_name': UI_CONFIG['module_name'],
+        'parent_module': UI_CONFIG['parent_module'],
+        'logger_namespace': f"smartcash.ui.{UI_CONFIG['parent_module']}.{UI_CONFIG['module_name']}",
+        'ui_initialized': True,
+        'config': config,
+        'version': UI_CONFIG['version']
+    })
+    
+    return ui_components
 
 
-def create_environment_form(config: Dict[str, Any]) -> Dict[str, Any]:
-    """Create environment configuration form components.
+# === HELPER FUNCTIONS ===
+
+def validate_colab_config(config: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Validate Colab configuration against defined rules.
     
     Args:
-        config: Configuration dictionary
+        config: Configuration dictionary to validate
         
     Returns:
-        Dictionary containing environment form components
+        Validated configuration dictionary
+        
+    Raises:
+        ValueError: If configuration validation fails
     """
-    env_config = config.get('environment', {})
-    components = {}
+    validated_config = config.copy()
     
-    # Environment type dropdown
-    components['environment_type_dropdown'] = widgets.Dropdown(
-        options=[
-            ('Google Colab', 'colab'),
-            ('Kaggle Notebooks', 'kaggle'),
-            ('Local Environment', 'local')
-        ],
-        value=env_config.get('type', 'colab'),
-        description='Environment:',
-        style={'description_width': '120px'},
-        layout=widgets.Layout(width='100%', margin='5px 0')
-    )
+    # Validate required fields
+    for field, rules in VALIDATION_RULES.items():
+        if field in validated_config:
+            value = validated_config[field]
+            
+            # Check required fields
+            if rules.get('required', False) and not value:
+                raise ValueError(f"Required field '{field}' is missing or empty")
+            
+            # Check minimum length
+            if 'min_length' in rules and len(str(value)) < rules['min_length']:
+                raise ValueError(f"Field '{field}' must be at least {rules['min_length']} characters")
+            
+            # Check allowed values
+            if 'allowed_values' in rules and value not in rules['allowed_values']:
+                raise ValueError(f"Field '{field}' value '{value}' not in allowed values: {rules['allowed_values']}")
     
-    # Project name text input
-    components['project_name_text'] = widgets.Text(
-        value=env_config.get('project_name', 'SmartCash'),
-        description='Project Name:',
-        style={'description_width': '120px'},
-        layout=widgets.Layout(width='100%', margin='5px 0')
-    )
-    
-    # Auto mount drive checkbox
-    components['auto_mount_drive_checkbox'] = widgets.Checkbox(
-        value=env_config.get('auto_mount_drive', True),
-        description='Auto Mount Drive',
-        layout=widgets.Layout(width='100%', margin='5px 0')
-    )
-    
-    # GPU enabled checkbox
-    components['gpu_enabled_checkbox'] = widgets.Checkbox(
-        value=env_config.get('gpu_enabled', False),
-        description='Enable GPU',
-        layout=widgets.Layout(width='100%', margin='5px 0')
-    )
-    
-    # GPU type dropdown
-    components['gpu_type_dropdown'] = widgets.Dropdown(
-        options=[
-            ('No GPU', 'none'),
-            ('Tesla K80', 'k80'),
-            ('Tesla T4', 't4'),
-            ('Tesla P100', 'p100'),
-            ('Tesla V100', 'v100')
-        ],
-        value=env_config.get('gpu_type', 'none'),
-        description='GPU Type:',
-        style={'description_width': '120px'},
-        layout=widgets.Layout(width='100%', margin='5px 0')
-    )
-    
-    # Create environment form layout
-    components['environment_form'] = widgets.VBox([
-        widgets.HTML("<h4>🌍 Environment Configuration</h4>"),
-        components['environment_type_dropdown'],
-        components['project_name_text'],
-        components['auto_mount_drive_checkbox'],
-        components['gpu_enabled_checkbox'],
-        components['gpu_type_dropdown']
-    ], layout=widgets.Layout(padding='10px', border='1px solid #ddd', border_radius='5px'))
-    
-    return components
+    return validated_config
 
 
-def create_setup_form(config: Dict[str, Any]) -> Dict[str, Any]:
-    """Create setup configuration form components.
+def get_colab_default_config() -> Dict[str, Any]:
+    """
+    Get default configuration for the Colab module.
+    
+    Returns:
+        Default configuration dictionary
+    """
+    return {
+        'auto_detect': True,
+        'drive_path': '/content/drive',
+        'project_name': 'SmartCash',
+        'show_summary': True
+    }
+
+
+def update_colab_config(ui_components: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Update configuration from UI components.
     
     Args:
-        config: Configuration dictionary
+        ui_components: Dictionary containing UI components
         
     Returns:
-        Dictionary containing setup form components
+        Updated configuration dictionary
     """
-    setup_config = config.get('setup', {})
-    components = {}
+    config = {}
     
-    # Setup stages selection
-    components['setup_stages_select'] = widgets.SelectMultiple(
-        options=[
-            ('Environment Detection', 'environment_detection'),
-            ('Drive Mount', 'drive_mount'),
-            ('GPU Setup', 'gpu_setup'),
-            ('Folder Setup', 'folder_setup'),
-            ('Config Sync', 'config_sync'),
-            ('Verify', 'verify')
-        ],
-        value=tuple(setup_config.get('stages', [])),
-        description='Setup Stages:',
-        rows=6,
-        style={'description_width': '120px'},
-        layout=widgets.Layout(width='100%', margin='5px 0')
-    )
+    # Extract values from form widgets
+    form_widgets = ui_components.get('form_widgets', {})
     
-    # Auto start checkbox
-    components['auto_start_checkbox'] = widgets.Checkbox(
-        value=setup_config.get('auto_start', False),
-        description='Auto Start Setup',
-        layout=widgets.Layout(width='100%', margin='5px 0')
-    )
+    if 'auto_detect' in form_widgets:
+        config['auto_detect'] = form_widgets['auto_detect'].value
     
-    # Stop on error checkbox
-    components['stop_on_error_checkbox'] = widgets.Checkbox(
-        value=setup_config.get('stop_on_error', True),
-        description='Stop on Error',
-        layout=widgets.Layout(width='100%', margin='5px 0')
-    )
+    if 'drive_path' in form_widgets:
+        config['drive_path'] = form_widgets['drive_path'].value
     
-    # Max retries input
-    components['max_retries_int'] = widgets.IntText(
-        value=setup_config.get('max_retries', 3),
-        description='Max Retries:',
-        style={'description_width': '120px'},
-        layout=widgets.Layout(width='100%', margin='5px 0')
-    )
+    if 'project_name' in form_widgets:
+        config['project_name'] = form_widgets['project_name'].value
     
-    # Show advanced options checkbox
-    ui_config = config.get('ui', {})
-    components['show_advanced_checkbox'] = widgets.Checkbox(
-        value=ui_config.get('show_advanced_options', False),
-        description='Show Advanced Options',
-        layout=widgets.Layout(width='100%', margin='5px 0')
-    )
-    
-    # Create setup form layout
-    components['setup_form'] = widgets.VBox([
-        widgets.HTML("<h4>⚙️ Setup Configuration</h4>"),
-        components['setup_stages_select'],
-        components['auto_start_checkbox'],
-        components['stop_on_error_checkbox'],
-        components['max_retries_int'],
-        components['show_advanced_checkbox']
-    ], layout=widgets.Layout(padding='10px', border='1px solid #ddd', border_radius='5px'))
-    
-    return components
+    return config
 
+
+# === EXPORT FUNCTIONS ===
+def create_colab_ui_components(config: Optional[Dict[str, Any]] = None, **kwargs) -> Dict[str, Any]:
+    """
+    Alias for create_colab_ui for backward compatibility.
+    
+    Args:
+        config: Optional configuration dictionary
+        **kwargs: Additional keyword arguments
+        
+    Returns:
+        Dictionary containing all UI components
+    """
+    return create_colab_ui(config, **kwargs)

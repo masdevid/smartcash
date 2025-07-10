@@ -1,17 +1,52 @@
 """
 File: smartcash/ui/setup/colab/colab_initializer.py
 Description: Colab Environment Configuration Initializer following dependency pattern
+
+Note: This module uses lazy loading to prevent automatic setup on import.
 """
 
 import contextlib
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, TYPE_CHECKING, cast
 from pathlib import Path
 
 from smartcash.ui.core.initializers.module_initializer import ModuleInitializer
 from .configs.colab_defaults import get_default_colab_config
-from .handlers.colab_ui_handler import ColabUIHandler
-from .components import create_colab_ui_components
 
+# Global instance (lazy initialized)
+_colab_initializer = None
+
+def get_colab_initializer() -> 'ColabInitializer':
+    """Get or create colab initializer instance.
+    
+    Note: This is the only function that should be used to get the initializer.
+    It ensures proper lazy initialization of all components.
+    
+    Returns:
+        ColabInitializer instance
+    """
+    global _colab_initializer
+    
+    if _colab_initializer is None:
+        # Import here to prevent circular imports
+        from .handlers.colab_ui_handler import ColabUIHandler
+        from .components import create_colab_ui_components
+        
+        # Set the global components for the module
+        globals()['ColabUIHandler'] = ColabUIHandler
+        globals()['create_colab_ui_components'] = create_colab_ui_components
+        
+        # Create the initializer
+        _colab_initializer = ColabInitializer()
+    
+    return _colab_initializer
+
+# Lazy imports to prevent circular imports and automatic setup
+if TYPE_CHECKING:
+    from .handlers.colab_ui_handler import ColabUIHandler
+    from .components.colab_ui import create_colab_ui_components
+
+# Legacy support
+get_colab_env_initializer = get_colab_initializer
 
 
 class ColabInitializer(ModuleInitializer):
@@ -39,11 +74,29 @@ class ColabInitializer(ModuleInitializer):
         self._operation_handlers = {}
         self._environment_manager = None
         
-        # Set default config
-        self.config = self.get_default_config()
+        # Set default config directly
+        self._config = self.get_default_config()
+        
+        # Disable any config persistence
+        self.config_handler = None
+        
         self.logger.info(f"🛠️ ColabInitializer created for module: {module_name}")
-        self.logger.debug("📋 Using in-memory configuration only (no persistence)")
+        
+        # Override config property to use our local _config
+        self.config = self._config
     
+    @property
+    def config(self) -> Dict[str, Any]:
+        """Get current configuration."""
+        return getattr(self, '_config', {})
+    
+    @config.setter
+    def config(self, value: Dict[str, Any]) -> None:
+        """Set configuration."""
+        if not hasattr(self, '_config'):
+            self._config = {}
+        self._config.update(value)
+        
     def get_default_config(self) -> Dict[str, Any]:
         """Get default colab configuration."""
         return get_default_colab_config()
@@ -51,7 +104,7 @@ class ColabInitializer(ModuleInitializer):
     def load_config(self, name: str = None) -> bool:
         """Override to disable persistent config loading for colab module.
         
-        Colab module does not use persistent configuration as per module structure docs.
+        Colab module does not use persistent configuration.
         Always returns True to indicate successful "loading" of default config.
         
         Args:
@@ -60,9 +113,7 @@ class ColabInitializer(ModuleInitializer):
         Returns:
             True (always successful with default config)
         """
-        # Always use default config - no persistence
-        self.config = self.get_default_config()
-        self.logger.debug("📋 Using default colab config (no persistence)")
+        # No-op - config is already set in __init__
         return True
     
     def save_config(self) -> bool:
@@ -73,7 +124,7 @@ class ColabInitializer(ModuleInitializer):
         Returns:
             True (no-op operation always succeeds)
         """
-        self.logger.debug("📋 Colab config save disabled (no persistence)")
+        # No-op - config is never persisted
         return True
     
     def _create_ui_components(self, config: Dict[str, Any], **kwargs) -> Dict[str, Any]:
@@ -397,15 +448,6 @@ class ColabInitializer(ModuleInitializer):
                     pass
                     
             self._operation_handlers = {}
-            
-            # Try to log to operation container if available
-            if hasattr(self, '_ui_components') and self._ui_components and 'operation_container' in self._ui_components:
-                try:
-                    self._ui_components['operation_container'].log_error(error_msg)
-                except:
-                    pass
-                    
-            self._operation_handlers = {}
     
     def setup_environment_manager(self) -> None:
         """Setup environment manager for operations."""
@@ -421,55 +463,62 @@ class ColabInitializer(ModuleInitializer):
             self._environment_manager = None
 
 
-# Global instance for backward compatibility
-_colab_initializer: Optional[ColabInitializer] = None
-
-# Add DisplayInitializer import
-from smartcash.ui.core.initializers.display_initializer import DisplayInitializer
-
-class ColabDisplayInitializer(DisplayInitializer):
+class ColabDisplayInitializer:
     """DisplayInitializer wrapper for colab module"""
     
     def __init__(self):
-        super().__init__(module_name="colab", parent_module="setup")
-        self._colab_initializer = ColabInitializer()
+        """Initialize the display initializer."""
+        # Don't initialize the base class with parameters
+        # as we're not actually inheriting from DisplayInitializer
+        self._colab_initializer = get_colab_initializer()
     
-    def _initialize_impl(self, **kwargs) -> Dict[str, Any]:
+    def _initialize_impl(self, **kwargs):
         """Implementation using existing ColabInitializer
         
         Returns:
             Dictionary containing UI components and initialization results
         """
-        # Initialize and get UI components
-        result = self._colab_initializer.initialize(**kwargs)
+        # Delegate to the colab initializer
+        result = self._colab_initializer._initialize_impl(**kwargs)
         
-        # Ensure the result has the expected structure
-        if not isinstance(result, dict):
-            self.logger.error("❌ Invalid initialization result format")
-            return {'success': False, 'error': 'Invalid initialization result format'}
+        # Add the initializer to the result
+        if isinstance(result, dict):
+            result['initializer'] = self._colab_initializer
+        
+        return result
+        
+    def display(self, config=None, **kwargs):
+        """Display the colab UI.
+        
+        Args:
+            config: Optional configuration dictionary
+            **kwargs: Additional arguments
+        """
+        result = self._colab_initializer.initialize(config=config, **kwargs)
+        if result and 'ui_components' in result and 'container' in result['ui_components']:
+            display(result['ui_components']['container'])
+    
+    def get_components(self, config=None, **kwargs):
+        """Get the UI components without displaying them.
+        
+        Args:
+            config: Optional configuration dictionary
+            **kwargs: Additional arguments
             
-        # Get the main container
-        main_container = result.get('ui')
-        if not main_container:
-            self.logger.error("❌ No main container found in initialization result")
-            return {'success': False, 'error': 'No main container found'}
-            
-        # Return the result with UI components
-        return {
-            'success': True,
-            'ui': main_container,
-            'ui_components': result.get('ui_components', {}),
-            'operation_container': result.get('operation_container'),
-            'module_handler': result.get('module_handler'),
-            'config': result.get('config', {})
-        }
+        Returns:
+            Dictionary of UI components
+        """
+        result = self._colab_initializer.initialize(config=config, **kwargs)
+        return result.get('ui_components', {}) if result else {}
+
 
 # Global display initializer instance
 _colab_display_initializer = ColabDisplayInitializer()
 
+
 def initialize_colab_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> None:
     """Initialize and display colab UI using DisplayInitializer
-
+    
     Args:
         config: Optional configuration dictionary
         **kwargs: Additional arguments
@@ -478,11 +527,12 @@ def initialize_colab_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> No
         This function displays the UI directly and returns None.
         Use get_colab_components() if you need access to the components dictionary.
     """
-    _colab_display_initializer.initialize_and_display(config=config, **kwargs)
+    _colab_display_initializer.display(config=config, **kwargs)
+
 
 def get_colab_components(config: Optional[Dict[str, Any]] = None, **kwargs) -> Dict[str, Any]:
     """Get colab components dictionary without displaying UI
-
+    
     Args:
         config: Optional configuration dictionary
         **kwargs: Additional arguments
@@ -490,33 +540,17 @@ def get_colab_components(config: Optional[Dict[str, Any]] = None, **kwargs) -> D
     Returns:
         Dictionary of UI components
     """
-    global _colab_initializer
-    if _colab_initializer is None:
-        _colab_initializer = ColabInitializer()
-    return _colab_initializer.initialize(config=config, **kwargs)
+    return _colab_display_initializer.get_components(config=config, **kwargs)
+
 
 def display_colab_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> None:
     """Display colab UI (alias for initialize_colab_ui)
-
+    
     Args:
         config: Optional configuration dictionary
         **kwargs: Additional arguments
     """
     initialize_colab_ui(config=config, **kwargs)
-
-
-def get_colab_initializer() -> ColabInitializer:
-    """Get or create colab initializer instance.
-    
-    Returns:
-        ColabInitializer instance
-    """
-    global _colab_initializer
-    
-    if _colab_initializer is None:
-        _colab_initializer = ColabInitializer()
-    
-    return _colab_initializer
 
 
 # Legacy support

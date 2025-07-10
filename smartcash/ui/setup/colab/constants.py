@@ -142,32 +142,21 @@ assert (
 
 # UI Configuration
 UI_CONFIG = {
-    'module_name': 'Colab Environment Setup',
-    'module_description': 'Configure Google Colab environment for SmartCash',
-    'version': '1.0.0',
+    'title': 'Colab Environment Setup',
+    'subtitle': 'Configure Google Colab environment for SmartCash',
+    'icon': '🚀',
+    'module_name': 'colab',
     'parent_module': 'setup',
-    'icon': '🚀'
+    'version': '1.0.0'
 }
 
-# Button Configuration
+# Button Configuration - Single primary action for Colab setup
 BUTTON_CONFIG = {
-    'setup': {
-        'text': '🚀 Setup Environment',
+    'primary': {
+        'text': '🚀 Initialize Environment',
         'style': 'primary',
-        'tooltip': 'Start setting up the Colab environment',
+        'tooltip': 'Start Colab environment setup with phases',
         'order': 1
-    },
-    'save': {
-        'text': '💾 Save',
-        'style': 'success',
-        'tooltip': 'Save current configuration',
-        'order': 2
-    },
-    'reset': {
-        'text': '🔄 Reset',
-        'style': 'warning',
-        'tooltip': 'Reset to default values',
-        'order': 3
     }
 }
 

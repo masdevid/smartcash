@@ -290,8 +290,8 @@ class ActionContainer:
         """Initialize all button widgets if they don't exist."""
         # Create save/reset buttons using the dedicated component
         save_reset_buttons = create_save_reset_buttons(
-            save_text='💾 Save',
-            reset_text='🔄 Reset',
+            save_label='💾 Save',
+            reset_label='🔄 Reset',
             container_width='auto',
             with_sync_info=False,
             show_icons=True,

@@ -62,6 +62,11 @@ class AugmentInitializer(ModuleInitializer):
             # Create UI components
             ui_components = create_augment_ui(config=config, **kwargs)
             
+            if ui_components is None:
+                error_msg = "Failed to create UI components: create_augment_ui returned None"
+                self.logger.error(error_msg)
+                raise RuntimeError(error_msg)
+            
             # Add module metadata
             ui_components.update({
                 'module_name': UI_CONFIG['module_name'],

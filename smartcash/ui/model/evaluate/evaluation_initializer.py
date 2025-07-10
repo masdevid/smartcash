@@ -53,7 +53,10 @@ class EvaluationInitializer(ModuleInitializer):
             self.logger.info("🔧 Creating evaluation UI components")
             
             # Create UI components
-            ui_components = create_evaluation_ui()
+            ui_result = create_evaluation_ui()
+            
+            # Extract the actual UI components from the result
+            ui_components = ui_result.get('ui_components', {})
             
             # Initialize operation manager
             self.operation_manager = EvaluationOperationManager(
@@ -75,8 +78,9 @@ class EvaluationInitializer(ModuleInitializer):
                     operation_manager=self.operation_manager
                 )
                 
-                # Setup event handlers with UI components
-                self._ui_handler.setup(ui_components=ui_components)
+                # Setup event handlers with UI components if the method exists
+                if hasattr(self._ui_handler, 'setup'):
+                    self._ui_handler.setup(ui_components=ui_components)
             
             self.logger.info(f"✅ Created {len(ui_components)} evaluation UI components")
             return ui_components

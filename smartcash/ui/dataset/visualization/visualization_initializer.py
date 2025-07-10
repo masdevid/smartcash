@@ -73,12 +73,10 @@ class VisualizationInitializer(ModuleInitializer):
             # Create UI components
             ui_components = create_visualization_ui(validated_config, **kwargs)
             
-            # Setup UI handler if not already set
+            # Initialize UI handler if not already set
             if not hasattr(self, '_ui_handler') or self._ui_handler is None:
-                self._ui_handler = VisualizationUIHandler(ui_components=ui_components)
-                
-                # Setup event handlers with UI components
-                self._ui_handler.setup(ui_components=ui_components)
+                # The handler is initialized with the UI components directly in __init__
+                self._ui_handler = VisualizationUIHandler(ui_components=ui_components, logger=self.logger)
             
             # Update UI from config
             self.config_handler.update_ui_from_config(ui_components, validated_config)

@@ -63,7 +63,10 @@ class PretrainedInitializer(ModuleInitializer):
             validated_config = self.config_handler.validate_config(final_config)
             
             # Create UI components
-            ui_components = create_pretrained_ui(validated_config, **kwargs)
+            ui_result = create_pretrained_ui(validated_config, **kwargs)
+            
+            # Extract the actual UI components from the result
+            ui_components = ui_result.get('ui_components', {})
             
             # Setup UI handler if not already set
             if not hasattr(self, '_ui_handler') or self._ui_handler is None:
@@ -72,11 +75,14 @@ class PretrainedInitializer(ModuleInitializer):
                 # Store service instance in the handler
                 self._ui_handler.service = self.service
             
-            # Update UI from config
-            self.config_handler.update_ui_from_config(ui_components, validated_config)
-            
-            # Schedule post-init check
-            self._schedule_post_init_check(ui_components, validated_config)
+            # Update UI from config if components exist
+            if ui_components:
+                self.config_handler.update_ui_from_config(ui_components, validated_config)
+                
+                # Schedule post-init check
+                self._schedule_post_init_check(ui_components, validated_config)
+            else:
+                self.logger.warning("⚠️ No UI components were created")
             
             self.logger.info(f"✅ Created {len(ui_components)} pretrained models UI components")
             return ui_components

@@ -61,14 +61,18 @@ class TrainingInitializer(ModuleInitializer):
             validated_config = self.config_handler.validate_config(final_config)
             
             # Create UI components
-            ui_components = create_training_ui(validated_config, **kwargs)
+            ui_result = create_training_ui(validated_config, **kwargs)
+            
+            # Extract the actual UI components from the result
+            ui_components = ui_result.get('ui_components', {})
             
             # Setup UI handler if not already set
             if not hasattr(self, '_ui_handler') or self._ui_handler is None:
                 self._ui_handler = TrainingUIHandler(ui_components=ui_components)
                 
-                # Setup event handlers with UI components
-                self._ui_handler.setup(ui_components=ui_components)
+                # Setup event handlers with UI components if the method exists
+                if hasattr(self._ui_handler, 'setup'):
+                    self._ui_handler.setup(ui_components=ui_components)
             
             # Update UI from config
             self.config_handler.update_ui_from_config(ui_components, validated_config)
@@ -76,7 +80,10 @@ class TrainingInitializer(ModuleInitializer):
             # Schedule post-init check
             self._schedule_post_init_check(ui_components, validated_config)
             
-            self.logger.info(f"✅ Created {len(ui_components)} training UI components")
+            # Log the number of UI components created
+            component_count = len(ui_components.get('widgets', {})) + len(ui_components.get('containers', {}))
+            self.logger.info(f"✅ Created {component_count} training UI components")
+            
             return ui_components
             
         except Exception as e:

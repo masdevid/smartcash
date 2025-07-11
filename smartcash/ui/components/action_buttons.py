@@ -84,10 +84,23 @@ def create_action_buttons(
     button_widgets = []
     button_dict = {}
     
+    # Function to check if text contains emoji
+    def has_emoji(text):
+        # Basic emoji range in unicode
+        emoji_ranges = [
+            (0x1F600, 0x1F64F),  # Emoticons
+            (0x1F300, 0x1F5FF),  # Misc Symbols and Pictographs
+            (0x1F680, 0x1F6FF),  # Transport and Map
+            (0x1F1E0, 0x1F1FF),  # Flags (iOS)
+            (0x2600, 0x26FF),    # Misc symbols
+            (0x2700, 0x27BF),    # Dingbats
+            (0xFE00, 0xFE0F)     # Variation Selectors
+        ]
+        return any(ord(char) in range(r[0], r[1] + 1) for char in str(text) for r in emoji_ranges)
+    
     for btn_config in normalized_buttons:
         # Check if text already contains emoji
-        import emoji
-        text_has_emoji = any(char in emoji.EMOJI_DATA for char in btn_config['text'])
+        text_has_emoji = has_emoji(btn_config['text'])
         
         # Only add icon if text doesn't already have an emoji
         if btn_config['icon'] and not text_has_emoji:

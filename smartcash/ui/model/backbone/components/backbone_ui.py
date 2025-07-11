@@ -153,11 +153,19 @@ def create_backbone_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> Dic
     summary_content = create_config_summary(config)
     summary_container = create_summary_container(
         title="📋 Ringkasan Konfigurasi",
-        content=summary_content,
-        collapsible=True
+        theme="info"
     )
     
-    # Store summary content for updates
+    # Initialize the container if needed
+    if hasattr(summary_container, 'initialize') and not getattr(summary_container, '_initialized', True):
+        summary_container.initialize()
+    
+    # Set the content
+    if hasattr(summary_container, 'set_content'):
+        summary_container.set_content(summary_content)
+    
+    # Store summary container and content for updates
+    components['summary_container'] = summary_container
     components['summary_content'] = summary_content
     
     # 6. Create Footer Container

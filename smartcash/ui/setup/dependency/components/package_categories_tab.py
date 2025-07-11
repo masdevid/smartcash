@@ -305,9 +305,21 @@ def create_compact_action_buttons(pkg: Dict[str, Any], status_tracker: PackageSt
         'button_hover': '#e0e0e0'
     }
     
-    # Check if package name already has emoji
-    import emoji
-    name_has_emoji = any(char in emoji.EMOJI_DATA for char in package_name)
+    # Check if package name already has emoji (simple unicode range check)
+    def has_emoji(text):
+        # Basic emoji range in unicode
+        emoji_ranges = [
+            (0x1F600, 0x1F64F),  # Emoticons
+            (0x1F300, 0x1F5FF),  # Misc Symbols and Pictographs
+            (0x1F680, 0x1F6FF),  # Transport and Map
+            (0x1F1E0, 0x1F1FF),  # Flags (iOS)
+            (0x2600, 0x26FF),    # Misc symbols
+            (0x2700, 0x27BF),    # Dingbats
+            (0xFE00, 0xFE0F)     # Variation Selectors
+        ]
+        return any(ord(char) in range(r[0], r[1] + 1) for char in text for r in emoji_ranges)
+    
+    name_has_emoji = has_emoji(package_name)
     
     # Install button with emoji (only if name doesn't have emoji)
     install_emoji = '⬇️' if not name_has_emoji else ''

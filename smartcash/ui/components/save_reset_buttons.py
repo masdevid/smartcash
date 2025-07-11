@@ -36,13 +36,21 @@ def create_save_reset_buttons(
         Dictionary containing container and button widgets
     """
     
-    # Check if save label already has emoji (simple check for Unicode characters)
-    try:
-        import emoji
-        save_has_emoji = any(char in emoji.EMOJI_DATA for char in save_label)
-    except ImportError:
-        # Fallback: Simple check for Unicode emoji characters (code points > 127)
-        save_has_emoji = any(ord(char) > 127 for char in save_label)
+    # Check if save label already has emoji (simple unicode range check)
+    def has_emoji(text):
+        # Basic emoji range in unicode
+        emoji_ranges = [
+            (0x1F600, 0x1F64F),  # Emoticons
+            (0x1F300, 0x1F5FF),  # Misc Symbols and Pictographs
+            (0x1F680, 0x1F6FF),  # Transport and Map
+            (0x1F1E0, 0x1F1FF),  # Flags (iOS)
+            (0x2600, 0x26FF),    # Misc symbols
+            (0x2700, 0x27BF),    # Dingbats
+            (0xFE00, 0xFE0F)     # Variation Selectors
+        ]
+        return any(ord(char) in range(r[0], r[1] + 1) for char in text for r in emoji_ranges)
+    
+    save_has_emoji = has_emoji(save_label)
     
     # Only add emoji if label doesn't already have one
     save_emoji = '💾 ' if (show_icons and not save_has_emoji) else ''
@@ -64,11 +72,7 @@ def create_save_reset_buttons(
     )
     
     # Check if reset label already has emoji
-    try:
-        reset_has_emoji = any(char in emoji.EMOJI_DATA for char in reset_label)
-    except (ImportError, NameError):
-        # Fallback: Simple check for Unicode emoji characters (code points > 127)
-        reset_has_emoji = any(ord(char) > 127 for char in reset_label)
+    reset_has_emoji = has_emoji(reset_label)
     
     # Only add emoji if label doesn't already have one
     reset_emoji = '↩️ ' if (show_icons and not reset_has_emoji) else ''

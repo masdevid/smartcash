@@ -29,12 +29,17 @@ class SplitInitializer(ModuleInitializer):
     """
 
     def __init__(self):
+        if hasattr(self, '_initialized'):
+            self.logger.debug("SplitInitializer already initialized, reusing instance")
+            return
+            
         super().__init__(
             module_name=MODULE_NAME,
             config_handler_class=SplitConfigHandler
         )
-        self.logger.info("🔧 Initializing SplitInitializer")
+        self.logger.debug("🔧 Initializing SplitInitializer")
         self.components = {}
+        self._initialized = False
     
     def _initialize_impl(self, config: Optional[Dict[str, Any]] = None, **kwargs) -> Dict[str, Any]:
         """Implementation of the initialization process.
@@ -290,8 +295,13 @@ class SplitInitializer(ModuleInitializer):
                 print(message)
 
 
-# Global instance
-_split_initializer = SplitInitializer()
+# Global instance - lazy initialization
+def get_split_initializer():
+    if not hasattr(get_split_initializer, '_instance'):
+        get_split_initializer._instance = SplitInitializer()
+    return get_split_initializer._instance
+
+_split_initializer = None  # Will be initialized on first access
 
 
 class SplitDisplayInitializer(DisplayInitializer):
@@ -299,15 +309,20 @@ class SplitDisplayInitializer(DisplayInitializer):
     
     def __init__(self):
         super().__init__(module_name=MODULE_NAME, parent_module="dataset")
-        self._split_initializer = SplitInitializer()
+        self._split_initializer = get_split_initializer()
     
     def _initialize_impl(self, **kwargs):
         """Implementation using existing SplitInitializer"""
         return self._split_initializer.initialize(**kwargs)
 
 
-# Global display initializer instance
-_split_display_initializer = SplitDisplayInitializer()
+# Global display initializer instance - lazy initialization
+def get_display_initializer():
+    if not hasattr(get_display_initializer, '_instance'):
+        get_display_initializer._instance = SplitDisplayInitializer()
+    return get_display_initializer._instance
+
+_split_display_initializer = None  # Will be initialized on first access
 
 
 def initialize_split_ui(env=None, config=None, **kwargs):
@@ -323,8 +338,8 @@ def initialize_split_ui(env=None, config=None, **kwargs):
         This function displays the UI directly and returns None.
         Use get_split_components() if you need access to the components dictionary.
     """
-    # Initialize the UI and display it
-    _split_initializer.initialize(config=config, env=env, **kwargs)
+    initializer = get_display_initializer()
+    initializer.initialize(env=env, config=config, **kwargs)
     return None
 
 
@@ -339,7 +354,8 @@ def get_split_components(env=None, config=None, **kwargs):
     Returns:
         Dictionary of UI components
     """
-    return _split_initializer.initialize(env=env, config=config, **kwargs)
+    initializer = get_split_initializer()
+    return initializer.initialize(env=env, config=config, display=False, **kwargs)
 
 
 def display_split_ui(env=None, config=None, **kwargs):
@@ -351,7 +367,7 @@ def display_split_ui(env=None, config=None, **kwargs):
         **kwargs: Additional arguments
             - parent_display: Optional parent display to use for the UI
     """
-    return initialize_split_ui(env=env, config=config, **kwargs)
+    initialize_split_ui(env=env, config=config, **kwargs)
 
 
 # Public API

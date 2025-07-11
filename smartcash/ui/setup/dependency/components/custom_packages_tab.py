@@ -16,7 +16,7 @@ def create_custom_packages_tab(config: Dict[str, Any], logger=None) -> widgets.V
     # Create main container with full width
     main_container = widgets.VBox(layout=widgets.Layout(
         width='100%',
-        padding='16px',
+        padding='0',  # Remove padding to match categories tab
         overflow='hidden'
     ))
     
@@ -33,14 +33,13 @@ def create_custom_packages_tab(config: Dict[str, Any], logger=None) -> widgets.V
     </div>
     """)
     
-    # Create form container with card styling
+    # Create form container with minimal styling (no border)
     form_card = widgets.VBox(layout=widgets.Layout(
         width='100%',
-        border='1px solid #e0e0e0',
-        border_radius='8px',
+        border='none',  # Remove border
         padding='0',
-        background_color='white',
-        margin='0 0 16px 0',
+        background_color='transparent',  # Transparent background
+        margin='0 0 12px 0',
         overflow='hidden'
     ))
     
@@ -89,17 +88,17 @@ def create_custom_packages_tab(config: Dict[str, Any], logger=None) -> widgets.V
     </div>
     """)
     
-    # Create text area
+    # Create text area with full width
     text_area = widgets.Textarea(
         value=custom_packages,
         placeholder="Enter custom packages here...\nExamples:\nnumpy>=1.20.0\nmatplotlib\ntensorflow==2.8.0\ngit+https://github.com/user/repo.git",
         layout=widgets.Layout(
             width='100%',
-            height='200px',
+            height='150px',  # Reduced height
             border='1px solid #e1e5e9',
             border_radius='6px',
-            padding='12px',
-            margin='0 0 12px 0',
+            padding='8px',  # Reduced padding
+            margin='0 0 8px 0',  # Reduced margin
             font_family='monospace',
             font_size='0.9em'
         )
@@ -147,25 +146,30 @@ def create_custom_packages_tab(config: Dict[str, Any], logger=None) -> widgets.V
         )
     )
     
-    # Ensure buttons are properly spaced and aligned
+    # Ensure buttons are properly spaced and aligned in a full-width layout
     button_row.children = [
-        widgets.Box([clear_button], layout=widgets.Layout(margin='0 0 0 auto')),
+        widgets.Box([clear_button], layout=widgets.Layout(margin='0 8px 0 0')),
         widgets.Box([parse_button], layout=widgets.Layout(margin='0'))
     ]
     
+    # Create a full-width input row with text area and buttons side by side
+    input_row = widgets.HBox([
+        widgets.VBox([text_area], layout=widgets.Layout(width='80%', margin='0')),
+        widgets.VBox([button_row], layout=widgets.Layout(width='20%', margin='0', justify_content='flex-end', align_items='flex-end'))
+    ], layout=widgets.Layout(width='100%', align_items='flex-end'))
+    
     # Add widgets to form content
-    form_content.children = [instructions, text_area, button_row]
+    form_content.children = [instructions, input_row]
     
     # Add to form card
     form_card.children = [form_header, form_content]
     
-    # Create output card
+    # Create output card with minimal styling (no border)
     output_card = widgets.VBox(layout=widgets.Layout(
         width='100%',
-        border='1px solid #e0e0e0',
-        border_radius='8px',
+        border='none',  # Remove border
         padding='0',
-        background_color='white',
+        background_color='transparent',  # Transparent background
         margin='0',
         overflow='hidden'
     ))

@@ -14,7 +14,22 @@ import os
 import sys
 import platform
 import traceback
-from typing import Dict, Any, Tuple
+from typing import Dict, Any, Tuple, Callable, Union
+
+def safe_get(func: Callable, default: Any = None) -> Any:
+    """Safely execute a function and return default if error occurs.
+    
+    Args:
+        func: Function to execute
+        default: Default value to return if function fails
+        
+    Returns:
+        Result of function or default value
+    """
+    try:
+        return func()
+    except Exception:
+        return default
 
 def detect_environment_info(check_drive: bool = False) -> Dict[str, Any]:
     """Detect and return comprehensive environment information."""

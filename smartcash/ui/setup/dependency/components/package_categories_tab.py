@@ -282,8 +282,16 @@ def create_compact_package_widget(pkg: Dict[str, Any], is_selected: bool, status
     return container
 
 def create_compact_action_buttons(pkg: Dict[str, Any], status_tracker: PackageStatusTracker, logger) -> widgets.HBox:
-    """Create compact action buttons for package in a 3-column grid."""
+    """Create compact action buttons for package in a 3-column grid.
     
+    Args:
+        pkg: Package information dictionary
+        status_tracker: Package status tracker instance
+        logger: Logger instance for logging
+        
+    Returns:
+        HBox containing the action buttons
+    """
     package_name = pkg['name']
     
     # Button styles
@@ -297,9 +305,14 @@ def create_compact_action_buttons(pkg: Dict[str, Any], status_tracker: PackageSt
         'button_hover': '#e0e0e0'
     }
     
-    # Install button with emoji
+    # Check if package name already has emoji
+    import emoji
+    name_has_emoji = any(char in emoji.EMOJI_DATA for char in package_name)
+    
+    # Install button with emoji (only if name doesn't have emoji)
+    install_emoji = '⬇️' if not name_has_emoji else ''
     install_btn = widgets.Button(
-        description='⬇️',  # Download emoji
+        description=install_emoji,  # Only show emoji if name doesn't have one
         layout=widgets.Layout(
             width=button_style['button_width'],
             height=button_style['button_height'],
@@ -318,9 +331,10 @@ def create_compact_action_buttons(pkg: Dict[str, Any], status_tracker: PackageSt
         }
     )
     
-    # Check/Refresh button with emoji
+    # Check/Refresh button with emoji (only if name doesn't have emoji)
+    check_emoji = '🔄' if not name_has_emoji else ''
     check_btn = widgets.Button(
-        description='🔄',  # Refresh emoji
+        description=check_emoji,  # Only show emoji if name doesn't have one
         layout=widgets.Layout(
             width=button_style['button_width'],
             height=button_style['button_height'],

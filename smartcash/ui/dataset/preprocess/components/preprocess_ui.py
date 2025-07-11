@@ -127,46 +127,118 @@ def create_preprocessing_main_ui(config: Optional[Dict[str, Any]] = None, **kwar
         )
         ui_components['header_container'] = header_container.container
         
-        # 3. Create Form Container
-        form_container = create_form_container()
+        # 3. Create Form Container with full width and no horizontal margin
+        try:
+            form_container = create_form_container(
+                container_margin="0",  # No margin
+                container_padding="16px 0",  # Only vertical padding
+                layout_kwargs={
+                    'width': '100%',
+                    'max_width': '100%',
+                    'margin': '0',
+                    'padding': '0'
+                }
+            )
+            
+            # Safely get form container and set children
+            get_form_container = form_container.get('get_form_container')
+            if callable(get_form_container):
+                form_widget = get_form_container()
+                if hasattr(form_widget, 'children'):
+                    form_widget.children = (input_options,)
+            
+            # Store form container with fallback
+            form_container_widget = form_container.get('container')
+            if form_container_widget is None:
+                form_container_widget = input_options  # Fallback to just show inputs
+                
+        except Exception as e:
+            # Create a fallback form container
+            error_msg = f"Failed to create form container: {str(e)}"
+            form_container_widget = widgets.VBox([
+                widgets.HTML(f"<div style='color: red; padding: 10px;'>{error_msg}</div>"),
+                input_options  # Still try to show the input options
+            ])
+            
+            # Log the error for debugging
+            if 'log_accordion' in ui_components:
+                ui_components['log_accordion'].log(f"UI Error: {error_msg}", level="error")
         
-        # Place input options in the form container
-        form_container['get_form_container']().children = (input_options,)
-        ui_components['form_container'] = form_container['container']
+        # Store in components with fallback
+        ui_components['form_container'] = form_container_widget
         
         # 4. Create Action Container with primary button for main preprocess action
-        action_container = create_action_container(
-            buttons=[
-                {
-                    "id": "check",
-                    "text": BUTTON_CONFIG['check']['text'],
-                    "style": BUTTON_CONFIG['check']['style'],
-                    "tooltip": BUTTON_CONFIG['check']['tooltip'],
-                    "order": BUTTON_CONFIG['check']['order']
-                },
-                {
-                    "id": "cleanup",
-                    "text": BUTTON_CONFIG['cleanup']['text'],
-                    "style": BUTTON_CONFIG['cleanup']['style'],
-                    "tooltip": BUTTON_CONFIG['cleanup']['tooltip'],
-                    "order": BUTTON_CONFIG['cleanup']['order']
-                }
-            ],
-            title="🚀 Preprocessing Operations",
-            alignment="left",
-            show_save_reset=True  # Use default save/reset buttons
-        )
-        
-        # Configure the primary button for main preprocessing action
-        primary_button = action_container['primary_button']
-        if primary_button:
-            primary_button.description = BUTTON_CONFIG['preprocess']['text']
-            primary_button.tooltip = BUTTON_CONFIG['preprocess']['tooltip']
-        
-        ui_components['action_container'] = action_container
-        ui_components['preprocess_btn'] = primary_button
-        ui_components['check_btn'] = action_container['buttons'].get('check')
-        ui_components['cleanup_btn'] = action_container['buttons'].get('cleanup')
+        try:
+            action_container = create_action_container(
+                buttons=[
+                    {
+                        "id": "check",
+                        "text": BUTTON_CONFIG['check']['text'],
+                        "style": BUTTON_CONFIG['check']['style'],
+                        "tooltip": BUTTON_CONFIG['check']['tooltip'],
+                        "order": BUTTON_CONFIG['check']['order']
+                    },
+                    {
+                        "id": "cleanup",
+                        "text": BUTTON_CONFIG['cleanup']['text'],
+                        "style": BUTTON_CONFIG['cleanup']['style'],
+                        "tooltip": BUTTON_CONFIG['cleanup']['tooltip'],
+                        "order": BUTTON_CONFIG['cleanup']['order']
+                    }
+                ],
+                title="🚀 Preprocessing Operations",
+                alignment="left",
+                show_save_reset=True  # Use default save/reset buttons
+            )
+            
+            # Safely configure the primary button for main preprocessing action
+            primary_button = action_container.get('primary_button')
+            if primary_button and isinstance(primary_button, widgets.Button):
+                primary_button.description = BUTTON_CONFIG['preprocess']['text']
+                primary_button.tooltip = BUTTON_CONFIG['preprocess']['tooltip']
+            
+            # Get buttons with fallbacks
+            buttons = getattr(action_container, 'buttons', {}) or {}
+            check_btn = buttons.get('check')
+            cleanup_btn = buttons.get('cleanup')
+            
+            # Create disabled fallback buttons if needed
+            def create_disabled_button(text, tooltip="This feature is not available"):
+                btn = widgets.Button(description=text, disabled=True, tooltip=tooltip)
+                btn.add_class('disabled-button')
+                return btn
+            
+            if not primary_button:
+                primary_button = create_disabled_button(
+                    BUTTON_CONFIG['preprocess']['text'],
+                    "Preprocessing action is not available"
+                )
+            if not check_btn:
+                check_btn = create_disabled_button(
+                    BUTTON_CONFIG['check']['text'],
+                    "Check action is not available"
+                )
+            if not cleanup_btn:
+                cleanup_btn = create_disabled_button(
+                    BUTTON_CONFIG['cleanup']['text'],
+                    "Cleanup action is not available"
+                )
+            
+            ui_components['action_container'] = action_container
+            ui_components['preprocess_btn'] = primary_button
+            ui_components['check_btn'] = check_btn
+            ui_components['cleanup_btn'] = cleanup_btn
+            
+        except Exception as e:
+            # Create fallback buttons if action container creation fails
+            error_msg = f"Failed to create action container: {str(e)}"
+            error_button = widgets.Button(description="Error", disabled=True, tooltip=error_msg)
+            error_button.add_class('error-button')
+            
+            ui_components['action_container'] = {'container': widgets.HTML(f"<div style='color: red;'>{error_msg}</div>")}
+            ui_components['preprocess_btn'] = error_button
+            ui_components['check_btn'] = error_button
+            ui_components['cleanup_btn'] = error_button
     
         # 4. Create Summary Container (STANDARD ORDER)
         summary_content = _create_module_summary_content({})
@@ -179,21 +251,54 @@ def create_preprocessing_main_ui(config: Optional[Dict[str, Any]] = None, **kwar
         ui_components['summary_container'] = summary_container.container
         
         # 5. Create Operation Container (includes progress tracker, dialogs, log accordion)
-        operation_container = create_operation_container(
-            title=f"📊 {UI_CONFIG['module_name']} Status",
-            show_progress=True,
-            show_dialog=True,
-            show_logs=True,
-            log_module_name=UI_CONFIG['module_name'],
-            log_namespace_filter='preprocess'  # Filter logs for preprocess namespace only
-        )
-        ui_components['operation_container'] = operation_container
-        
-        # Extract components from operation container for backward compatibility
-        ui_components['progress_tracker'] = operation_container['progress_tracker']
-        ui_components['progress'] = ui_components['progress_tracker']  # Alias
-        ui_components['log_accordion'] = operation_container['log_accordion']
-        ui_components['log_output'] = ui_components['log_accordion']  # Alias
+        try:
+            operation_container = create_operation_container(
+                title=f"📊 {UI_CONFIG['module_name']} Status",
+                show_progress=True,
+                show_dialog=True,
+                show_logs=True,
+                log_module_name=UI_CONFIG['module_name'],
+                log_namespace_filter='preprocess'  # Filter logs for preprocess namespace only
+            )
+            
+            # Safely extract components with fallbacks
+            progress_tracker = operation_container.get('progress_tracker')
+            log_accordion = operation_container.get('log_accordion')
+            
+            # Set up fallback for progress updates
+            if not progress_tracker:
+                progress_tracker = type('DummyProgress', (), {
+                    'set_progress': lambda *_, **__: None,
+                    'error': lambda *_, **__: None,
+                    'warning': lambda *_, **__: None,
+                    'success': lambda *_, **__: None,
+                    'widget': widgets.HTML()
+                })()
+            
+            # Set up fallback for logging
+            if not log_accordion:
+                log_accordion = type('DummyLogAccordion', (), {
+                    'log': lambda *_, **__: None,
+                    'clear': lambda: None,
+                    'widget': widgets.HTML()
+                })()
+            
+            ui_components['operation_container'] = operation_container
+            ui_components['progress_tracker'] = progress_tracker
+            ui_components['progress'] = progress_tracker  # Alias
+            ui_components['log_accordion'] = log_accordion
+            ui_components['log_output'] = log_accordion  # Alias
+            
+        except Exception as e:
+            # Create minimal fallback UI components
+            error_widget = widgets.HTML(f"<div style='color: red; padding: 10px;'>Failed to initialize operation container: {str(e)}</div>")
+            dummy_component = type('DummyComponent', (), {'widget': error_widget})()
+            
+            ui_components['operation_container'] = {'container': error_widget}
+            ui_components['progress_tracker'] = dummy_component
+            ui_components['progress'] = dummy_component
+            ui_components['log_accordion'] = dummy_component
+            ui_components['log_output'] = dummy_component
         
         # 6. Create Info Box with Tips
         info_box = _create_module_info_box()
@@ -208,20 +313,81 @@ def create_preprocessing_main_ui(config: Optional[Dict[str, Any]] = None, **kwar
         # === MAIN UI ASSEMBLY ===
         
         # 8. Assemble Main Container (STANDARD ORDER)
-        main_container = create_main_container(
-            header_container=header_container.container,     # 1. Header Container
-            form_container=form_container['container'],      # 2. Form Container  
-            action_container=action_container['container'],  # 3. Action Container
-            summary_container=summary_container.container,   # 4. Summary Container
-            operation_container=operation_container['container'], # 5. Operation Container
-            footer_container=footer_container.container      # 6. Footer Container
-        )
-        ui_components['main_container'] = main_container.container
-        ui_components['ui'] = main_container.container  # Alias for compatibility
+        try:
+            # Safely get all container widgets with fallbacks
+            header_widget = getattr(header_container, 'container', None)
+            form_widget = form_container if not hasattr(form_container, 'get') else form_container.get('container', form_container)
+            action_widget = action_container.get('container', None) if hasattr(action_container, 'get') else action_container
+            summary_widget = getattr(summary_container, 'container', None)
+            operation_widget = operation_container.get('container', None) if hasattr(operation_container, 'get') else operation_container
+            footer_widget = getattr(footer_container, 'container', None)
+            
+            # Create a simple fallback widget for any missing container
+            def create_fallback_widget(name):
+                return widgets.HTML(f"<div style='padding: 10px; border: 1px dashed #ccc;'>[{name} Container Not Available]</div>")
+            
+            # Create main container with fallbacks
+            main_container = create_main_container(
+                header_container=header_widget or create_fallback_widget("Header"),
+                form_container=form_widget or create_fallback_widget("Form"),
+                action_container=action_widget or create_fallback_widget("Actions"),
+                summary_container=summary_widget or create_fallback_widget("Summary"),
+                operation_container=operation_widget or create_fallback_widget("Operations"),
+                footer_container=footer_widget or create_fallback_widget("Footer")
+            )
+            
+            # Store main container with fallback
+            main_widget = getattr(main_container, 'container', None)
+            if main_widget is None:
+                # Create a simple fallback UI if main container creation fails
+                main_widget = widgets.VBox([
+                    header_widget or create_fallback_widget("Header"),
+                    form_widget or create_fallback_widget("Form"),
+                    action_widget or create_fallback_widget("Actions"),
+                    summary_widget or create_fallback_widget("Summary"),
+                    operation_widget or create_fallback_widget("Operations"),
+                    footer_widget or create_fallback_widget("Footer")
+                ])
+                
+                # Add some error styling
+                main_widget.add_class('fallback-ui')
+                
+                # Log the error
+                if 'log_accordion' in ui_components:
+                    ui_components['log_accordion'].log(
+                        "Warning: Using fallback UI due to main container creation failure",
+                        level="warning"
+                    )
+            
+            ui_components['main_container'] = main_widget
+            ui_components['ui'] = main_widget  # Alias for compatibility
+            
+        except Exception as e:
+            # If everything fails, create a minimal error UI
+            error_widget = widgets.HTML(
+                f"<div style='color: red; padding: 20px;'>"
+                f"<h3>⚠️ UI Initialization Error</h3>"
+                f"<p>Failed to initialize the preprocessing UI: {str(e)}</p>"
+                f"<p>Please check the logs for more details.</p>"
+                f"</div>"
+            )
+            
+            ui_components['main_container'] = error_widget
+            ui_components['ui'] = error_widget  # Alias for compatibility
+            
+            # Try to log the error if possible
+            if 'log_accordion' in ui_components:
+                try:
+                    ui_components['log_accordion'].log(
+                        f"Critical UI Error: {str(e)}\n{traceback.format_exc()}",
+                        level="error"
+                    )
+                except:
+                    pass  # If logging fails, we can't do much more
     
         # === HELPER METHODS ===
         
-        def update_status(message: str, status_type: str = "info", show: bool = True) -> None:
+        def update_ui_status(message: str, status_type: str = "info", show: bool = True) -> None:
             """
             Update the status panel with a new message.
             
@@ -230,7 +396,13 @@ def create_preprocessing_main_ui(config: Optional[Dict[str, Any]] = None, **kwar
                 status_type: Status type (info, success, warning, error)
                 show: Whether to show the status panel
             """
-            header_container.update_status(message, status_type, show)
+            if hasattr(header_container, 'update_status'):
+                header_container.update_status(message, status_type, show)
+            else:
+                # Fallback to logging if header container doesn't support status updates
+                logger = getattr(header_container, 'logger', None)
+                if logger:
+                    logger.log(message, level=status_type.upper())
         
         def update_title(title: str, subtitle: Optional[str] = None) -> None:
             """
@@ -262,7 +434,7 @@ def create_preprocessing_main_ui(config: Optional[Dict[str, Any]] = None, **kwar
         # Add helper methods and components to ui_components
         ui_components.update({
             # UPDATE METHODS
-            'update_status': update_status,
+            'update_ui_status': update_ui_status,
             'update_title': update_title,
             'update_section': update_section,
             

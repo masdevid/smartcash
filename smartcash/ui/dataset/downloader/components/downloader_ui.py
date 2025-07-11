@@ -24,6 +24,10 @@ from smartcash.ui.components.footer_container import create_footer_container
 from smartcash.ui.components.main_container import create_main_container
 from smartcash.ui.core.errors.handlers import handle_ui_errors
 
+# Global UI handler for Save/Reset and status updates
+from smartcash.ui.core.handlers.global_ui_handler import create_global_ui_handler
+from smartcash.ui.core.utils.log_suppression import suppress_ui_init_logs
+
 # Import downloader specific components
 from .input_options import create_downloader_input_options
 from smartcash.ui.dataset.downloader.constants import (
@@ -38,6 +42,7 @@ BUTTON_CONFIG = BUTTON_CONFIG
 VALIDATION_RULES = VALIDATION_RULES
 
 
+@suppress_ui_init_logs(duration=3.0)
 @handle_ui_errors(error_component_title="Dataset Downloader UI Creation Error")
 def create_downloader_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> Dict[str, Any]:
     """Create and initialize the Dataset Downloader UI components.
@@ -197,6 +202,47 @@ def create_downloader_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> D
             'initialized': True
         }
     }
+    
+    # Create and configure global UI handler for Save/Reset and header status updates
+    from smartcash.ui.dataset.downloader.configs.downloader_defaults import get_default_downloader_config
+    
+    try:
+        default_values = get_default_downloader_config()
+        # Extract form-specific defaults
+        form_defaults = {
+            'workspace_input': default_values.get('data', {}).get('roboflow', {}).get('workspace', ''),
+            'project_input': default_values.get('data', {}).get('roboflow', {}).get('project', ''),
+            'version_input': default_values.get('data', {}).get('roboflow', {}).get('version', ''),
+            'api_key_input': default_values.get('data', {}).get('roboflow', {}).get('api_key', ''),
+            'validate_checkbox': default_values.get('download', {}).get('validate_download', True),
+            'backup_checkbox': default_values.get('download', {}).get('backup_existing', False),
+        }
+        
+        # Create global UI handler
+        global_ui_handler = create_global_ui_handler(
+            module_name="downloader",
+            header_container=header_container,
+            form_widgets=ui_components['form_widgets'],
+            default_values=form_defaults
+        )
+        
+        # Bind Save/Reset buttons to the global handler
+        save_button = ui_components['buttons'].get('save')
+        reset_button = ui_components['buttons'].get('reset')
+        if save_button and reset_button:
+            global_ui_handler.bind_save_reset_buttons(save_button, reset_button)
+            
+        # Add global handler to components
+        ui_components['global_ui_handler'] = global_ui_handler
+        
+    except Exception as e:
+        # Log error but don't fail UI creation
+        try:
+            operation_container['log_message'](f"⚠️ Failed to setup global UI handler: {str(e)}", "warning")
+        except:
+            # Fallback: just print the error
+            print(f"⚠️ Failed to setup global UI handler: {str(e)}")
+            print(f"⚠️ Additional logging error occurred")
     
     # Store the main container as 'ui' for backward compatibility
     components = {

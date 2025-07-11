@@ -54,7 +54,7 @@ def create_operation_container(
     return {
         'container': container.container,
         'progress_tracker': container.progress_tracker if show_progress else None,
-        'dialog_area': container.dialog_area if show_dialog else None,
+        'dialog_area': container.dialog_area if container._show_dialog_enabled else None,
         'log_accordion': container.log_accordion if show_logs else None,
         'show_dialog': container.show_dialog,
         'show_info_dialog': container.show_info_dialog,
@@ -109,7 +109,7 @@ class OperationContainer(BaseUIComponent):
         self.progress_levels = progress_levels
         self.show_progress = show_progress
         self.show_logs = show_logs
-        self.show_dialog = show_dialog
+        self._show_dialog_enabled = show_dialog  # Renamed to avoid method conflict
         self.log_module_name = log_module_name
         self.log_height = log_height
         self.log_namespace_filter = log_namespace_filter
@@ -125,7 +125,7 @@ class OperationContainer(BaseUIComponent):
         self._create_ui_components(progress_config)
         
         # Initialize dialog area if enabled (must be before creating container)
-        if self.show_dialog:
+        if self._show_dialog_enabled:
             self._init_dialog_area()
     
     def _create_ui_components(self, progress_config: Optional[ProgressConfig] = None) -> None:
@@ -420,16 +420,16 @@ class OperationContainer(BaseUIComponent):
         for level, data in self.progress_bars.items():
             if data['visible']:
                 if data.get('error', False):
-                    self.progress_tracker.error_progress(data['message'], level)
+                    self.progress_tracker.error(data['message'])
                 else:
-                    self.progress_tracker.update_progress(
+                    self.progress_tracker.set_progress(
                         data['value'], 
-                        data['message'], 
-                        level
+                        level,
+                        data['message']
                     )
             else:
                 # Hide the progress bar
-                self.progress_tracker.hide_progress(level)
+                self.progress_tracker.hide()
     
     # ===== Dialog Methods =====
     
@@ -452,7 +452,10 @@ class OperationContainer(BaseUIComponent):
             cancel_text: Text for cancel button
             danger_mode: If True, shows the confirm button in danger color
         """
-        if not self.dialog_area:
+        if not hasattr(self, 'dialog_area') or not self.dialog_area:
+            # If dialogs are disabled, just call confirm callback if provided
+            if on_confirm:
+                on_confirm()
             return
             
         with self.dialog_area:

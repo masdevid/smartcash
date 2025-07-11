@@ -472,7 +472,7 @@ class LogAccordion(BaseUIComponent):
             
             # Create the log entry HTML with enhanced structure
             html = f"""
-            <div class='log-entry' style='border-left-color: {color} !important;'>
+            <div class='log-entry' style='border-left-color: {style['color']} !important;'>
                 <div class='log-content'>
                     {timestamp}
                     {level_badge}
@@ -483,20 +483,13 @@ class LogAccordion(BaseUIComponent):
                     </div>
                 </div>
             </div>
-            """.format(
-                color=style['color'],
-                timestamp=timestamp,
-                level_badge=level_badge,
-                namespace_badge=namespace_badge,
-                message=message,
-                duplicate_counter=duplicate_counter,
-                trace_html=trace_html
-            )
+            """
             
             return widgets.HTML(html)
             
         except Exception as e:
-            self._logger.error(f"Error creating log widget: {str(e)}")
+            # Use the inherited logger from BaseUIComponent
+            self.logger.error(f"Error creating log widget: {str(e)}")
             return widgets.HTML(f"<div class='log-entry' style='color: #dc3545;'>Error displaying log: {str(e)}</div>")
 
     def _format_timestamp(self, timestamp: datetime) -> str:

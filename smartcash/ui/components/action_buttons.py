@@ -13,6 +13,18 @@ def create_action_buttons(
     button_spacing: str = '8px',
     container_margin: str = '8px 0'
 ) -> Dict[str, Any]:
+    """Create action buttons with emoji support and duplicate emoji prevention.
+    
+    Args:
+        buttons: List of button configurations
+        alignment: Button alignment ('left', 'center', 'right')
+        container_width: Width of the button container
+        button_spacing: Spacing between buttons
+        container_margin: Margin around the container
+        
+    Returns:
+        Dictionary containing container and button widgets
+    """
     """
     Create a set of action buttons with flexible layout and configuration.
     
@@ -73,8 +85,15 @@ def create_action_buttons(
     button_dict = {}
     
     for btn_config in normalized_buttons:
-        # Create button with emoji (if any) and text
-        button_text = f"{btn_config['icon']} {btn_config['text']}".strip()
+        # Check if text already contains emoji
+        import emoji
+        text_has_emoji = any(char in emoji.EMOJI_DATA for char in btn_config['text'])
+        
+        # Only add icon if text doesn't already have an emoji
+        if btn_config['icon'] and not text_has_emoji:
+            button_text = f"{btn_config['icon']} {btn_config['text']}".strip()
+        else:
+            button_text = btn_config['text']
         button = widgets.Button(
             description=button_text,
             button_style='',  # Clear default style to use custom styling

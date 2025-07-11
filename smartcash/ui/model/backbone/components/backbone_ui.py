@@ -6,6 +6,11 @@ import ipywidgets as widgets
 from typing import Dict, Any, Optional
 
 # Standard container imports
+from smartcash.ui.components.containers import (
+    create_header_container, create_form_container, create_action_container,
+    create_operation_container, create_footer_container, create_main_container,
+    create_summary_container
+)
 from smartcash.ui.components.header_container import create_header_container
 from smartcash.ui.components.form_container import create_form_container, LayoutType
 from smartcash.ui.components.action_container import create_action_container
@@ -15,8 +20,8 @@ from smartcash.ui.components.main_container import create_main_container
 from smartcash.ui.core.errors.handlers import handle_ui_errors
 
 # Local imports
-from .model_form import create_model_form
-from .config_summary import create_config_summary
+from .model_form import create_model_form, update_form_values
+from .config_summary import create_config_summary, update_config_summary
 
 # Module metadata
 MODULE_METADATA = {
@@ -125,9 +130,12 @@ def create_backbone_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> Dic
         gap="12px"
     )
     
-    # Add form widgets
-    form_widgets = _create_module_form_widgets(config)
-    form_container['add_item'](form_widgets, "backbone_form")
+    # Add form widgets (full width)
+    model_form = create_model_form(config)
+    form_container['add_item'](model_form, "backbone_form")
+    
+    # Store form widgets for easy access
+    components['model_form'] = model_form
     
     # 3. Create Action Container with action buttons and save/reset
     action_container = create_action_container(
@@ -145,7 +153,18 @@ def create_backbone_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> Dic
         log_height="200px"
     )
     
-    # 5. Create Footer Container
+    # 5. Create Summary Container
+    summary_content = create_config_summary(config)
+    summary_container = create_summary_container(
+        title="📋 Ringkasan Konfigurasi",
+        content=summary_content,
+        collapsible=True
+    )
+    
+    # Store summary content for updates
+    components['summary_content'] = summary_content
+    
+    # 6. Create Footer Container
     footer_container = create_footer_container(
         info_items=[_create_module_info_box()],
         tips=[
@@ -154,11 +173,15 @@ def create_backbone_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> Dic
         ]
     )
     
+    # Store summary container for updates
+    components['summary_container'] = summary_container
+    
     # 6. Create Main Container
     main_container = create_main_container(
         components=[
             {'component': header_container.container, 'type': 'header'},
             {'component': form_container['container'], 'type': 'form'},
+            {'component': summary_container, 'type': 'summary'},
             {'component': action_container['container'], 'type': 'action'},
             {'component': operation_container['container'], 'type': 'operation'},
             {'component': footer_container.container, 'type': 'footer'}
@@ -391,39 +414,16 @@ def create_backbone_child_components(config: Optional[Dict[str, Any]] = None) ->
     
     return child_components
 
-def _create_module_form_widgets(config: Dict[str, Any]) -> Dict[str, Any]:
+def _create_module_form_widgets(config: Dict[str, Any]) -> widgets.Widget:
     """Create module-specific form widgets.
     
     Args:
         config: Configuration dictionary for the form widgets
         
     Returns:
-        Dictionary containing the form UI and widget references
+        Widget containing the form UI
     """
-    # Create form widgets using existing functions
-    model_form = create_model_form(config)
-    config_summary = create_config_summary(config)
-    
-    # Create two-column layout
-    two_column_layout = widgets.HBox([
-        widgets.Box(
-            [model_form],
-            layout=widgets.Layout(width='65%', padding='0 5px 0 0')
-        ),
-        widgets.Box(
-            [config_summary],
-            layout=widgets.Layout(width='35%', padding='0 0 0 5px')
-        )
-    ], layout=widgets.Layout(
-        display='flex',
-        gap='10px',
-        width='100%',
-        align_items='flex-start',
-        margin='0',
-        padding='0'
-    ))
-    
-    return two_column_layout
+    return create_model_form(config)
 
 
 def _create_module_summary_content(config: Dict[str, Any]) -> widgets.Widget:

@@ -107,13 +107,25 @@ class BackboneUIHandler(ModuleUIHandler):
             self.logger.error(f"❌ Error updating UI from config: {e}")
     
     def _update_config_summary(self, config: Dict[str, Any]) -> None:
-        """Update configuration summary widget."""
+        """Update configuration summary widget.
+        
+        Args:
+            config: Current configuration dictionary
+        """
         try:
             from ..components.config_summary import update_config_summary
-            update_config_summary(self._ui_components['config_summary'], config)
-        except ImportError:
-            # Fallback if config_summary module is not available
-            self.logger.warning("⚠️ Config summary module not available")
+            
+            # Update summary content if available
+            if 'summary_content' in self._ui_components:
+                update_config_summary(self._ui_components['summary_content'], config)
+            # Fallback to old key if summary_content not found
+            elif 'config_summary' in self._ui_components:
+                update_config_summary(self._ui_components['config_summary'], config)
+                
+            self.logger.debug("✅ Configuration summary updated")
+            
+        except Exception as e:
+            self.logger.warning(f"⚠️ Failed to update config summary: {e}", exc_info=True)
     
     def setup(self, ui_components: Dict[str, Any]) -> None:
         """Set up the handler with UI components.
@@ -149,24 +161,19 @@ class BackboneUIHandler(ModuleUIHandler):
             if widget_name in self._ui_components:
                 widget = self._ui_components[widget_name]
                 widget.observe(
-                    lambda change, w=widget_name: self._on_form_change(w, change), 
+                    lambda change, name=widget_name: self._on_form_change(change, name), 
                     names='value'
                 )
         
-        # Button handlers - only include buttons that exist in the UI
+        # Button click handlers
         button_handlers = {
-            'validate_btn': self._handle_validate_operation,
-            'load_btn': self._handle_load_operation,
-            'build_btn': self._handle_build_operation,
-            'summary_btn': self._handle_summary_operation,
-            'save_button': self._handle_save_config,
-            'reset_button': self._handle_reset_config
+            'validate_btn': self._on_validate_click,
+            'load_btn': self._on_load_click,
+            'build_btn': self._on_build_click,
+            'summary_btn': self._on_summary_click,
+            'save_button': self._on_save_click,
+            'reset_button': self._on_reset_click
         }
-        
-        # Log available UI components for debugging
-        available_buttons = [name for name in button_handlers.keys() 
-                           if name in self._ui_components and self._ui_components[name] is not None]
-        self.logger.info(f"Available buttons: {available_buttons}")
         
         # Set up handlers for existing buttons
         for button_name, handler in button_handlers.items():
@@ -176,23 +183,27 @@ class BackboneUIHandler(ModuleUIHandler):
             else:
                 self.logger.warning(f"Button {button_name} not found or invalid in UI components")
         
+        # Initial summary update
+        self._update_summary()
+        
         self.logger.info("✅ Event handlers setup complete")
     
-    def _on_form_change(self, widget_name: str, change) -> None:
-        """Handle form widget changes."""
+    def _on_form_change(self, change: Dict[str, Any], widget_name: str) -> None:
+        """Handle form field changes."""
+        if change['type'] == 'change' and change['name'] == 'value':
+            self.logger.debug(f"Form field {widget_name} changed to {change['new']}")
+            # Update summary on any form change
+            self._update_summary()
+            # Trigger validation if auto-validate is enabled
+            if self.config_handler.get_ui_config().get('validation', {}).get('auto_validate', True):
+                self._on_validate_click()
+    
+    def _update_summary(self) -> None:
+        """Update summary."""
         try:
-            # Extract current config
-            current_config = self.extract_config_from_ui()
-            
-            # Update config handler
-            self.config_handler.update_config(current_config)
-            
-            # Update config summary
+            config = self.extract_config_from_ui()
             if 'config_summary' in self._ui_components:
-                self._update_config_summary(current_config)
-            
-            # Validate form state
-            self._validate_form_state(current_config)
+                self._update_config_summary(config)
             
         except Exception as e:
             self.logger.warning(f"⚠️ Form change handling error: {e}")

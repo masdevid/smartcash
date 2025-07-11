@@ -36,10 +36,18 @@ def create_save_reset_buttons(
         Dictionary containing container and button widgets
     """
     
-    # Save button with emoji
-    save_emoji = '💾 ' if show_icons else ''
+    # Check if save label already has emoji (simple check for Unicode characters)
+    try:
+        import emoji
+        save_has_emoji = any(char in emoji.EMOJI_DATA for char in save_label)
+    except ImportError:
+        # Fallback: Simple check for Unicode emoji characters (code points > 127)
+        save_has_emoji = any(ord(char) > 127 for char in save_label)
+    
+    # Only add emoji if label doesn't already have one
+    save_emoji = '💾 ' if (show_icons and not save_has_emoji) else ''
     save_button = widgets.Button(
-        description=f"{save_emoji}{save_label}",
+        description=f"{save_emoji}{save_label}".strip(),
         button_style='', 
         tooltip=save_tooltip,
         layout=widgets.Layout(
@@ -55,10 +63,17 @@ def create_save_reset_buttons(
         }
     )
     
-    # Reset button with emoji
-    reset_emoji = '↩️ ' if show_icons else ''
+    # Check if reset label already has emoji
+    try:
+        reset_has_emoji = any(char in emoji.EMOJI_DATA for char in reset_label)
+    except (ImportError, NameError):
+        # Fallback: Simple check for Unicode emoji characters (code points > 127)
+        reset_has_emoji = any(ord(char) > 127 for char in reset_label)
+    
+    # Only add emoji if label doesn't already have one
+    reset_emoji = '↩️ ' if (show_icons and not reset_has_emoji) else ''
     reset_button = widgets.Button(
-        description=f"{reset_emoji}{reset_label}",
+        description=f"{reset_emoji}{reset_label}".strip(),
         button_style='',
         tooltip=reset_tooltip,
         layout=widgets.Layout(

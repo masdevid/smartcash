@@ -3,48 +3,25 @@
 ## Overview
 SmartCash UI system has achieved **81.9% overall success rate** with solid core infrastructure. This document outlines the next development priorities based on comprehensive testing results.
 
-## Current Status (January 2025)
-### ✅ **Production Ready Components**
-- Core Infrastructure (90% success rate)
-- Setup Modules (100% success rate) **[UPDATED: Colab module now 100% functional]**
-- UI Components (100% success rate)
-- Dialog Systems (SimpleDialog fully functional)
-- Progress Tracking (All levels working)
-- Log Accordion (Full functionality)
-- Model Evaluation (100% success rate)
-- Backbone Builder (100% success rate)
-- **Colab Environment Setup (100% success rate)** **[NEW: Complete UI standardization completed Jan 11, 2025]**
-
-### 🆕 **Recent Achievements (January 11, 2025)**
-- **Colab UI Standardization**: Achieved 100% success rate with complete template compliance
-- **Widget Caching Issues**: Fixed display initializer caching problems
-- **Footer Container API**: Fixed API mismatch causing None values
-- **Test Infrastructure**: Created comprehensive test suites with 100% pass rate
-- **Configuration Persistence**: Properly disabled persistence for colab module
-
-### ⚠️ **Needs Improvement**
-- Training Module (79.3% - partial issues)
-- Dataset Processing Modules (70-85% success rates)
-- Data Visualization (0% - TODO)
-
-### 🎯 **Next Priorities**
-1. **Complete Dataset Pipeline** - Enhance preprocessing, split, and augmentation modules
-2. **Training Module Stabilization** - Fix remaining 20% issues
-3. **Data Visualization Implementation** - Build from scratch
-4. **Performance Optimization** - Enhance existing working modules
-5. **Advanced Features** - Add new capabilities to mature modules
-
 ## Architecture
-
+- **New Clean Architecture Pattern**
+ - **Class Diagram Example** look at `inheritance_diagram.md`
+  ```
+  BaseHandler → Error Handling → SharedConfig → UI Components
+       ↓              ↓              ↓              ↓
+    Lightweight    Focused       Centralized   Specialized
+    Fast init      Clear         Thread-safe   Component-specific
+    Simple API     Reliable      Versioning    Action-based
+  ```
 ### Module Groups
 
 #### 1. Setup & Configuration (1.x)
 - **1.1 Repository Setup**
-  - Module: `setup/repo`
+  - Module: `setup/repo` (direct cell code)
   - Purpose: Handles repository cloning and initialization
   - Persistence Configs: `False`
 
-- **1.2 Google Colab Environment** ✅ **[COMPLETE]**
+- **1.2 Google Colab Environment**
   - Module: `setup/colab`
   - Purpose: Manages Google Colab-specific environment configuration
   - Persistence Configs: `False`
@@ -101,17 +78,17 @@ smartcash/ui/core/
     ├── __init__.py           # Minimal exports to avoid circular dependencies
     ├── handlers/             # Base handler implementations
     │   ├── __init__.py       # Export only public handler classes
-    │   ├── base_handler.py   # Base handler with error handling
-    │   ├── config_handler.py
-    │   ├── ui_handler.py
-    │   └── operation_handler.py
+    │   ├── base_handler.py         # Base handler with error handling + UILogger (with Suppression)
+    │   ├── config_handler.py       # Config Handler (extend UI Handler)
+    │   ├── ui_handler.py           # UI Handler (extend Base Handler)
+    │   └── operation_handler.py    # Operation Handler (extend UI Handler)
     ├── initializers/         # Initializer implementations
     │   ├── __init__.py       # Export only public initializer classes
-    │   ├── base_initializer.py
-    │   ├── display_initializer.py
-    │   ├── config_initializer.py
-    │   ├── module_initializer.py
-    │   └── operation_initializer.py
+    │   ├── base_initializer.py      # Base Initializer
+    │   ├── display_initializer.py   # Display Initializer (extend Base Initializer)
+    │   ├── config_initializer.py    # Config Initializer (extend Module Initializer)
+    │   ├── module_initializer.py    # Module Initializer (extend Base Initializer)
+    │   └── operation_initializer.py # Operation Initializer (extend Module Initializer)
     ├── errors/               # Centralized error handling
     │   ├── __init__.py       # Public error handling API
     │   ├── decorators.py     # Error handling decorators
@@ -127,12 +104,12 @@ smartcash/ui/core/
 
 1. **Core Components** (`ui/core/`)
    - **Handlers**: Base handler implementations following a clear hierarchy:
-     - `BaseHandler`: Core functionality
+     - `BaseHandler`: Core functionality (extend Error Handler)
      - `ConfigurableHandler`: Config management
        - `PersistentConfigHandler`: File I/O operations
          - `SharedConfigHandler`: Shared configurations
        - `ModuleConfigHandler`: Module-specific configs
-   - **Initializers**: Base initialization logic with error handling
+   - **Initializers**: Base initialization logic centralized with error handling
    - **Error Handling**: Centralized error management with decorators
    - **Shared Utilities**: Common functionality across modules
 
@@ -140,27 +117,29 @@ smartcash/ui/core/
    Each module follows this structure:
    ```
    [module]/
-   ├── __init__.py           # Minimal exports, typically just the initializer
-   ├── components/           # UI component definitions
-   │   ├── __init__.py       # Export only public components
-   │   ├── [module]_ui.py    # Main UI components
+   ├── __init__.py               # Minimal exports, typically just the initializer
+   ├── constants.py              # Constants management
+   ├── [module]_initializer.py   # Main Initializer + Display Initializer
+   ├── components/               # UI component definitions
+   │   ├── __init__.py           # Export only public components
+   │   ├── [module]_ui.py        # Main UI components
    │   └── ...
-   ├── configs/              # Configuration management
+   ├── configs/                  # Configuration management
+   │   ├── __init__.py           # Export only public configs
+   │   ├── [module]_defaults.py  # Default Config
+   │   └── [module]_config.py    # Config Handler
+   ├── handlers/                 # Module-specific handlers
    │   ├── __init__.py
-   │   ├── [module]_defaults.py
-   │   └── [module]_config_handler.py
-   ├── handlers/             # Module-specific handlers
+   │   └── [module]_ui_handler.py # UI Handler
+   ├── operations/                # Operation handlers
    │   ├── __init__.py
-   │   └── [module]_ui_handler.py
-   └── operations/           # Operation handlers
+   │   ├── [module]_manager.py   # Operation Manager (Orchestrator -> Inherit Operation Handler)
+   │   └── [operation_name]_operation.py # Operation Handler (Inherit Manager)
+   └── services/                 # Module-specific services (Backend Bridge Layer)
    
 3. **UI Layout**
    - Consistent container-based layout across modules
-   - Standard UI components:
-     - Header with title and status
-     - Main content area with form components
-     - Action buttons
-     - Status/logging panel
+   - Read more in `UI_MODULE_STANDARDIZATION_SUMMARY.md`
 
 ### Initialization Flow
 1. **Environment Setup**
@@ -220,7 +199,8 @@ smartcash/ui/core/
 
 ## Scope
 - **In Scope**:
-  - Refactor initializers in `smartcash/ui/setup`
+  - Refactor `smartcash/ui/core` dan `smartcash/ui/components`
+  - Refactor initializers in `smartcash/ui/{setup, dataset, model}`
   - Update handler implementations
   - Ensure container-based layout consistency
   - Maintain existing form layouts and styles
@@ -240,20 +220,20 @@ smartcash/ui/core/
 1. **Data Preprocessing Module** (Current: 75% → Target: 95%)
    - Fix remaining import issues in test suite
    - Enhance error handling for edge cases
-   - Add more robust validation for preprocessing operations
-   - Implement missing preprocessing techniques
+   - Fix Progress Tracker
+   - Fix Confirmation Dialog
+   - Fix Collapsible Logger 
 
 2. **Data Splitting Module** (Current: 78.8% → Target: 90%)
+   - Fix UI and Config Handler
    - Resolve failing test cases (21/99 tests failing)
-   - Improve stratification algorithms
-   - Add validation for complex split scenarios
-   - Enhance cross-validation support
 
 3. **Data Augmentation Module** (Current: 85% → Target: 95%)
    - Fix remaining import/initialization issues
-   - Add more augmentation techniques
-   - Improve batch processing capabilities
-   - Add real-time preview functionality
+   - Enhance error handling for edge cases
+   - Fix Progress Tracker
+   - Fix Confirmation Dialog
+   - Fix Collapsible Logger 
 
 ### **Phase 5: Training Module Stabilization (Following Quarter)**
 **Priority: HIGH** - Achieve production-ready training pipeline
@@ -291,23 +271,12 @@ smartcash/ui/core/
    - Confusion matrices
    - Feature importance plots
 
-### **Phase 7: Performance & Advanced Features (Ongoing)**
-**Priority: LOW** - Enhance mature modules
-
-1. **Performance Optimization**
-   - Optimize component rendering
-   - Improve memory usage
-   - Cache frequently used operations
-   - Add lazy loading for large datasets
-
-2. **Advanced Features**
-   - Advanced model architectures
-   - Custom augmentation pipelines
-   - Automated hyperparameter tuning
-   - Model ensemble capabilities
-
 ## Success Metrics
 ### **Immediate Goals (Q1 2025)**
+- UI Module Standardization: 100% success rate
+- Core Module Refactoring: 90%+ success rate across all modules
+- Shared UI Components:100% success rate across all modules
+- Setup Cells Module: 100% success rate across all modules
 - Dataset Pipeline: 90%+ success rate across all modules
 - Training Module: 95%+ success rate
 - Overall System: 90%+ success rate

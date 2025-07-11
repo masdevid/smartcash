@@ -76,18 +76,51 @@ class ColabUIHandler(ModuleUIHandler):
         self._ui_components = ui_components
         
         # Get operation container from UI components and set up operation handler
-        if 'operation_manager' in ui_components:
-            self.operation_container = ui_components['operation_manager']
-            self.logger.info("✅ Using operation container from UI components")
-        elif 'operation_container' in ui_components:
-            # Fallback to direct operation container
+        if 'operation_container' in ui_components and hasattr(ui_components['operation_container'], 'log_message') and hasattr(ui_components['operation_container'], 'update_progress'):
+            # Use the operation container directly if it has the required methods
             self.operation_container = ui_components['operation_container']
-            self.logger.info("✅ Using operation container directly from UI components")
+            self.logger.info("✅ Using operation container with required methods")
+        elif 'operation_container' in ui_components and hasattr(ui_components['operation_container'], 'get', None):
+            # Handle case where operation_container is a dict-like object
+            container_dict = ui_components['operation_container']
+            if 'container' in container_dict and hasattr(container_dict['container'], 'log_message') and hasattr(container_dict['container'], 'update_progress'):
+                self.operation_container = container_dict['container']
+                self.logger.info("✅ Using operation container from dict with required methods")
+            else:
+                # Create a wrapper that forwards method calls to the appropriate object
+                class OperationContainerWrapper:
+                    def __init__(self, container_dict):
+                        self.container = container_dict.get('container')
+                        self.log_accordion = container_dict.get('log_accordion')
+                        self.progress_tracker = container_dict.get('progress_tracker')
+                    
+                    def log_message(self, message, level='info'):
+                        if self.log_accordion and hasattr(self.log_accordion, 'log'):
+                            self.log_accordion.log(message, level)
+                        else:
+                            print(f"[{level.upper()}] {message}")
+                    
+                    def update_progress(self, progress, message="", level="primary", **kwargs):
+                        if self.progress_tracker and hasattr(self.progress_tracker, 'set_progress'):
+                            self.progress_tracker.set_progress(progress, message=message, level=level, **kwargs)
+                
+                self.operation_container = OperationContainerWrapper(container_dict)
+                self.logger.info("✅ Created operation container wrapper with available components")
         else:
-            # Create fallback operation container
-            from smartcash.ui.components.operation_container import OperationContainer
-            self.operation_container = OperationContainer()
-            self.logger.warning("⚠️ Created fallback operation container")
+            # Create a minimal fallback operation container with required methods
+            class FallbackOperationContainer:
+                def log_message(self, message, level='info'):
+                    print(f"[{level.upper()}] {message}")
+                
+                def update_progress(self, *args, **kwargs):
+                    pass
+                
+                def __getattr__(self, name):
+                    # Return a no-op function for any other method calls
+                    return lambda *args, **kwargs: None
+            
+            self.operation_container = FallbackOperationContainer()
+            self.logger.warning("⚠️ Created fallback operation container with minimal functionality")
         
         # Set up operation handler with the operation container
         self.operation_handler = ColabOperationManager(

@@ -129,10 +129,16 @@ def create_form_container(
         }
 
         if l_type == LayoutType.COLUMN:
-            return widgets.VBox([], layout=widgets.Layout(display='flex', flex_flow='column', align_items='stretch', **layout_props))
+            # Create a copy of layout_props to avoid modifying the original
+            column_layout = layout_props.copy()
+            # Ensure align_items is only set once
+            column_layout['align_items'] = 'stretch'
+            return widgets.VBox([], layout=widgets.Layout(display='flex', flex_flow='column', **column_layout))
         elif l_type == LayoutType.ROW:
-            layout_props['flex_flow'] = 'row wrap'
-            return widgets.HBox([], layout=widgets.Layout(display='flex', **layout_props))
+            # Create a copy of layout_props to avoid modifying the original
+            row_layout = layout_props.copy()
+            row_layout['flex_flow'] = 'row wrap'
+            return widgets.HBox([], layout=widgets.Layout(display='flex', **row_layout))
         elif l_type == LayoutType.GRID:
             if state['grid_columns']:
                 layout_props['grid_template_columns'] = f"repeat({state['grid_columns']}, 1fr)" if isinstance(state['grid_columns'], int) else state['grid_columns']

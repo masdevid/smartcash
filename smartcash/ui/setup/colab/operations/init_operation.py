@@ -60,7 +60,7 @@ class InitOperation(OperationHandler):
                 self.config['environment'] = {}
             self.config['environment']['type'] = env_type
             
-            self.log(f"Environment detected: {env_type}", 'info')
+            self.log(f"Environment detected: {env_type}", 'debug')
             
             if progress_callback:
                 progress_callback(30, f"✅ Environment: {env_type}")

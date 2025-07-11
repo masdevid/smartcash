@@ -179,9 +179,12 @@ class ColabUIModule(UIModule):
     def _setup_operation_manager(self) -> None:
         """Setup operation manager for Colab operations."""
         try:
+            # Create a wrapper object with necessary methods for operation container
+            operation_container_wrapper = self._create_operation_container_wrapper()
+            
             self._operation_manager = ColabOperationManager(
                 config=self.get_config(),
-                operation_container=self.get_component("operation_container")
+                operation_container=operation_container_wrapper
             )
             
             logger.debug("⚙️ Setup operation manager")
@@ -223,6 +226,58 @@ class ColabUIModule(UIModule):
         except Exception as e:
             logger.error(f"❌ Failed to register operations: {e}")
             raise
+    
+    def _create_operation_container_wrapper(self):
+        """Create a wrapper object that provides operation container methods."""
+        class OperationContainerWrapper:
+            def __init__(self, module):
+                self.module = module
+            
+            def update_progress(self, progress, message="", level="primary", **kwargs):
+                """Update progress bar."""
+                try:
+                    progress_tracker = self.module.get_component("progress_tracker")
+                    if progress_tracker and hasattr(progress_tracker, 'set_progress'):
+                        progress_tracker.set_progress(progress, message, level)
+                except Exception as e:
+                    logger.debug(f"Progress update failed: {e}")
+            
+            def log_message(self, message, level='info'):
+                """Log message to UI log output."""
+                try:
+                    # Try log_accordion first
+                    log_accordion = self.module.get_component("log_accordion")
+                    if log_accordion and hasattr(log_accordion, 'log'):
+                        log_accordion.log(message, level)
+                        return
+                    
+                    # Fallback to log_output
+                    log_output = self.module.get_component("log_output")
+                    if log_output and hasattr(log_output, 'log'):
+                        log_output.log(message, level)
+                        return
+                    
+                    # Fallback to log_message function
+                    log_message_func = self.module.get_component("log_message")
+                    if log_message_func and callable(log_message_func):
+                        log_message_func(message, level)
+                        return
+                        
+                    # Last resort: use logger
+                    getattr(logger, level, logger.info)(message)
+                except Exception as e:
+                    logger.debug(f"Log message failed: {e}")
+            
+            def show_dialog(self, title, content, dialog_type="info"):
+                """Show dialog."""
+                try:
+                    show_dialog_func = self.module.get_component("show_dialog")
+                    if show_dialog_func and callable(show_dialog_func):
+                        show_dialog_func(title, content, dialog_type)
+                except Exception as e:
+                    logger.debug(f"Show dialog failed: {e}")
+        
+        return OperationContainerWrapper(self)
     
     def _setup_event_handlers(self) -> None:
         """Setup event handlers for UI components."""
@@ -312,7 +367,16 @@ class ColabUIModule(UIModule):
             # Reset to default configuration
             logger.info("🔄 Resetting configuration to defaults")
             if self._config_handler:
-                self._config_handler.reset_to_defaults()
+                # Check if the method exists, use appropriate method
+                if hasattr(self._config_handler, 'reset_to_defaults'):
+                    self._config_handler.reset_to_defaults()
+                elif hasattr(self._config_handler, 'reset_config'):
+                    self._config_handler.reset_config()
+                else:
+                    # Fallback: manually reset using default config
+                    from .configs.colab_defaults import get_default_colab_config
+                    default_config = get_default_colab_config()
+                    self.update_config(**default_config)
             logger.info("✅ Configuration reset to defaults")
         except Exception as e:
             logger.error(f"❌ Failed to reset configuration: {e}")

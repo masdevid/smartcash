@@ -155,10 +155,14 @@ validate_config_quick = lambda config: all(
     config.get(f, '').strip() for f in ['api_key', 'workspace', 'project', 'version']
 )
 
+# Alias for test compatibility
+get_download_service = get_downloader_instance
+
 # UPDATED exports dengan backend services
 __all__ = [
     # Core factory (UI dependency)
     'get_downloader_instance',
+    'get_download_service',  # Alias for compatibility
     'create_download_session', 
     'get_default_config',
     'create_roboflow_downloader',

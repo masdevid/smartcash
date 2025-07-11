@@ -103,19 +103,22 @@ def create_enhanced_category_card(category_key: str, category_info: Dict[str, An
         pkg_widget = create_compact_package_widget(pkg, pkg['name'] in selected_packages, status_tracker, logger)
         package_widgets.append(pkg_widget)
     
-    # Create grid layout for packages (3 columns)
+    # Create responsive 3-column grid layout for packages
     grid = widgets.GridBox(
         children=package_widgets,
         layout=widgets.Layout(
             width='100%',
             grid_template_columns='repeat(auto-fill, minmax(300px, 1fr))',
-            grid_gap='8px',
+            grid_auto_rows='minmax(80px, max-content)',
+            grid_gap='12px',
             padding='12px',
-            overflow='visible'
+            overflow='hidden',
+            align_items='stretch',
+            justify_content='space-between'
         )
     )
     
-    # Create card with full width and no shadow for cleaner look
+    # Create card with full width and responsive design
     card = widgets.VBox([
         header,
         grid
@@ -125,8 +128,9 @@ def create_enhanced_category_card(category_key: str, category_info: Dict[str, An
         border_radius='8px',
         padding='0',
         background_color='white',
-        margin='0',
-        overflow='visible'
+        margin='0 0 16px 0',
+        overflow='hidden',
+        min_width='0'  # Prevent horizontal overflow
     ))
     
     # Store metadata
@@ -185,7 +189,7 @@ def create_category_card(category_key: str, category_info: Dict[str, Any], selec
     return card
 
 def create_compact_package_widget(pkg: Dict[str, Any], is_selected: bool, status_tracker: PackageStatusTracker, logger) -> widgets.VBox:
-    """Create ultra-compact widget for package with name, version, and action buttons."""
+    """Create compact widget for package with name, version, and action buttons in a 3-column grid."""
     
     name = pkg.get('name', '')
     version = pkg.get('version', '')
@@ -195,55 +199,67 @@ def create_compact_package_widget(pkg: Dict[str, Any], is_selected: bool, status
     selection_checkbox = widgets.Checkbox(
         value=is_selected,
         description='',
-        layout=widgets.Layout(width='24px', height='24px')
+        layout=widgets.Layout(width='20px', height='20px', margin='0 4px 0 0')
     )
     
-    # Package name and version in a single line
+    # Package name and version in a single line with truncation
     name_html = widgets.HTML(f"""
-    <div style="display: flex; align-items: center; gap: 6px; line-height: 1.2;">
-        <span style="font-weight: 600; color: #333; font-size: 0.85rem;">{name}</span>
-        {f'<span style="color: #666; font-size: 0.75rem;">v{version}</span>' if version else ''}
-        {'<span style="color: #ff9800; font-size: 0.8rem;" title="Default package">⭐</span>' if is_default else ''}
+    <div style="
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        line-height: 1.2;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-width: 180px;
+    ">
+        <span style="
+            font-weight: 500;
+            color: #333;
+            font-size: 0.8rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            display: inline-block;
+            max-width: 150px;
+        ">{name}</span>
+        {f'<span style="color: #666; font-size: 0.7rem; white-space: nowrap;">v{version}</span>' if version else ''}
+        {'<span style="color: #ff9800; font-size: 0.7rem; flex-shrink: 0;" title="Default package">⭐</span>' if is_default else ''}
     </div>
     """)
     
-    # Create action buttons in a horizontal layout below the package name
+    # Create action buttons in a horizontal layout
     action_buttons = create_compact_action_buttons(pkg, status_tracker, logger)
     
-    # Create a container for the action buttons
-    button_container = widgets.HBox(
-        [widgets.HTML("<div style='width: 24px;'></div>"), action_buttons],
-        layout=widgets.Layout(
-            width='100%',
-            justify_content='flex-start',
-            padding='2px 0 0 0',
-            margin='0'
-        )
-    )
-    
-    # Create main container with vertical layout
-    container = widgets.VBox(
+    # Create main container with horizontal layout
+    container = widgets.HBox(
         [
-            widgets.HBox(
-                [selection_checkbox, name_html],
+            selection_checkbox,
+            widgets.VBox(
+                [
+                    name_html,
+                    action_buttons  # Use action_buttons directly
+                ],
                 layout=widgets.Layout(
-                    width='100%',
-                    justify_content='space-between',
-                    align_items='center',
-                    padding='0',
-                    margin='0'
+                    width='auto',
+                    margin='0',
+                    padding='0 4px',
+                    align_items='flex-start'
                 )
-            ),
-            button_container
+            )
         ],
         layout=widgets.Layout(
             width='100%',
+            height='100%',
+            min_height='50px',
             border='1px solid #e8e8e8',
             border_radius='6px',
             padding='8px',
             background_color='#f8fff8' if is_selected else 'white',
             margin='0',
-            align_items='flex-start'
+            align_items='center',
+            overflow='hidden'
         )
     )
     
@@ -266,26 +282,61 @@ def create_compact_package_widget(pkg: Dict[str, Any], is_selected: bool, status
     return container
 
 def create_compact_action_buttons(pkg: Dict[str, Any], status_tracker: PackageStatusTracker, logger) -> widgets.HBox:
-    """Create compact action buttons for package."""
+    """Create compact action buttons for package in a 3-column grid."""
     
     package_name = pkg['name']
     
-    # Compact install button
+    # Button styles
+    button_style = {
+        'button_width': '26px',
+        'button_height': '24px',
+        'font_size': '12px',
+        'padding': '0',
+        'margin': '0 2px',
+        'button_color': '#f0f0f0',
+        'button_hover': '#e0e0e0'
+    }
+    
+    # Install button with emoji
     install_btn = widgets.Button(
-        description='',
-        icon='download',
-        button_style='primary',
-        layout=widgets.Layout(width='32px', height='28px'),
-        tooltip=f"Install {package_name}"
+        description='⬇️',  # Download emoji
+        layout=widgets.Layout(
+            width=button_style['button_width'],
+            height=button_style['button_height'],
+            padding=button_style['padding'],
+            margin=button_style['margin'],
+            min_width=button_style['button_width']
+        ),
+        tooltip=f"Install {package_name}",
+        style={
+            'button_color': button_style['button_color'],
+            'font_size': button_style['font_size'],
+            'font_weight': 'bold',
+            'text_color': '#333',
+            'border': '1px solid #ddd',
+            'border_radius': '4px'
+        }
     )
     
-    # Compact check button  
+    # Check/Refresh button with emoji
     check_btn = widgets.Button(
-        description='',
-        icon='refresh',
-        button_style='info',
-        layout=widgets.Layout(width='32px', height='28px'),
-        tooltip=f"Check {package_name}"
+        description='🔄',  # Refresh emoji
+        layout=widgets.Layout(
+            width=button_style['button_width'],
+            height=button_style['button_height'],
+            padding=button_style['padding'],
+            margin=button_style['margin'],
+            min_width=button_style['button_width']
+        ),
+        tooltip=f"Check {package_name}",
+        style={
+            'button_color': button_style['button_color'],
+            'font_size': button_style['font_size'],
+            'font_weight': 'bold',
+            'text_color': '#333',
+            'border': '1px solid #ddd',
+            'border_radius': '4px'
+        }
     )
     
     # Button handlers

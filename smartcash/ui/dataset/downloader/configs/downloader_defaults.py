@@ -77,6 +77,9 @@ def get_uuid_defaults() -> Dict[str, Any]:
         'validate_consistency': uuid_config['validate_consistency']
     }
 
+# Alias for test compatibility
+get_default_config = get_default_downloader_config
+
 # One-liner utilities untuk quick access
 get_default_workspace = lambda: 'smartcash-wo2us'
 get_default_project = lambda: 'rupiah-emisi-2022'

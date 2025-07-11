@@ -15,74 +15,74 @@ import ipywidgets as widgets
 from .save_reset_buttons import create_save_reset_buttons
 from .action_buttons import create_action_buttons
 
-# Predefined phases for Colab environment setup
+# Predefined phases for Colab environment setup with emoji icons
 COLAB_PHASES = {
     'initial': {
         'text': '🚀 Initialize Environment',
-        'icon': 'rocket',
+        'icon': '🚀',
         'style': 'primary',
         'tooltip': 'Start setting up the Colab environment',
         'disabled': False
     },
     'init': {
         'text': '⚙️ Initializing...',
-        'icon': 'cog',
+        'icon': '⚙️',
         'style': 'info',
         'tooltip': 'Initializing environment setup',
         'disabled': True
     },
     'drive': {
         'text': '📁 Mounting Drive...',
-        'icon': 'cloud',
+        'icon': '📁',
         'style': 'info',
         'tooltip': 'Mounting Google Drive for persistent storage',
         'disabled': True
     },
     'symlink': {
         'text': '🔗 Creating Symlinks...',
-        'icon': 'link',
+        'icon': '🔗',
         'style': 'info',
         'tooltip': 'Creating symbolic links for project structure',
         'disabled': True
     },
     'folders': {
         'text': '📂 Creating Folders...',
-        'icon': 'folder',
+        'icon': '📂',
         'style': 'info',
         'tooltip': 'Setting up project directory structure',
         'disabled': True
     },
     'config': {
-        'text': '⚙️ Syncing Config...',
-        'icon': 'sync',
+        'text': '🔄 Syncing Config...',
+        'icon': '🔄',
         'style': 'info',
         'tooltip': 'Synchronizing configuration files',
         'disabled': True
     },
     'env': {
         'text': '🌍 Setting Environment...',
-        'icon': 'globe',
+        'icon': '🌍',
         'style': 'info',
         'tooltip': 'Configuring environment variables',
         'disabled': True
     },
     'verify': {
         'text': '🔍 Verifying Setup...',
-        'icon': 'search',
+        'icon': '🔍',
         'style': 'info',
         'tooltip': 'Verifying environment setup',
         'disabled': True
     },
     'complete': {
         'text': '✅ Environment Ready!',
-        'icon': 'check',
+        'icon': '✅',
         'style': 'success',
         'tooltip': 'Environment setup complete',
         'disabled': False
     },
     'error': {
         'text': '❌ Setup Failed',
-        'icon': 'exclamation-triangle',
+        'icon': '❌',
         'style': 'danger',
         'tooltip': 'Click to see error details or retry',
         'disabled': False

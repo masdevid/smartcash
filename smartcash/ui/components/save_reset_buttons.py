@@ -36,22 +36,42 @@ def create_save_reset_buttons(
         Dictionary containing container and button widgets
     """
     
-    # Save button
+    # Save button with emoji
+    save_emoji = '💾 ' if show_icons else ''
     save_button = widgets.Button(
-        description=save_label,
-        button_style='primary', 
+        description=f"{save_emoji}{save_label}",
+        button_style='', 
         tooltip=save_tooltip,
-        icon='save' if show_icons else '',  # Only show icon if show_icons is True
-        layout=widgets.Layout(width=button_width, height='30px', margin='0 4px 0 0')
+        layout=widgets.Layout(
+            width=button_width, 
+            height='32px', 
+            margin='0 4px 0 0',
+            border='1px solid #4CAF50',  # Green border for save
+            font_weight='500'
+        ),
+        style={
+            'button_color': '#E8F5E9',  # Light green background
+            'text_color': '#2E7D32'     # Dark green text
+        }
     )
     
-    # Reset button  
+    # Reset button with emoji
+    reset_emoji = '↩️ ' if show_icons else ''
     reset_button = widgets.Button(
-        description=reset_label,
+        description=f"{reset_emoji}{reset_label}",
         button_style='',
         tooltip=reset_tooltip,
-        icon='undo' if show_icons else '',  # Only show icon if show_icons is True
-        layout=widgets.Layout(width=button_width, height='30px', margin='0')
+        layout=widgets.Layout(
+            width=button_width, 
+            height='32px', 
+            margin='0',
+            border='1px solid #757575',  # Gray border for reset
+            font_weight='500'
+        ),
+        style={
+            'button_color': '#FAFAFA',  # Light gray background
+            'text_color': '#424242'     # Dark gray text
+        }
     )
     
     # Map alignment parameter to justify-content CSS value

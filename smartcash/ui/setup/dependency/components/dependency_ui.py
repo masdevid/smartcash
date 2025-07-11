@@ -82,7 +82,9 @@ def create_dependency_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> D
         layout_type=LayoutType.COLUMN,
         container_margin="0",
         container_padding="16px",
-        gap="12px"
+        gap="12px",
+        width="100%",
+        align_items="stretch"
     )
     form_container['container'].children = (form_widgets['ui'],)
     

@@ -16,13 +16,16 @@ def create_dependency_tabs(config: Dict[str, Any], logger=None) -> widgets.Tab:
     package_tab = create_package_categories_tab(config, logger)
     custom_tab = create_custom_packages_tab(config, logger)
     
-    # Create tab widget with enhanced styling
+    # Create tab widget with full width and enhanced styling
     tabs = widgets.Tab(
         children=[package_tab, custom_tab],
         layout=widgets.Layout(
             width='100%',
-            min_height='500px',  # Reduced min height for better responsiveness
-            margin='0'  # Remove margin for tighter layout
+            min_height='500px',
+            margin='0',
+            display='flex',
+            flex_flow='column',
+            align_items='stretch'  # Ensure children stretch to full width
         )
     )
     

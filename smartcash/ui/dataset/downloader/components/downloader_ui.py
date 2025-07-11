@@ -84,12 +84,35 @@ def create_downloader_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> D
     form_container['add_item'](input_options, "input_options")
     
     # 3. Create Action Container
+    # Create all three action buttons: download, check, cleanup (all as action buttons)
+    buttons = [
+        {
+            'id': 'download_btn',
+            'text': BUTTON_CONFIG['download']['text'],
+            'style': 'success',  # Use success style for download
+            'tooltip': BUTTON_CONFIG['download']['tooltip'],
+            'order': 1
+        },
+        {
+            'id': 'check_btn', 
+            'text': BUTTON_CONFIG['check']['text'],
+            'style': BUTTON_CONFIG['check']['style'],
+            'tooltip': BUTTON_CONFIG['check']['tooltip'],
+            'order': 2
+        },
+        {
+            'id': 'cleanup_btn',
+            'text': BUTTON_CONFIG['cleanup']['text'], 
+            'style': BUTTON_CONFIG['cleanup']['style'],
+            'tooltip': BUTTON_CONFIG['cleanup']['tooltip'],
+            'order': 3
+        }
+    ]
+    
     action_container = create_action_container(
-        title="Download Actions",
-        buttons=[BUTTON_CONFIG['check'], BUTTON_CONFIG['cleanup']],
-        primary_button=BUTTON_CONFIG['download'],
-        show_save_reset=True,
-        alignment="left"
+        title="📥 Dataset Operations",
+        buttons=buttons,
+        show_save_reset=True
     )
     
     # 4. Create Operation Container
@@ -150,13 +173,13 @@ def create_downloader_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> D
             'backup_checkbox': getattr(input_options, 'backup_checkbox', None),
         },
         
-        # Buttons
+        # Buttons - ensure we get the correct button references
         'buttons': {
-            'download': action_container['primary_button'],
-            'check': action_container['buttons'].get('check'),
-            'cleanup': action_container['buttons'].get('cleanup'),
-            'save': action_container.get('save_button'),
-            'reset': action_container.get('reset_button'),
+            'download': action_container.get('buttons', {}).get('download_btn'),
+            'check': action_container.get('buttons', {}).get('check_btn'), 
+            'cleanup': action_container.get('buttons', {}).get('cleanup_btn'),
+            'save': getattr(action_container.get('action_container'), 'save_button', None),
+            'reset': getattr(action_container.get('action_container'), 'reset_button', None),
         },
         
         # Operation functions

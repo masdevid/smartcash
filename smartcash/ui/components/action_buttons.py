@@ -73,20 +73,27 @@ def create_action_buttons(
     button_dict = {}
     
     for btn_config in normalized_buttons:
-        # Create button widget
+        # Create button with emoji (if any) and text
+        button_text = f"{btn_config['icon']} {btn_config['text']}".strip()
         button = widgets.Button(
-            description=btn_config['text'],
-            icon=btn_config['icon'],
-            button_style=btn_config['style'],
+            description=button_text,
+            button_style='',  # Clear default style to use custom styling
             tooltip=btn_config['tooltip'],
             layout=widgets.Layout(
-                height='36px',
-                margin='0',
-                min_width='fit-content',  # Ensure button fits text
-                text_align='center',      # Center-align text
-                border_radius='6px',
-                font_weight='500'
-            )
+                height='32px',
+                margin='0 2px',
+                min_width='100px',
+                padding='0 12px',
+                text_align='center',
+                border_radius='4px',
+                font_weight='500',
+                border='1px solid #ddd'
+            ),
+            style={
+                'button_color': '#f5f5f5',
+                'font_weight': '500',
+                'text_color': '#333'
+            }
         )
         
         # Store button in dictionary by ID

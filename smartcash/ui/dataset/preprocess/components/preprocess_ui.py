@@ -48,18 +48,16 @@ def _create_module_form_widgets(config: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
-def _create_module_summary_content(components: Dict[str, Any]) -> widgets.Widget:
+def _create_module_summary_content(components: Dict[str, Any]) -> str:
     """Create summary content for the module.
     
     Args:
         components: Dictionary of UI components
         
     Returns:
-        Widget containing the summary content
+        HTML string containing the summary content
     """
-    return widgets.HTML(
-        value="<p>Current preprocessing settings and YOLO preset configuration will be displayed here.</p>"
-    )
+    return "<p>Current preprocessing settings and YOLO preset configuration will be displayed here.</p>"
 
 
 def _create_module_info_box() -> widgets.Widget:

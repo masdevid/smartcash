@@ -260,9 +260,9 @@ def create_colab_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> Dict[s
     # Primary button for Colab setup with phases - following single operation pattern
     action_container = create_action_container(
         buttons=[{
-            'id': 'primary',
+            'id': 'colab_setup',
             'text': BUTTON_CONFIG['primary']['text'],
-            'style': BUTTON_CONFIG['primary']['style'],
+            'style': 'primary',
             'tooltip': BUTTON_CONFIG['primary']['tooltip']
         }],
         title=f"🚀 {UI_CONFIG['title']} Operations",
@@ -272,7 +272,7 @@ def create_colab_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> Dict[s
     
     # Extract button references
     ui_components['primary_button'] = action_container['primary_button']
-    ui_components['setup_button'] = action_container['buttons'].get('primary')
+    ui_components['setup_button'] = action_container['buttons'].get('colab_setup')
     
     # Save/Reset buttons (access from action_container instance)
     action_container_instance = action_container['action_container']

@@ -10,7 +10,7 @@ Note: This container handles only button management. For dialogs and other UI el
 use the OperationContainer class.
 """
 from ipywidgets import widgets, Layout, VBox, HBox, HTML, Button, ToggleButton, ButtonStyle
-from typing import Dict, Any, Optional, Callable, Literal, TypedDict, List
+from typing import Dict, Any, Optional, Callable, Literal, TypedDict, List, Tuple
 import ipywidgets as widgets
 from .save_reset_buttons import create_save_reset_buttons
 from .action_buttons import create_action_buttons
@@ -99,11 +99,11 @@ def create_action_container(
 ) -> Dict[str, Any]:
     """Create an action container with fixed layout and the specified buttons.
     
-    Layout is fixed as: Save/Reset (right) → Divider → Primary (center) → Actions (left)
+    Layout order: Save/Reset → Divider → Title → Primary → Action Buttons
     
     Args:
         buttons: List of button configurations. Each config should include:
-            - button_id: Unique identifier for the button
+            - id: Unique identifier for the button (preferred) or button_id (legacy)
             - text: Display text for the button
             - style: Button style ('primary', 'success', 'info', 'warning', 'danger')
             - icon: Optional icon to display before text (e.g., 'plus', 'save')
@@ -126,30 +126,53 @@ def create_action_container(
     action_container = ActionContainer(
         container_margin=container_margin,
         show_save_reset=show_save_reset,
+        title=title,
         **kwargs
     )
     
     # Add buttons to container
     button_widgets = {}
-    for btn_config in buttons:
-        btn_id = btn_config.get('button_id')
-        if not btn_id:
-            continue
-            
-        # Map old parameter names to new ones if needed
-        btn_config = btn_config.copy()
-        if 'button_id' in btn_config:
-            btn_id = btn_config.pop('button_id')
-            btn_config['id'] = btn_id
-            
-        # Add button to container
-        action_container.add_button(**btn_config)
-        
-        # Store reference to the button
-        button_widgets[btn_id] = action_container.get_button(btn_id)
     
-    # Store title to be added after container is initialized
-    action_container._title = title
+    # Separate primary and action button configs
+    primary_configs = [btn for btn in buttons if btn.get('style') == 'primary']
+    action_configs = [btn for btn in buttons if btn.get('style') != 'primary']
+    
+    # Process primary button if provided
+    if primary_configs:
+        if len(primary_configs) > 1:
+            print("Warning: Only one primary button is allowed. Using the first one.")
+            
+        primary_config = primary_configs[0].copy()
+        btn_id = primary_config.pop('id', primary_config.pop('button_id', 'primary'))
+        
+        try:
+            # Add primary button
+            button = action_container.add_button(
+                button_id=btn_id,
+                **primary_config
+            )
+            if button:
+                button_widgets[btn_id] = button
+        except Exception as e:
+            print(f"Warning: Failed to add primary button {btn_id}: {str(e)}")
+    
+    # Process action buttons if no primary button exists
+    elif action_configs:
+        for btn_config in action_configs:
+            btn_config = btn_config.copy()
+            btn_id = btn_config.pop('id', btn_config.pop('button_id', None))
+            if not btn_id:
+                continue
+                
+            try:
+                button = action_container.add_button(
+                    button_id=btn_id,
+                    **btn_config
+                )
+                if button:
+                    button_widgets[btn_id] = button
+            except Exception as e:
+                print(f"Warning: Failed to add button {btn_id}: {str(e)}")
     
     # Return container and utility methods
     return {
@@ -175,153 +198,122 @@ class ActionContainer:
     """
     
     def __init__(self, container_margin: str = "12px 0", phases: Dict[str, dict] = None, 
-                 show_save_reset: bool = True, **kwargs):
+                 show_save_reset: bool = True, title: str = None):
         """Initialize the ActionContainer.
         
         Args:
-            container_margin: Margin around the container (default: "12px 0")
-            phases: Dictionary of phase configurations for primary button (optional)
+            container_margin: Margin around the container (default: '12px 0')
             show_save_reset: Whether to show save/reset buttons (default: True)
-            **kwargs: Additional keyword arguments (ignored for compatibility)
+            title: Optional title for the container
         """
-        # Store container margin
-        self.container_margin = container_margin
+        self.container = widgets.VBox(layout=widgets.Layout(
+            width='100%',
+            margin=container_margin,
+            padding='0',
+            border='none',
+            display='flex',
+            flex_flow='column nowrap',
+            align_items='stretch',
+            justify_content='flex-start'
+        ))
         
-        # Initialize button storage
+        self.container_margin = container_margin
+        self._show_save_reset = show_save_reset
+        self._title = title
+        
+        # Initialize buttons dictionary
         self.buttons = {
             'primary': None,
             'save_reset': None,
-            'action': None
+            'action': {}
         }
         
-        # Set up save/reset visibility
-        self._show_save_reset = show_save_reset
+        # Track initialization and update state to prevent recursion
+        self._initializing = False
+        self._initialized = False
+        self._updating = False
         
-        # Initialize phases with default values if none provided
+        # Set default phases if not already set
         self.phases = phases or COLAB_PHASES
         self.current_phase = 'initial' if 'initial' in self.phases else next(iter(self.phases.keys()), '')
         
-        # Set default Colab environment setup phases
-        self.set_phases(COLAB_PHASES)
-        
-        # Create the container with vertical layout
-        self.container = widgets.VBox(
-            layout=widgets.Layout(
-                width='100%',
-                margin=container_margin,
-                display='flex',
-                flex_flow='column nowrap',
-                align_items='stretch',
-                gap='8px'
-            )
-        )
-        
-        # Create a horizontal container for buttons
-        self.buttons_container = widgets.HBox(
-            layout=widgets.Layout(
-                width='100%',
-                display='flex',
-                flex_flow='row wrap',
-                align_items='center',
-                justify_content='flex-start',
-                gap='8px'
-            )
-        )
-        
         # Initialize buttons
         self._init_buttons()
-    
-    def _init_buttons(self):
-        """Initialize all button widgets if they don't exist."""
-        # Primary button (large, centered) with phase support and flexible styling
-        self.buttons['primary'] = widgets.Button(
-            layout=widgets.Layout(
-                width='auto',
-                height='auto',  # Allow height to be flexible
-                margin='12px auto',
-                padding='15px 30px',  # Increased padding for better text visibility
-                font_weight='bold',
-                min_width='200px',
-                max_width='400px',  # Prevent button from becoming too wide
-                border_radius='6px',
-                box_shadow='0 2px 4px rgba(0,0,0,0.1)'
-            ),
-            disabled=False
-        )
         
-        # Create save/reset buttons using the dedicated component
-        save_reset_buttons = create_save_reset_buttons(
-            save_label='💾 Save',
-            reset_label='🔄 Reset',
-            button_width='120px',
-            container_width='auto',
-            save_tooltip='Save current configuration',
-            reset_tooltip='Reset to default values',
-            with_sync_info=False,
-            show_icons=True,
-            alignment='left'
-        )
-        self.buttons['save_reset'] = save_reset_buttons['container']
-        self.save_button = save_reset_buttons.get('save_button')
-        self.reset_button = save_reset_buttons.get('reset_button')
-        
-    def _get_button_colors(self, style_name: str) -> tuple:
-        """Get button background and text color based on style name.
+    def _get_button_colors(self, style: str) -> Tuple[str, str]:
+        """Get button colors based on style.
         
         Args:
-            style_name: Name of the button style
+            style: Button style name
             
         Returns:
-            tuple: (background_color, text_color)
+            Tuple of (background_color, text_color)
         """
-        colors = {
-            'primary': ('#007bff', '#ffffff'),    # Blue with white text
-            'success': ('#28a745', '#ffffff'),    # Green with white text
-            'info': ('#17a2b8', '#ffffff'),       # Cyan with white text
-            'warning': ('#ffc107', '#212529'),    # Yellow with dark text
-            'danger': ('#dc3545', '#ffffff'),     # Red with white text
-            'secondary': ('#6c757d', '#ffffff'),  # Gray with white text
-            'light': ('#f8f9fa', '#212529'),      # Light gray with dark text
-            'dark': ('#343a40', '#ffffff')        # Dark gray with white text
+        # Default colors
+        bg_color = '#007bff'  # Default blue
+        text_color = '#ffffff'  # White text
+        
+        # Map style to colors
+        style_colors = {
+            'primary': ('#007bff', '#ffffff'),
+            'success': ('#28a745', '#ffffff'),
+            'info': ('#17a2b8', '#ffffff'),
+            'warning': ('#ffc107', '#212529'),
+            'danger': ('#dc3545', '#ffffff'),
+            'secondary': ('#6c757d', '#ffffff'),
+            'light': ('#f8f9fa', '#212529'),
+            'dark': ('#343a40', '#ffffff'),
         }
-        return colors.get(style_name.lower(), colors['primary'])
         
-        # Create action buttons using the dedicated component
-        if self.buttons['primary'] is None:
-            action_buttons = create_action_buttons(
-                buttons=[{
-                    'button_id': 'configure',
-                    'text': '⚙️ Configure',
-                    'style': 'info',
-                    'tooltip': 'Configure settings',
-                    'order': 1
-                }],
-                alignment='left',
-                container_width='auto',
-                button_spacing='8px',
-                container_margin='6px 0'
-            )
-            self.buttons['action'] = action_buttons['container']
-        else:
-            self.buttons['action'] = None
-            
-        # Add buttons to container, filtering out None values
-        children = []
+        return style_colors.get(style.lower(), (bg_color, text_color))
         
-        if self.buttons['primary'] is not None:
-            children.append(self.buttons['primary'])
-            
-        if self.buttons['save_reset'] is not None:
-            children.append(self.buttons['save_reset'])
-            
-        if self.buttons['action'] is not None:
-            children.append(self.buttons['action'])
-            
-        self.container.children = children
+    def _get_button_color(self, style: str) -> str:
+        """Get the background color for a button style.
         
-        # Apply initial phase
-        self.set_phase('initial')
-    
+        Args:
+            style: Button style name
+            
+        Returns:
+            Background color as a hex string
+        """
+        return self._get_button_colors(style)[0]
+        
+    def _init_buttons(self):
+        """Initialize all button widgets if they don't exist."""
+        # Prevent re-entrancy
+        if self._initializing:
+            return
+            
+        self._initializing = True
+        
+        try:
+            # Create save/reset buttons if needed
+            if self.buttons['save_reset'] is None and self._show_save_reset:
+                save_reset_buttons = create_save_reset_buttons(
+                    save_label='💾 Save',
+                    reset_label='🔄 Reset',
+                    button_width='120px',
+                    container_width='auto',
+                    save_tooltip='Save current configuration',
+                    reset_tooltip='Reset to default values',
+                    with_sync_info=False,
+                    show_icons=True,
+                    alignment='right'
+                )
+                self.buttons['save_reset'] = save_reset_buttons['container']
+                self.save_button = save_reset_buttons.get('save_button')
+                self.reset_button = save_reset_buttons.get('reset_button')
+            
+            # Initialize action buttons as empty dict
+            if not isinstance(self.buttons['action'], dict):
+                self.buttons['action'] = {}
+            
+            # Mark as initialized
+            self._initialized = True
+                
+        finally:
+            self._initializing = False
+            
     def set_phases(self, phases: Dict[str, dict]) -> None:
         """Set available phases for the primary button.
         
@@ -357,9 +349,23 @@ class ActionContainer:
         self.current_phase = phase_id
         phase_config = self.phases[phase_id]
         
-        # Initialize primary button if it doesn't exist
+        # Create primary button if it doesn't exist
         if self.buttons['primary'] is None:
-            self._init_buttons()
+            self.buttons['primary'] = widgets.Button(
+                description='',
+                layout=widgets.Layout(
+                    width='auto',
+                    height='auto',
+                    margin='12px auto',
+                    padding='15px 30px',
+                    font_weight='bold',
+                    min_width='200px',
+                    max_width='400px',
+                    border_radius='6px',
+                    box_shadow='0 2px 4px rgba(0,0,0,0.1)'
+                ),
+                disabled=False
+            )
             
         if self.buttons['primary'] is not None:
             # Update button properties from phase config
@@ -382,6 +388,10 @@ class ActionContainer:
         # Handle icon if present
         if 'icon' in phase_config:
             self.buttons['primary'].icon = phase_config['icon']
+            
+        # Update container if not currently updating
+        if not self._updating:
+            self._update_container()
     
     def update_phase_property(self, phase_id: str, prop: str, value: Any) -> None:
         """Update a property of a specific phase.
@@ -457,6 +467,78 @@ class ActionContainer:
             if btn is not None:
                 btn.disabled = not enabled
                 
+    def _create_button(self, button_id: str, text: str, style: str = 'primary',
+                     icon: str = None, tooltip: str = None, order: int = 0,
+                     disabled: bool = False, **kwargs):
+        """Create a button with the specified properties.
+        
+        Args:
+            button_id: Unique identifier for the button
+            text: Display text for the button
+            style: Button style ('primary', 'success', 'info', 'warning', 'danger')
+            icon: Optional icon to display before text (e.g., 'plus', 'save')
+            tooltip: Optional tooltip text
+            order: Order in which to display the button (lower numbers come first)
+            disabled: Whether the button is initially disabled
+            **kwargs: Additional arguments to pass to the Button constructor
+            
+        Returns:
+            The created Button widget
+        """
+        # Format the button text with icon if provided
+        button_text = text
+        if icon:
+            button_text = f"<i class='fa {icon}'></i> {button_text}"
+            
+        # Create button with appropriate styling
+        button_style = widgets.ButtonStyle()
+        button_style.button_color = self._get_button_color(style)
+        button_style.font_weight = 'bold'
+        
+        # Set up layout based on button type
+        if style == 'primary':
+            layout = widgets.Layout(
+                width='auto',
+                height='auto',
+                margin='12px auto',
+                padding='15px 30px',
+                font_weight='bold',
+                min_width='200px',
+                max_width='400px',
+                border_radius='6px',
+                box_shadow='0 2px 4px rgba(0,0,0,0.1)'
+            )
+        else:
+            layout = widgets.Layout(
+                width='auto',
+                height='auto',
+                min_width='120px',
+                max_width='300px',
+                padding='8px 16px',
+                border_radius='6px',
+                box_shadow='0 2px 4px rgba(0,0,0,0.1)',
+                font_weight='500',
+                margin='0 4px'
+            )
+        
+        # Create the button
+        button = widgets.Button(
+            description=button_text,
+            style=button_style,
+            disabled=disabled,
+            layout=layout,
+            **kwargs
+        )
+        
+        # Store order for sorting
+        button._order = order
+        
+        # Add tooltip if provided
+        if tooltip:
+            button.tooltip = tooltip
+            
+        return button
+        
     def add_button(self, button_id: str, text: str, style: str = 'primary', 
                   icon: str = None, tooltip: str = None, order: int = 0, 
                   disabled: bool = False, **kwargs):
@@ -464,65 +546,66 @@ class ActionContainer:
         
         Args:
             button_id: Unique identifier for the button
-            text: Button text
+            text: Display text for the button
             style: Button style ('primary', 'success', 'info', 'warning', 'danger')
-            icon: Optional icon to display before text
+            icon: Optional icon to display before text (e.g., 'plus', 'save')
             tooltip: Optional tooltip text
-            order: Display order (lower numbers appear first)
+            order: Order in which to display the button (lower numbers come first)
             disabled: Whether the button is initially disabled
-            **kwargs: Additional arguments to pass to Button constructor
+            **kwargs: Additional arguments to pass to the Button constructor
+            
+        Returns:
+            The created Button widget
             
         Raises:
-            ValueError: If trying to add a primary button when action buttons exist,
-                       or action buttons when a primary button exists
+            ValueError: If button_id is 'primary' or 'save_reset' (reserved)
+            ValueError: If trying to mix primary and action buttons
         """
-        # Validate button type
-        if style == 'primary' and self.buttons['action']:
-            raise ValueError(
-                "Cannot add primary button when action buttons exist. "
-                "Use either primary button or action buttons, not both."
-            )
-        
-        if button_id and button_id != 'primary' and self.buttons['primary']:
-            raise ValueError(
-                "Cannot add action buttons when a primary button exists. "
-                "Use either primary button or action buttons, not both."
-            )
-        
-        if icon and not icon.startswith('fa-'):
-            icon = f'fa-{icon}'
+        if button_id in ['primary', 'save_reset']:
+            raise ValueError(f"Button ID '{button_id}' is reserved for internal use")
             
-        # Get colors based on button style
-        bg_color, text_color = self._get_button_colors(style)
-        button_style = ButtonStyle()
-        button_style.button_color = bg_color
-        button_style.font_weight = 'bold'
-        button_style.text_color = text_color
-        
-        button = widgets.Button(
-            description=f"{text}",
-            layout=widgets.Layout(
-                width='auto',
-                min_width='120px',  # Ensure minimum width for better appearance
-                padding='8px 16px',  # Add padding for better clickability
-                margin='2px'         # Add small margin between buttons
-            ),
-            disabled=disabled,
-            style=button_style,
-            **kwargs
-        )
-        
-        if tooltip:
-            button.tooltip = tooltip
+        # Check for mutual exclusion between primary and action buttons
+        if style == 'primary':
+            # If we have any action buttons, raise an error
+            if isinstance(self.buttons.get('action'), dict) and self.buttons['action']:
+                raise ValueError("Cannot add primary button when action buttons exist. "
+                              "Use either primary button or action buttons, not both.")
             
-        # Store order for sorting
-        button._order = order
-        
-        # Store button reference
-        self.buttons[button_id] = button
-        
-        # Update container children
-        self._update_container()
+            # If we already have a primary button, remove it first
+            if self.buttons.get('primary') is not None:
+                if hasattr(self.buttons['primary'], 'close'):
+                    self.buttons['primary'].close()
+                self.buttons['primary'] = None
+                
+            # Create a new primary button
+            button = self._create_button(button_id, text, style, icon, tooltip, order, disabled, **kwargs)
+            self.buttons['primary'] = button
+            if not self._updating:  # Prevent recursion
+                self._update_container()
+            return button
+            
+        else:  # Action button
+            # If we have a primary button, raise an error
+            if self.buttons.get('primary') is not None:
+                raise ValueError("Cannot add action buttons when a primary button exists. "
+                              "Use either primary button or action buttons, not both.")
+            
+            # Initialize action buttons dict if needed
+            if not isinstance(self.buttons.get('action'), dict):
+                self.buttons['action'] = {}
+            
+            # If button with this ID exists, remove it first
+            if button_id in self.buttons['action']:
+                if hasattr(self.buttons['action'][button_id], 'close'):
+                    self.buttons['action'][button_id].close()
+                del self.buttons['action'][button_id]
+                
+            # Create a new action button
+            button = self._create_button(button_id, text, style, icon, tooltip, order, disabled, **kwargs)
+            self.buttons['action'][button_id] = button
+            if not self._updating:  # Prevent recursion
+                self._update_container()
+            return button
 
     def get_button(self, button_id: str) -> Optional[widgets.Button]:
         """Get a button by its ID.
@@ -533,17 +616,17 @@ class ActionContainer:
         Returns:
             The button widget or None if not found
         """
-        # Check if the button is stored directly
-        if button_id in self.buttons:
+        # Check if it's a primary or save_reset button
+        if button_id in self.buttons and button_id in ['primary', 'save_reset']:
             return self.buttons[button_id]
             
-        # For backwards compatibility, check if it's the single action button
-        if button_id == 'action' and not isinstance(self.buttons['action'], dict) and self.buttons['action'] is not None:
-            return self.buttons['action']
-            
-        # Check if it's in the action buttons dictionary (old style)
+        # Check if it's in the action buttons dictionary
         if isinstance(self.buttons.get('action'), dict) and button_id in self.buttons['action']:
             return self.buttons['action'][button_id]
+            
+        # For backwards compatibility, check if it's the single action button (old style)
+        if button_id == 'action' and not isinstance(self.buttons.get('action'), dict) and self.buttons.get('action') is not None:
+            return self.buttons['action']
             
         return None
         
@@ -560,186 +643,169 @@ class ActionContainer:
         """Check if a button should be shown based on its type and current state.
         
         Args:
-            button_type: Type of button ('primary', 'action', or 'save_reset')
+            button_type: Type of button ('primary', 'save_reset') or button ID for action buttons
             
         Returns:
             bool: True if the button should be shown, False otherwise
         """
-        if button_type not in self.buttons or self.buttons[button_type] is None:
-            return False
+        # Handle action buttons (stored in the 'action' dictionary)
+        action_buttons = self.buttons.get('action', {})
+        if isinstance(action_buttons, dict) and button_type in action_buttons:
+            return True  # Show all action buttons by default
             
-        # For primary button, check if current phase is valid
-        if button_type == 'primary' and hasattr(self, 'current_phase') and self.current_phase:
-            return self.current_phase in self.phases
+        # Handle primary and save_reset buttons
+        if button_type in self.buttons and self.buttons[button_type] is not None:
+            # For primary button, check if current phase is valid
+            if button_type == 'primary':
+                if hasattr(self, 'current_phase') and self.current_phase:
+                    return self.current_phase in self.phases
+                return True
+            return True
             
-        return True
+        return False
         
     def _update_container(self):
         """Update the container's children with fixed layout order: 
-        save_reset (top, right-aligned), divider, title, primary (center)/actions (left).
+        save_reset (top, right-aligned), title, primary (center)/actions (left).
         """
-        # Ensure all buttons are initialized
-        self._init_buttons()
-        
-        # Check which buttons should be shown
-        has_primary = (self.buttons.get('primary') is not None and 
-                      self._should_show_button('primary'))
-        has_action = (self.buttons.get('action') is not None and 
-                     self._should_show_button('action'))
-        has_save_reset = (self._show_save_reset and 
-                         self.buttons.get('save_reset') is not None and 
-                         self._should_show_button('save_reset'))
-        
-        # Create main container sections
-        container_sections = []
-        
-        # 1. Save/Reset section (top, right-aligned)
-        if has_save_reset:
-            save_reset_section = widgets.HBox(
-                [self.buttons['save_reset']],
-                layout=widgets.Layout(
-                    width='100%',
-                    justify_content='flex-end',  # Right alignment
-                    margin='0 0 10px 0'
-                )
-            )
-            container_sections.append(save_reset_section)
+        # Prevent re-entrancy during initialization and updates
+        if self._initializing or not hasattr(self, 'container'):
+            return
             
-            # Add divider after save/reset
-            divider = widgets.HTML(
-                '<hr style="margin: 10px 0; border: 0; border-top: 1px solid #e0e0e0;">',
-                layout=widgets.Layout(width='100%')
-            )
-            container_sections.append(divider)
-        
-        # 2. Add title after divider if it exists
-        if hasattr(self, '_title') and self._title:
-            title_section = widgets.HTML(
-                f"<h4 style='margin: 0 0 15px 0;'>{self._title}</h4>"
-            )
-            container_sections.append(title_section)
-        
-        # 3. Primary button section (center-aligned)
-        if has_primary:
-            primary_section = widgets.HBox(
-                [self.buttons['primary']],
-                layout=widgets.Layout(
-                    width='100%',
-                    justify_content='center',  # Center alignment for primary
-                    margin='10px 0'
-                )
-            )
-            container_sections.append(primary_section)
-        # 4. Action buttons section (left-aligned) - only if no primary button
-        elif has_action:
-            action_section = widgets.HBox(
-                [self.buttons['action']],
-                layout=widgets.Layout(
-                    width='100%',
-                    justify_content='flex-start',  # Left alignment for actions
-                    margin='10px 0'
-                )
-            )
-            container_sections.append(action_section)
-        
-        # If no buttons are set, create a default primary button
-        if not container_sections:
-            style = ButtonStyle()
-            style.button_color = '#007bff'  # Default blue
-            style.font_weight = 'bold'
+        # Set a flag to prevent recursive updates
+        if getattr(self, '_updating', False):
+            return
             
-            self.buttons['primary'] = widgets.Button(
-                description='🔄 Default Action',
-                style=style,
-                disabled=False,
-                layout=widgets.Layout(
-                    width='auto',
-                    height='auto',  # Flexible height
-                    min_width='200px',
-                    max_width='400px',  # Prevent too wide
-                    padding='15px 30px',  # Generous padding for text visibility
-                    border_radius='6px',
-                    box_shadow='0 2px 4px rgba(0,0,0,0.1)',
-                    font_weight='bold'
-                )
-            )
+        self._updating = True
+        
+        try:
+            # Ensure buttons are initialized
+            if not self._initialized:
+                self._init_buttons(skip_update=True)
+                
+            # Check which buttons should be shown
+            has_primary = (self.buttons.get('primary') is not None and 
+                          self._should_show_button('primary'))
             
-            primary_section = widgets.HBox(
-                [self.buttons['primary']],
-                layout=widgets.Layout(
+            # Handle action buttons
+            has_action = False
+            action_buttons = []
+            if isinstance(self.buttons.get('action'), dict):
+                action_buttons = [
+                    btn for btn_id, btn in self.buttons['action'].items()
+                    if self._should_show_button(btn_id)
+                ]
+                has_action = len(action_buttons) > 0
+                
+            has_save_reset = (self._show_save_reset and 
+                             self.buttons.get('save_reset') is not None and 
+                             self._should_show_button('save_reset'))
+            
+            # Create main container sections
+            container_children = []
+            
+            # 1. Save/Reset buttons (top, right-aligned)
+            if has_save_reset and self.buttons['save_reset'] is not None:
+                save_reset_section = widgets.HBox(
+                    [self.buttons['save_reset']],
+                    layout=widgets.Layout(
+                        width='100%',
+                        justify_content='flex-end',
+                        margin='0 0 8px 0'
+                    )
+                )
+                container_children.append(save_reset_section)
+            
+            # 2. Divider (if we have save/reset and other content)
+            if (has_save_reset and self.buttons['save_reset'] is not None and
+                (self._title or has_primary or has_action)):
+                divider = widgets.HTML(
+                    value="<hr style='margin: 8px 0; border: none; border-top: 1px solid #e0e0e0;'>"
+                )
+                container_children.append(divider)
+            
+            # 3. Title
+            if self._title:
+                title_widget = widgets.HTML(
+                    value=f"<h4 style='margin: 8px 0 12px 0; color: #333;'>{self._title}</h4>"
+                )
+                container_children.append(title_widget)
+            
+            # 4. Primary button (centered)
+            if has_primary and self.buttons['primary'] is not None:
+                primary_section = widgets.HBox(
+                    [self.buttons['primary']],
+                    layout=widgets.Layout(
+                        width='100%',
+                        justify_content='center',
+                        margin='10px 0'
+                    )
+                )
+                container_children.append(primary_section)
+            
+            # 4. Add action buttons (left-aligned) if they exist and no primary button
+            elif has_action and action_buttons:
+                # Sort buttons by their order
+                action_buttons.sort(key=lambda x: getattr(x, '_order', 0))
+                
+                action_section = widgets.HBox(
+                    action_buttons,
+                    layout=widgets.Layout(
+                        width='100%',
+                        justify_content='flex-start',
+                        margin='10px 0',
+                        flex_wrap='wrap',
+                        gap='8px'  # Add some space between buttons
+                    )
+                )
+                container_children.append(action_section)
+            
+            # If no buttons are set, create a default primary button
+            if not container_children and not has_primary and not has_action and not has_save_reset:
+                style = ButtonStyle()
+                style.button_color = '#007bff'  # Default blue
+                style.font_weight = 'bold'
+                
+                self.buttons['primary'] = widgets.Button(
+                    description='🔄 Default Action',
+                    style=style,
+                    disabled=False,
+                    layout=widgets.Layout(
+                        width='auto',
+                        height='auto',  # Flexible height
+                        min_width='200px',
+                        max_width='400px',  # Prevent too wide
+                        padding='15px 30px',  # Generous padding for text visibility
+                        border_radius='6px',
+                        box_shadow='0 2px 4px rgba(0,0,0,0.1)',
+                        font_weight='bold'
+                    )
+                )
+                
+                primary_section = widgets.HBox(
+                    [self.buttons['primary']],
+                    layout=widgets.Layout(
+                        width='100%',
+                        justify_content='center',
+                        margin='10px 0'
+                    )
+                )
+                container_children.append(primary_section)
+            
+            # Update container with proper layout
+            if container_children:  # Only update if we have children to add
+                self.container.children = tuple(container_children)
+                self.container.layout = widgets.Layout(
                     width='100%',
-                    justify_content='center',
-                    margin='10px 0'
+                    align_items='stretch',
+                    margin=self.container_margin,
+                    padding='0',
+                    border='none',
+                    display='flex',
+                    flex_flow='column nowrap',
+                    justify_content='flex-start'
                 )
-            )
-            container_sections.append(primary_section)
-        
-        # Update container with proper layout
-        self.container = widgets.VBox(
-            children=container_sections,
-            layout=widgets.Layout(
-                width='100%',
-                align_items='stretch',
-                margin=self.container_margin if hasattr(self, 'container_margin') else '12px 0',
-                padding='0',
-                border='none',
-                display='flex',
-                flex_flow='column nowrap',
-                justify_content='flex-start'
-            )
-        )
-        
-    def add_button(self, button_id: str, text: str, style: str = 'primary',
-                  icon: str = None, tooltip: str = None, order: int = 0, 
-                  disabled: bool = False, **kwargs):
-        """Add a button to the container.
-        
-        Args:
-            button_id: Unique identifier for the button
-            text: Button text
-            style: Button style ('primary', 'success', 'info', 'warning', 'danger')
-            icon: Optional icon to display before text
-            tooltip: Optional tooltip text
-            order: Display order (lower numbers appear first)
-            disabled: Whether the button is initially disabled
-            **kwargs: Additional arguments to pass to Button constructor
-        """
-        # Get colors based on button style
-        bg_color, text_color = self._get_button_colors(style)
-        button_style = ButtonStyle()
-        button_style.button_color = bg_color
-        button_style.font_weight = 'bold'
-        button_style.text_color = text_color
-        
-        # Add icon if provided
-        if icon:
-            if not icon.startswith('fa-'):
-                icon = f'fa-{icon}'
-            text = f"<i class='fa {icon} fa-fw'></i> {text}"
-        
-        button = widgets.Button(
-            description=text,
-            layout=widgets.Layout(
-                width='auto',
-                min_width='120px',  # Ensure minimum width for better appearance
-                padding='8px 16px',  # Add padding for better clickability
-                margin='2px'         # Add small margin between buttons
-            ),
-            disabled=disabled,
-            style=button_style,
-            **kwargs
-        )
-        
-        if tooltip:
-            button.tooltip = tooltip
-            
-        # Store order for sorting
-        button._order = order
-        
-        # Store button reference
-        self.buttons[button_id] = button
-        
-        # Update container children
-        self._update_container()
+        finally:
+            self._updating = False
 
 # Note: Dialog methods have been removed. Use OperationContainer for dialog functionality.

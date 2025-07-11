@@ -76,10 +76,10 @@ class SummaryContainer(BaseUIComponent):
         # Create content widgets
         widgets_list = []
         
-        # Add title if provided
+        # Title is kept in the component but not displayed by default
         if self._title:
             self._ui_components['title'] = widgets.HTML(
-                f"<h4 style='margin: 0 0 10px 0; font-size: 1.1rem; color: {self._theme_style['text_color']}'>"
+                f"<h4 style='margin: 0 0 10px 0; font-size: 1.1rem; color: {self._theme_style['text_color']}; display: none;'>"
                 f"{self._icon + ' ' if self._icon else ''}{self._title}</h4>"
             )
             widgets_list.append(self._ui_components['title'])

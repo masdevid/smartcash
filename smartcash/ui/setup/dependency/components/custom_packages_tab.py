@@ -105,27 +105,53 @@ def create_custom_packages_tab(config: Dict[str, Any], logger=None) -> widgets.V
         )
     )
     
-    # Create buttons
-    button_row = widgets.HBox(layout=widgets.Layout(
-        width='100%',
-        justify_content='flex-end',
-        gap='8px',
-        margin='8px 0 0 0'
-    ))
+    # Create buttons with improved styling
+    button_row = widgets.HBox(
+        layout=widgets.Layout(
+            width='100%',
+            justify_content='flex-end',
+            gap='12px',
+            margin='12px 0 8px 0',
+            padding='0',
+            display='flex',
+            flex_flow='row wrap',
+            align_items='center'
+        )
+    )
     
     parse_button = widgets.Button(
         description='📦 Parse Packages',
         button_style='primary',
-        layout=widgets.Layout(width='180px', height='36px')
+        layout=widgets.Layout(
+            width='auto',
+            min_width='180px',
+            height='40px',
+            padding='0 16px',
+            margin='0'
+        ),
+        style=dict(
+            font_weight='bold',
+            text_color='white'
+        )
     )
     
     clear_button = widgets.Button(
         description='🗑️ Clear',
         button_style='warning',
-        layout=widgets.Layout(width='120px', height='36px')
+        layout=widgets.Layout(
+            width='auto',
+            min_width='120px',
+            height='40px',
+            padding='0 16px',
+            margin='0'
+        )
     )
     
-    button_row.children = [parse_button, clear_button]
+    # Ensure buttons are properly spaced and aligned
+    button_row.children = [
+        widgets.Box([clear_button], layout=widgets.Layout(margin='0 0 0 auto')),
+        widgets.Box([parse_button], layout=widgets.Layout(margin='0'))
+    ]
     
     # Add widgets to form content
     form_content.children = [instructions, text_area, button_row]
@@ -300,10 +326,20 @@ def extract_version_spec(package_spec: str) -> str:
     
     return ''
 
-def create_enhanced_parsed_packages_html(packages: list) -> str:
-    """Create enhanced HTML for parsed packages with modern design."""
+def create_enhanced_parsed_packages_html(packages: list, logger=None) -> str:
+    """Create enhanced HTML for parsed packages with modern design.
+    
+    Args:
+        packages: List of package dictionaries
+        logger: Optional logger instance for error reporting
+    """
     if not packages:
         return ""
+    
+    # Initialize logger if not provided
+    if logger is None:
+        import logging
+        logger = logging.getLogger(__name__)
     
     html_parts = ["""
     <style>
@@ -395,46 +431,102 @@ def create_enhanced_parsed_packages_html(packages: list) -> str:
     </style>
     <div class="packages-grid">
     """]
-            </div>
-        </div>
-        """
     
-    html += """
-        </div>
+    # Add package cards here
+    for pkg in packages:
+        if not isinstance(pkg, dict):
+            logger.warning(f"Skipping invalid package format: {pkg}")
+            continue
+            
+        try:
+            pkg_name = str(pkg.get('name', '')).strip() or 'unknown'
+            is_git = bool(pkg.get('is_git', False))
+            version_spec = str(pkg.get('version_spec', '')).strip()
+            raw_spec = str(pkg.get('raw', '')).strip() or pkg_name
+            
+            icon = "🔗" if is_git else "📦"
+            version_text = f" ({version_spec})" if version_spec else ""
+            
+            html_parts.append(f"""
+            <div class="package-card">
+                <div class="package-header">
+                    <h3 class="package-name">{icon} {pkg_name}{version_text}</h3>
+                    <span class="package-type">{'Git' if is_git else 'PyPI'}</span>
+                </div>
+                <div class="package-spec" title="{raw_spec}">{raw_spec}</div>
+                <div class="package-footer">
+                    <span class="package-version">{version_spec or 'latest'}</span>
+                    <div class="package-actions">
+                        <button class="action-btn">Install</button>
+                        <button class="action-btn">Remove</button>
+                    </div>
+                </div>
+            </div>
+            """)
+        except Exception as e:
+            logger.error(f"Error rendering package {pkg}: {str(e)}")
+            continue
+    
+    # Close the packages grid
+    html_parts.append("""
     </div>
-    """
-    return html
+    """)
+    
+    return "".join(html_parts)
 
-def create_parsed_packages_html(packages: list) -> str:
-    """Create HTML untuk parsed packages"""
+def create_parsed_packages_html(packages: list, logger=None) -> str:
+    """Create HTML untuk menampilkan daftar package yang sudah di-parse.
+    
+    Args:
+        packages: List of package dictionaries
+        logger: Optional logger instance for error reporting
+    """
     if not packages:
         return ""
     
-    html = "<div style='background: #f8f9fa; border-radius: 8px; padding: 15px;'>"
-    html += "<h4 style='color: #495057; margin: 0 0 15px 0;'>📦 Parsed Packages</h4>"
+    # Initialize logger if not provided
+    if logger is None:
+        import logging
+        logger = logging.getLogger(__name__)
+    
+    html_parts = ["<div style='background: #f8f9fa; border-radius: 8px; padding: 15px;'>"]
+    html_parts.append("<h4 style='color: #495057; margin: 0 0 15px 0;'>📦 Parsed Packages</h4>")
     
     for pkg in packages:
-        icon = "🔗" if pkg['is_git'] else "📦"
-        version_text = f" ({pkg['version_spec']})" if pkg['version_spec'] else ""
-        
-        html += f"""
-        <div style='
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            margin-bottom: 8px;
-            padding: 8px;
-            background: white;
-            border-radius: 6px;
-            border: 1px solid #dee2e6;
-        '>
-            <span style='font-size: 16px;'>{icon}</span>
-            <div>
-                <strong>{pkg['name']}</strong>{version_text}
-                <div style='color: #6c757d; font-size: 12px;'>{pkg['raw']}</div>
+        if not isinstance(pkg, dict):
+            logger.warning(f"Skipping invalid package format: {pkg}")
+            continue
+            
+        try:
+            pkg_name = str(pkg.get('name', '')).strip() or 'unknown'
+            is_git = bool(pkg.get('is_git', False))
+            version_spec = str(pkg.get('version_spec', '')).strip()
+            raw_spec = str(pkg.get('raw', '')).strip() or pkg_name
+            
+            icon = "🔗" if is_git else "📦"
+            version_text = f" ({version_spec})" if version_spec else ""
+            
+            html_parts.append(f"""
+            <div style='
+                display: flex;
+                align-items: center;
+                gap: 10px;
+                margin-bottom: 8px;
+                padding: 8px;
+                background: white;
+                border-radius: 6px;
+                border: 1px solid #dee2e6;
+            '>
+                <span style='font-size: 16px;'>{icon}</span>
+                <div>
+                    <strong>{pkg_name}</strong>{version_text}
+                    <div style='color: #6c757d; font-size: 12px;'>{raw_spec}</div>
+                </div>
             </div>
-        </div>
-        """
+            """)
+        except Exception as e:
+            logger.error(f"Error rendering package {pkg}: {str(e)}")
+            continue
     
-    html += "</div>"
-    return html
+    html_parts.append("</div>")
+    return "".join(html_parts)

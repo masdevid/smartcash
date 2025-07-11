@@ -44,6 +44,8 @@ class SplitInitializer(ModuleInitializer):
         Args:
             config: Optional configuration dictionary
             **kwargs: Additional keyword arguments
+                - display: If True, display the UI after initialization (default: True)
+                - parent_display: Parent display to use for displaying the UI
             
         Returns:
             Dictionary containing UI components and other initialization data
@@ -58,6 +60,10 @@ class SplitInitializer(ModuleInitializer):
             # Set up module handlers
             self._setup_module_handlers(self.components, config, **kwargs)
             
+            # Display the UI if requested
+            if kwargs.get('display', True):
+                self.display(parent_display=kwargs.get('parent_display'))
+            
             # Mark as initialized
             self._is_initialized = True
             
@@ -66,6 +72,38 @@ class SplitInitializer(ModuleInitializer):
         except Exception as e:
             self.handle_error(f"Failed to initialize SplitInitializer: {str(e)}", exc_info=True)
             return create_error_response("Gagal menginisialisasi modul split")
+    
+    def display(self, parent_display=None):
+        """Display the UI components.
+        
+        Args:
+            parent_display: Optional parent display to use
+        """
+        if not hasattr(self, 'components') or not self.components:
+            self.logger.warning("No components to display. Initialize first.")
+            return
+            
+        main_container = self.components.get('main_container')
+        if not main_container:
+            self.logger.error("Main container not found in components")
+            return
+            
+        try:
+            # Import IPython display if available
+            try:
+                from IPython.display import display as ipy_display
+                if parent_display:
+                    parent_display.clear_output(wait=True)
+                    parent_display.display(main_container)
+                else:
+                    ipy_display(main_container)
+                self.logger.info("✅ Split UI displayed successfully")
+            except ImportError:
+                # Fallback to print if IPython is not available
+                print("Split UI components created successfully")
+                
+        except Exception as e:
+            self.handle_error(f"Failed to display UI: {str(e)}", exc_info=True)
             
     def _create_ui_components(self, config: Dict[str, Any], env=None, **kwargs) -> Dict[str, Any]:
         """Create split UI components following colab/dependency pattern
@@ -290,12 +328,15 @@ def initialize_split_ui(env=None, config=None, **kwargs):
         env: Optional environment context
         config: Optional configuration dictionary
         **kwargs: Additional arguments
+            - parent_display: Optional parent display to use for the UI
     
     Note:
         This function displays the UI directly and returns None.
         Use get_split_components() if you need access to the components dictionary.
     """
-    return _split_display_initializer.initialize(env=env, config=config, **kwargs)
+    # Initialize the UI and display it
+    _split_initializer.initialize(config=config, env=env, **kwargs)
+    return None
 
 
 def get_split_components(env=None, config=None, **kwargs):
@@ -319,6 +360,7 @@ def display_split_ui(env=None, config=None, **kwargs):
         env: Optional environment context
         config: Optional configuration dictionary
         **kwargs: Additional arguments
+            - parent_display: Optional parent display to use for the UI
     """
     return initialize_split_ui(env=env, config=config, **kwargs)
 

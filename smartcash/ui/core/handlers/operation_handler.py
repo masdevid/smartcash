@@ -682,6 +682,56 @@ class OperationHandler(BaseHandler):
             except Exception as e:
                 self.logger.error(f"Error logging to operation container: {e}")
     
+    def reset_progress(self) -> None:
+        """Reset progress tracking to initial state."""
+        try:
+            # Reset internal progress state
+            self._progress = {
+                'message': '',
+                'current': 0,
+                'total': 100,
+                'level': ProgressLevel.INFO,
+                'level_name': 'primary',
+                'timestamp': datetime.now().isoformat()
+            }
+            
+            # Reset progress in operation container if available
+            if hasattr(self, '_operation_container') and self._operation_container:
+                if hasattr(self._operation_container, 'update_progress'):
+                    self._operation_container.update_progress(0, "Ready to start", "primary")
+                    
+            self.logger.debug("Progress reset to initial state")
+            
+        except Exception as e:
+            self.logger.error(f"Error resetting progress: {e}")
+    
+    def update_progress(self, progress: float, message: str = "", level: str = "primary") -> None:
+        """Update progress information.
+        
+        Args:
+            progress: Progress percentage (0-100)
+            message: Progress message
+            level: Progress level ('primary', 'secondary', 'tertiary')
+        """
+        try:
+            # Update internal progress state
+            self._progress = {
+                'message': message,
+                'current': int(progress),
+                'total': 100,
+                'level': ProgressLevel.INFO,
+                'level_name': level,
+                'timestamp': datetime.now().isoformat()
+            }
+            
+            # Update operation container if available
+            if hasattr(self, '_operation_container') and self._operation_container:
+                if hasattr(self._operation_container, 'update_progress'):
+                    self._operation_container.update_progress(int(progress), message, level)
+                    
+        except Exception as e:
+            self.logger.error(f"Error updating progress: {e}")
+    
     def show_dialog(
         self,
         title: str,

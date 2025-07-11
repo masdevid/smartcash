@@ -172,6 +172,14 @@ def create_preprocessing_main_ui(config: Optional[Dict[str, Any]] = None, **kwar
             action_container = create_action_container(
                 buttons=[
                     {
+                        "id": "preprocess",
+                        "text": BUTTON_CONFIG['preprocess']['text'],
+                        "style": BUTTON_CONFIG['preprocess']['style'],
+                        "tooltip": BUTTON_CONFIG['preprocess']['tooltip'],
+                        "order": BUTTON_CONFIG['preprocess']['order'],
+                        "primary": True  # Make this the primary button
+                    },
+                    {
                         "id": "check",
                         "text": BUTTON_CONFIG['check']['text'],
                         "style": BUTTON_CONFIG['check']['style'],
@@ -191,14 +199,9 @@ def create_preprocessing_main_ui(config: Optional[Dict[str, Any]] = None, **kwar
                 show_save_reset=True  # Use default save/reset buttons
             )
             
-            # Safely configure the primary button for main preprocessing action
-            primary_button = action_container.get('primary_button')
-            if primary_button and isinstance(primary_button, widgets.Button):
-                primary_button.description = BUTTON_CONFIG['preprocess']['text']
-                primary_button.tooltip = BUTTON_CONFIG['preprocess']['tooltip']
-            
-            # Get buttons with fallbacks
+            # Get all buttons with fallbacks
             buttons = getattr(action_container, 'buttons', {}) or {}
+            primary_button = buttons.get('preprocess')
             check_btn = buttons.get('check')
             cleanup_btn = buttons.get('cleanup')
             

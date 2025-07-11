@@ -17,99 +17,95 @@ import traceback
 from typing import Dict, Any, Tuple
 
 def detect_environment_info(check_drive: bool = False) -> Dict[str, Any]:
-    """Detect and return comprehensive environment information.
-    
-    Args:
-        check_drive: If True, will check drive mounting status. Defaults to False to prevent auto-mounting.
-        
-    Returns:
-        Dictionary containing detailed environment information including:
-        - python_version: Current Python version
-        - os: Operating system information
-        - gpu: GPU information if available
-        - storage_info: Disk storage information
-        - runtime: Runtime information (type, GPU availability)
-        - is_colab: Boolean indicating if running in Google Colab
-        - cpu_cores: Number of CPU cores
-        - total_ram: Total RAM in bytes
-        - drive_mounted: Boolean indicating if drive is mounted (only if check_drive=True)
-        - drive_mount_path: Path where drive is mounted (only if check_drive=True and drive is mounted)
-    """
-    # Helper function to safely get values
-    def safe_get(func, default=None, *args, **kwargs):
-        try:
-            return func(*args, **kwargs)
-        except Exception as e:
-            print(f"Warning: Error in {func.__name__}: {str(e)}")
-            return default
-    
-    # Initialize result with basic info
+    """Detect and return comprehensive environment information."""
+    # Initialize with default values
     result = {
-        'python_version': safe_get(_get_python_version, 'Unknown'),
-        'os': safe_get(_get_os_info, 'Unknown'),
+        'python_version': 'Unknown',
+        'os': {},
         'status': 'success',
-        'drive_checked': check_drive
+        'runtime': {'type': 'unknown', 'gpu': 'unknown', 'display': 'Unknown'},
+        'gpu': 'No GPU available',
+        'storage_info': {},
+        'is_colab': False,
+        'cpu_cores': 0,
+        'total_ram': 0,
+        'memory_info': {},
+        'drive_checked': check_drive,
+        'drive_mounted': None,
+        'drive_status': 'not_checked'
     }
     
-    # Get runtime information
-    runtime_info = safe_get(get_runtime_type, {})
-    result.update(runtime_info)
+    # Helper function to safely update result dictionary
+    def safe_update(updates: Dict[str, Any]) -> None:
+        for key, value in updates.items():
+            if value is not None:
+                result[key] = value
     
-    # Get system information
-    result.update({
-        'cpu_cores': safe_get(_get_cpu_cores, 'Unknown'),
-        'total_ram': safe_get(_get_total_ram, 0),
-        'memory_info': safe_get(_get_memory_info, {})
-    })
-    
-    # Get GPU information (only if available)
-    gpu_info = safe_get(_get_gpu_info, 'No GPU available')
-    if gpu_info != 'No GPU available':
-        gpu_details = safe_get(_get_gpu_details, {})
-        gpu_info = {
-            'available': True,
-            'name': gpu_info,
-            'details': gpu_details
-        }
-    result['gpu'] = gpu_info
-    
-    # Get storage information (local storage only, no drive mounting)
-    result['storage_info'] = safe_get(_get_storage_info, {})
-    
-    # Get network information
-    network_info = safe_get(_get_network_info, {})
-    if network_info:
-        result['network_info'] = network_info
-    
-    # Get environment variables
-    env_vars = safe_get(_get_environment_variables, {})
-    if env_vars:
-        result['environment_variables'] = env_vars
-    
-    # Check if running in Colab and get drive status if requested
-    if safe_get(_is_google_colab, False):
-        result['is_colab'] = True
+    try:
+        # Get basic info
+        safe_update({
+            'python_version': safe_get(_get_python_version, 'Unknown'),
+            'os': safe_get(_get_os_info, {})
+        })
         
-        # Only check drive status if explicitly requested
-        if check_drive:
-            is_drive_mounted, mount_path = safe_get(_is_drive_mounted, (False, ''))
-            result['drive_mounted'] = is_drive_mounted
-            if is_drive_mounted and mount_path:
-                result['drive_mount_path'] = mount_path
-                
-                # Test write access to the drive
-                try:
-                    import os
-                    test_file = os.path.join(mount_path, '.smartcash_write_test')
-                    with open(test_file, 'w') as f:
-                        f.write('test')
-                    os.remove(test_file)
-                    result['drive_write_access'] = True
-                except (IOError, OSError):
-                    result['drive_write_access'] = False
-        else:
-            result['drive_mounted'] = None  # Indicates not checked
-            result['drive_status'] = 'not_checked'
+        # Get runtime information
+        safe_update(safe_get(get_runtime_type, {}))
+        
+        # Get system information
+        safe_update({
+            'cpu_cores': safe_get(_get_cpu_cores, 0),
+            'total_ram': safe_get(_get_total_ram, 0),
+            'memory_info': safe_get(_get_memory_info, {})
+        })
+        
+        # Get GPU information
+        gpu_info = safe_get(_get_gpu_info, 'No GPU available')
+        if gpu_info != 'No GPU available':
+            safe_update({
+                'gpu': {
+                    'available': True,
+                    'name': gpu_info,
+                    'details': safe_get(_get_gpu_details, {})
+                }
+            })
+        
+        # Get storage information
+        safe_update({'storage_info': safe_get(_get_storage_info, {})})
+        
+        # Get network information
+        network_info = safe_get(_get_network_info, {})
+        if network_info:
+            safe_update({'network_info': network_info})
+        
+        # Get environment variables
+        env_vars = safe_get(_get_environment_variables, {})
+        if env_vars:
+            safe_update({'environment_variables': env_vars})
+        
+        # Check if running in Colab and get drive status if requested
+        if safe_get(_is_google_colab, False):
+            result['is_colab'] = True
+            
+            if check_drive:
+                is_drive_mounted, mount_path = safe_get(_is_drive_mounted, (False, ''))
+                result['drive_mounted'] = is_drive_mounted
+                if is_drive_mounted and mount_path:
+                    result['drive_mount_path'] = mount_path
+                    try:
+                        import os
+                        test_file = os.path.join(mount_path, '.smartcash_write_test')
+                        with open(test_file, 'w') as f:
+                            f.write('test')
+                        os.remove(test_file)
+                        result['drive_write_access'] = True
+                    except (IOError, OSError):
+                        result['drive_write_access'] = False
+            else:
+                result['drive_status'] = 'not_checked'
+    
+    except Exception as e:
+        result['status'] = f'error: {str(e)}'
+        print(f"Error in detect_environment_info: {str(e)}")
     
     return result
 

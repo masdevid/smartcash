@@ -123,39 +123,48 @@ class DependencyInitializer(ModuleInitializer):
             config: Loaded configuration
         """
         try:
-            # Ensure we have the ui_components dictionary
-            components = ui_components.get('ui_components', {})
+            # Set up logger to use operation container's log accordion
+            self._setup_logger_for_operation_container(ui_components)
             
-            # Check if operation manager is already set up in UI components
-            if 'operation_manager' in components:
-                self.operation_manager = components['operation_manager']
-                self.logger.info("✅ Using existing operation manager from UI components")
-                return
-                
-            # Create a new operation manager if not provided
-            self.logger.info("🔧 Creating new operation manager")
-            
-            # Make sure we have the operation container
-            operation_container = None
-            if 'containers' in components and 'operation' in components['containers']:
-                operation_container = components['containers']['operation']
-            
-            # Create the operation manager with proper UI components
-            self.operation_manager = DependencyOperationManager(
+            # Create operation manager
+            operation_manager = DependencyOperationManager(
                 config=config,
-                ui_components=components,
-                operation_container=operation_container,
-                logger=self.logger
+                ui_components=ui_components,
+                logger=self.logger  # Pass the configured logger
             )
             
-            # Store the operation manager in the UI components
-            if 'ui_components' in ui_components:
-                ui_components['ui_components']['operation_manager'] = self.operation_manager
+            # Store in UI components
+            ui_components['operation_manager'] = operation_manager
             
-            # Register operation handlers if the method exists
-            if hasattr(self, '_register_handlers'):
-                self._register_handlers(ui_components)
+            # Initialize the operation manager
+            operation_manager.initialize()
             
+            # Connect operation manager to UI components
+            if 'widgets' in ui_components:
+                # Connect install button
+                if 'install_button' in ui_components['widgets']:
+                    ui_components['widgets']['install_button'].on_click(
+                        lambda b: operation_manager.execute_install(
+                            operation_manager._get_selected_packages()
+                        )
+                    )
+                
+                # Connect update button
+                if 'update_button' in ui_components['widgets']:
+                    ui_components['widgets']['update_button'].on_click(
+                        lambda b: operation_manager.execute_update(
+                            operation_manager._get_selected_packages()
+                        )
+                    )
+                
+                # Connect uninstall button
+                if 'uninstall_button' in ui_components['widgets']:
+                    ui_components['widgets']['uninstall_button'].on_click(
+                        lambda b: operation_manager.execute_uninstall(
+                            operation_manager._get_selected_packages()
+                        )
+                    )
+                
             self.logger.info("✅ Operation manager setup complete")
                 
         except Exception as e:
@@ -163,6 +172,53 @@ class DependencyInitializer(ModuleInitializer):
             import traceback
             self.logger.error(f"Error details: {traceback.format_exc()}")
             raise
+            
+    def _setup_logger_for_operation_container(self, ui_components: Dict[str, Any]) -> None:
+        """Set up logger to use operation container's log accordion.
+        
+        Args:
+            ui_components: Dictionary of UI components
+        """
+        try:
+            # Check if operation container exists and has log_message method
+            if 'operation_container' in ui_components and hasattr(ui_components['operation_container'], 'log_message'):
+                # Store original logger methods
+                original_info = self.logger.info
+                original_warning = self.logger.warning
+                original_error = self.logger.error
+                original_debug = self.logger.debug
+                
+                # Override logger methods to use operation container's log_message
+                def log_to_operation_container(message, level='INFO'):
+                    # Log to operation container
+                    try:
+                        ui_components['operation_container'].log_message(message, level)
+                    except Exception:
+                        pass  # Fallback silently if operation container logging fails
+                    
+                    # Also log to original logger based on level
+                    if level == 'INFO':
+                        original_info(message)
+                    elif level == 'WARNING':
+                        original_warning(message)
+                    elif level == 'ERROR':
+                        original_error(message)
+                    elif level == 'DEBUG':
+                        original_debug(message)
+                
+                # Replace logger methods
+                self.logger.info = lambda msg: log_to_operation_container(msg, 'INFO')
+                self.logger.warning = lambda msg: log_to_operation_container(msg, 'WARNING')
+                self.logger.error = lambda msg: log_to_operation_container(msg, 'ERROR')
+                self.logger.debug = lambda msg: log_to_operation_container(msg, 'DEBUG')
+                
+                # Log a test message to verify setup
+                self.logger.info("📋 Logger connected to operation container")
+                
+        except Exception as e:
+            # Use original logger to report error
+            import logging
+            logging.getLogger(self.__class__.__name__).error(f"Failed to set up logger for operation container: {e}")
 
     def _setup_module_handlers(self, ui_components: Dict[str, Any], config: Dict[str, Any], **kwargs) -> Dict[str, Any]:
         """Setup handlers following downloader pattern with OperationHandler

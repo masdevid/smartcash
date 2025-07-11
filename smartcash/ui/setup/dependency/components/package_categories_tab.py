@@ -11,7 +11,7 @@ from ..configs.dependency_defaults import get_default_package_categories, get_pa
 from ..services.package_status_tracker import PackageStatusTracker
 
 def create_package_categories_tab(config: Dict[str, Any], logger=None) -> widgets.VBox:
-    """Create enhanced tab for package categories with full-width compact design."""
+    """Create enhanced tab for package categories with 3-column grid layout."""
     
     # Get package categories and load custom packages
     categories = get_default_package_categories()
@@ -29,35 +29,40 @@ def create_package_categories_tab(config: Dict[str, Any], logger=None) -> widget
         card = create_enhanced_category_card(category_key, category_info, selected_packages, status_tracker, logger)
         category_cards.append(card)
     
-    # Create full width container
-    container = widgets.VBox([
-        # Header
-        widgets.HTML("""
-        <div style="margin-bottom: 16px; padding: 0 16px;">
-            <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 8px;">
-                <span style="font-size: 24px;">📦</span>
-                <div>
-                    <h3 style="color: #333; margin: 0; font-size: 1.25rem;">Package Categories</h3>
-                    <p style="color: #666; margin: 0; font-size: 0.9rem;">Select packages from predefined categories. Default packages (⭐) are recommended.</p>
-                </div>
+    # Create header with improved styling
+    header = widgets.HTML("""
+    <div style="margin-bottom: 16px; padding: 0 16px;">
+        <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 8px;">
+            <span style="font-size: 24px;">📦</span>
+            <div>
+                <h3 style="color: #333; margin: 0; font-size: 1.25rem;">Package Categories</h3>
+                <p style="color: #666; margin: 0; font-size: 0.9rem;">Select packages from predefined categories. Default packages (⭐) are recommended.</p>
             </div>
         </div>
-        """),
-        
-        # Category cards in a scrollable container
-        widgets.VBox(
-            category_cards,
-            layout=widgets.Layout(
-                width='100%',
-                overflow_y='auto',
-                padding='0 16px 16px 16px',
-                gap='16px'
-            )
+    </div>
+    """)
+    
+    # Create a 3-column grid container for category cards
+    grid_container = widgets.GridBox(
+        children=category_cards,
+        layout=widgets.Layout(
+            width='100%',
+            grid_template_columns='repeat(3, 1fr)',  # 3-column grid
+            grid_gap='16px',
+            padding='0 16px 16px 16px',
+            overflow_y='auto'
         )
+    )
+    
+    # Create full width container
+    container = widgets.VBox([
+        header,
+        grid_container
     ], layout=widgets.Layout(
         width='100%',
         height='100%',
-        overflow='hidden'
+        overflow='hidden',
+        margin='0 auto'  # Center the container
     ))
     
     # Store status tracker for external access
@@ -67,7 +72,7 @@ def create_package_categories_tab(config: Dict[str, Any], logger=None) -> widget
     return container
 
 def create_enhanced_category_card(category_key: str, category_info: Dict[str, Any], selected_packages: List[str], status_tracker: PackageStatusTracker, logger) -> widgets.VBox:
-    """Create enhanced compact card for package category with full width layout."""
+    """Create enhanced compact card for package category with grid-friendly layout."""
     
     icon = category_info.get('icon', '📦')
     name = category_info.get('name', category_key)
@@ -75,23 +80,27 @@ def create_enhanced_category_card(category_key: str, category_info: Dict[str, An
     color = category_info.get('color', '#2196F3')
     packages = category_info.get('packages', [])
     
-    # Create compact header with better styling
+    # Create compact header with better styling for grid layout
     header = widgets.HTML(f"""
     <div style="
         background: linear-gradient(135deg, {color}15, {color}08);
-        border-left: 3px solid {color};
+        border-top: 3px solid {color};
         padding: 10px 16px;
         border-radius: 6px 6px 0 0;
         border: 1px solid {color}30;
         border-bottom: none;
+        height: 70px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
     ">
         <div style="display: flex; align-items: center; gap: 10px;">
-            <span style="font-size: 18px;">{icon}</span>
+            <span style="font-size: 24px;">{icon}</span>
             <div style="flex: 1; min-width: 0;">
                 <h4 style="margin: 0; color: {color}; font-size: 1rem; font-weight: 600; line-height: 1.2;">
                     {name} <span style="color: #666; font-weight: 400; font-size: 0.9rem;">{len(packages)} packages</span>
                 </h4>
-                {f'<p style="margin: 2px 0 0 0; color: #666; font-size: 0.8rem; line-height: 1.2;">{description}</p>' if description else ''}
+                {f'<p style="margin: 2px 0 0 0; color: #666; font-size: 0.8rem; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{description}</p>' if description else ''}
             </div>
         </div>
     </div>
@@ -282,7 +291,7 @@ def create_compact_package_widget(pkg: Dict[str, Any], is_selected: bool, status
     return container
 
 def create_compact_action_buttons(pkg: Dict[str, Any], status_tracker: PackageStatusTracker, logger) -> widgets.HBox:
-    """Create compact action buttons for package in a 3-column grid.
+    """Create compact action buttons for package with emoji icons.
     
     Args:
         pkg: Package information dictionary
@@ -305,19 +314,24 @@ def create_compact_action_buttons(pkg: Dict[str, Any], status_tracker: PackageSt
         'button_hover': '#e0e0e0'
     }
     
-    # Check if package name already has emoji (simple unicode range check)
+    # Check if text already has emoji
     def has_emoji(text):
-        # Basic emoji range in unicode
-        emoji_ranges = [
-            (0x1F600, 0x1F64F),  # Emoticons
-            (0x1F300, 0x1F5FF),  # Misc Symbols and Pictographs
-            (0x1F680, 0x1F6FF),  # Transport and Map
-            (0x1F1E0, 0x1F1FF),  # Flags (iOS)
-            (0x2600, 0x26FF),    # Misc symbols
-            (0x2700, 0x27BF),    # Dingbats
-            (0xFE00, 0xFE0F)     # Variation Selectors
-        ]
-        return any(ord(char) in range(r[0], r[1] + 1) for char in text for r in emoji_ranges)
+        import re
+        # Pattern to match emoji characters
+        emoji_pattern = re.compile(
+            "[\U0001F600-\U0001F64F"  # emoticons
+            "\U0001F300-\U0001F5FF"  # symbols & pictographs
+            "\U0001F680-\U0001F6FF"  # transport & map symbols
+            "\U0001F700-\U0001F77F"  # alchemical symbols
+            "\U0001F780-\U0001F7FF"  # Geometric Shapes
+            "\U0001F800-\U0001F8FF"  # Supplemental Arrows-C
+            "\U0001F900-\U0001F9FF"  # Supplemental Symbols and Pictographs
+            "\U0001FA00-\U0001FA6F"  # Chess Symbols
+            "\U0001FA70-\U0001FAFF"  # Symbols and Pictographs Extended-A
+            "\U00002702-\U000027B0"  # Dingbats
+            "\U000024C2-\U0001F251" 
+            "]+")
+        return bool(emoji_pattern.search(text))
     
     name_has_emoji = has_emoji(package_name)
     
@@ -466,27 +480,27 @@ def create_package_action_buttons(pkg: Dict[str, Any], status_tracker: PackageSt
     actions = get_button_actions()
     package_name = pkg['name']
     
-    # Install button
+    # Install button with emoji
     install_btn = widgets.Button(
-        description=actions['install']['text'],
-        button_style='primary',
-        layout=widgets.Layout(width='80px', height='30px'),
+        description="📥 Install" if not has_emoji(actions['install']['text']) else actions['install']['text'],
+        button_style=actions['install']['style'],
+        layout=widgets.Layout(width='auto', height='28px', min_width='60px'),
         tooltip=f"Install {package_name}"
     )
     
-    # Check button
+    # Check button with emoji
     check_btn = widgets.Button(
-        description=actions['check']['text'],
-        button_style='info',
-        layout=widgets.Layout(width='70px', height='30px'),
-        tooltip=f"Check status {package_name}"
+        description="🔍 Check" if not has_emoji(actions['check']['text']) else actions['check']['text'],
+        button_style=actions['check']['style'],
+        layout=widgets.Layout(width='auto', height='28px', min_width='60px'),
+        tooltip=f"Check {package_name}"
     )
     
-    # Uninstall button
+    # Uninstall button with emoji
     uninstall_btn = widgets.Button(
-        description=actions['uninstall']['text'],
-        button_style='danger',
-        layout=widgets.Layout(width='90px', height='30px'),
+        description="🗑️ Uninstall" if not has_emoji(actions['uninstall']['text']) else actions['uninstall']['text'],
+        button_style=actions['uninstall']['style'],
+        layout=widgets.Layout(width='auto', height='28px', min_width='60px'),
         tooltip=f"Uninstall {package_name}"
     )
     

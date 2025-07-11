@@ -91,30 +91,39 @@ def create_env_info_panel(env_info: Optional[Dict[str, Any]] = None, lazy_load: 
     
     return container
 
-def _format_env_info_content(env_info: Dict[str, Any]) -> str:
+def _format_env_info_content(env_info: Any) -> str:
     """Format informasi environment menjadi HTML.
     
     Args:
-        env_info: Dictionary berisi informasi environment
+        env_info: Dictionary berisi informasi environment atau string error
         
     Returns:
         String HTML yang sudah diformat
     """
+    if not isinstance(env_info, dict):
+        return '''
+        <div style="color: #d32f2f; padding: 15px; border: 1px solid #ffcdd2; border-radius: 6px; 
+                   margin: 10px 0; background-color: #ffebee; font-family: monospace;">
+            <strong>⚠️ Gagal memuat informasi environment:</strong><br>
+            <div style="margin-top: 8px;">{}</div>
+        </div>
+        '''.format(str(env_info) if env_info else "Tidak ada informasi yang tersedia")
+    
     try:
         # Dapatkan informasi runtime
-        runtime_info = env_info.get('runtime', {})
+        runtime_info = env_info.get('runtime', {}) or {}
         runtime_display = runtime_info.get('display', 'Environment Tidak Dikenal')
         
         # Dapatkan informasi sistem
         python_version = env_info.get('python_version', 'Tidak Tersedia')
-        os_info = env_info.get('os', {})
+        os_info = env_info.get('os', {}) or {}
         os_name = os_info.get('system', 'Tidak Tersedia')
         os_release = os_info.get('release', '')
         
         # Dapatkan informasi memori
-        memory_info = env_info.get('memory_info', {})
+        memory_info = env_info.get('memory_info', {}) or {}
         total_ram = memory_info.get('total_gb', 
-            env_info.get('total_ram', 0) / (1024**3) if env_info.get('total_ram') else 0
+            float(env_info.get('total_ram', 0)) / (1024**3) if env_info.get('total_ram') else 0
         )
         available_ram = memory_info.get('available_gb', 0)
         ram_usage = memory_info.get('percent_used', 0)
@@ -123,25 +132,26 @@ def _format_env_info_content(env_info: Dict[str, Any]) -> str:
         cpu_cores = env_info.get('cpu_cores', 'Tidak Tersedia')
         
         # Dapatkan informasi penyimpanan
-        storage_info = env_info.get('storage_info', {})
+        storage_info = env_info.get('storage_info', {}) or {}
         storage_status = _format_enhanced_storage_info(storage_info)
         
         # Dapatkan informasi GPU
-        gpu_info = _format_gpu_info(env_info.get('gpu_info', {}))
+        gpu_info = _format_gpu_info(env_info.get('gpu', {}))
         
         # Dapatkan status drive
         drive_status = _get_enhanced_drive_status(env_info)
         
         # Dapatkan informasi jaringan
-        network_info = env_info.get('network_info', {})
+        network_info = env_info.get('network_info', {}) or {}
         hostname = network_info.get('hostname', 'Tidak Tersedia')
         
         # Dapatkan status environment SmartCash
-        env_vars = env_info.get('environment_variables', {})
+        env_vars = env_info.get('environment_variables', {}) or {}
         smartcash_status = _get_smartcash_env_status(env_vars)
         
         # Tentukan warna RAM usage
         ram_color = "#4caf50"
+        ram_usage = float(ram_usage) if ram_usage else 0
         if ram_usage >= 90:
             ram_color = "#f44336"
         elif ram_usage >= 70:

@@ -220,6 +220,9 @@ class DependencyOperationManager(OperationHandler):
     
     def initialize(self):
         """Initialize the dependency operation manager."""
+        # Set up logger first
+        self._setup_logger()
+        
         self.logger.info("🔧 Initializing dependency operation manager")
         
         # Set up operation container if available
@@ -233,6 +236,84 @@ class DependencyOperationManager(OperationHandler):
         self._setup_ui_handlers()
         
         self.logger.info("✅ Dependency operation manager initialized")
+        
+    def _setup_logger(self):
+        """Set up logger for operation manager."""
+        try:
+            # Get logger from UI components
+            if 'logger' in self.ui_components:
+                self.logger = self.ui_components['logger']
+            else:
+                # Create a new logger
+                from smartcash.ui.logger import get_logger
+                self.logger = get_logger(self.full_module_name)
+            
+            # Set up operation container logging
+            self._setup_operation_container_logging()
+                
+        except Exception as e:
+            # Fallback to basic logger
+            import logging
+            self.logger = logging.getLogger(self.__class__.__name__)
+            self.logger.setLevel(logging.INFO)
+            self.logger.warning(f"⚠️ Failed to set up logger: {e}")
+            
+    def _setup_operation_container_logging(self):
+        """Set up logging to operation container if available."""
+        try:
+            # Check if operation container exists
+            operation_container = None
+            if 'operation_container' in self.ui_components:
+                operation_container = self.ui_components['operation_container']
+            elif 'containers' in self.ui_components and 'operation' in self.ui_components['containers']:
+                operation_container = self.ui_components['containers']['operation']
+                
+            # Store original logger methods
+            if operation_container and hasattr(operation_container, 'log_message'):
+                self._operation_container = operation_container
+                self._original_info = self.logger.info
+                self._original_warning = self.logger.warning
+                self._original_error = self.logger.error
+                self._original_debug = self.logger.debug
+                
+                # Override logger methods
+                self.logger.info = lambda msg: self._log_to_operation_container(msg, 'INFO')
+                self.logger.warning = lambda msg: self._log_to_operation_container(msg, 'WARNING')
+                self.logger.error = lambda msg: self._log_to_operation_container(msg, 'ERROR')
+                self.logger.debug = lambda msg: self._log_to_operation_container(msg, 'DEBUG')
+                
+                # Log a test message
+                self.logger.info("📋 Logger connected to operation container")
+        except Exception as e:
+            # Use original logger
+            import logging
+            logging.getLogger(self.__class__.__name__).error(f"Failed to set up operation container logging: {e}")
+    
+    def _log_to_operation_container(self, message, level='INFO'):
+        """Log message to operation container and original logger.
+        
+        Args:
+            message: Message to log
+            level: Log level (INFO, WARNING, ERROR, DEBUG)
+        """
+        try:
+            # Log to operation container
+            if hasattr(self, '_operation_container') and self._operation_container:
+                self._operation_container.log_message(message, level)
+            
+            # Also log to original logger
+            if level == 'INFO' and hasattr(self, '_original_info'):
+                self._original_info(message)
+            elif level == 'WARNING' and hasattr(self, '_original_warning'):
+                self._original_warning(message)
+            elif level == 'ERROR' and hasattr(self, '_original_error'):
+                self._original_error(message)
+            elif level == 'DEBUG' and hasattr(self, '_original_debug'):
+                self._original_debug(message)
+        except Exception as e:
+            # Fallback to basic logging
+            import logging
+            logging.getLogger(self.__class__.__name__).error(f"Failed to log message: {e}")
     
     def get_operations(self) -> Dict[str, Callable]:
         """Get available operations."""
@@ -269,7 +350,7 @@ class DependencyOperationManager(OperationHandler):
             return result
             
         except Exception as e:
-            self.logger.error(f"Error in execute_install: {e}")
+            self._log_to_operation_container(f"Error in execute_install: {e}")
             return {'success': False, 'error': str(e)}
     
     async def execute_uninstall(self, packages: List[str], progress_callback=None) -> Dict[str, Any]:
@@ -296,7 +377,7 @@ class DependencyOperationManager(OperationHandler):
             return result
             
         except Exception as e:
-            self.logger.error(f"Error in execute_uninstall: {e}")
+            self._log_to_operation_container(f"Error in execute_uninstall: {e}")
             return {'success': False, 'error': str(e)}
     
     async def execute_update(self, packages: List[str], progress_callback=None) -> Dict[str, Any]:
@@ -323,7 +404,7 @@ class DependencyOperationManager(OperationHandler):
             return result
             
         except Exception as e:
-            self.logger.error(f"Error in execute_update: {e}")
+            self._log_to_operation_container(f"Error in execute_update: {e}")
             return {'success': False, 'error': str(e)}
     
     async def execute_check_status(self, packages: List[str] = None, progress_callback=None) -> Dict[str, Any]:
@@ -350,7 +431,7 @@ class DependencyOperationManager(OperationHandler):
             return result
             
         except Exception as e:
-            self.logger.error(f"Error in execute_check_status: {e}")
+            self._log_to_operation_container(f"Error in execute_check_status: {e}")
             return {'success': False, 'error': str(e)}
     
     async def install_requirements_txt(self, repo_path: str, progress_callback=None) -> Dict[str, Any]:
@@ -377,7 +458,7 @@ class DependencyOperationManager(OperationHandler):
                     'message': f'No requirements.txt found in {repo_path}'
                 }
             
-            self.logger.info(f"🚀 Installing requirements.txt from {repo_path}")
+            self._log_to_operation_container(f"🚀 Installing requirements.txt from {repo_path}")
             
             # Read requirements.txt to get package count for progress
             with open(requirements_path, 'r') as f:
@@ -404,7 +485,7 @@ class DependencyOperationManager(OperationHandler):
             cmd = ['pip', 'install', '-r', requirements_path]
             
             # Execute pip install command
-            self.logger.info(f"Executing: {' '.join(cmd)}")
+            self._log_to_operation_container(f"Executing: {' '.join(cmd)}")
             process = await asyncio.create_subprocess_exec(
                 *cmd,
                 stdout=asyncio.subprocess.PIPE,
@@ -421,7 +502,7 @@ class DependencyOperationManager(OperationHandler):
                 progress_callback(100, "Requirements.txt installation complete")
             
             if process.returncode == 0:
-                self.logger.info(f"✅ Successfully installed requirements.txt from {repo_path}")
+                self._log_to_operation_container(f"✅ Successfully installed requirements.txt from {repo_path}")
                 return {
                     'success': True,
                     'message': f'Successfully installed {total_packages} packages from requirements.txt',
@@ -432,7 +513,7 @@ class DependencyOperationManager(OperationHandler):
                 }
             else:
                 error_msg = stderr_str or stdout_str or 'Unknown error'
-                self.logger.error(f"❌ Failed to install requirements.txt from {repo_path}: {error_msg}")
+                self._log_to_operation_container(f"❌ Failed to install requirements.txt from {repo_path}: {error_msg}")
                 return {
                     'success': False,
                     'error': error_msg,
@@ -442,7 +523,7 @@ class DependencyOperationManager(OperationHandler):
                 
         except Exception as e:
             error_msg = f"Error installing requirements.txt from {repo_path}: {str(e)}"
-            self.logger.error(error_msg)
+            self._log_to_operation_container(error_msg)
             return {
                 'success': False,
                 'error': str(e),
@@ -481,10 +562,10 @@ class DependencyOperationManager(OperationHandler):
             
             if smartcash_result['success']:
                 results['installed_total'] += smartcash_result.get('installed', 0)
-                self.logger.info("✅ SmartCash requirements.txt installed successfully")
+                self._log_to_operation_container("✅ SmartCash requirements.txt installed successfully")
             else:
                 results['errors'].append(f"SmartCash: {smartcash_result.get('error', 'Unknown error')}")
-                self.logger.warning(f"⚠️ SmartCash requirements.txt failed: {smartcash_result.get('error')}")
+                self._log_to_operation_container(f"⚠️ SmartCash requirements.txt failed: {smartcash_result.get('error')}")
             
             # Install yolov5 requirements
             if progress_callback:
@@ -495,10 +576,10 @@ class DependencyOperationManager(OperationHandler):
             
             if yolov5_result['success']:
                 results['installed_total'] += yolov5_result.get('installed', 0)
-                self.logger.info("✅ YOLOv5 requirements.txt installed successfully")
+                self._log_to_operation_container("✅ YOLOv5 requirements.txt installed successfully")
             else:
                 results['errors'].append(f"YOLOv5: {yolov5_result.get('error', 'Unknown error')}")
-                self.logger.warning(f"⚠️ YOLOv5 requirements.txt failed: {yolov5_result.get('error')}")
+                self._log_to_operation_container(f"⚠️ YOLOv5 requirements.txt failed: {yolov5_result.get('error')}")
             
             # Update final progress
             if progress_callback:
@@ -524,7 +605,7 @@ class DependencyOperationManager(OperationHandler):
             
         except Exception as e:
             error_msg = f"Error installing requirements from repositories: {str(e)}"
-            self.logger.error(error_msg)
+            self._log_to_operation_container(error_msg)
             return {
                 'overall_success': False,
                 'error': str(e),
@@ -553,7 +634,7 @@ class DependencyOperationManager(OperationHandler):
                 summary_container = self.operation_container
             
             if summary_container is None:
-                self.logger.warning("No summary container available to update")
+                self._log_to_operation_container("No summary container available to update")
                 return
             
             # Prepare summary content
@@ -601,13 +682,13 @@ class DependencyOperationManager(OperationHandler):
                     display(Markdown(summary_markdown))
             else:
                 # Fallback to logging
-                self.logger.info("\n" + summary_markdown)
+                self._log_to_operation_container("\n" + summary_markdown)
                 
         except Exception as e:
-            self.logger.error(f"❌ Failed to update operation summary: {e}")
+            self._log_to_operation_container(f"❌ Failed to update operation summary: {e}", 'error')
             if hasattr(self, 'logger'):
                 import traceback
-                self.logger.error(f"Error details: {traceback.format_exc()}")
+                self._log_to_operation_container(f"Error details: {traceback.format_exc()}", 'error')
     
     def _setup_ui_handlers(self):
         """Set up UI event handlers for operation buttons."""
@@ -636,7 +717,7 @@ class DependencyOperationManager(OperationHandler):
                 widgets['uninstall_button'].on_click(on_uninstall_clicked)
                 
         except Exception as e:
-            self.logger.error(f"❌ Failed to set up UI handlers: {e}")
+            self._log_to_operation_container(f"❌ Failed to set up UI handlers: {e}")
     
     def _get_selected_packages(self) -> List[str]:
         """Get the list of selected packages from the UI.
@@ -668,5 +749,5 @@ class DependencyOperationManager(OperationHandler):
             return list(set(selected_packages))  # Remove duplicates
             
         except Exception as e:
-            self.logger.error(f"❌ Error getting selected packages: {e}")
+            self._log_to_operation_container(f"❌ Error getting selected packages: {e}")
             return []

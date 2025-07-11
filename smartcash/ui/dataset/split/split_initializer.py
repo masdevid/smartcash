@@ -77,16 +77,23 @@ class SplitInitializer(ModuleInitializer):
         """Display the UI components.
         
         Args:
-            parent_display: Optional parent display to use
+            parent_display: Optional parent display to use for the UI
+            
+        Note:
+            If parent_display is provided, the UI will be displayed in the parent display.
+            Otherwise, it will be displayed in the default output.
+            
+        Returns:
+            Dictionary of UI components if successful, None otherwise
         """
         if not hasattr(self, 'components') or not self.components:
             self.logger.warning("No components to display. Initialize first.")
-            return
+            return None
             
         main_container = self.components.get('main_container')
         if not main_container:
             self.logger.error("Main container not found in components")
-            return
+            return None
             
         try:
             # Import IPython display if available
@@ -94,17 +101,21 @@ class SplitInitializer(ModuleInitializer):
                 from IPython.display import display as ipy_display
                 if parent_display:
                     parent_display.clear_output(wait=True)
-                    parent_display.display(main_container)
+                    with parent_display:
+                        ipy_display(main_container)
                 else:
                     ipy_display(main_container)
-                self.logger.info("✅ Split UI displayed successfully")
             except ImportError:
-                # Fallback to print if IPython is not available
-                print("Split UI components created successfully")
+                # Fallback to standard print if IPython is not available
+                print("Displaying UI components:")
+                print(main_container)
                 
-        except Exception as e:
-            self.handle_error(f"Failed to display UI: {str(e)}", exc_info=True)
+            return self.components
             
+        except Exception as e:
+            self.logger.error(f"Error displaying UI: {str(e)}", exc_info=True)
+            return None
+    
     def _create_ui_components(self, config: Dict[str, Any], env=None, **kwargs) -> Dict[str, Any]:
         """Create split UI components following colab/dependency pattern
 
@@ -238,28 +249,6 @@ class SplitInitializer(ModuleInitializer):
             
         except Exception as e:
             self.handle_error(f"Failed to reset configuration: {str(e)}", exc_info=True)
-            raise
-    
-    def display(self) -> None:
-        """Display the UI components.
-        
-        This method displays the main UI container if it exists.
-        """
-        try:
-            if not hasattr(self, 'components'):
-                self.logger.warning("No components to display")
-                return
-                
-            main_container = self.components.get('main_container')
-            if main_container:
-                from IPython.display import display
-                display(main_container)
-                self.logger.info("✅ UI displayed successfully")
-            else:
-                self.logger.warning("No main container found to display")
-                
-        except Exception as e:
-            self.handle_error(f"Failed to display UI: {str(e)}", exc_info=True)
             raise
     
     def _log_error(self, message: str) -> None:

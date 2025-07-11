@@ -200,7 +200,7 @@ PREPROCESSING_TIPS = [
 BUTTON_CONFIG = {
     'preprocess': {
         'text': '🚀 Mulai Preprocessing',
-        'style': 'primary',
+        'style': 'success',  # Changed from primary to success
         'tooltip': 'Mulai proses preprocessing dataset',
         'order': 1
     },

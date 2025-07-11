@@ -176,8 +176,7 @@ def create_preprocessing_main_ui(config: Optional[Dict[str, Any]] = None, **kwar
                         "text": BUTTON_CONFIG['preprocess']['text'],
                         "style": BUTTON_CONFIG['preprocess']['style'],
                         "tooltip": BUTTON_CONFIG['preprocess']['tooltip'],
-                        "order": BUTTON_CONFIG['preprocess']['order'],
-                        "primary": True  # Make this the primary button
+                        "order": BUTTON_CONFIG['preprocess']['order']
                     },
                     {
                         "id": "check",

@@ -6,17 +6,13 @@ import ipywidgets as widgets
 from typing import Dict, Any, Optional
 
 # Standard container imports
-from smartcash.ui.components.containers import (
-    create_header_container, create_form_container, create_action_container,
-    create_operation_container, create_footer_container, create_main_container,
-    create_summary_container
-)
 from smartcash.ui.components.header_container import create_header_container
 from smartcash.ui.components.form_container import create_form_container, LayoutType
 from smartcash.ui.components.action_container import create_action_container
 from smartcash.ui.components.operation_container import create_operation_container
 from smartcash.ui.components.footer_container import create_footer_container
 from smartcash.ui.components.main_container import create_main_container
+from smartcash.ui.components.summary_container import create_summary_container
 from smartcash.ui.core.errors.handlers import handle_ui_errors
 
 # Local imports

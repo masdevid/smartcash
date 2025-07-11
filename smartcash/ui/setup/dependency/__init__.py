@@ -1,20 +1,26 @@
 """
 File: smartcash/ui/setup/dependency/__init__.py
-Deskripsi: Module exports - hanya initializer dan public API
+Description: Simplified dependency module exports using UIModule pattern.
 """
 
-from .dependency_initializer import (
-    initialize_dependency_ui, 
-    get_dependency_components, 
+# Import new UIModule functions (preferred approach)
+from .dependency_uimodule import (
+    DependencyUIModule,
+    create_dependency_uimodule,
+    get_dependency_uimodule,
+    reset_dependency_uimodule,
+    initialize_dependency_ui,
     display_dependency_ui,
-    get_dependency_initializer, 
-    DependencyInitializer
+    get_dependency_components
 )
 
 __all__ = [
-    "initialize_dependency_ui", 
-    "get_dependency_components", 
+    # UIModule pattern (current implementation)
+    "DependencyUIModule",
+    "create_dependency_uimodule", 
+    "get_dependency_uimodule",
+    "reset_dependency_uimodule",
+    "initialize_dependency_ui",
     "display_dependency_ui",
-    "get_dependency_initializer", 
-    "DependencyInitializer"
+    "get_dependency_components"
 ]

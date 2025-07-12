@@ -287,7 +287,7 @@ class ColabUIModule(UIModule):
             else:
                 error_msg = result.get("message", "Setup failed")
                 self._update_status(f"Setup failed: {error_msg}", "error")
-                self.log(f"❌ Setup failed: {error_msg}", 'error')
+                self.logger.error(f"❌ Setup failed: {error_msg}")
             
             # Restore buttons with appropriate status
             self._get_operation_manager().enable_all_buttons(
@@ -302,7 +302,7 @@ class ColabUIModule(UIModule):
         except Exception as e:
             self.logger.error(f"❌ Setup button click failed: {e}")
             self._update_status(f"Setup error: {str(e)}", "error")
-            self.log(f"❌ Setup error: {str(e)}", 'error')
+            self.logger.error(f"❌ Setup error: {str(e)}")
             
             # Restore buttons in error state
             if button_states:

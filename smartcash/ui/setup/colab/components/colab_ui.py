@@ -1,21 +1,17 @@
 """
 File: smartcash/ui/setup/colab/components/colab_ui.py
-Description: UI components for Colab environment setup following standardized container architecture
+Description: Main UI assembly for Colab environment setup
 
-This module provides UI components for the Colab setup interface, built using
-shared container components from the SmartCash UI library. It implements the visual
-representation and layout of the Colab environment setup functionality.
+This module serves as the main entry point for the Colab UI, assembling all
+components into a complete interface. It follows the standardized container-based
+architecture with consistent ordering and structure.
 
-Components:
-- Header Container (Header + Status Panel)
-- Form Container (Custom to each module)
-- Action Container (Save/Reset | Primary | Action Buttons)
-- Summary Container (Custom, Nice to have)
-- Operation Container (Progress + Dialog + Log)
-- Footer Container (Info Accordion + Tips)
-
-The module follows the standardized container-based architecture with consistent
-ordering and structure across all UI modules.
+Components are split into separate modules for better maintainability:
+- colab_ui_environment.py: Environment information container
+- colab_ui_form.py: Form widgets and configuration
+- colab_ui_summary.py: Summary content
+- colab_ui_footer.py: Footer components
+- colab_ui_helpers.py: Helper functions and validators
 """
 
 import ipywidgets as widgets
@@ -23,24 +19,85 @@ from typing import Dict, Any, Optional
 
 # Core container imports - standardized across all modules
 from smartcash.ui.components.header_container import create_header_container
-from smartcash.ui.components.form_container import create_form_container
 from smartcash.ui.components.action_container import create_action_container
 from smartcash.ui.components.summary_container import create_summary_container
 from smartcash.ui.components.operation_container import create_operation_container
 from smartcash.ui.components.footer_container import create_footer_container
 
+# Local component imports
+from .colab_ui_environment import create_environment_container
+from .colab_ui_form import create_module_form_widgets
+from .colab_ui_summary import create_module_summary_content
+from .colab_ui_footer import create_module_info_box, create_module_tips_box
+from .colab_ui_helpers import (
+    get_colab_default_config,
+    validate_colab_config,
+    update_colab_config
+)
+
 # Error handling import
 from smartcash.ui.core.errors.handlers import handle_ui_errors
 
-# Module-specific imports
-from smartcash.ui.setup.colab.components import env_info_panel
-from smartcash.ui.setup.colab.components import setup_summary
-from smartcash.ui.setup.colab.components import tips_panel
-from smartcash.ui.setup.colab.constants import UI_CONFIG, BUTTON_CONFIG, VALIDATION_RULES
+# UI Configuration
+UI_CONFIG = {
+    'title': 'Google Colab Setup',
+    'description': 'Configure your Google Colab environment for SmartCash',
+    'module_name': 'colab_setup',
+    'version': '1.0.0'
+}
 
-# Module constants (for validator compliance)
-UI_CONFIG = UI_CONFIG
-BUTTON_CONFIG = BUTTON_CONFIG
+# Button configuration
+BUTTON_CONFIG = {
+    'primary': {
+        'description': 'Initialize Environment',
+        'button_style': 'success',
+        'icon': 'check'
+    },
+    'secondary': {
+        'description': 'Reset',
+        'button_style': 'warning',
+        'icon': 'undo'
+    },
+    'cancel': {
+        'description': 'Cancel',
+        'button_style': 'danger',
+        'icon': 'times'
+    }
+}
+
+
+def _create_environment_container(config: Dict[str, Any]) -> widgets.VBox:
+    """Create environment information container.
+    
+    Args:
+        config: Module configuration dictionary
+        
+    Returns:
+        VBox widget containing environment information and tips
+    """
+    # Create environment info panel with lazy loading
+    env_info = _create_environment_container(config)
+    
+    # Create environment container
+    return widgets.VBox([
+        widgets.HTML("<h4>📊 Environment Information</h4>"),
+        env_info,
+        widgets.HTML(
+            "<div style='margin-top: 15px; padding: 10px; background: #f8f9fa; border-radius: 4px; font-size: 0.9em; color: #666;'>"
+            "<strong>💡 Configuration Tips:</strong><br>"
+            "• Auto-detect will automatically configure environment settings<br>"
+            "• Ensure drive path is correct for Google Drive mounting<br>"
+            "• Project name will be used for folder structure"
+            "</div>"
+        )
+    ], layout=widgets.Layout(
+        width='100%',
+        margin='10px 0',
+        padding='10px',
+        border='1px solid #e0e0e0',
+        border_radius='8px',
+        background_color='#ffffff'
+    ))
 
 
 def _create_module_form_widgets(config: Dict[str, Any]) -> Dict[str, Any]:
@@ -55,59 +112,10 @@ def _create_module_form_widgets(config: Dict[str, Any]) -> Dict[str, Any]:
     Returns:
         Dictionary containing form widgets and UI
     """
-    # Environment detection checkbox
-    auto_detect = widgets.Checkbox(
-        value=config.get('auto_detect', True),
-        description='Auto-detect environment',
-        style={'description_width': 'initial'}
-    )
+    # Create form widgets with default values from config
+    form_widgets = _create_module_form_widgets(config)
     
-    # Drive mount path
-    drive_path = widgets.Text(
-        value=config.get('drive_path', '/content/drive'),
-        description='Drive Mount Path:',
-        placeholder='Enter drive mount path',
-        style={'description_width': '120px'},
-        layout={'width': '100%'}
-    )
-    
-    # Project name
-    project_name = widgets.Text(
-        value=config.get('project_name', 'SmartCash'),
-        description='Project Name:',
-        placeholder='Enter project name',
-        style={'description_width': '120px'},
-        layout={'width': '100%'}
-    )
-    
-    # Create environment info panel with lazy loading
-    env_info = env_info_panel.create_env_info_panel(config, lazy_load=True)
-    
-    # Create form layout
-    form_ui = widgets.VBox([
-        widgets.HTML("<h4>🔧 Colab Environment Configuration</h4>"),
-        auto_detect,
-        drive_path,
-        project_name,
-        widgets.HTML("<h4>📊 Environment Information</h4>"),
-        env_info,
-        widgets.HTML(
-            "<div style='margin-top: 15px; padding: 10px; background: #f8f9fa; border-radius: 4px; font-size: 0.9em; color: #666;'>"
-            "<strong>💡 Configuration Tips:</strong><br>"
-            "• Auto-detect will automatically configure environment settings<br>"
-            "• Ensure drive path is correct for Google Drive mounting<br>"
-            "• Project name will be used for folder structure"
-            "</div>"
-        )
-    ])
-    
-    return {
-        'ui': form_ui,
-        'auto_detect': auto_detect,
-        'drive_path': drive_path,
-        'project_name': project_name,
-        'env_info_panel': env_info
-    }
+    return form_widgets
 
 
 def _create_module_summary_content(config: Dict[str, Any]) -> Optional[widgets.Widget]:
@@ -123,28 +131,9 @@ def _create_module_summary_content(config: Dict[str, Any]) -> Optional[widgets.W
     Returns:
         Widget containing summary content or None if not applicable
     """
-    summary_html = f"""
-    <div style="padding: 15px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
-                border-radius: 8px; color: white; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
-        <h4 style="margin: 0 0 10px 0; font-size: 1.1rem;">🚀 Colab Environment Summary</h4>
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px;">
-            <div style="background: rgba(255,255,255,0.1); padding: 10px; border-radius: 6px;">
-                <div style="font-size: 0.8rem; opacity: 0.8;">Status</div>
-                <div style="font-size: 1rem; font-weight: 600;">Ready for Setup</div>
-            </div>
-            <div style="background: rgba(255,255,255,0.1); padding: 10px; border-radius: 6px;">
-                <div style="font-size: 0.8rem; opacity: 0.8;">Environment</div>
-                <div style="font-size: 1rem; font-weight: 600;">Google Colab</div>
-            </div>
-            <div style="background: rgba(255,255,255,0.1); padding: 10px; border-radius: 6px;">
-                <div style="font-size: 0.8rem; opacity: 0.8;">Configuration</div>
-                <div style="font-size: 1rem; font-weight: 600;">Default</div>
-            </div>
-        </div>
-    </div>
-    """
+    summary_content = _create_module_summary_content(config)
     
-    return widgets.HTML(summary_html)
+    return summary_content
 
 
 def _create_module_info_box() -> widgets.Widget:
@@ -154,19 +143,9 @@ def _create_module_info_box() -> widgets.Widget:
     Returns:
         Widget containing module information
     """
-    info_html = f"""
-    <div class="alert alert-info" style="font-size: 0.9em; padding: 12px; margin: 0;">
-        <strong>💡 Colab Environment Setup Information:</strong>
-        <ul style="margin: 8px 0 0 15px; padding: 0;">
-            <li><strong>Purpose:</strong> Automatically configure Google Colab environment for SmartCash</li>
-            <li><strong>Configuration:</strong> Set drive mount path and project settings</li>
-            <li><strong>Operations:</strong> Mount drive, create folders, setup symlinks, sync configs</li>
-            <li><strong>Verification:</strong> Validate environment setup and dependencies</li>
-        </ul>
-    </div>
-    """
+    info_box = _create_module_info_box()
     
-    return widgets.HTML(info_html)
+    return info_box
 
 
 def _create_module_tips_box() -> widgets.Widget:
@@ -176,19 +155,9 @@ def _create_module_tips_box() -> widgets.Widget:
     Returns:
         Widget containing helpful tips
     """
-    tips_html = f"""
-    <div class="alert alert-success" style="font-size: 0.9em; padding: 12px; margin: 0;">
-        <strong>💡 Colab Setup Tips:</strong>
-        <ul style="margin: 8px 0 0 15px; padding: 0;">
-            <li>Ensure you have Google Drive access before starting</li>
-            <li>The setup process will create necessary folder structures</li>
-            <li>Monitor the progress tracker for detailed status updates</li>
-            <li>Check logs if any errors occur during setup</li>
-        </ul>
-    </div>
-    """
+    tips_box = _create_module_tips_box()
     
-    return widgets.HTML(tips_html)
+    return tips_box
 
 
 @handle_ui_errors(error_component_title="Colab UI Creation Error")
@@ -231,7 +200,7 @@ def create_colab_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> Dict[s
     # Header with title, subtitle, and status indicator
     header_container = create_header_container(
         title=UI_CONFIG['title'],
-        subtitle=UI_CONFIG['subtitle'],
+        subtitle=UI_CONFIG['description'],
         icon=UI_CONFIG['icon'],
         status_message="Ready for environment setup",
         status_type="info",
@@ -265,9 +234,9 @@ def create_colab_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> Dict[s
     action_container = create_action_container(
         buttons=[{
             'id': 'colab_setup',
-            'text': BUTTON_CONFIG['primary']['text'],
+            'text': BUTTON_CONFIG['primary']['description'],
             'style': 'primary',
-            'tooltip': BUTTON_CONFIG['primary']['tooltip']
+            'tooltip': BUTTON_CONFIG['primary']['description']
         }],
         title=f"🚀 {UI_CONFIG['title']} Operations",
         show_save_reset=True  # Include save/reset for configuration
@@ -327,6 +296,34 @@ def create_colab_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> Dict[s
     ui_components['progress_tracker'] = operation_container.get('progress_tracker')
     ui_components['log_accordion'] = operation_container.get('log_accordion')
     
+    # === 5.1 ENVIRONMENT CONTAINER ===
+    # Environment information and status
+    environment_container = _create_environment_container(config)
+    ui_components['environment_container'] = environment_container
+    
+    # Add refresh button to update environment info
+    refresh_button = widgets.Button(
+        description='🔄 Refresh Environment Info',
+        button_style='info',
+        tooltip='Click to refresh environment information',
+        layout=widgets.Layout(width='auto', margin='5px 0')
+    )
+    
+    def on_refresh_clicked(button):
+        with environment_container.hold_trait_notifications():
+            environment_container.children = [widgets.HTML(
+                value='<div style="text-align: center; padding: 10px;">Refreshing environment information...</div>',
+                layout={'width': '100%'}
+            )]
+            new_environment_container = _create_environment_container(config)
+            environment_container.children = new_environment_container.children
+    
+    refresh_button.on_click(on_refresh_clicked)
+    
+    # Add refresh button to the environment container
+    if hasattr(environment_container, 'children'):
+        environment_container.children = tuple([refresh_button] + list(environment_container.children))
+    
     # === 6. FOOTER CONTAINER ===
     # Info accordion and helpful tips
     from smartcash.ui.components.footer_container import PanelConfig, PanelType
@@ -371,6 +368,7 @@ def create_colab_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> Dict[s
     # Add remaining containers
     container_order.extend([
         ui_components.get('operation_container'),
+        ui_components.get('environment_container'),
         ui_components.get('footer_container')
     ])
     
@@ -422,26 +420,7 @@ def validate_colab_config(config: Dict[str, Any]) -> Dict[str, Any]:
     Raises:
         ValueError: If configuration validation fails
     """
-    validated_config = config.copy()
-    
-    # Validate required fields
-    for field, rules in VALIDATION_RULES.items():
-        if field in validated_config:
-            value = validated_config[field]
-            
-            # Check required fields
-            if rules.get('required', False) and not value:
-                raise ValueError(f"Required field '{field}' is missing or empty")
-            
-            # Check minimum length
-            if 'min_length' in rules and len(str(value)) < rules['min_length']:
-                raise ValueError(f"Field '{field}' must be at least {rules['min_length']} characters")
-            
-            # Check allowed values
-            if 'allowed_values' in rules and value not in rules['allowed_values']:
-                raise ValueError(f"Field '{field}' value '{value}' not in allowed values: {rules['allowed_values']}")
-    
-    return validated_config
+    return validate_colab_config(config)
 
 
 def get_colab_default_config() -> Dict[str, Any]:
@@ -451,12 +430,7 @@ def get_colab_default_config() -> Dict[str, Any]:
     Returns:
         Default configuration dictionary
     """
-    return {
-        'auto_detect': True,
-        'drive_path': '/content/drive',
-        'project_name': 'SmartCash',
-        'show_summary': True
-    }
+    return get_colab_default_config()
 
 
 def update_colab_config(ui_components: Dict[str, Any]) -> Dict[str, Any]:
@@ -469,21 +443,7 @@ def update_colab_config(ui_components: Dict[str, Any]) -> Dict[str, Any]:
     Returns:
         Updated configuration dictionary
     """
-    config = {}
-    
-    # Extract values from form widgets
-    form_widgets = ui_components.get('form_widgets', {})
-    
-    if 'auto_detect' in form_widgets:
-        config['auto_detect'] = form_widgets['auto_detect'].value
-    
-    if 'drive_path' in form_widgets:
-        config['drive_path'] = form_widgets['drive_path'].value
-    
-    if 'project_name' in form_widgets:
-        config['project_name'] = form_widgets['project_name'].value
-    
-    return config
+    return update_colab_config(ui_components)
 
 
 # === EXPORT FUNCTIONS ===

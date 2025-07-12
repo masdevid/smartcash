@@ -194,7 +194,25 @@ class PretrainedUIModule(UIModule):
             Main UI widget
         """
         components = self.get_ui_components()
-        return components.get('main_container') or components.get('ui')
+        
+        # Try to get the main container from different possible locations
+        if 'ui_components' in components and 'ui' in components['ui_components']:
+            return components['ui_components']['ui']
+        if 'ui' in components:
+            return components['ui']
+        if 'main_container' in components:
+            return components['main_container']
+            
+        # If we get here, try to find the main container in the UI components
+        if 'containers' in components:
+            if 'main' in components['containers']:
+                return components['containers']['main']
+            if 'header' in components['containers'] and hasattr(components['containers']['header'], 'container'):
+                return components['containers']['header'].container
+                
+        # As a last resort, return None
+        self.logger.warning("Could not find main widget in UI components")
+        return None
     
     def get_config(self) -> Dict[str, Any]:
         """
@@ -544,23 +562,46 @@ def initialize_pretrained_ui(
         # Create and initialize module
         module = create_pretrained_uimodule(config=config, auto_initialize=True)
         
+        if not module or not module._is_initialized:
+            print("❌ Failed to initialize pretrained module")
+            return None
+            
         if display:
             try:
                 from IPython.display import display as ipython_display
+                
+                # Get the main widget
                 main_widget = module.get_main_widget()
-                if main_widget:
+                
+                if main_widget is not None:
+                    # Display the main widget
                     ipython_display(main_widget)
+                    print("✅ Pretrained UI displayed successfully")
                 else:
-                    print("⚠️ No UI widget available for display")
+                    # Try to get the UI components directly if main widget is None
+                    components = module.get_ui_components()
+                    if 'ui_components' in components and 'ui' in components['ui_components']:
+                        ipython_display(components['ui_components']['ui'])
+                        print("✅ Pretrained UI displayed from components")
+                    elif 'ui' in components:
+                        ipython_display(components['ui'])
+                        print("✅ Pretrained UI displayed from root components")
+                    else:
+                        print("⚠️ No UI widget available for display. Available keys:", list(components.keys()))
+                        if 'ui_components' in components:
+                            print("UI Components keys:", list(components['ui_components'].keys()))
             except ImportError:
                 print("⚠️ IPython not available, cannot display UI")
             except Exception as e:
-                print(f"⚠️ Display failed: {e}")
+                print(f"⚠️ Display failed: {str(e)}")
         
         return module
         
     except Exception as e:
-        print(f"❌ Failed to initialize pretrained UI: {e}")
+        print(f"❌ Failed to initialize pretrained UI: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return None
         return None
 
 

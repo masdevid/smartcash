@@ -186,7 +186,11 @@ class AugmentUIModule(UIModule):
             Main UI widget
         """
         components = self.get_ui_components()
-        return components.get('main_container') or components.get('ui')
+        # Try to get the main container from various possible locations
+        return (components.get('ui_components', {}).get('main_container') or
+                components.get('main_container') or
+                components.get('ui') or
+                components.get('container'))
     
     def get_config(self) -> Dict[str, Any]:
         """

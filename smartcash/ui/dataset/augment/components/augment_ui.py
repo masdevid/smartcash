@@ -367,6 +367,7 @@ def create_augment_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> Dict
         'action_container': action_container,
         'operation_container': operation_container,
         'footer_container': footer_container,
+        'main_container': ui_components.get('main_container'),  # Add main container to top level
         **widgets_dict,
         # Add ui_components as a flat dictionary with all components
         'ui_components': {
@@ -375,6 +376,7 @@ def create_augment_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> Dict
             'actions': action_container,
             'operation': operation_container,
             'footer': footer_container,
+            'main': ui_components.get('main_container'),  # Also include in ui_components
             'widgets': widgets_dict,
             'metadata': MODULE_METADATA,
             'config': config

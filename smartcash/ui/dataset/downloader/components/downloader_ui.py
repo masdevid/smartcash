@@ -198,7 +198,29 @@ def create_downloader_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> D
         }
     )
     
-    # 8. Create the final UI components dictionary
+    # 8. Create the final UI components dictionary with proper null checks
+    
+    # Safely get operation container components with fallbacks
+    def safe_get_operation_component(container, key, default=None):
+        if not container:
+            return default
+        return container.get(key, default)
+    
+    # Create operation widgets with fallbacks
+    progress_bar = safe_get_operation_component(operation_container, 'progress_bar')
+    status_text = safe_get_operation_component(operation_container, 'status_text')
+    log_output = safe_get_operation_component(operation_container, 'log_output')
+    update_progress = safe_get_operation_component(operation_container, 'update_progress')
+    show_dialog = safe_get_operation_component(operation_container, 'show_dialog')
+    
+    # Log any missing components
+    if not progress_bar:
+        print("[DEBUG] Warning: progress_bar not found in operation_container")
+    if not status_text:
+        print("[DEBUG] Warning: status_text not found in operation_container")
+    if not log_output:
+        print("[DEBUG] Warning: log_output not found in operation_container")
+    
     ui_components = {
         # Main containers
         'main_container': main_container,
@@ -216,12 +238,12 @@ def create_downloader_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> D
         'validate_checkbox': input_options.validate_checkbox,
         'backup_checkbox': input_options.backup_checkbox,
         
-        # Operation widgets
-        'progress_bar': operation_container.get('progress_bar'),
-        'status_text': operation_container.get('status_text'),
-        'log_output': operation_container.get('log_output'),
-        'update_progress': operation_container.get('update_progress'),
-        'show_dialog': operation_container.get('show_dialog'),
+        # Operation widgets with fallbacks
+        'progress_bar': progress_bar,
+        'status_text': status_text,
+        'log_output': log_output,
+        'update_progress': update_progress,
+        'show_dialog': show_dialog,
         
         # Buttons - add direct references
         'download_button': action_buttons.get('download_button'),
@@ -273,12 +295,12 @@ def create_downloader_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> D
         'validate_checkbox': input_options.validate_checkbox,
         'backup_checkbox': input_options.backup_checkbox,
         
-        # Add operation widgets
-        'progress_bar': operation_container.get('progress_bar'),
-        'status_text': operation_container.get('status_text'),
-        'log_output': operation_container.get('log_output'),
-        'update_progress': operation_container.get('update_progress'),
-        'show_dialog': operation_container.get('show_dialog')
+        # Add operation widgets with the same instances as above
+        'progress_bar': progress_bar,
+        'status_text': status_text,
+        'log_output': log_output,
+        'update_progress': update_progress,
+        'show_dialog': show_dialog
     }
     
     # Create and configure global UI handler for Save/Reset and header status updates

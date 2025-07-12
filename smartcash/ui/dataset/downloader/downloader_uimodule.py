@@ -143,45 +143,102 @@ class DownloaderUIModule(UIModule):
         Returns:
             Self for method chaining
         """
-        if config:
-            self.update_config(**config)
+        self.logger.info("🔄 Starting DownloaderUIModule initialization...")
         
         try:
-            # Create UI components
+            # Update config if provided
+            if config:
+                self.logger.debug("Updating config with provided values")
+                self.update_config(**config)
+            
+            # Step 1: Create UI components
+            self.logger.info("🔧 Creating UI components...")
             self._create_ui_components()
+            self.logger.info("✅ UI components created")
             
-            # Setup downloader service
+            # Step 2: Setup downloader service
+            self.logger.info("🛠 Setting up downloader service...")
             self._setup_downloader_service()
+            self.logger.info("✅ Downloader service setup complete")
             
-            # Setup operation manager
+            # Step 3: Setup operation manager
+            self.logger.info("⚙️ Setting up operation manager...")
             self._setup_operation_manager()
+            self.logger.info("✅ Operation manager setup complete")
             
-            # Setup config handler
+            # Step 4: Setup config handler
+            self.logger.info("⚙️ Setting up config handler...")
             self._setup_config_handler()
+            self.logger.info("✅ Config handler setup complete")
             
-            # Register operations
+            # Step 5: Register operations
+            self.logger.info("📝 Registering operations...")
             self._register_operations()
+            self.logger.info("✅ Operations registered")
             
-            # Inject shared methods
+            # Step 6: Inject shared methods
+            self.logger.info("🔌 Injecting shared methods...")
             SharedMethodRegistry.inject_methods(self, category="operations")
+            self.logger.info("✅ Shared methods injected")
             
-            # Setup event handlers for buttons
+            # Step 7: Setup event handlers
+            self.logger.info("🖱 Setting up event handlers...")
             self._setup_event_handlers()
+            self.logger.info("✅ Event handlers set up")
             
-            # Call parent initialization
+            # Step 8: Call parent initialization
+            self.logger.info("🔄 Initializing parent UIModule...")
             super().initialize()
+            
+            # Mark as initialized
+            self._is_initialized = True
+            self._initialization_error = None
             
             # Update status to show module is ready
             self._update_status("Downloader module initialized - ready for dataset operations", "success")
             
-            self.logger.debug(f"✅ Initialized Downloader UIModule")
+            self.logger.info("✅ DownloaderUIModule initialized successfully")
             
         except Exception as e:
-            self.logger.error(f"❌ Failed to initialize Downloader UIModule: {e}")
-            self._update_status(f"Failed to initialize module: {str(e)}", "error")
-            raise
+            import traceback
+            tb = traceback.format_exc()
+            error_msg = f"❌ Failed to initialize DownloaderUIModule: {str(e)}\n\n{tb}"
+            self.logger.error(error_msg)
+            self._is_initialized = False
+            self._initialization_error = error_msg
+            self._update_status(f"Initialization failed: {str(e)}", "error")
+            
+            # Re-raise the exception to be caught by the caller
+            raise RuntimeError(f"Failed to initialize DownloaderUIModule: {str(e)}") from e
         
         return self
+    
+    def get_main_widget(self):
+        """Get the main widget for display."""
+        try:
+            # First try to get the main container from registered components
+            main_widget = self.get_component('main_container')
+            
+            # If not found, try alternative names
+            if main_widget is None:
+                main_widget = self.get_component('ui')
+                
+                # If still not found, try to get it from the _ui_components dictionary
+                if main_widget is None and hasattr(self, '_ui_components'):
+                    if 'main_container' in self._ui_components:
+                        main_widget = self._ui_components['main_container']
+                    elif 'ui' in self._ui_components:
+                        main_widget = self._ui_components['ui']
+            
+            # If we have a main widget but it has a container attribute, use that
+            if hasattr(main_widget, 'container'):
+                main_widget = main_widget.container
+                
+            return main_widget
+            
+        except Exception as e:
+            self.logger.error(f"❌ Error getting main widget: {e}")
+            return None
     
     def _create_ui_components(self) -> None:
         """Create and register UI components."""
@@ -197,7 +254,21 @@ class DownloaderUIModule(UIModule):
                 else:
                     self.logger.info(f"  - {key}: {type(value).__name__}")
             
-            # 2. Debug: Print all component keys before registration
+            # 2. Store the main container reference
+            if 'main_container' in ui_components:
+                self._main_container = ui_components['main_container']
+            elif 'ui' in ui_components and hasattr(ui_components['ui'], 'container'):
+                self._main_container = ui_components['ui'].container
+            
+            # 3. Store the full components dictionary
+            self._ui_components = ui_components
+            
+            # 4. Register all components
+            for name, component in ui_components.items():
+                if component is not None:
+                    self.register_component(name, component)
+            
+            self.logger.info("✅ UI components created and registered successfully")
             all_component_keys = list(ui_components.keys())
             self.logger.info(f"📦 UI components to register: {all_component_keys}")
             
@@ -940,14 +1011,78 @@ def reset_downloader_uimodule() -> None:
 # === Backward Compatibility Layer ===
 
 @handle_ui_errors(return_type=None)
-def initialize_downloader_ui(config: Dict[str, Any] = None) -> None:
-    """Initialize Downloader UI using new UIModule pattern."""
-    from IPython.display import display
+def initialize_downloader_ui(config: Dict[str, Any] = None, display: bool = True) -> Optional[Any]:
+    """Initialize Downloader UI using new UIModule pattern.
     
-    module = create_downloader_uimodule(config, auto_initialize=True)
-    main_container = module.get_component('main_container')
-    if main_container:
-        display(main_container)
+    Args:
+        config: Optional configuration dictionary
+        display: Whether to display the UI (requires IPython)
+        
+    Returns:
+        DownloaderUIModule instance if successful, None otherwise
+    """
+    try:
+        # Create and initialize module
+        module = create_downloader_uimodule(config=config, auto_initialize=True)
+        
+        if not module or not hasattr(module, '_is_initialized') or not module._is_initialized:
+            print("❌ Failed to initialize downloader module")
+            if hasattr(module, '_initialization_error'):
+                print(f"   Error: {module._initialization_error}")
+            return None
+            
+        if display:
+            try:
+                from IPython.display import display as ipython_display
+                
+                # Try to get the main widget
+                main_widget = module.get_main_widget()
+                
+                if main_widget is not None:
+                    # Display the main widget
+                    ipython_display(main_widget)
+                    print("✅ Downloader UI displayed successfully")
+                else:
+                    # If main_container not found, try to get UI components directly
+                    print("⚠️ Main container not found, trying alternative methods...")
+                    
+                    # Try to get UI components from the module
+                    if hasattr(module, 'get_ui_components'):
+                        components = module.get_ui_components()
+                        if isinstance(components, dict):
+                            # Try common container names
+                            for container_name in ['ui', 'main', 'container', 'widget']:
+                                if container_name in components:
+                                    ipython_display(components[container_name])
+                                    print(f"✅ Downloader UI displayed from '{container_name}' component")
+                                    return module
+                            
+                            # If no common names found, try to find any widget
+                            for name, component in components.items():
+                                if hasattr(component, 'layout') and hasattr(component, 'children'):
+                                    ipython_display(component)
+                                    print(f"✅ Downloader UI displayed from component '{name}'")
+                                    return module
+                    
+                    # If we get here, we couldn't find a suitable component
+                    print("⚠️ Could not find a suitable UI component to display")
+                    if hasattr(module, 'list_components'):
+                        print("Available components:", module.list_components())
+                    
+            except ImportError:
+                print("⚠️ IPython not available, cannot display UI")
+            except Exception as e:
+                print(f"⚠️ Display failed: {str(e)}")
+                import traceback
+                traceback.print_exc()
+        
+        return module
+        
+    except Exception as e:
+        print(f"❌ Failed to initialize downloader UI: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return None
 
 @handle_ui_errors(return_type=dict)
 def get_downloader_components(config: Dict[str, Any] = None) -> Dict[str, Any]:

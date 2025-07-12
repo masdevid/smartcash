@@ -19,16 +19,20 @@ from typing import Dict, Any, Optional
 
 # Core container imports - standardized across all modules
 from smartcash.ui.components.header_container import create_header_container
+from smartcash.ui.components.form_container import create_form_container
 from smartcash.ui.components.action_container import create_action_container
 from smartcash.ui.components.summary_container import create_summary_container
 from smartcash.ui.components.operation_container import create_operation_container
 from smartcash.ui.components.footer_container import create_footer_container
 
 # Local component imports
-from .colab_ui_environment import create_environment_container
-from .colab_ui_form import create_module_form_widgets
-from .colab_ui_summary import create_module_summary_content
-from .colab_ui_footer import create_module_info_box, create_module_tips_box
+from .colab_ui_environment import create_environment_container as _create_environment_container
+from .colab_ui_form import create_module_form_widgets as _create_module_form_widgets
+from .colab_ui_summary import create_module_summary_content as _create_module_summary_content
+from .colab_ui_footer import (
+    create_module_info_box as _create_module_info_box,
+    create_module_tips_box as _create_module_tips_box
+)
 from .colab_ui_helpers import (
     get_colab_default_config,
     validate_colab_config,
@@ -42,8 +46,10 @@ from smartcash.ui.core.errors.handlers import handle_ui_errors
 UI_CONFIG = {
     'title': 'Google Colab Setup',
     'description': 'Configure your Google Colab environment for SmartCash',
-    'module_name': 'colab_setup',
-    'version': '1.0.0'
+    'module_name': 'colab',
+    'parent_module': 'setup',
+    'version': '1.0.0',
+    'icon': 'cogs'  # Font Awesome icon name
 }
 
 # Button configuration
@@ -66,98 +72,12 @@ BUTTON_CONFIG = {
 }
 
 
-def _create_environment_container(config: Dict[str, Any]) -> widgets.VBox:
-    """Create environment information container.
-    
-    Args:
-        config: Module configuration dictionary
-        
-    Returns:
-        VBox widget containing environment information and tips
-    """
-    # Create environment info panel with lazy loading
-    env_info = _create_environment_container(config)
-    
-    # Create environment container
-    return widgets.VBox([
-        widgets.HTML("<h4>📊 Environment Information</h4>"),
-        env_info,
-        widgets.HTML(
-            "<div style='margin-top: 15px; padding: 10px; background: #f8f9fa; border-radius: 4px; font-size: 0.9em; color: #666;'>"
-            "<strong>💡 Configuration Tips:</strong><br>"
-            "• Auto-detect will automatically configure environment settings<br>"
-            "• Ensure drive path is correct for Google Drive mounting<br>"
-            "• Project name will be used for folder structure"
-            "</div>"
-        )
-    ], layout=widgets.Layout(
-        width='100%',
-        margin='10px 0',
-        padding='10px',
-        border='1px solid #e0e0e0',
-        border_radius='8px',
-        background_color='#ffffff'
-    ))
-
-
-def _create_module_form_widgets(config: Dict[str, Any]) -> Dict[str, Any]:
-    """Create Colab-specific form widgets.
-    
-    This function should be customized for each module to create the appropriate
-    form elements based on the module's requirements.
-    
-    Args:
-        config: Module configuration dictionary
-        
-    Returns:
-        Dictionary containing form widgets and UI
-    """
-    # Create form widgets with default values from config
-    form_widgets = _create_module_form_widgets(config)
-    
-    return form_widgets
-
-
-def _create_module_summary_content(config: Dict[str, Any]) -> Optional[widgets.Widget]:
-    """
-    Create Colab-specific summary content.
-
-    This function should be customized for each module to display relevant
-    summary information, statistics, or previews.
-
-    Args:
-        config: Module configuration dictionary
-        
-    Returns:
-        Widget containing summary content or None if not applicable
-    """
-    summary_content = _create_module_summary_content(config)
-    
-    return summary_content
-
-
-def _create_module_info_box() -> widgets.Widget:
-    """
-    Create Colab-specific info box for footer.
-
-    Returns:
-        Widget containing module information
-    """
-    info_box = _create_module_info_box()
-    
-    return info_box
-
-
-def _create_module_tips_box() -> widgets.Widget:
-    """
-    Create Colab-specific tips box for footer.
-
-    Returns:
-        Widget containing helpful tips
-    """
-    tips_box = _create_module_tips_box()
-    
-    return tips_box
+# Re-export the functions for backward compatibility
+create_environment_container = _create_environment_container
+create_module_form_widgets = _create_module_form_widgets
+create_module_summary_content = _create_module_summary_content
+create_module_info_box = _create_module_info_box
+create_module_tips_box = _create_module_tips_box
 
 
 @handle_ui_errors(error_component_title="Colab UI Creation Error")
@@ -223,8 +143,8 @@ def create_colab_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> Dict[s
     form_widgets = _create_module_form_widgets(config)
     
     # Add form widgets to container
-    if form_widgets:
-        form_container['add_item'](form_widgets['ui'], width='100%')
+    if form_widgets and 'form_ui' in form_widgets:
+        form_container['add_item'](form_widgets['form_ui'], width='100%')
     
     ui_components['form_container'] = form_container['container']
     ui_components['form_widgets'] = form_widgets

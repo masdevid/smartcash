@@ -261,70 +261,71 @@ class ColabUIModule(UIModule):
             self.logger.error(f"❌ Failed to setup event handlers: {e}")
     
     def _handle_setup_button_click(self, button=None) -> None:
-        """Handle setup button click.
+        """Handle setup button click event.
         
         Args:
             button: The button that was clicked (unused, required by ipywidgets)
         """
-        button_states = {}
         try:
-            # Log using instance logger to avoid callable errors
-            self.logger.info("🚀 Setup button clicked - starting full setup")
+            # Get operation handler from parent module
+            operation_handler = getattr(self, '_operation_handler', None)
+            if not operation_handler:
+                self.logger.error("❌ Operation handler not available")
+                self._update_status("Error: Operation system not initialized", "error")
+                return
+
+            # Get operation container through the handler
+            operation_container = getattr(operation_handler, '_operation_container', None)
             
-            # Update status panel
+            # Log start of operation
+            self.logger.info("🚀 Starting environment setup")
             self._update_status("Starting environment setup...", "info")
             
-            # Disable all buttons to prevent multiple clicks
-            button_states = self._get_operation_manager().disable_all_buttons("⏳ Setting up environment...")
-            
-            # Log to UI using operation container if available
-            operation_container = getattr(self, '_operation_container', None)
             if operation_container:
-                if hasattr(operation_container, 'log_message'):
-                    operation_container.log_message("🚀 Starting environment setup...", level='info')
-                elif hasattr(operation_container, 'log'):
-                    operation_container.log("🚀 Starting environment setup...", level='info')
-            
-            # Execute full setup
-            result = self.execute_full_setup()
-            
-            # Update status based on result
-            success = result.get("success", False)
-            if success:
-                status_msg = "Environment setup completed successfully!"
-                self._update_status(status_msg, "success")
-                self.logger.info("✅ " + status_msg)
+                operation_container.log_message("🚀 Starting environment setup...", level='info')
+
+            # Get button states before disabling
+            button_states = self._get_operation_manager().disable_all_buttons("⏳ Setting up...")
+
+            try:
+                # Execute the full setup using parent module's operation system
+                result = self.execute_operation(
+                    "full_setup",
+                    self.execute_full_setup,
+                    message="Performing full environment setup..."
+                )
                 
-                # Update operation container with success
-                if operation_container:
-                    if hasattr(operation_container, 'log_message'):
-                        operation_container.log_message("✅ " + status_msg, level='success')
-                    elif hasattr(operation_container, 'log'):
-                        operation_container.log("✅ " + status_msg, level='success')
-            else:
-                error_msg = result.get("message", "Setup failed")
-                status_msg = f"Setup failed: {error_msg}"
-                self._update_status(status_msg, "error")
-                self.logger.error("❌ " + status_msg)
+                success = result.get("success", False)
                 
-                # Update operation container with error
+                # Handle operation result
+                if success:
+                    status_msg = "✅ Environment setup completed successfully!"
+                    self._update_status(status_msg, "success")
+                    self.logger.info(status_msg)
+                    
+                    if operation_container:
+                        operation_container.log_message(status_msg, level='success')
+                else:
+                    error_msg = result.get("message", "Setup failed")
+                    status_msg = f"❌ Setup failed: {error_msg}"
+                    self._update_status(status_msg, "error")
+                    self.logger.error(status_msg)
+                    
+                    if operation_container:
+                        operation_container.log_message(status_msg, level='error')
+
+                return result
+
+            except Exception as e:
+                error_msg = f"❌ Setup failed: {str(e)}"
+                self.logger.error(error_msg)
+                self._update_status(error_msg, "error")
+                
                 if operation_container:
-                    if hasattr(operation_container, 'log_message'):
-                        operation_container.log_message("❌ " + status_msg, level='error')
-                    elif hasattr(operation_container, 'log'):
-                        operation_container.log("❌ " + status_msg, level='error')
-            
-            # Restore buttons with appropriate status
-            self._get_operation_manager().enable_all_buttons(
-                button_states, 
-                success=success,
-                success_message="✅ Setup Complete" if success else None,
-                error_message="❌ Setup Failed" if not success else None
-            )
-            
-            self.logger.debug(f"Setup completed with result: {result}")
-            return result
-            
+                    operation_container.log_message(error_msg, level='error')
+                    
+                raise
+
         except Exception as e:
             self.logger.error(f"❌ Setup button click failed: {e}")
             self._update_status(f"Setup error: {str(e)}", "error")

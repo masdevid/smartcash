@@ -1,33 +1,31 @@
-[09:32:42] INFO - 🚀 Setup button clicked - starting full setup
-[09:32:42] INFO - 🚀 Starting environment setup...
-[09:32:42] INFO - Status update: 🔄 full_setup dimulai...
-[09:32:42] INFO - Progress: Starting full_setup... (?/100)
-[09:32:42] ERROR - Error updating operation container: 'VBox' object has no attribute 'update_progress'
-[09:32:42] ERROR - Error logging to operation container: 'Logger' object is not callable
-[09:32:42] INFO - 🚀 Starting complete environment setup
-[09:32:42] ERROR - Error logging to operation container: 'Logger' object is not callable
-[09:32:42] INFO - Executing stage: init (weight: 0%)
-[09:32:42] INFO - Progress: INIT: 🔍 Detecting runtime environment... (?/100)
-[09:32:42] ERROR - Error updating operation container: 'VBox' object has no attribute 'update_progress'
-[09:32:42] ERROR - Error logging to operation container: 'Logger' object is not callable
-[09:32:42] INFO - Progress: INIT: ✅ Environment: unknown (?/100)
-[09:32:42] ERROR - Error updating operation container: 'VBox' object has no attribute 'update_progress'
-[09:32:42] INFO - Progress: INIT: 🔧 Checking system requirements... (?/100)
-[09:32:42] ERROR - Error updating operation container: 'VBox' object has no attribute 'update_progress'
-[09:32:42] ERROR - Error logging to operation container: 'Logger' object is not callable
-[09:32:42] INFO - System: Linux 6.1.123+
-[09:32:42] ERROR - Error logging to operation container: 'Logger' object is not callable
-[09:32:42] INFO - RAM: 12.7GB available
-[09:32:42] INFO - Progress: INIT: 🔍 Validating configuration... (?/100)
-[09:32:42] ERROR - Error updating operation container: 'VBox' object has no attribute 'update_progress'
-[09:32:42] INFO - Progress: INIT: ✅ Initialization complete (?/100)
-[09:32:42] ERROR - Error updating operation container: 'VBox' object has no attribute 'update_progress'
-[09:32:42] ERROR - Error logging to operation container: 'Logger' object is not callable
-[09:32:42] INFO - ✅ Stage init completed successfully
-[09:32:42] ERROR - Error logging to operation container: 'Logger' object is not callable
-[09:32:42] ERROR - Full setup failed: DRIVE
-[09:32:42] INFO - Progress: full_setup completed successfully (100/100)
-[09:32:42] ERROR - Error updating operation container: 'VBox' object has no attribute 'update_progress'
-[09:32:42] INFO - Status update: full_setup selesai dalam 0.0 detik
-[09:32:42] ERROR - ❌ Setup button click failed: 'ColabUIModule' object has no attribute 'log'
-[09:32:42] ERROR - ❌ Setup error: 'ColabUIModule' object has no attribute 'log'
+[09:43:18] INFO - 🚀 Setup button clicked - starting full setup
+[09:43:18] INFO - Status update: 🔄 full_setup dimulai...
+[09:43:18] INFO - Progress: Starting full_setup... (?/100)
+[09:43:18] ERROR - Error updating operation container: 'VBox' object has no attribute 'update_progress'
+[09:43:18] ERROR - Error logging to operation container: 'Logger' object is not callable
+[09:43:18] INFO - 🚀 Starting complete environment setup
+[09:43:18] ERROR - Error logging to operation container: 'Logger' object is not callable
+[09:43:18] INFO - Executing stage: init (weight: 0%)
+[09:43:18] INFO - Progress: INIT: 🔍 Detecting runtime environment... (?/100)
+[09:43:18] ERROR - Error updating operation container: 'VBox' object has no attribute 'update_progress'
+[09:43:18] ERROR - Error logging to operation container: 'Logger' object is not callable
+[09:43:18] INFO - Progress: INIT: ✅ Environment: unknown (?/100)
+[09:43:18] ERROR - Error updating operation container: 'VBox' object has no attribute 'update_progress'
+[09:43:18] INFO - Progress: INIT: 🔧 Checking system requirements... (?/100)
+[09:43:18] ERROR - Error updating operation container: 'VBox' object has no attribute 'update_progress'
+[09:43:18] ERROR - Error logging to operation container: 'Logger' object is not callable
+[09:43:18] INFO - System: Linux 6.1.123+
+[09:43:18] ERROR - Error logging to operation container: 'Logger' object is not callable
+[09:43:18] INFO - RAM: 12.7GB available
+[09:43:18] INFO - Progress: INIT: 🔍 Validating configuration... (?/100)
+[09:43:18] ERROR - Error updating operation container: 'VBox' object has no attribute 'update_progress'
+[09:43:18] INFO - Progress: INIT: ✅ Initialization complete (?/100)
+[09:43:18] ERROR - Error updating operation container: 'VBox' object has no attribute 'update_progress'
+[09:43:18] ERROR - Error logging to operation container: 'Logger' object is not callable
+[09:43:18] INFO - ✅ Stage init completed successfully
+[09:43:18] ERROR - Error logging to operation container: 'Logger' object is not callable
+[09:43:18] ERROR - Full setup failed: DRIVE
+[09:43:18] INFO - Progress: full_setup completed successfully (100/100)
+[09:43:18] ERROR - Error updating operation container: 'VBox' object has no attribute 'update_progress'
+[09:43:18] INFO - Status update: full_setup selesai dalam 0.0 detik
+[09:43:18] INFO - ✅ Environment setup completed successfully!

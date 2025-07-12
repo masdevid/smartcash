@@ -142,10 +142,10 @@ class ColabUIModule(UIModule):
             # Call parent initialization
             super().initialize()
             
-            logger.debug(f"✅ Initialized Colab UIModule")
+            self.logger.debug(f"✅ Initialized Colab UIModule")
             
         except Exception as e:
-            logger.error(f"❌ Failed to initialize Colab UIModule: {e}")
+            self.logger.error(f"❌ Failed to initialize Colab UIModule: {e}")
             raise
         
         return self
@@ -170,10 +170,10 @@ class ColabUIModule(UIModule):
             for component_type, component in ui_components.items():
                 self.register_component(component_type, component)
             
-            logger.debug(f"📦 Created {len(ui_components)} UI components")
+            self.logger.debug(f"📦 Created {len(ui_components)} UI components")
             
         except Exception as e:
-            logger.error(f"❌ Failed to create UI components: {e}")
+            self.logger.error(f"❌ Failed to create UI components: {e}")
             raise
     
     def _setup_operation_manager(self) -> None:
@@ -187,10 +187,10 @@ class ColabUIModule(UIModule):
                 operation_container=operation_container
             )
             
-            logger.debug("⚙️ Setup operation manager")
+            self.logger.debug("⚙️ Setup operation manager")
             
         except Exception as e:
-            logger.error(f"❌ Failed to setup operation manager: {e}")
+            self.logger.error(f"❌ Failed to setup operation manager: {e}")
             raise
     
     def _setup_config_handler(self) -> None:
@@ -198,10 +198,10 @@ class ColabUIModule(UIModule):
         try:
             self._config_handler = ColabConfigHandler()
             
-            logger.debug("🔧 Setup config handler (no persistence)")
+            self.logger.debug("🔧 Setup config handler (no persistence)")
             
         except Exception as e:
-            logger.error(f"❌ Failed to setup config handler: {e}")
+            self.logger.error(f"❌ Failed to setup config handler: {e}")
             raise
     
     def _register_operations(self) -> None:
@@ -221,10 +221,10 @@ class ColabUIModule(UIModule):
             self.register_operation("status", self.get_environment_status)
             self.register_operation("reset", self.reset_environment)
             
-            logger.debug(f"⚙️ Registered {len(operations)} operations")
+            self.logger.debug(f"⚙️ Registered {len(operations)} operations")
             
         except Exception as e:
-            logger.error(f"❌ Failed to register operations: {e}")
+            self.logger.error(f"❌ Failed to register operations: {e}")
             raise
     
     
@@ -235,28 +235,28 @@ class ColabUIModule(UIModule):
             setup_button = self.get_component("setup_button") or self.get_component("primary_button")
             if setup_button:
                 setup_button.on_click(self._handle_setup_button_click)
-                logger.debug("✅ Connected setup button to handler")
+                self.logger.debug("✅ Connected setup button to handler")
             else:
-                logger.warning("⚠️ No setup button found to connect")
+                self.logger.warning("⚠️ No setup button found to connect")
             
             # Get save/reset buttons if they exist
             save_button = self.get_component("save_button")
             if save_button:
                 save_button.on_click(self._handle_save_config)
-                logger.debug("✅ Connected save button to handler")
+                self.logger.debug("✅ Connected save button to handler")
             
             reset_button = self.get_component("reset_button")
             if reset_button:
                 reset_button.on_click(self._handle_reset_config)
-                logger.debug("✅ Connected reset button to handler")
+                self.logger.debug("✅ Connected reset button to handler")
                 
         except Exception as e:
-            logger.error(f"❌ Failed to setup event handlers: {e}")
+            self.logger.error(f"❌ Failed to setup event handlers: {e}")
     
     def _handle_setup_button_click(self, button=None) -> None:
         """Handle setup button click."""
         try:
-            logger.info("🚀 Setup button clicked - starting full setup")
+            self.logger.info("🚀 Setup button clicked - starting full setup")
             
             # Update button state to show processing
             if button:
@@ -293,10 +293,10 @@ class ColabUIModule(UIModule):
                     button.button_style = "danger"
                 button.disabled = False
             
-            logger.info(f"Setup completed with result: {result}")
+            self.logger.info(f"Setup completed with result: {result}")
             
         except Exception as e:
-            logger.error(f"❌ Setup button click failed: {e}")
+            self.logger.error(f"❌ Setup button click failed: {e}")
             if button:
                 button.description = "❌ Error"
                 button.button_style = "danger"
@@ -306,17 +306,17 @@ class ColabUIModule(UIModule):
         """Handle save configuration button click."""
         try:
             # Save current configuration
-            logger.info("💾 Saving configuration")
+            self.logger.info("💾 Saving configuration")
             # Configuration is automatically saved in memory for Colab
-            logger.info("✅ Configuration saved")
+            self.logger.info("✅ Configuration saved")
         except Exception as e:
-            logger.error(f"❌ Failed to save configuration: {e}")
+            self.logger.error(f"❌ Failed to save configuration: {e}")
     
     def _handle_reset_config(self, button=None) -> None:
         """Handle reset configuration button click."""
         try:
             # Reset to default configuration
-            logger.info("🔄 Resetting configuration to defaults")
+            self.logger.info("🔄 Resetting configuration to defaults")
             if self._config_handler:
                 # Check if the method exists, use appropriate method
                 if hasattr(self._config_handler, 'reset_to_defaults'):
@@ -328,9 +328,9 @@ class ColabUIModule(UIModule):
                     from .configs.colab_defaults import get_default_colab_config
                     default_config = get_default_colab_config()
                     self.update_config(**default_config)
-            logger.info("✅ Configuration reset to defaults")
+            self.logger.info("✅ Configuration reset to defaults")
         except Exception as e:
-            logger.error(f"❌ Failed to reset configuration: {e}")
+            self.logger.error(f"❌ Failed to reset configuration: {e}")
     
     def get_environment_status(self) -> Dict[str, Any]:
         """Get comprehensive environment status.
@@ -385,7 +385,7 @@ class ColabUIModule(UIModule):
             }
             
         except Exception as e:
-            logger.error(f"❌ Failed to reset environment: {e}")
+            self.logger.error(f"❌ Failed to reset environment: {e}")
             return {
                 "success": False,
                 "error": str(e),
@@ -435,7 +435,7 @@ class ColabUIModule(UIModule):
             }
             
         except Exception as e:
-            logger.error(f"❌ Failed to execute full setup: {e}")
+            self.logger.error(f"❌ Failed to execute full setup: {e}")
             return {
                 "success": False,
                 "error": str(e),

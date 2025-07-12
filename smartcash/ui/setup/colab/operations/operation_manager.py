@@ -348,31 +348,3 @@ class ColabOperationManager(OperationHandler):
                 
         except Exception as e:
             self.logger.error(f"Error updating progress: {e}")
-    
-    def log(self, message: str, level: str = 'info') -> None:
-        """Override parent log method to avoid duplicate logging.
-        
-        Args:
-            message: Message to log
-            level: Log level (debug, info, warning, error, critical)
-        """
-        # Only log to operation container to avoid duplication
-        if hasattr(self, 'operation_container') and self.operation_container is not None:
-            if hasattr(self.operation_container, 'log'):
-                # Map string levels to LogLevel enum
-                from smartcash.ui.components.log_accordion import LogLevel
-                level_map = {
-                    'info': LogLevel.INFO,
-                    'warning': LogLevel.WARNING,
-                    'error': LogLevel.ERROR,
-                    'success': LogLevel.INFO,
-                    'debug': LogLevel.DEBUG,
-                    'critical': LogLevel.ERROR
-                }
-                log_level = level_map.get(level, LogLevel.INFO)
-                self.operation_container.log(message, log_level)
-                return
-        
-        # Fallback to standard logger only if no operation container
-        log_func = getattr(self.logger, level, self.logger.info)
-        log_func(message)

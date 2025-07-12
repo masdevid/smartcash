@@ -60,6 +60,7 @@ import json
 import uuid
 import logging
 import threading
+from smartcash.ui.logger import get_module_logger
 import concurrent.futures
 from datetime import datetime, timedelta
 from typing import (
@@ -103,7 +104,7 @@ class ConfigVersioningError(ConfigError):
     """Raised when there's an error with config versioning."""
     pass
 
-logger = logging.getLogger(__name__)
+logger = get_module_logger("smartcash.ui.core.shared.shared_config_manager")
 
 class SharedConfigManager:
     """📡 Manager untuk berbagi konfigurasi antar child components.

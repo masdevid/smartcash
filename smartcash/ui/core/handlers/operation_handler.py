@@ -665,22 +665,40 @@ class OperationHandler(BaseHandler):
                 self.logger.error(f"Error updating operation container: {e}")
     
     def log(self, message: str, level: str = 'info') -> None:
-        """Log a message to both the logger and OperationContainer.
+        """Log a message, preferring OperationContainer to avoid duplication.
         
         Args:
             message: Message to log
             level: Log level (debug, info, warning, error, critical)
         """
-        # Log to the standard logger
-        log_func = getattr(self.logger, level, self.logger.info)
-        log_func(message)
-        
-        # Forward to OperationContainer if available
+        # Prefer OperationContainer to avoid duplicate logging
         if hasattr(self, '_operation_container') and self._operation_container:
             try:
-                self._operation_container.log_message(message=message, level=level)
+                # Try new-style operation container with log method first
+                if hasattr(self._operation_container, 'log'):
+                    from smartcash.ui.components.log_accordion import LogLevel
+                    level_map = {
+                        'debug': LogLevel.DEBUG,
+                        'info': LogLevel.INFO,
+                        'warning': LogLevel.WARNING,
+                        'error': LogLevel.ERROR,
+                        'critical': LogLevel.ERROR,
+                        'success': LogLevel.INFO
+                    }
+                    log_level = level_map.get(level, LogLevel.INFO)
+                    self._operation_container.log(message, log_level)
+                    return
+                # Fallback to old-style log_message method
+                elif hasattr(self._operation_container, 'log_message'):
+                    self._operation_container.log_message(message=message, level=level)
+                    return
             except Exception as e:
-                self.logger.error(f"Error logging to operation container: {e}")
+                # If operation container fails, fall back to logger
+                pass
+        
+        # Fallback to standard logger only if no operation container
+        log_func = getattr(self.logger, level, self.logger.info)
+        log_func(message)
     
     def reset_progress(self) -> None:
         """Reset progress tracking to initial state."""

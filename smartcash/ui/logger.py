@@ -81,6 +81,7 @@ class UILogger:
         # Setup the underlying logger
         self.logger = logging.getLogger(f"ui.{name}")
         self.logger.setLevel(self._level)
+        self.logger.propagate = False  # Prevent propagation to parent loggers
         
         # Add console handler if no handlers are present
         if not self.logger.handlers:

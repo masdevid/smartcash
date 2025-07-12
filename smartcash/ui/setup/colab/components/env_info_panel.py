@@ -590,6 +590,10 @@ def _format_additional_info(env_info: Dict[str, Any]) -> str:
         atau string kosong jika tidak ada informasi tambahan yang tersedia.
     """
     try:
+        # Handle case where env_info is not a dictionary
+        if not isinstance(env_info, dict):
+            return ''  # Return empty string if not a valid dict
+            
         additional_info = []
         
         # 1. Informasi Jaringan

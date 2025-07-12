@@ -7,13 +7,34 @@ while preserving the unique form structure and styling from the original module.
 """
 
 import ipywidgets as widgets
-from typing import Dict, Any, Optional, Tuple
+from IPython.display import display, Image
+from typing import Dict, Any, Optional, List, Tuple
+import os
+from pathlib import Path
+
+# Import local components
+from .preview_widget import create_preview_widget
+from .basic_options import create_basic_options_widget
+from .advanced_options import create_advanced_options_widget
+from .augmentation_types import create_augmentation_types_widget
+from .operation_summary import create_operation_summary_widget
+from ..constants import UI_CONFIG, BUTTON_CONFIG, SECTION_STYLES, AUGMENT_COLORS
+
+# Import core components
+from smartcash.ui.components import (
+    create_header_container,
+    create_form_container,
+    create_action_container,
+    create_operation_container,
+    create_summary_container,
+    create_footer_container,
+    create_main_container,
+    SummaryContainer
+)
 from smartcash.ui.core.errors.handlers import handle_ui_errors
-from smartcash.ui.components.header_container import create_header_container
-from smartcash.ui.components.form_container import create_form_container
-from smartcash.ui.components.action_container import create_action_container
-from smartcash.ui.components.operation_container import create_operation_container
-from smartcash.ui.components.footer_container import create_footer_container, PanelConfig, PanelType
+from IPython.display import display
+from ipywidgets import HTML, Layout, VBox
+from smartcash.ui.components.footer_container import PanelConfig, PanelType
 
 from .basic_options import create_basic_options_widget
 from .advanced_options import create_advanced_options_widget
@@ -100,54 +121,111 @@ def _create_augment_ui_components(config: Dict[str, Any]) -> Tuple[Dict[str, Any
         icon=UI_CONFIG['icon']
     )
     ui_components['header_container'] = header_container
-    header_widget = header_container.container  # Get the actual widget from the container
+    header_widget = header_container.container
     
-    # 2. Form Container
-    form_container = create_form_container()
-    ui_components['form_container'] = form_container
-    form_container_widget = form_container['container']  # Get the actual widget from the container
+    # 2. Create form widgets
+    basic_options = create_basic_options_widget()
+    advanced_options = create_advanced_options_widget()
+    augmentation_types = create_augmentation_types_widget()
     
-    # 3. Action Container
+    # 3. Create preview section
+    preview_image_path = Path("data/previews/augmentation_preview.jpg")
+    if preview_image_path.exists():
+        with open(preview_image_path, "rb") as f:
+            preview_image = f.read()
+            preview_widget = IPyImage(
+                value=preview_image,
+                format='jpg',
+                width=300,
+                height=200,
+                layout=Layout(margin='10px auto', border='1px solid #ddd')
+            )
+    else:
+        preview_widget = HTML(
+            value='<div style="text-align: center; padding: 20px; color: #666;">No preview available</div>',
+            layout=Layout(margin='10px auto')
+        )
+    
+    # Create preview container
+    preview_container = VBox([
+        HTML('<div style="font-weight: bold; margin: 10px 0 5px 0; text-align: center;">🎯 Live Preview</div>'),
+        preview_widget,
+        HTML('<div style="font-size: 0.8em; color: #666; text-align: center; margin-top: 5px;">' +
+             'Preview will update with augmentation settings</div>')
+    ], layout=Layout(
+        border='1px solid #e0e0e0',
+        border_radius='8px',
+        padding='10px',
+        margin='10px 0',
+        background='#f9f9f9',
+        width='100%',
+        align_items='center'
+    ))
+    
+    # 4. Create form widgets using the module function
+    form_widgets = _create_module_form_widgets(config)
+    form_container = form_widgets['ui']
+    
+    # Update the widgets dictionary with the form widgets
+    widgets_dict.update(form_widgets['widgets'])
+    
+    # Store the form container in ui_components
+    ui_components['form_container'] = {
+        'container': form_container,
+        'preview': widgets_dict.get('preview_widget')
+    }
+    
+    # 5. Create action container with proper button configuration
     action_buttons = [
+        {
+            "id": "preview",
+            "text": BUTTON_CONFIG['preview']['text'],
+            "style": BUTTON_CONFIG['preview']['style'],
+            "tooltip": BUTTON_CONFIG['preview']['tooltip'],
+            "order": 1
+        },
         {
             "id": "augment",
             "text": BUTTON_CONFIG['augment']['text'],
             "style": BUTTON_CONFIG['augment']['style'],
             "tooltip": BUTTON_CONFIG['augment']['tooltip'],
-            "order": BUTTON_CONFIG['augment']['order']
+            "order": 2
         },
         {
             "id": "check",
             "text": BUTTON_CONFIG['check']['text'],
             "style": BUTTON_CONFIG['check']['style'],
             "tooltip": BUTTON_CONFIG['check']['tooltip'],
-            "order": BUTTON_CONFIG['check']['order']
+            "order": 3
         },
         {
             "id": "cleanup",
             "text": BUTTON_CONFIG['cleanup']['text'],
             "style": BUTTON_CONFIG['cleanup']['style'],
             "tooltip": BUTTON_CONFIG['cleanup']['tooltip'],
-            "order": BUTTON_CONFIG['cleanup']['order']
-        },
-        {
-            "id": "preview",
-            "text": BUTTON_CONFIG['preview']['text'],
-            "style": BUTTON_CONFIG['preview']['style'],
-            "tooltip": BUTTON_CONFIG['preview']['tooltip'],
-            "order": BUTTON_CONFIG['preview']['order']
+            "order": 4
         }
     ]
     
     action_container = create_action_container(
         buttons=action_buttons,
         title="🚀 Augmentation Operations",
-        alignment="left"
+        container_margin="15px 0 5px 0"
     )
     ui_components['action_container'] = action_container
-    action_widget = action_container['container']  # Get the actual widget from the container
     
-    # 4. Operation Container
+    # 6. Create summary container for operation status
+    operation_summary = create_operation_summary_widget()
+    summary_container = create_summary_container(
+        theme="info",
+        title="📊 Operation Status",
+        icon="ℹ️"
+    )
+    # Get the HTML content from the widget and pass it as a string
+    summary_container.set_content(operation_summary['container'].value)
+    ui_components['summary_container'] = summary_container
+    
+    # 7. Operation Container
     operation_container = create_operation_container(
         show_progress=True,
         show_dialog=True,
@@ -155,116 +233,94 @@ def _create_augment_ui_components(config: Dict[str, Any]) -> Tuple[Dict[str, Any
         log_module_name="Augmentation"
     )
     ui_components['operation_container'] = operation_container
-    operation_widget = operation_container['container']  # Get the actual widget from the container
     
-    # 5. Footer Container
+    # 8. Footer Container with accordion
     info_box = _create_module_info_box()
     footer_container = create_footer_container(
         panels=[
             PanelConfig(
-                panel_type=PanelType.INFO_BOX,
-                title="ℹ️ Information",
+                panel_type=PanelType.INFO_ACCORDION,  # Changed to accordion
+                title="📚 Augmentation Guide",
                 content=info_box,
+                style="info",
                 flex="1",
-                min_width="100%"
+                min_width="100%",
+                open_by_default=True
             )
-        ]
+        ],
+        # Customize footer container style
+        style={
+            'border_top': '1px solid #e0e0e0',
+            'background': '#f9f9f9',
+            'margin_top': '15px',
+            'padding': '10px'
+        }
     )
     ui_components['footer_container'] = footer_container
-    footer_widget = footer_container.container  # Get the actual widget from the container
     
-    # Create form widgets
-    basic_options = create_basic_options_widget()
-    advanced_options = create_advanced_options_widget()
-    augmentation_types = create_augmentation_types_widget()
-    operation_summary = create_operation_summary_widget()
-    
-    # Create form layout
-    row1 = widgets.HBox([
-        _create_styled_container(
-            basic_options['container'],
-            "📋 Basic Options",
-            'basic_options',
-            '48%'
-        ),
-        _create_styled_container(
-            advanced_options['container'],
-            "⚙️ Advanced Parameters",
-            'advanced_options',
-            '48%'
-        )
-    ], layout=widgets.Layout(
-        width='100%',
-        display='flex',
-        flex_flow='row wrap',
-        justify_content='space-between',
-        align_items='stretch',
-        gap='15px',
-        margin='8px 0'
-    ))
-    
-    row2 = widgets.HBox([
-        _create_styled_container(
-            augmentation_types['container'],
-            "🔄 Augmentation Types",
-            'augmentation_types',
-            '48%'
-        ),
-        _create_styled_container(
-            operation_summary['container'],
-            "📊 Operation Summary",
-            'live_preview',
-            '48%'
-        )
-    ], layout=widgets.Layout(
-        width='100%',
-        display='flex',
-        flex_flow='row wrap',
-        justify_content='space-between',
-        align_items='stretch',
-        gap='15px',
-        margin='8px 0 15px 0'
-    ))
-    
-    # Update form container
-    form_container['add_item'](widgets.VBox([row1, row2]))
-    
-    # Assemble main UI
-    main_ui = widgets.VBox([
-        header_widget,  # Use the widget directly
-        form_container_widget,  # Use the widget directly
-        action_widget,  # Use the widget directly
-        operation_widget,  # Use the widget directly
-        footer_widget  # Use the widget directly
-    ], layout=widgets.Layout(
-        width='100%',
-        margin='10px 0',
-        border='1px solid #e0e0e0',
-        border_radius='8px',
-        background_color='#fafafa'
-    ))
-    
-    ui_components['ui'] = main_ui
-    
-    # Collect all widgets
+    # Store widgets for later reference
     widgets_dict.update({
-        # Widget groups
-        **basic_options.get('widgets', {}),
-        **advanced_options.get('widgets', {}),
+        'basic_options': basic_options,
+        'advanced_options': advanced_options,
+        'augmentation_types': augmentation_types,
+        'form_container': form_container,
+        'operation_summary': operation_summary,
+        'preview_widget': preview_widget,
         **augmentation_types.get('widgets', {}),
-        **operation_summary.get('widgets', {}),
-        
-        # Action buttons - access from the action_container dictionary
-        'augment_button': action_container['buttons'].get('augment'),
-        'check_button': action_container['buttons'].get('check'),
-        'cleanup_button': action_container['buttons'].get('cleanup'),
-        'preview_button': action_container['buttons'].get('preview'),
-        
-        # Operation widgets - access from the operation_container dictionary
-        'operation_status': operation_container.get('status_widget'),
-        'operation_progress': operation_container.get('progress_widget'),
-        'log_output': operation_container.get('log_output')
+        **operation_summary.get('widgets', {})
     })
+    
+    # Create main container with proper layout
+    main_container = create_main_container(
+        components=[
+            {
+                'type': 'header',
+                'component': header_container.container,
+                'order': 0,
+                'name': 'header'
+            },
+            {
+                'type': 'form',
+                'component': form_container,
+                'order': 1,
+                'name': 'form'
+            },
+            {
+                'type': 'action',
+                'component': action_container['container'],  # Access the container widget using dictionary access
+                'order': 2,
+                'name': 'actions'
+            },
+            {
+                'type': 'operation',
+                'component': summary_container.container,
+                'order': 3,
+                'name': 'summary'
+            },
+            {
+                'type': 'operation',
+                'component': operation_container['container'],
+                'order': 4,
+                'name': 'operations'
+            },
+            {
+                'type': 'footer',
+                'component': footer_container.container,
+                'order': 5,
+                'name': 'footer'
+            }
+        ],
+        # Styling for the main container
+        width='100%',
+        max_width='1200px',
+        margin='0 auto',
+        padding='0 10px 20px 10px',
+        align_items='stretch'
+    )
+    
+    # Add the main container to the UI components
+    ui_components['main_container'] = main_container
+    ui_components['main_layout'] = main_container.container
     
     return ui_components, widgets_dict
 
@@ -302,7 +358,6 @@ def create_augment_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> Dict
     
     # Create UI components dictionary
     ui_components = {
-        'ui': ui_components['ui'],
         'module_name': 'augment',
         'parent_module': 'dataset',
         'ui_initialized': True,
@@ -331,7 +386,7 @@ def create_augment_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> Dict
 
 def _create_module_form_widgets(config: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Create module-specific form widgets.
+    Create module-specific form widgets with live preview.
     
     Args:
         config: Configuration dictionary for the form widgets
@@ -343,7 +398,9 @@ def _create_module_form_widgets(config: Dict[str, Any]) -> Dict[str, Any]:
     basic_options = create_basic_options_widget()
     advanced_options = create_advanced_options_widget()
     augmentation_types = create_augmentation_types_widget()
-    operation_summary = create_operation_summary_widget()
+    
+    # Create live preview widget
+    preview_widget = create_preview_widget()
     
     # Create 2x2 grid with original styling
     row1 = widgets.HBox([
@@ -377,9 +434,9 @@ def _create_module_form_widgets(config: Dict[str, Any]) -> Dict[str, Any]:
             '48%'
         ),
         _create_styled_container(
-            operation_summary['container'], 
-            "📊 Operation Summary", 
-            'live_preview', 
+            preview_widget['container'], 
+            "👁️ Live Preview", 
+            'preview_panel', 
             '48%'
         )
     ], layout=widgets.Layout(
@@ -400,7 +457,7 @@ def _create_module_form_widgets(config: Dict[str, Any]) -> Dict[str, Any]:
             **basic_options.get('widgets', {}),
             **advanced_options.get('widgets', {}),
             **augmentation_types.get('widgets', {}),
-            **operation_summary.get('widgets', {})
+            'preview_widget': preview_widget
         }
     }
 
@@ -420,23 +477,31 @@ def _create_module_summary_content(config: Dict[str, Any]) -> str:
 
 def _create_module_info_box() -> widgets.Widget:
     """
-    Create the info box content for the footer.
+    Create the info accordion for the footer with augmentation tips.
     
     Returns:
-        Widget containing the info box content
+        Widget containing the info accordion content
     """
-    return widgets.HTML(
-        value=f"""
-        <div class="alert alert-info" style="font-size: 0.9em; padding: 8px 12px; 
-             background: {SECTION_STYLES['basic_options']['background']}; 
-             border-left: 4px solid {AUGMENT_COLORS['info']}; border-radius: 4px;">
+    info_content = """
+    <div style="font-size: 0.9em; line-height: 1.5;">
+        <div style="margin-bottom: 10px;">
             <strong>💡 Augmentation Tips:</strong>
-            <ul style="margin: 5px 0 0 15px; padding: 0; line-height: 1.4;">
+            <ul style="margin: 5px 0 0 15px; padding: 0;">
                 <li>Use 'Combined' type for balanced position + lighting effects</li>
                 <li>Monitor target count to maintain dataset balance</li>
                 <li>Preview results before running full augmentation</li>
                 <li>Backup data before cleanup operations</li>
             </ul>
         </div>
-        """
-    )
+        <div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid #eee;">
+            <strong>📊 Recommended Settings:</strong>
+            <ul style="margin: 5px 0 0 15px; padding: 0;">
+                <li>Start with low intensity (0.1-0.3) and gradually increase</li>
+                <li>Use 2-4 augmentation types for balanced results</li>
+                <li>Check class distribution after augmentation</li>
+            </ul>
+        </div>
+    </div>
+    """
+    
+    return widgets.HTML(info_content)

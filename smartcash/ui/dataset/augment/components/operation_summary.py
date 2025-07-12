@@ -7,6 +7,8 @@ It provides operation status, statistics, and real-time feedback.
 """
 
 import ipywidgets as widgets
+from ipywidgets import HTML, Layout, VBox, HBox, Output, Button, IntProgress, FloatProgress
+from IPython.display import display
 from typing import Dict, Any, Optional
 from smartcash.ui.core.errors.handlers import handle_ui_errors
 from ..constants import (
@@ -56,185 +58,315 @@ def _create_progress_bar(progress: float, phase: str = "") -> widgets.HTML:
 @handle_ui_errors(error_component_title="Operation Summary Creation Error")
 def create_operation_summary_widget() -> Dict[str, Any]:
     """
-    Create operation summary widget - NEW summary_container component.
+    Create a horizontally-optimized operation summary widget.
     
     Features:
-    - 📊 Real-time operation status and progress
-    - 📈 Dataset statistics and metrics
-    - 🔄 Processing phases with visual feedback
-    - ✅ Success/error status tracking
-    - 📝 Operation history and logs
+    - 📊 Real-time operation status and progress in a compact horizontal layout
+    - 📈 Dataset statistics and metrics displayed side by side
+    - 🔄 Processing phases with visual progress indicators
+    - ✅ Success/error status tracking with color-coded badges
+    - 📝 Operation history and logs in a collapsible section
     
     Returns:
         Dictionary containing container, widgets, and metadata
     """
     
-    # Create summary widgets
+    # Create summary widgets with compact styling
     widgets_dict = {
-        # Status indicators
+        # Status indicators (top row)
         'operation_status': widgets.HTML(
-            value="<div style='font-size: 12px; color: #666;'>Status: Ready</div>",
-            layout=widgets.Layout(width='100%', margin='4px 0')
-        ),
-        
-        # Progress tracking
-        'operation_progress': widgets.HTML(
-            value="<div style='font-size: 12px; color: #666;'>Progress: Waiting for operation...</div>",
-            layout=widgets.Layout(width='100%', margin='4px 0')
-        ),
-        
-        # Current phase
-        'current_phase': widgets.HTML(
-            value="<div style='font-size: 11px; color: #666;'>Phase: Initialization</div>",
+            value="<div style='font-size: 11px; color: #666;'>Status: <span style='color: #28a745;'>Ready</span></div>",
             layout=widgets.Layout(width='100%', margin='2px 0')
         ),
         
-        # Statistics display
+        # Progress tracking (expanded to show more details)
+        'operation_progress': widgets.HTML(
+            value="<div style='font-size: 11px; color: #666;'>Progress: <span style='color: #007bff;'>0%</span></div>",
+            layout=widgets.Layout(width='100%', margin='2px 0')
+        ),
+        
+        # Current phase with icon
+        'current_phase': widgets.HTML(
+            value="<div style='font-size: 10px; color: #6c757d;'><i>Initializing...</i></div>",
+            layout=widgets.Layout(width='100%', margin='2px 0')
+        ),
+        
+        # Statistics display (more compact)
         'dataset_stats': widgets.HTML(
             value="""
-            <div style='font-size: 10px; color: #333; padding: 6px; 
-                        background: #f8f9fa; border-radius: 4px; margin: 4px 0;'>
-                <strong>Dataset Statistics:</strong><br>
-                • Original images: --<br>
-                • Target images: --<br>
-                • Classes detected: --
+            <div style='font-size: 10px; color: #333; padding: 8px; 
+                        background: #f8f9fa; border-radius: 6px; margin: 2px 0;
+                        border-left: 3px solid #6f42c1;'>
+                <div style='font-weight: 600; color: #6f42c1; margin-bottom: 4px;'>
+                    <i class='fas fa-database'></i> Dataset
+                </div>
+                <div style='display: flex; justify-content: space-between;'>
+                    <div>Original: <b>--</b></div>
+                    <div>Target: <b>--</b></div>
+                    <div>Classes: <b>--</b></div>
+                </div>
             </div>
             """,
-            layout=widgets.Layout(width='100%')
+            layout=widgets.Layout(width='100%', margin='4px 0')
         ),
         
-        # Operation metrics
+        # Operation metrics (more compact)
         'operation_metrics': widgets.HTML(
             value="""
-            <div style='font-size: 10px; color: #333; padding: 6px; 
-                        background: #f0f8ff; border-radius: 4px; margin: 4px 0;'>
-                <strong>Operation Metrics:</strong><br>
-                • Processing time: --<br>
-                • Images processed: --<br>
-                • Success rate: --
+            <div style='font-size: 10px; color: #333; padding: 8px; 
+                        background: #e7f5ff; border-radius: 6px; margin: 2px 0;
+                        border-left: 3px solid #0d6efd;'>
+                <div style='font-weight: 600; color: #0d6efd; margin-bottom: 4px;'>
+                    <i class='fas fa-tachometer-alt'></i> Metrics
+                </div>
+                <div style='display: flex; justify-content: space-between;'>
+                    <div>Time: <b>--</b></div>
+                    <div>Processed: <b>--</b></div>
+                    <div>Success: <b>--</b></div>
+                </div>
             </div>
             """,
-            layout=widgets.Layout(width='100%')
+            layout=widgets.Layout(width='100%', margin='4px 0')
         ),
         
-        # Recent activity log
-        'activity_log': widgets.Textarea(
-            value='Ready for augmentation operation...',
-            description='Activity:',
-            disabled=True,
-            layout=widgets.Layout(width='100%', height='60px'),
-            style={'description_width': '60px'}
+        # Recent activity log (more compact)
+        'activity_log': widgets.HTML(
+            value='''
+            <div style='font-size: 10px; color: #333; padding: 8px; 
+                        background: #f8f9fa; border-radius: 6px; margin: 2px 0;
+                        border-left: 3px solid #fd7e14;'>
+                <div style='font-weight: 600; color: #fd7e14; margin-bottom: 4px;'>
+                    <i class='fas fa-history'></i> Recent Activity
+                </div>
+                <div style='font-family: monospace; font-size: 9px; line-height: 1.3;'>
+                    Ready for augmentation operation...
+                </div>
+            </div>
+            ''',
+            layout=widgets.Layout(width='100%', margin='4px 0')
         )
     }
     
-    # Create section headers
-    main_header = widgets.HTML(f"""
-    <h6 style='color: {AUGMENT_COLORS["primary"]}; margin: 6px 0; font-size: 12px; font-weight: 600;'>
-        📊 Operation Summary
-    </h6>
-    """)
-    
-    status_header = widgets.HTML(f"""
-    <h6 style='color: {AUGMENT_COLORS["info"]}; margin: 8px 0 4px 0; font-size: 11px; font-weight: 600;'>
-        🔄 Current Status
-    </h6>
-    """)
-    
-    metrics_header = widgets.HTML(f"""
-    <h6 style='color: {AUGMENT_COLORS["success"]}; margin: 8px 0 4px 0; font-size: 11px; font-weight: 600;'>
-        📈 Statistics
-    </h6>
-    """)
-    
-    # Create container with organized layout
-    container = widgets.VBox([
-        main_header,
-        
+    # Create main container with horizontal layout
+    left_column = widgets.VBox([
         # Status section
-        status_header,
+        widgets.HTML(f"""
+        <div style='color: {AUGMENT_COLORS["primary"]}; margin: 4px 0 8px 0; 
+                    font-size: 12px; font-weight: 600;'>
+            <i class='fas fa-tasks'></i> Operation Summary
+        </div>
+        """),
         widgets_dict['operation_status'],
         widgets_dict['operation_progress'],
         widgets_dict['current_phase'],
-        
-        # Metrics section
-        metrics_header,
-        widgets_dict['dataset_stats'],
-        widgets_dict['operation_metrics'],
-        
-        # Activity log
-        widgets_dict['activity_log']
-        
+        widgets.HTML("<div style='height: 10px;'></div>")  # Spacer
     ], layout=widgets.Layout(
-        width='100%',
-        padding='10px',
-        display='flex',
-        flex_flow='column',
-        align_items='stretch',
-        gap='4px'
+        width='30%',
+        padding='8px',
+        border_right='1px solid #eee',
+        min_width='200px'
     ))
+    
+    middle_column = widgets.VBox([
+        # Dataset stats and metrics
+        widgets.HTML(f"""
+        <div style='color: {AUGMENT_COLORS["info"]}; margin: 4px 0 8px 0; 
+                    font-size: 12px; font-weight: 600;'>
+            <i class='fas fa-chart-bar'></i> Metrics
+        </div>
+        """),
+        widgets_dict['dataset_stats'],
+        widgets_dict['operation_metrics']
+    ], layout=widgets.Layout(
+        width='35%',
+        padding='8px',
+        border_right='1px solid #eee',
+        min_width='200px'
+    ))
+    
+    right_column = widgets.VBox([
+        # Activity log
+        widgets.HTML(f"""
+        <div style='color: {AUGMENT_COLORS["success"]}; margin: 4px 0 8px 0; 
+                    font-size: 12px; font-weight: 600;'>
+            <i class='fas fa-history'></i> Activity Log
+        </div>
+        """),
+        widgets_dict['activity_log']
+    ], layout=widgets.Layout(
+        width='35%',
+        padding='8px',
+        min_width='250px',
+        overflow_y='auto'
+    ))
+    
+    # Create main container with horizontal layout
+    container = widgets.HBox(
+        [left_column, middle_column, right_column],
+        layout=widgets.Layout(
+            width='100%',
+            padding='0',
+            display='flex',
+            flex_flow='row wrap',
+            align_items='flex-start',
+            justify_content='space-between',
+            border='1px solid #e0e0e0',
+            borderRadius='8px',
+            overflow='hidden',
+            margin='0 0 10px 0'
+        )
+    )
     
     # Summary update methods
     def update_status(status: str, message: str):
-        """Update operation status."""
-        widgets_dict['operation_status'].value = _create_status_badge(status, message)._dom_classes
+        """Update operation status with color coding."""
+        status_colors = {
+            'success': '#28a745',
+            'error': '#dc3545',
+            'warning': '#ffc107',
+            'info': '#17a2b8',
+            'pending': '#6c757d'
+        }
+        color = status_colors.get(status.lower(), '#6c757d')
+        widgets_dict['operation_status'].value = f"""
+        <div style='font-size: 11px;'>
+            Status: <span style='color: {color}; font-weight: 500;'>{message}</span>
+        </div>
+        """
     
     def update_progress(progress: float, phase: str = "Processing"):
-        """Update operation progress."""
-        widgets_dict['operation_progress'].value = _create_progress_bar(progress, phase)._dom_classes
-        widgets_dict['current_phase'].value = f"<div style='font-size: 11px; color: #666;'>Phase: {phase}</div>"
+        """Update operation progress with visual indicator."""
+        progress_percent = min(100, max(0, int(progress * 100)))
+        widgets_dict['operation_progress'].value = f"""
+        <div style='font-size: 11px;'>
+            Progress: <span style='color: #0d6efd;'>{progress_percent}%</span>
+            <div style='width: 100%; height: 6px; background: #e9ecef; border-radius: 3px; margin-top: 4px; overflow: hidden;'>
+                <div style='width: {progress_percent}%; height: 100%; background: #0d6efd; transition: width 0.3s;'></div>
+            </div>
+        </div>
+        """
+        widgets_dict['current_phase'].value = f"""
+        <div style='font-size: 10px; color: #6c757d;'>
+            <i class='fas fa-sync-alt fa-spin' style='margin-right: 4px;'></i>
+            {phase}
+        </div>
+        """
     
     def update_dataset_stats(original: int, target: int, classes: int):
-        """Update dataset statistics."""
+        """Update dataset statistics in a compact format."""
         widgets_dict['dataset_stats'].value = f"""
-        <div style='font-size: 10px; color: #333; padding: 6px; 
-                    background: #f8f9fa; border-radius: 4px; margin: 4px 0;'>
-            <strong>Dataset Statistics:</strong><br>
-            • Original images: {original:,}<br>
-            • Target images: {target:,}<br>
-            • Classes detected: {classes}
+        <div style='font-size: 10px; color: #333; padding: 8px; 
+                    background: #f8f9fa; border-radius: 6px; margin: 2px 0;
+                    border-left: 3px solid #6f42c1;'>
+            <div style='font-weight: 600; color: #6f42c1; margin-bottom: 4px;'>
+                <i class='fas fa-database'></i> Dataset
+            </div>
+            <div style='display: flex; justify-content: space-between;'>
+                <div>Original: <b>{original:,}</b></div>
+                <div>Target: <b>{target:,}</b></div>
+                <div>Classes: <b>{classes}</b></div>
+            </div>
         </div>
         """
     
     def update_operation_metrics(time_elapsed: str, processed: int, success_rate: float):
-        """Update operation metrics."""
+        """Update operation metrics with visual indicators."""
+        success_color = '#28a745' if success_rate >= 90 else '#ffc107' if success_rate >= 70 else '#dc3545'
         widgets_dict['operation_metrics'].value = f"""
-        <div style='font-size: 10px; color: #333; padding: 6px; 
-                    background: #f0f8ff; border-radius: 4px; margin: 4px 0;'>
-            <strong>Operation Metrics:</strong><br>
-            • Processing time: {time_elapsed}<br>
-            • Images processed: {processed:,}<br>
-            • Success rate: {success_rate:.1f}%
+        <div style='font-size: 10px; color: #333; padding: 8px; 
+                    background: #e7f5ff; border-radius: 6px; margin: 2px 0;
+                    border-left: 3px solid #0d6efd;'>
+            <div style='font-weight: 600; color: #0d6efd; margin-bottom: 4px;'>
+                <i class='fas fa-tachometer-alt'></i> Metrics
+            </div>
+            <div style='display: flex; justify-content: space-between;'>
+                <div>Time: <b>{time_elapsed}</b></div>
+                <div>Processed: <b>{processed:,}</b></div>
+                <div>Success: <b style='color: {success_color};'>{success_rate:.1f}%</b></div>
+            </div>
         </div>
         """
     
-    def add_activity(message: str):
-        """Add activity to log."""
+    def log_activity(message: str, level: str = 'info') -> None:
+        """Add a message to the activity log with timestamp and styling.
+        
+        Args:
+            message: The message to log
+            level: Log level ('info', 'success', 'warning', 'error')
+        """
+        import datetime
+        from IPython.display import display, HTML
+        
+        level_colors = {
+            'info': '#17a2b8',
+            'success': '#28a745',
+            'warning': '#ffc107',
+            'error': '#dc3545'
+        }
+        
+        timestamp = datetime.datetime.now().strftime('%H:%M:%S')
+        color = level_colors.get(level.lower(), '#6c757d')
+        
+        # Get current log and limit to last 5 entries
         current_log = widgets_dict['activity_log'].value
-        new_log = f"{message}\n{current_log}"
-        # Keep only last 5 entries
-        log_lines = new_log.split('\n')[:5]
-        widgets_dict['activity_log'].value = '\n'.join(log_lines)
+        entries = current_log.split('<div class="log-entry">')
+        entries = [e for e in entries if e.strip()]
+        entries = entries[-5:]  # Keep only last 5 entries
+        
+        # Add new entry
+        new_entry = f"""
+        <div class="log-entry" style="margin-bottom: 4px; border-left: 2px solid {color}; padding-left: 6px;">
+            <div style="display: flex; justify-content: space-between; font-size: 9px; color: #6c757d;">
+                <span>[{timestamp}]</span>
+                <span style="color: {color}; font-weight: 500; text-transform: uppercase;">{level}</span>
+            </div>
+            <div style="font-size: 9px; color: #333; line-height: 1.3;">
+                {message}
+            </div>
+        </div>
+        """
+        
+        entries.append(new_entry)
+        widgets_dict['activity_log'].value = "".join(entries)
+    
+    # Add Font Awesome for icons if not already loaded
+    display(HTML('''
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+    <style>
+        .log-entry {
+            transition: all 0.3s ease;
+            opacity: 0.9;
+        }
+        .log-entry:hover {
+            opacity: 1;
+            background-color: #f8f9fa;
+        }
+    </style>
+    '''))
+    
+    # Initialize activity log with empty content
+    widgets_dict['activity_log'].value = ''
+    
+    # Convert the container to HTML string
+    html_content = ""
+    for child in container.children:
+        if hasattr(child, 'value'):
+            html_content += child.value if child.value else ""
+    
+    # Create a simple HTML widget with the content
+    html_widget = widgets.HTML(value=html_content)
     
     return {
-        'container': container,
+        'container': html_widget,
         'widgets': widgets_dict,
-        
-        # Update methods
-        'update_methods': {
-            'status': update_status,
-            'progress': update_progress,
-            'dataset_stats': update_dataset_stats,
-            'operation_metrics': update_operation_metrics,
-            'activity': add_activity
-        },
-        
-        # Status tracking
-        'status_types': ['pending', 'processing', 'success', 'error', 'warning'],
-        'progress_phases': list(PROGRESS_PHASES.keys()),
-        
-        # Form metadata
+        'update_status': update_status,
+        'update_progress': update_progress,
+        'update_dataset_stats': update_dataset_stats,
+        'update_operation_metrics': update_operation_metrics,
+        'log_activity': log_activity,
+        'refresh': lambda: None,  # Add empty refresh method for compatibility
         'form_type': 'operation_summary',
         'component_version': '2.0.0',
-        'is_summary_container': True,  # NEW: Mark as summary container
+        'is_summary_container': True,
         'real_time_updates': True
     }

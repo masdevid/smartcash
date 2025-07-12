@@ -580,18 +580,18 @@ class DownloaderUIModule(UIModule):
             success = result.get("success", False)
             if success:
                 self._update_status("Dataset download completed successfully!", "success")
-                self.log("✅ Dataset download completed successfully!", 'info')
+                self.logger.info("✅ Dataset download completed successfully!")
             else:
                 error_msg = result.get("error", "Download failed")
                 self._update_status(f"Download failed: {error_msg}", "error")
-                self.log(f"❌ Download failed: {error_msg}", 'error')
+                self.logger.error(f"❌ Download failed: {error_msg}")
             
-            self.logger.info(f"Download completed with result: {result}")
+            self.logger.debug(f"Download completed with result: {result}")
             
         except Exception as e:
-            self.logger.error(f"❌ Download button click failed: {e}")
-            self._update_status(f"Download error: {str(e)}", "error")
-            self.log(f"❌ Download error: {str(e)}", 'error')
+            error_msg = str(e)
+            self.logger.error(f"❌ Download button click failed: {error_msg}", exc_info=True)
+            self._update_status(f"Download error: {error_msg}", "error")
     
     def _handle_check_button_click(self, button=None) -> None:
         """Handle check button click event."""
@@ -607,16 +607,16 @@ class DownloaderUIModule(UIModule):
             if success:
                 count = result.get("count", 0)
                 self._update_status(f"Dataset check completed - {count} files found", "success")
-                self.log(f"✅ Dataset check completed - {count} files found", 'info')
+                self.logger.info(f"✅ Dataset check completed - {count} files found", 'info')
             else:
                 error_msg = result.get("error", "Check failed")
                 self._update_status(f"Check failed: {error_msg}", "error")
-                self.log(f"❌ Check failed: {error_msg}", 'error')
-            
+                self.logger.error(f"❌ Check failed: {error_msg}")
+        
         except Exception as e:
-            self.logger.error(f"❌ Check button click failed: {e}")
-            self._update_status(f"Check error: {str(e)}", "error")
-            self.log(f"❌ Check error: {str(e)}", 'error')
+            error_msg = str(e)
+            self.logger.error(f"❌ Check button click failed: {error_msg}", exc_info=True)
+            self._update_status(f"Check error: {error_msg}", "error")
     
     def _handle_cleanup_button_click(self, button=None) -> None:
         """Handle cleanup button click event."""
@@ -632,16 +632,16 @@ class DownloaderUIModule(UIModule):
             if success:
                 cleaned_count = result.get("cleaned_count", 0)
                 self._update_status(f"Cleanup completed - {cleaned_count} items cleaned", "success")
-                self.log(f"✅ Cleanup completed - {cleaned_count} items cleaned", 'info')
+                self.logger.info(f"✅ Cleanup completed - {cleaned_count} items cleaned")
             else:
                 error_msg = result.get("error", "Cleanup failed")
                 self._update_status(f"Cleanup failed: {error_msg}", "error")
-                self.log(f"❌ Cleanup failed: {error_msg}", 'error')
+                self.logger.error(f"❌ Cleanup failed: {error_msg}")
             
         except Exception as e:
-            self.logger.error(f"❌ Cleanup button click failed: {e}")
-            self._update_status(f"Cleanup error: {str(e)}", "error")
-            self.log(f"❌ Cleanup error: {str(e)}", 'error')
+            error_msg = str(e)
+            self.logger.error(f"❌ Cleanup button click failed: {error_msg}", exc_info=True)
+            self._update_status(f"Cleanup error: {error_msg}", "error")
     
     def _extract_ui_config(self) -> Dict[str, Any]:
         """Extract configuration from UI form inputs."""
@@ -803,17 +803,51 @@ class DownloaderUIModule(UIModule):
             }
         
         try:
-            # Execute check operation
+            # Import asyncio only when needed
             import asyncio
+            
+            # Check if we're in a Jupyter notebook environment with an existing event loop
+            try:
+                import ipykernel
+                from IPython import get_ipython
+                
+                if get_ipython() is not None:
+                    # In Jupyter, schedule the coroutine to run in the existing event loop
+                    future = asyncio.ensure_future(self._operation_manager.execute_check())
+                    # Return a placeholder result, the actual result will be handled by the event loop
+                    return {
+                        "success": True,
+                        "message": "Check operation started in background"
+                    }
+            except (ImportError, AttributeError):
+                # Not in Jupyter, handle normally
+                pass
+                
+            # Fall back to synchronous execution if not in Jupyter or if there was an error
             if asyncio.iscoroutinefunction(self._operation_manager.execute_check):
-                result = asyncio.run(self._operation_manager.execute_check())
+                # If there's no running event loop, create one
+                try:
+                    loop = asyncio.get_event_loop()
+                except RuntimeError:
+                    loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(loop)
+                
+                if loop.is_running():
+                    # If loop is already running, schedule the task
+                    future = asyncio.ensure_future(self._operation_manager.execute_check())
+                    return {
+                        "success": True,
+                        "message": "Check operation started in background"
+                    }
+                else:
+                    # Otherwise, run the coroutine directly
+                    return loop.run_until_complete(self._operation_manager.execute_check())
             else:
-                result = self._operation_manager.execute_check()
-            
-            return result
-            
+                # Not a coroutine, just call it directly
+                return self._operation_manager.execute_check()
+                
         except Exception as e:
-            self.logger.error(f"❌ Failed to execute check: {e}")
+            self.logger.error(f"❌ Failed to execute check: {e}", exc_info=True)
             return {
                 "success": False,
                 "error": str(e)

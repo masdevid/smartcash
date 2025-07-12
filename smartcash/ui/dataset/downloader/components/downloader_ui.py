@@ -73,7 +73,8 @@ def create_downloader_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> D
     header_container = create_header_container(
         title=UI_CONFIG['title'],
         subtitle=UI_CONFIG['subtitle'],
-        status_text="Ready",
+        status_message="Ready",
+        status_type="info",
         icon=UI_CONFIG['icon']
     )
     

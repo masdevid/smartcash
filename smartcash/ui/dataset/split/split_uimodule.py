@@ -4,6 +4,10 @@ Description: Main UIModule implementation for split configuration module
 """
 
 from typing import Dict, Any, Optional
+
+# Import ipywidgets for UI components
+import ipywidgets as widgets
+
 from smartcash.ui.core.ui_module import UIModule, register_operation_method
 from smartcash.ui.core.ui_module_factory import UIModuleFactory, create_template
 from smartcash.ui.logger import get_module_logger
@@ -160,31 +164,68 @@ class SplitUIModule(UIModule):
         Get main widget for display.
         
         Returns:
-            Main UI widget
+            Main UI widget that can be displayed in a notebook
         """
-        components = self.get_ui_components()
-        
-        # Try different possible locations for the main widget
-        if 'main_container' in components:
-            return components['main_container']
+        try:
+            components = self.get_ui_components()
             
-        if 'ui_components' in components and 'main_container' in components['ui_components']:
-            return components['ui_components']['main_container']
+            # Try to get the main container directly
+            main_widget = components.get('main_container')
             
-        if 'containers' in components and 'main' in components['containers']:
-            return components['containers']['main']
-            
-        if 'ui' in components:
-            return components['ui']
-            
-        # If we get here, try to find any widget that might be the main container
-        for key, value in components.items():
-            if hasattr(value, 'layout') and hasattr(value, 'children'):
-                return value
+            # If not found, try common container names
+            if main_widget is None and 'containers' in components:
+                main_widget = components['containers'].get('main')
                 
-        # As a last resort, return None
-        self.logger.warning("Could not find main widget in UI components")
-        return None
+            # If still not found, look for any container-like widget
+            if main_widget is None:
+                for key, widget in components.items():
+                    if (isinstance(widget, (widgets.Widget, widgets.DOMWidget)) and 
+                        hasattr(widget, 'layout') and 
+                        hasattr(widget, 'children')):
+                        main_widget = widget
+                        break
+            
+            # If we have a valid widget, ensure it's properly initialized
+            if main_widget is not None:
+                # For MainContainer, we need to get its container attribute
+                if hasattr(main_widget, 'container'):
+                    main_widget = main_widget.container
+                
+                # Ensure the widget has a layout
+                if not hasattr(main_widget, 'layout'):
+                    main_widget.layout = widgets.Layout()
+                
+                # Set a reasonable default size
+                if not hasattr(main_widget.layout, 'width'):
+                    main_widget.layout.width = '100%'
+                if not hasattr(main_widget.layout, 'height'):
+                    main_widget.layout.height = 'auto'
+                
+                return main_widget
+            
+            # If no main widget found, create a VBox with all components
+            from ipywidgets import VBox
+            children = [
+                v for v in components.values() 
+                if v is not None and isinstance(v, (widgets.Widget, widgets.DOMWidget))
+            ]
+            
+            if children:
+                container = VBox(children=children, layout=widgets.Layout(width='100%'))
+                return container
+            
+            self.logger.warning("Could not find or create a displayable main widget")
+            return None
+            
+        except Exception as e:
+            self.logger.error(f"Error getting main widget: {str(e)}")
+            
+            # Try to return something meaningful even if there was an error
+            try:
+                from ipywidgets import HTML
+                return HTML(f"<div style='color: red; padding: 10px;'>Error displaying UI: {str(e)}</div>")
+            except:
+                return None
     
     def get_config(self) -> Dict[str, Any]:
         """
@@ -517,35 +558,50 @@ def initialize_split_ui(
             if hasattr(module, '_initialization_error'):
                 print(f"   Error: {module._initialization_error}")
             return None
-            
-        if display:
+        
+        # Get the main widget
+        main_widget = module.get_main_widget()
+        
+        if display and main_widget is not None:
             try:
+                # Try to import IPython display
+                from IPython import get_ipython
                 from IPython.display import display as ipython_display
                 
-                # Get the main widget
-                main_widget = module.get_main_widget()
-                
-                if main_widget is not None:
-                    # Display the main widget
+                # Check if we're in a notebook environment
+                if get_ipython() is not None:
+                    # In notebook, use IPython display with full width
+                    if hasattr(main_widget, 'layout'):
+                        try:
+                            if not hasattr(main_widget.layout, 'width'):
+                                main_widget.layout.width = '100%'
+                        except Exception as e:
+                            print(f"⚠️ Could not set widget width: {e}")
                     ipython_display(main_widget)
-                    print("✅ Split UI displayed successfully")
                 else:
-                    # Try to get the UI components directly if main widget is None
-                    components = module.get_ui_components()
-                    if 'ui_components' in components and 'ui' in components['ui_components']:
-                        ipython_display(components['ui_components']['ui'])
-                        print("✅ Split UI displayed from components")
-                    elif 'ui' in components:
-                        ipython_display(components['ui'])
-                        print("✅ Split UI displayed from root components")
-                    else:
-                        print("⚠️ No UI widget available for display. Available keys:", list(components.keys()))
-                        if 'ui_components' in components:
-                            print("UI Components keys:", list(components['ui_components'].keys()))
+                    # In script, just print the widget info
+                    print("Split UI initialized. Running in script mode.")
+                    print(f"Widget type: {type(main_widget).__name__}")
+                    if hasattr(main_widget, 'layout'):
+                        try:
+                            # Try to get layout as dict if possible
+                            if hasattr(main_widget.layout, '_trait_values'):
+                                print(f"Widget layout: {main_widget.layout._trait_values}")
+                            else:
+                                print("Widget layout available (details not shown)")
+                        except Exception as e:
+                            print(f"⚠️ Could not display layout: {e}")
+                    return module
             except ImportError:
-                print("⚠️ IPython not available, cannot display UI")
+                # IPython not available, just print
+                print("IPython not available. Running in script mode.")
+                print(f"Widget type: {type(main_widget).__name__}")
+                return module
             except Exception as e:
-                print(f"⚠️ Display failed: {str(e)}")
+                print(f"⚠️ Failed to display UI: {str(e)}")
+                import traceback
+                traceback.print_exc()
+                return module
         
         return module
         

@@ -200,26 +200,28 @@ def create_downloader_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> D
     
     # 8. Create the final UI components dictionary with proper null checks
     
-    # Safely get operation container components with fallbacks
-    def safe_get_operation_component(container, key, default=None):
-        if not container:
-            return default
-        return container.get(key, default)
+    # Get operation container components directly using the correct names
+    progress_tracker = operation_container.get('progress_tracker') if operation_container else None
+    log_accordion = operation_container.get('log_accordion') if operation_container else None
+    update_progress = operation_container.get('update_progress') if operation_container else None
+    show_dialog = operation_container.get('show_dialog') if operation_container else None
     
-    # Create operation widgets with fallbacks
-    progress_bar = safe_get_operation_component(operation_container, 'progress_bar')
-    status_text = safe_get_operation_component(operation_container, 'status_text')
-    log_output = safe_get_operation_component(operation_container, 'log_output')
-    update_progress = safe_get_operation_component(operation_container, 'update_progress')
-    show_dialog = safe_get_operation_component(operation_container, 'show_dialog')
+    # For backward compatibility, set the old variable names
+    progress_bar = progress_tracker
+    log_output = log_accordion
+    
+    # Get status text from progress tracker if available
+    status_text = None
+    if hasattr(progress_tracker, 'get_status_text'):
+        status_text = progress_tracker.get_status_text()
     
     # Log any missing components
-    if not progress_bar:
-        print("[DEBUG] Warning: progress_bar not found in operation_container")
-    if not status_text:
-        print("[DEBUG] Warning: status_text not found in operation_container")
-    if not log_output:
-        print("[DEBUG] Warning: log_output not found in operation_container")
+    if not progress_tracker:
+        print("[DEBUG] Warning: progress_tracker not found in operation_container")
+    if not status_text and progress_tracker:
+        print("[DEBUG] Warning: get_status_text() not available on progress_tracker")
+    if not log_accordion:
+        print("[DEBUG] Warning: log_accordion not found in operation_container")
     
     ui_components = {
         # Main containers

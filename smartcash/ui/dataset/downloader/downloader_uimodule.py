@@ -129,6 +129,9 @@ class DownloaderUIModule(UIModule):
             auto_initialize=False
         )
         
+        # Initialize logger
+        self.logger = get_module_logger("smartcash.ui.dataset.downloader")
+        
         # Downloader-specific attributes
         self._operation_manager: Optional[DownloaderOperationManager] = None
         self._config_handler: Optional[DownloaderConfigHandler] = None
@@ -1008,95 +1011,31 @@ def reset_downloader_uimodule() -> None:
     local_logger = get_module_logger("smartcash.ui.dataset.downloader.reset")
     local_logger.debug("🔄 Reset global Downloader UIModule instance")
 
-# === Backward Compatibility Layer ===
-
-@handle_ui_errors(return_type=None)
-def initialize_downloader_ui(config: Dict[str, Any] = None, display: bool = True) -> Optional[Any]:
-    """Initialize Downloader UI using new UIModule pattern.
+def initialize_downloader_ui(config: Dict[str, Any] = None):
+    """Initialize and display the downloader UI.
+    
+    This is the main entry point for the downloader UI, typically called from a notebook cell.
+    It creates the UIModule, initializes it, and displays the main widget.
     
     Args:
         config: Optional configuration dictionary
-        display: Whether to display the UI (requires IPython)
         
     Returns:
-        DownloaderUIModule instance if successful, None otherwise
+        The initialized downloader module instance
     """
-    try:
-        # Create and initialize module
-        module = create_downloader_uimodule(config=config, auto_initialize=True)
-        
-        if not module or not hasattr(module, '_is_initialized') or not module._is_initialized:
-            print("❌ Failed to initialize downloader module")
-            if hasattr(module, '_initialization_error'):
-                print(f"   Error: {module._initialization_error}")
-            return None
-            
-        if display:
-            try:
-                from IPython.display import display as ipython_display
-                
-                # Try to get the main widget
-                main_widget = module.get_main_widget()
-                
-                if main_widget is not None:
-                    # Display the main widget
-                    ipython_display(main_widget)
-                    print("✅ Downloader UI displayed successfully")
-                else:
-                    # If main_container not found, try to get UI components directly
-                    print("⚠️ Main container not found, trying alternative methods...")
-                    
-                    # Try to get UI components from the module
-                    if hasattr(module, 'get_ui_components'):
-                        components = module.get_ui_components()
-                        if isinstance(components, dict):
-                            # Try common container names
-                            for container_name in ['ui', 'main', 'container', 'widget']:
-                                if container_name in components:
-                                    ipython_display(components[container_name])
-                                    print(f"✅ Downloader UI displayed from '{container_name}' component")
-                                    return module
-                            
-                            # If no common names found, try to find any widget
-                            for name, component in components.items():
-                                if hasattr(component, 'layout') and hasattr(component, 'children'):
-                                    ipython_display(component)
-                                    print(f"✅ Downloader UI displayed from component '{name}'")
-                                    return module
-                    
-                    # If we get here, we couldn't find a suitable component
-                    print("⚠️ Could not find a suitable UI component to display")
-                    if hasattr(module, 'list_components'):
-                        print("Available components:", module.list_components())
-                    
-            except ImportError:
-                print("⚠️ IPython not available, cannot display UI")
-            except Exception as e:
-                print(f"⚠️ Display failed: {str(e)}")
-                import traceback
-                traceback.print_exc()
-        
-        return module
-        
-    except Exception as e:
-        print(f"❌ Failed to initialize downloader UI: {str(e)}")
-        import traceback
-        traceback.print_exc()
-        return None
-
-@handle_ui_errors(return_type=dict)
-def get_downloader_components(config: Dict[str, Any] = None) -> Dict[str, Any]:
-    """Get Downloader components using new UIModule pattern."""
-    module = create_downloader_uimodule(config, auto_initialize=True)
-    return {
-        component_type: module.get_component(component_type)
-        for component_type in module.list_components()
-    }
-
-@handle_ui_errors(return_type=None)
-def display_downloader_ui(config: Dict[str, Any] = None) -> None:
-    """Display Downloader UI using new UIModule pattern."""
-    initialize_downloader_ui(config)
+    from IPython.display import display
+    
+    # Create and initialize the downloader module
+    module = create_downloader_uimodule(config=config, auto_initialize=True)
+    
+    # Display the UI if it has a main widget
+    if hasattr(module, 'get_main_widget'):
+        widget = module.get_main_widget()
+        if widget is not None:
+            display(widget)
+            return module
+    
+    return module
 
 # Note: Template and shared methods are registered on-demand in create_downloader_uimodule()
 # to avoid logs during import

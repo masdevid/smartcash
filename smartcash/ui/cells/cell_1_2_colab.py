@@ -1,7 +1,7 @@
 """
 File: smartcash/ui/cells/cell_1_2_colab.py
 Deskripsi: Entry point untuk Google Colab environment setup
-NOTE: Cell Code should remain minimalis (import and run initializer only). 
+NOTE: Cell Code should remain minimal (import and run initializer only). 
       Initializer should handle all the logic.
 """
 

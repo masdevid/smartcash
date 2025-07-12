@@ -1,81 +1,45 @@
 """
 File: smartcash/ui/dataset/downloader/__init__.py
-Description: Dataset Downloader module entry point with new UIModule pattern support.
+Description: Dataset Downloader module entry point with UIModule pattern.
 
-This module provides both the new UIModule pattern API and maintains backward
-compatibility with the existing initializer-based API.
+This module provides the UIModule pattern API for the dataset downloader,
+including UI initialization, display, and component access.
 """
 
-# New UIModule pattern API (recommended)
+from typing import Dict, Any, Optional
+from IPython.display import display
+
+# Import UIModule components
 from smartcash.ui.dataset.downloader.downloader_uimodule import (
     DownloaderUIModule,
     create_downloader_uimodule,
     get_downloader_uimodule,
     reset_downloader_uimodule,
-    initialize_downloader_ui as initialize_downloader_ui_new,
-    get_downloader_components as get_downloader_components_new,
-    display_downloader_ui as display_downloader_ui_new
+    initialize_downloader_ui
 )
 
-# Legacy initializer-based API (backward compatibility)
-from smartcash.ui.dataset.downloader.downloader_initializer import (
-    initialize_downloader_ui as initialize_downloader_ui_legacy,
-    display_downloader_ui as display_downloader_ui_legacy,
-    get_downloader_components as get_downloader_components_legacy
-)
 
-# Default to new UIModule pattern, but provide legacy fallback
-def initialize_downloader_ui(use_legacy: bool = False, **kwargs):
-    """Initialize downloader UI.
+def get_downloader_components(config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    """Get downloader UI components.
     
     Args:
-        use_legacy: If True, use legacy initializer pattern
-        **kwargs: Arguments passed to the initializer
+        config: Optional configuration dictionary
+        
+    Returns:
+        Dictionary of UI components
     """
-    if use_legacy:
-        return initialize_downloader_ui_legacy(**kwargs)
-    else:
-        return initialize_downloader_ui_new(**kwargs)
+    module = create_downloader_uimodule(config=config, auto_initialize=True)
+    return getattr(module, 'get_ui_components', lambda: {})()
 
-def display_downloader_ui(use_legacy: bool = False, **kwargs):
-    """Display downloader UI.
-    
-    Args:
-        use_legacy: If True, use legacy initializer pattern
-        **kwargs: Arguments passed to the initializer
-    """
-    if use_legacy:
-        return display_downloader_ui_legacy(**kwargs)
-    else:
-        return display_downloader_ui_new(**kwargs)
-
-def get_downloader_components(use_legacy: bool = False, **kwargs):
-    """Get downloader components.
-    
-    Args:
-        use_legacy: If True, use legacy initializer pattern
-        **kwargs: Arguments passed to the initializer
-    """
-    if use_legacy:
-        return get_downloader_components_legacy(**kwargs)
-    else:
-        return get_downloader_components_new(**kwargs)
-
-# Export both APIs
+# Export public API
 __all__ = [
-    # New UIModule pattern API
+    # Core UIModule components
     'DownloaderUIModule',
     'create_downloader_uimodule',
-    'get_downloader_uimodule', 
+    'get_downloader_uimodule',
     'reset_downloader_uimodule',
-    
-    # Main API functions (default to new pattern)
     'initialize_downloader_ui',
-    'display_downloader_ui',
-    'get_downloader_components',
     
-    # Legacy API (explicit)
-    'initialize_downloader_ui_legacy',
-    'display_downloader_ui_legacy',
-    'get_downloader_components_legacy'
+    # Helper functions
+    'get_downloader_components'
 ]

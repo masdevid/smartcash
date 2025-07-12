@@ -49,7 +49,7 @@ UI_CONFIG = {
     'module_name': 'colab',
     'parent_module': 'setup',
     'version': '1.0.0',
-    'icon': 'cogs'  # Font Awesome icon name
+    'icon': '⚙️'  # Font Awesome icon name
 }
 
 # Button configuration

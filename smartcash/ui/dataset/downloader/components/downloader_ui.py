@@ -92,21 +92,21 @@ def create_downloader_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> D
     # Create all three action buttons: download, check, cleanup (all as action buttons)
     buttons = [
         {
-            'id': 'download_btn',
+            'button_id': 'download_button',  # Use button_id instead of id
             'text': BUTTON_CONFIG['download']['text'],
             'style': 'success',  # Use success style for download
             'tooltip': BUTTON_CONFIG['download']['tooltip'],
             'order': 1
         },
         {
-            'id': 'check_btn', 
+            'button_id': 'check_button',  # Use button_id instead of id
             'text': BUTTON_CONFIG['check']['text'],
             'style': BUTTON_CONFIG['check']['style'],
             'tooltip': BUTTON_CONFIG['check']['tooltip'],
             'order': 2
         },
         {
-            'id': 'cleanup_btn',
+            'button_id': 'cleanup_button',  # Use button_id instead of id
             'text': BUTTON_CONFIG['cleanup']['text'], 
             'style': BUTTON_CONFIG['cleanup']['style'],
             'tooltip': BUTTON_CONFIG['cleanup']['tooltip'],
@@ -114,11 +114,20 @@ def create_downloader_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> D
         }
     ]
     
+    print(f"[DEBUG] Creating action container with buttons: {[btn['button_id'] for btn in buttons]}")
+    
+    # Create action container
     action_container = create_action_container(
         title="📥 Dataset Operations",
         buttons=buttons,
         show_save_reset=True
     )
+    
+    # Debug: Print all available buttons and their types
+    available_buttons = action_container.get('buttons', {})
+    print(f"[DEBUG] Action container created. Available buttons: {list(available_buttons.keys())}")
+    for btn_id, btn in available_buttons.items():
+        print(f"[DEBUG] Button {btn_id}: {type(btn).__name__} (enabled: {not getattr(btn, 'disabled', False)})")
     
     # 4. Create Operation Container
     operation_container = create_operation_container(
@@ -138,7 +147,38 @@ def create_downloader_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> D
         ]
     )
     
-    # 6. Create Main Container
+    # Extract buttons from action container
+    action_buttons = action_container.get('buttons', {})
+    print(f"[DEBUG] Action buttons from container: {list(action_buttons.keys())}")
+    
+    # Ensure all required buttons exist and are properly referenced
+    button_components = {}
+    for btn_id in ['download_button', 'check_button', 'cleanup_button']:
+        if btn_id in action_buttons and action_buttons[btn_id] is not None:
+            # Store direct reference to the button widget
+            button_widget = action_buttons[btn_id]
+            button_components[btn_id] = button_widget
+            print(f"[DEBUG] Added button to components: {btn_id} -> {button_widget is not None}")
+        else:
+            print(f"[WARNING] Button not found or is None in action_buttons: {btn_id}")
+            button_components[btn_id] = None
+    
+    # 6. Create components dictionary with all UI elements
+    components = {
+        'header_container': header_container,
+        'form_container': form_container,
+        'action_container': action_container,  # Full action container with all methods
+        'operation_container': operation_container,
+        'footer_container': footer_container,
+        'ui_initialized': True,
+        'module_name': UI_CONFIG['module_name'],
+        'parent_module': UI_CONFIG['parent_module'],
+        'version': UI_CONFIG['version'],
+        # Add direct button references
+        **button_components
+    }
+    
+    # 7. Create Main Container with all components
     main_container = create_main_container(
         components=[
             {'component': header_container.container, 'type': 'header'},
@@ -158,41 +198,35 @@ def create_downloader_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> D
         }
     )
     
-    # Create the UI components dictionary following the standard structure
+    # 8. Create the final UI components dictionary
     ui_components = {
         # Main containers
         'main_container': main_container,
-        'header_container': header_container.container,
-        'form_container': form_container['container'],
-        'action_container': action_container['container'],
-        'operation_container': operation_container['container'],
-        'footer_container': footer_container.container,
+        'header_container': header_container,
+        'form_container': form_container,
+        'action_container': action_container,
+        'operation_container': operation_container,
+        'footer_container': footer_container,
         
-        # Form widgets
-        'form_widgets': {
-            'workspace_input': getattr(input_options, 'workspace_input', None),
-            'project_input': getattr(input_options, 'project_input', None),
-            'version_input': getattr(input_options, 'version_input', None),
-            'api_key_input': getattr(input_options, 'api_key_input', None),
-            'validate_checkbox': getattr(input_options, 'validate_checkbox', None),
-            'backup_checkbox': getattr(input_options, 'backup_checkbox', None),
-        },
+        # Form widgets - accessed as attributes of input_options
+        'workspace_input': input_options.workspace_input,
+        'project_input': input_options.project_input,
+        'version_input': input_options.version_input,
+        'api_key_input': input_options.api_key_input,
+        'validate_checkbox': input_options.validate_checkbox,
+        'backup_checkbox': input_options.backup_checkbox,
         
-        # Buttons - ensure we get the correct button references
-        'buttons': {
-            'download': action_container.get('buttons', {}).get('download_btn'),
-            'check': action_container.get('buttons', {}).get('check_btn'), 
-            'cleanup': action_container.get('buttons', {}).get('cleanup_btn'),
-            'save': getattr(action_container.get('action_container'), 'save_button', None),
-            'reset': getattr(action_container.get('action_container'), 'reset_button', None),
-        },
+        # Operation widgets
+        'progress_bar': operation_container.get('progress_bar'),
+        'status_text': operation_container.get('status_text'),
+        'log_output': operation_container.get('log_output'),
+        'update_progress': operation_container.get('update_progress'),
+        'show_dialog': operation_container.get('show_dialog'),
         
-        # Operation functions
-        'operations': {
-            'log_message': operation_container['log_message'],
-            'update_progress': operation_container['update_progress'],
-            'show_dialog': operation_container['show_dialog'],
-        },
+        # Buttons - add direct references
+        'download_button': action_buttons.get('download_button'),
+        'check_button': action_buttons.get('check_button'),
+        'cleanup_button': action_buttons.get('cleanup_button'),
         
         # Module info
         'module_info': {
@@ -200,40 +234,103 @@ def create_downloader_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> D
             'parent': UI_CONFIG['parent_module'],
             'version': UI_CONFIG['version'],
             'initialized': True
-        }
+        },
+        
+        # UI state
+        'ui_initialized': True,
+        'module_name': UI_CONFIG['module_name'],
+        'parent_module': UI_CONFIG['parent_module'],
+        'version': UI_CONFIG['version']
+    }
+    
+    # Create the final components dictionary
+    components = {
+        'ui': main_container,
+        'ui_components': {
+            'header': header_container,
+            'form': form_container,
+            'action': action_container,
+            'operation': operation_container,
+            'footer': footer_container
+        },
+        'ui_initialized': True,
+        'module_name': UI_CONFIG['module_name'],
+        'parent_module': UI_CONFIG['parent_module'],
+        'version': UI_CONFIG['version'],
+        'config': config,
+        'main_container': main_container,
+        
+        # Add all button references
+        'download_button': action_buttons.get('download_button'),
+        'check_button': action_buttons.get('check_button'),
+        'cleanup_button': action_buttons.get('cleanup_button'),
+        
+        # Add form widgets - accessed as attributes of input_options
+        'workspace_input': input_options.workspace_input,
+        'project_input': input_options.project_input,
+        'version_input': input_options.version_input,
+        'api_key_input': input_options.api_key_input,
+        'validate_checkbox': input_options.validate_checkbox,
+        'backup_checkbox': input_options.backup_checkbox,
+        
+        # Add operation widgets
+        'progress_bar': operation_container.get('progress_bar'),
+        'status_text': operation_container.get('status_text'),
+        'log_output': operation_container.get('log_output'),
+        'update_progress': operation_container.get('update_progress'),
+        'show_dialog': operation_container.get('show_dialog')
     }
     
     # Create and configure global UI handler for Save/Reset and header status updates
-    from smartcash.ui.dataset.downloader.configs.downloader_defaults import get_default_downloader_config
-    
     try:
+        from smartcash.ui.dataset.downloader.configs.downloader_defaults import get_default_downloader_config
+        
         default_values = get_default_downloader_config()
-        # Extract form-specific defaults
+        
+        # Create form widgets dictionary using the attributes defined in input_options
+        form_widgets = {
+            'workspace_input': input_options.workspace_input,
+            'project_input': input_options.project_input,
+            'version_input': input_options.version_input,
+            'api_key_input': input_options.api_key_input,
+            'validate_checkbox': input_options.validate_checkbox,
+            'backup_checkbox': input_options.backup_checkbox
+        }
+        
+        # Extract form-specific defaults from config
         form_defaults = {
             'workspace_input': default_values.get('data', {}).get('roboflow', {}).get('workspace', ''),
             'project_input': default_values.get('data', {}).get('roboflow', {}).get('project', ''),
             'version_input': default_values.get('data', {}).get('roboflow', {}).get('version', ''),
             'api_key_input': default_values.get('data', {}).get('roboflow', {}).get('api_key', ''),
             'validate_checkbox': default_values.get('download', {}).get('validate_download', True),
-            'backup_checkbox': default_values.get('download', {}).get('backup_existing', False),
+            'backup_checkbox': default_values.get('download', {}).get('backup_existing', False)
         }
         
         # Create global UI handler
         global_ui_handler = create_global_ui_handler(
             module_name="downloader",
             header_container=header_container,
-            form_widgets=ui_components['form_widgets'],
+            form_widgets=form_widgets,
             default_values=form_defaults
         )
         
-        # Bind Save/Reset buttons to the global handler
-        save_button = ui_components['buttons'].get('save')
-        reset_button = ui_components['buttons'].get('reset')
+        # Get Save/Reset buttons from action container
+        save_button = action_buttons.get('save_button')
+        reset_button = action_buttons.get('reset_button')
+        
+        # If not found in action_buttons, try to get from action_container
+        if not save_button or not reset_button:
+            action_btns = action_container.get('buttons', {})
+            save_button = action_btns.get('save_button')
+            reset_button = action_btns.get('reset_button')
+        
+        # Bind Save/Reset buttons to the global handler if available
         if save_button and reset_button:
             global_ui_handler.bind_save_reset_buttons(save_button, reset_button)
             
         # Add global handler to components
-        ui_components['global_ui_handler'] = global_ui_handler
+        components['global_ui_handler'] = global_ui_handler
         
     except Exception as e:
         # Log error but don't fail UI creation
@@ -242,18 +339,6 @@ def create_downloader_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> D
         except:
             # Fallback: just print the error
             print(f"⚠️ Failed to setup global UI handler: {str(e)}")
-            print(f"⚠️ Additional logging error occurred")
-    
-    # Store the main container as 'ui' for backward compatibility
-    components = {
-        'ui': main_container,
-        'ui_components': ui_components,
-        'ui_initialized': True,
-        'module_name': UI_CONFIG['module_name'],
-        'parent_module': UI_CONFIG['parent_module'],
-        'version': UI_CONFIG['version'],
-        'config': config.copy()
-    }
     
     return components
 

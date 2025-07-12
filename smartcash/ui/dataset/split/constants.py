@@ -6,16 +6,39 @@ This module contains all the configuration constants used by the Dataset Split U
 
 # UI Configuration
 UI_CONFIG = {
-    'module_name': 'Dataset Split',
-    'module_description': 'Configure how to split your dataset into train/validation/test sets',
+    'module_name': 'split',
+    'parent_module': 'dataset',
+    'title': '📊 Dataset Split',
+    'description': 'Configure how to split your dataset into train/validation/test sets',
+    'version': '1.0.0'
+}
+
+# Module Metadata
+MODULE_METADATA = {
+    'name': 'split',
+    'title': '📊 Dataset Split',
+    'description': 'Dataset splitting module with train/validation/test configuration',
     'version': '1.0.0',
-    'parent_module': 'dataset'
+    'category': 'dataset',
+    'author': 'SmartCash',
+    'tags': ['dataset', 'split', 'train', 'validation', 'test'],
+    'features': [
+        'Train/validation/test split configuration',
+        'Custom split ratios',
+        'Stratified and random splitting',
+        'Directory structure preservation',
+        'Backup and overwrite options',
+        'Seed-based reproducible splits'
+    ]
 }
 
 # Button Configuration
 BUTTON_CONFIG = {
     'save': {'button_style': 'success', 'icon': 'save'},
-    'reset': {'button_style': 'warning', 'icon': 'undo'}
+    'reset': {'button_style': 'warning', 'icon': 'undo'},
+    'split': {'button_style': 'primary', 'icon': 'scissors'},
+    'check': {'button_style': 'info', 'icon': 'check'},
+    'cleanup': {'button_style': 'warning', 'icon': 'trash'}
 }
 
 # Default split ratios
@@ -42,7 +65,7 @@ DEFAULT_LAYOUT = {
     'border_radius': '5px'
 }
 
-# Module Metadata
+# Module Metadata (backward compatibility)
 MODULE_NAME = 'split'
 MODULE_GROUP = 'dataset'
 MODULE_TITLE = '📊 Dataset Split'

@@ -66,11 +66,9 @@ class DownloaderOperationManager(OperationHandler):
     def handle_error(self, error_msg: str, **kwargs):
         """Handle errors with proper logging and UI feedback."""
         self.logger.error(f"❌ {error_msg}")
-        if hasattr(self, 'operation_container') or hasattr(self, '_operation_container'):
-            # Log error to operation container if available
-            operation_container = getattr(self, 'operation_container', None) or getattr(self, '_operation_container', None)
-            if operation_container and hasattr(operation_container, 'log_error'):
-                operation_container.log_error(error_msg)
+        
+        # Try to log to operation container using the log method from parent OperationHandler
+        self.log(error_msg, 'error')
     
     def log_error(self, error_msg: str):
         """Log error to operation container."""
@@ -148,28 +146,14 @@ class DownloaderOperationManager(OperationHandler):
     async def _update_operation_summary(self, operation_type: str, result: Dict[str, Any]) -> None:
         """Update operation summary with operation results."""
         try:
-            from ..components.operation_summary import update_operation_summary
-            
-            # Get the operation summary widget from UI components
-            ui_components = getattr(self, '_ui_components', {})
-            if hasattr(self.operation_container, 'get_ui_components'):
-                ui_components.update(self.operation_container.get_ui_components())
-            
-            operation_summary = ui_components.get('operation_summary')
-            if operation_summary:
-                # Determine status type based on result
-                if result.get('cancelled'):
-                    status_type = 'warning'
-                elif result.get('success'):
-                    status_type = 'success'
-                else:
-                    status_type = 'error'
-                
-                # Update the summary widget
-                update_operation_summary(operation_summary, operation_type, result, status_type)
-                self.logger.info(f"✅ Updated operation summary for {operation_type}")
+            # Log operation result to operation container
+            if result.get('cancelled'):
+                self.log(f"⚠️ {operation_type.capitalize()} operation was cancelled", 'warning')
+            elif result.get('success'):
+                self.log(f"✅ {operation_type.capitalize()} operation completed successfully", 'info')
             else:
-                self.logger.warning("⚠️ Operation summary widget not found in UI components")
+                error_msg = result.get('error', 'Unknown error')
+                self.log(f"❌ {operation_type.capitalize()} operation failed: {error_msg}", 'error')
                 
         except Exception as e:
             self.logger.error(f"❌ Failed to update operation summary: {e}")

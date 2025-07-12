@@ -191,7 +191,12 @@ class OperationContainer(BaseUIComponent):
         if prop_name == 'align_items':
             valid_values = ['flex-start', 'flex-end', 'center', 'baseline', 'stretch', 'inherit', 'initial', 'unset']
             if value not in valid_values:
-                self.logger.warning(f"Invalid {prop_name} value: '{value}'. Using default: '{default}'")
+                try:
+                    self.logger.warning(f"Invalid {prop_name} value: '{value}'. Using default: '{default}'")
+                except (TypeError, AttributeError):
+                    # Fallback if logger is not properly initialized
+                    import logging
+                    logging.getLogger(__name__).warning(f"Invalid {prop_name} value: '{value}'. Using default: '{default}'")
                 return default
                 
         return value

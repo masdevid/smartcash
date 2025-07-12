@@ -41,7 +41,11 @@ class BaseUIComponent(ABC):
         
         # Initialize logger
         self.logger = logger or logging.getLogger(f"smartcash.ui.{self.__class__.__name__}")
-        self.logger.debug(f"Initializing {self.__class__.__name__} with component_name: {component_name}")
+        try:
+            self.logger.debug(f"Initializing {self.__class__.__name__} with component_name: {component_name}")
+        except (TypeError, AttributeError):
+            # Fallback if logger is not properly initialized
+            logging.getLogger(__name__).debug(f"Initializing {self.__class__.__name__} with component_name: {component_name}")
         
         # Initialize error handling
         self._error_handler = error_handler or CoreErrorHandler(

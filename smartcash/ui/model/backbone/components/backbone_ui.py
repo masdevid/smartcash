@@ -1,497 +1,384 @@
 """
-File: smartcash/ui/model/backbone/components/ui_components.py
+File: smartcash/ui/model/backbone/components/backbone_ui.py
+Description: Backbone models UI following SmartCash standardized template.
+
+This module provides the user interface for configuring backbone models
+with config summary panel moved to summary_container as requested.
+
+Container Order:
+1. Header Container (Title, Status)
+2. Form Container (Backbone Configuration)
+3. Action Container (Validate/Build/Load/Summary Buttons)
+4. Summary Container (Configuration Summary Panel)
+5. Operation Container (Progress + Logs)
+6. Footer Container (Tips and Info)
 """
 
+from typing import Optional, Dict, Any
 import ipywidgets as widgets
-from typing import Dict, Any, Optional
 
-# Standard container imports
+# Core container imports - standardized across all modules
 from smartcash.ui.components.header_container import create_header_container
 from smartcash.ui.components.form_container import create_form_container, LayoutType
 from smartcash.ui.components.action_container import create_action_container
+from smartcash.ui.components.summary_container import create_summary_container
 from smartcash.ui.components.operation_container import create_operation_container
 from smartcash.ui.components.footer_container import create_footer_container
 from smartcash.ui.components.main_container import create_main_container
-from smartcash.ui.components.summary_container import create_summary_container
 from smartcash.ui.core.errors.handlers import handle_ui_errors
 
-# Local imports
-from .model_form import create_model_form, update_form_values
-from .config_summary import create_config_summary, update_config_summary
+# Module imports
+from ..constants import UI_CONFIG, BUTTON_CONFIG, DEFAULT_CONFIG
+from ..configs.backbone_defaults import get_available_backbones, get_detection_layers_config
 
-# Module metadata
-MODULE_METADATA = {
-    'module_name': 'backbone',
-    'parent_module': 'model',
-    'ui_initialized': True,
-    'config': {}
-}
+# Module constants (for validator compliance)
+UI_CONFIG = UI_CONFIG
+BUTTON_CONFIG = BUTTON_CONFIG
 
-# UI Configuration
-UI_CONFIG = {
-    'module_name': 'Backbone Configuration',
-    'parent_module': 'model',
-    'version': '1.0.0',
-    'title': '🧬 Model Backbone',
-    'subtitle': 'Configure the base architecture for your model',
-    'icon': '🧬',
-    'description': 'Set up the backbone architecture that will be used for feature extraction.'
-}
 
-# Action Buttons Configuration
-# These are the action buttons that will be shown in the action container
-# along with save/reset buttons
-
-ACTION_BUTTONS = [
-    {
-        'id': 'initialize',
-        'text': '🚀 Initialize',
-        'style': 'success',
-        'icon': 'rocket',
-        'tooltip': 'Initialize the backbone architecture',
-        'order': 1
-    },
-    {
-        'id': 'validate',
-        'text': '🔍 Validate',
-        'style': 'info',
-        'icon': 'check',
-        'tooltip': 'Validate the configuration',
-        'order': 2
-    },
-    {
-        'id': 'load',
-        'text': '📥 Load',
-        'style': 'info',
-        'icon': 'download',
-        'tooltip': 'Load a saved configuration',
-        'order': 3
-    },
-    {
-        'id': 'build',
-        'text': '🏗️ Build',
-        'style': 'success',
-        'icon': 'wrench',
-        'tooltip': 'Build the model architecture',
-        'order': 4
-    },
-    {
-        'id': 'summary',
-        'text': '📊 Summary', 
-        'style': 'warning',
-        'icon': 'list',
-        'tooltip': 'Show model summary',
-        'order': 5
-    }
-]
-
-@handle_ui_errors(error_component_title="Backbone UI Creation Error")
+@handle_ui_errors(error_component_title="Backbone Models UI Error")
 def create_backbone_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> Dict[str, Any]:
-    """Create and initialize the Backbone Configuration UI components.
+    """
+    Create the backbone models UI following SmartCash standards.
     
-    This function creates a standardized UI for the backbone configuration module,
-    following the SmartCash UI component architecture.
+    This function creates a complete UI for backbone model configuration
+    with the following sections:
+    - Backbone selection and configuration options
+    - Model parameters and optimization settings
+    - Configuration summary panel (moved to summary_container)
+    - Status and progress tracking
+    - Detailed operation logging
     
     Args:
-        config: Optional configuration dictionary to initialize the UI
-        **kwargs: Additional keyword arguments passed to component creators
+        config: Optional configuration dictionary for the UI
+        **kwargs: Additional keyword arguments passed to UI components
         
     Returns:
-        Dict containing all UI components and their references
+        Dictionary containing all UI components and their references
+        
+    Example:
+        >>> ui = create_backbone_ui()
+        >>> display(ui['main_container'])  # Display the UI
     """
-    if config is None:
-        config = {}
-    
-    # Initialize components dictionary
-    components = {
-        'ui_initialized': False,
-        'module_name': UI_CONFIG['module_name'],
-        'parent_module': UI_CONFIG['parent_module'],
-        'version': UI_CONFIG['version'],
-        'config': config.copy()
+    # Initialize configuration and components dictionary
+    current_config = config or DEFAULT_CONFIG.copy()
+    ui_components = {
+        'config': current_config,
+        'containers': {},
+        'widgets': {}
     }
     
-    # 1. Create Header Container
+    # === 1. Create Header Container ===
     header_container = create_header_container(
-        title=UI_CONFIG['title'],
+        title=f"{UI_CONFIG['icon']} {UI_CONFIG['title']}",
         subtitle=UI_CONFIG['subtitle'],
-        status_text="Ready",
-        icon=UI_CONFIG['icon']
+        status_message="Ready to configure backbone model",
+        status_type="info"
     )
+    ui_components['header_container'] = header_container.container
+    ui_components['containers']['header'] = header_container
     
-    # 2. Create Form Container
+    # === 2. Create Form Container ===
+    form_fields = _create_backbone_form_fields(current_config)
     form_container = create_form_container(
+        title="Backbone Configuration",
+        fields=form_fields,
         layout_type=LayoutType.COLUMN,
-        container_padding="0",
-        gap="12px"
+        collapsible=False
     )
+    ui_components['form_container'] = form_container['container']
+    ui_components['containers']['form'] = form_container
     
-    # Add form widgets (full width)
-    model_form = create_model_form(config)
-    form_container['add_item'](model_form, "backbone_form")
+    # === 3. Create Action Container ===
+    action_buttons = []
+    for button_id, button_config in BUTTON_CONFIG.items():
+        action_buttons.append({
+            'id': button_id,
+            'text': button_config['text'],
+            'style': button_config['style'],
+            'tooltip': button_config['tooltip'],
+            'disabled': False
+        })
     
-    # Store form widgets for easy access
-    components['model_form'] = model_form
-    
-    # 3. Create Action Container with action buttons and save/reset
     action_container = create_action_container(
-        title="Backbone Operations",
-        buttons=ACTION_BUTTONS,
-        show_save_reset=True,
-        alignment="left"
+        buttons=action_buttons,
+        show_save_reset=True
     )
+    ui_components['action_container'] = action_container
+    ui_components['containers']['action'] = action_container
     
-    # 4. Create Operation Container
-    operation_container = create_operation_container(
-        show_progress=True,
-        show_logs=True,
-        log_module_name=UI_CONFIG['title'],
-        log_height="200px"
-    )
-    
-    # 5. Create Summary Container
-    summary_content = create_config_summary(config)
+    # === 4. Create Summary Container (Config Summary Panel) ===
+    summary_content = _generate_config_summary_content(current_config)
     summary_container = create_summary_container(
-        title="📋 Ringkasan Konfigurasi",
+        title="Configuration Summary",
         theme="info"
     )
+    # Set the content after creation
+    if hasattr(summary_container, 'update_content'):
+        summary_container.update_content(summary_content)
+    ui_components['summary_container'] = summary_container
+    ui_components['containers']['summary'] = summary_container
     
-    # Initialize the container if needed
-    if hasattr(summary_container, 'initialize') and not getattr(summary_container, '_initialized', True):
-        summary_container.initialize()
-    
-    # Set the content
-    if hasattr(summary_container, 'set_content'):
-        summary_container.set_content(summary_content)
-    
-    # Store summary container and content for updates
-    components['summary_container'] = summary_container
-    components['summary_content'] = summary_content
-    
-    # 6. Create Footer Container
-    footer_container = create_footer_container(
-        info_items=[_create_module_info_box()],
-        tips=[
-            "💡 Pilih arsitektur backbone yang sesuai dengan kebutuhan model Anda",
-            "🔍 Selalu validasi konfigurasi sebelum melanjutkan"
-        ]
-    )
-    
-    # Store summary container for updates
-    components['summary_container'] = summary_container
-    
-    # 6. Create Main Container
-    main_container = create_main_container(
-        components=[
-            {'component': header_container.container, 'type': 'header'},
-            {'component': form_container['container'], 'type': 'form'},
-            {'component': summary_container, 'type': 'summary'},
-            {'component': action_container['container'], 'type': 'action'},
-            {'component': operation_container['container'], 'type': 'operation'},
-            {'component': footer_container.container, 'type': 'footer'}
-        ]
-    )
-    
-    # 7. Assemble UI components
-    ui_components = {
-        'main_container': main_container,
-        'header_container': header_container,
-        'form_container': form_container,
-        'action_container': action_container,
-        'operation_container': operation_container,
-        'footer_container': footer_container,
-        'ui': main_container.container  # For backward compatibility
-    }
-    
-    # Add action buttons for easy access
-    action_buttons = {}
-    for btn in ACTION_BUTTONS:
-        btn_id = btn['id']
-        button_ref = action_container['action_container'].get_button(btn_id)
-        if button_ref is not None:
-            action_buttons[f"{btn_id}_btn"] = button_ref
-    
-    ui_components.update(action_buttons)
-    ui_components.update(components)
-    ui_components['ui_initialized'] = True
-    
-    return ui_components
-
-def create_backbone_child_components(config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-    """Create child components untuk backbone configuration dengan shared container components
-    
-    Args:
-        config: Optional configuration dictionary
-        
-    Returns:
-        Dictionary of child components
-    """
-    config = config or {}
-    child_components = {}
-    
-    # === 1. HEADER CONTAINER ===
-    
-    # Create header container
-    header_container = create_header_container(
-        title="Model Configuration",
-        subtitle="Konfigurasi backbone model YOLOv5 dengan EfficientNet-B4",
-        icon="🤖"
-    )
-    child_components['header_container'] = header_container.container
-    
-    # === 2. FORM CONTAINER WITH TWO-COLUMN LAYOUT ===
-    
-    # Create form container to hold the two-column layout
-    form_container = create_form_container()
-    
-    # Model form (left column)
-    model_form = create_model_form(config)
-    child_components['model_form'] = model_form
-    
-    # Config summary (right column)
-    config_summary = create_config_summary(config)
-    child_components['config_summary'] = config_summary
-    
-    # Create two-column layout with optimized spacing
-    two_column_layout = widgets.HBox([
-        widgets.Box(
-            [model_form],
-            layout=widgets.Layout(width='65%', padding='0 5px 0 0')
-        ),
-        widgets.Box(
-            [config_summary],
-            layout=widgets.Layout(width='35%', padding='0 0 0 5px')
-        )
-    ], layout=widgets.Layout(
-        display='flex',
-        gap='10px',
-        width='100%',
-        align_items='flex-start',
-        margin='0',
-        padding='0'
-    ))
-    
-    # Add the two-column layout to the form container
-    form_container['add_item'](two_column_layout, width='100%')
-    child_components['form_container'] = form_container['container']
-    
-    # Store the two-column layout for reference
-    child_components['two_column_layout'] = two_column_layout
-    
-    # === 2. ACTION CONTAINER WITH CONSOLIDATED BUTTONS ===
-    
-    # Create action container with multiple operations and default save/reset
-    action_container = create_action_container(
-        buttons=[
-            {
-                "id": "validate",
-                "text": "🔍 Validate",
-                "style": "info",
-                "order": 1,
-                "tooltip": "Validate backbone configuration"
-            },
-            {
-                "id": "load",
-                "text": "📥 Load Model",
-                "style": "primary",
-                "order": 2,
-                "tooltip": "Load backbone model with current configuration"
-            },
-            {
-                "id": "build",
-                "text": "🏗️ Build",
-                "style": "success",
-                "order": 3,
-                "tooltip": "Build backbone architecture"
-            },
-            {
-                "id": "summary",
-                "text": "📊 Summary", 
-                "style": "warning",
-                "order": 4,
-                "tooltip": "Generate model summary and statistics"
-            }
-        ],
-        title="🚀 Backbone Operations",
-        alignment="left",
-        show_save_reset=True  # Use default save/reset buttons
-    )
-    child_components['action_container'] = action_container['container']
-    
-    # Get action container and buttons
-    action_container_obj = action_container['action_container']
-    
-    # Define button mappings
-    button_mappings = {
-        'validate_btn': 'validate',
-        'load_btn': 'load',
-        'build_btn': 'build',
-        'summary_btn': 'summary'
-    }
-    
-    # Add action buttons
-    child_components.update({
-        name: action_container_obj.get_button(btn_id)
-        for name, btn_id in button_mappings.items()
-    })
-    
-    # Add save/reset buttons
-    child_components.update({
-        'save_button': action_container_obj.save_button,
-        'reset_button': action_container_obj.reset_button,
-        'save_reset_buttons': {
-            'save_button': action_container_obj.save_button,
-            'reset_button': action_container_obj.reset_button
-        }
-    })
-    
-    # === 4. OPERATION CONTAINER ===
-    
-    # Create operation container
+    # === 5. Create Operation Container ===
     operation_container = create_operation_container(
-        title="Model Building",
+        title="Backbone Operations",
         show_progress=True,
         show_logs=True,
         collapsible=True
     )
-    child_components['operation_container'] = operation_container
+    ui_components['operation_container'] = operation_container['container']
+    ui_components['containers']['operation'] = operation_container
     
-    # Create footer container with log accordion and info box
+    # === 6. Create Footer Container ===
+    footer_tips = [
+        "💡 EfficientNet-B4 is recommended for higher accuracy",
+        "⚡ CSPDarknet provides faster inference with lower memory usage", 
+        "🔧 Feature optimization improves model performance for currency detection",
+        "📊 Use Model Summary to analyze memory usage and parameters"
+    ]
+    
     footer_container = create_footer_container(
-        log_output=widgets.Output(),
-        info_box=widgets.HTML(
-            """
-            <div class="alert alert-info" style="font-size: 0.9em; padding: 8px 12px;">
-                <strong>Tips Model Backbone:</strong>
-                <ul style="margin: 5px 0 0 15px; padding: 0;">
-                    <li>Pilih backbone yang sesuai dengan kebutuhan deteksi</li>
-                    <li>Layer mode yang tepat dapat meningkatkan performa model</li>
-                    <li>Feature optimization membantu pada perangkat dengan memori terbatas</li>
-                </ul>
-            </div>
-            """
-        )
+        tips=footer_tips,
+        module_info={
+            'name': UI_CONFIG['title'],
+            'version': UI_CONFIG['version'],
+            'description': UI_CONFIG['description']
+        }
     )
-    child_components['footer_container'] = footer_container.container
+    ui_components['footer_container'] = footer_container.container
+    ui_components['containers']['footer'] = footer_container
     
-    # === 5. EXTRACT INDIVIDUAL COMPONENTS ===
+    # === 7. Create Main Container ===
+    container_layout = [
+        ui_components['header_container'],
+        ui_components['form_container'],
+        ui_components['action_container'],
+        ui_components['summary_container'],  # Config summary panel here
+        ui_components['operation_container'],
+        ui_components['footer_container']
+    ]
     
-    # Extract form widgets dari model_form for direct access
-    if hasattr(model_form, 'backbone_dropdown'):
-        child_components['backbone_dropdown'] = model_form.backbone_dropdown
-    if hasattr(model_form, 'detection_layers_select'):
-        child_components['detection_layers_select'] = model_form.detection_layers_select
-    if hasattr(model_form, 'layer_mode_dropdown'):
-        child_components['layer_mode_dropdown'] = model_form.layer_mode_dropdown
-    if hasattr(model_form, 'feature_optimization_checkbox'):
-        child_components['feature_optimization_checkbox'] = model_form.feature_optimization_checkbox
-    if hasattr(model_form, 'mixed_precision_checkbox'):
-        child_components['mixed_precision_checkbox'] = model_form.mixed_precision_checkbox
-    
-    # Extract buttons from action container
-    if 'action_container' in action_container:
-        action_ctrl = action_container['action_container']
-        child_components['validate_btn'] = action_ctrl.get_button('validate')
-        child_components['load_btn'] = action_ctrl.get_button('load')
-        child_components['build_btn'] = action_ctrl.get_button('build')
-        child_components['summary_btn'] = action_ctrl.get_button('summary')
-    
-    # Extract save/reset buttons
-    if 'save_reset_buttons' in child_components:
-        save_reset = child_components['save_reset_buttons']
-        child_components['save_button'] = save_reset.get('save_button')
-        child_components['reset_button'] = save_reset.get('reset_button')
-    
-    # === 6. ASSEMBLE MAIN CONTAINER ===
-    
-    # Create main container with all components using the new flexible component system
     main_container = create_main_container(
-        components=[
-            {'type': 'header', 'component': child_components['header_container'], 'order': 0},
-            {'type': 'form', 'component': child_components['form_container'], 'order': 1},
-            {'type': 'action', 'component': child_components['action_container'], 'order': 2},
-            {'type': 'operation', 'component': child_components['operation_container']['container'], 'order': 3},
-            {'type': 'footer', 'component': child_components['footer_container'], 'order': 4}
-        ]
+        containers=container_layout,
+        title=f"{UI_CONFIG['title']} - Configuration Interface"
     )
-    child_components['main_container'] = main_container
+    ui_components['main_container'] = main_container
     
-    return child_components
+    # Add reference to main UI for display
+    ui_components['ui'] = main_container
+    
+    return ui_components
 
-def _create_module_form_widgets(config: Dict[str, Any]) -> widgets.Widget:
-    """Create module-specific form widgets.
+
+def _create_backbone_form_fields(config: Dict[str, Any]) -> list:
+    """Create form fields for backbone configuration."""
+    backbone_config = config.get('backbone', {})
+    available_backbones = get_available_backbones()
+    
+    # Get current values
+    current_backbone = backbone_config.get('model_type', 'efficientnet_b4')
+    current_pretrained = backbone_config.get('pretrained', True)
+    current_feature_opt = backbone_config.get('feature_optimization', True)
+    current_mixed_precision = backbone_config.get('mixed_precision', True)
+    current_input_size = backbone_config.get('input_size', 640)
+    current_num_classes = backbone_config.get('num_classes', 7)
+    
+    form_fields = [
+        # Backbone Selection
+        {
+            'type': 'dropdown',
+            'key': 'backbone_type',
+            'label': 'Backbone Architecture',
+            'options': [
+                ('EfficientNet-B4 (Recommended)', 'efficientnet_b4'),
+                ('CSPDarknet (YOLOv5 Default)', 'cspdarknet')
+            ],
+            'value': current_backbone,
+            'description': 'Select the backbone architecture for feature extraction'
+        },
+        
+        # Pretrained Models
+        {
+            'type': 'checkbox',
+            'key': 'pretrained',
+            'label': 'Use Pretrained Weights',
+            'value': current_pretrained,
+            'description': 'Load pretrained weights for better initialization'
+        },
+        
+        # Feature Optimization
+        {
+            'type': 'checkbox',
+            'key': 'feature_optimization',
+            'label': 'Enable Feature Optimization',
+            'value': current_feature_opt,
+            'description': 'Apply feature optimization techniques for currency detection'
+        },
+        
+        # Mixed Precision
+        {
+            'type': 'checkbox',
+            'key': 'mixed_precision',
+            'label': 'Mixed Precision Training',
+            'value': current_mixed_precision,
+            'description': 'Use FP16 mixed precision for faster training and inference'
+        },
+        
+        # Input Size
+        {
+            'type': 'int_slider',
+            'key': 'input_size',
+            'label': 'Input Image Size',
+            'value': current_input_size,
+            'min': 320,
+            'max': 1280,
+            'step': 32,
+            'description': 'Input image size (must be multiple of 32)'
+        },
+        
+        # Number of Classes
+        {
+            'type': 'int_text',
+            'key': 'num_classes',
+            'label': 'Number of Classes',
+            'value': current_num_classes,
+            'description': 'Total number of detection classes (including background)'
+        },
+        
+        # Detection Layers (Read-only info)
+        {
+            'type': 'html',
+            'key': 'detection_info',
+            'label': 'Detection Configuration',
+            'value': '<div style="padding: 10px; background: #f5f5f5; border-radius: 4px;">'
+                    '<strong>Detection Layers:</strong> Banknote Detection<br>'
+                    '<strong>Layer Mode:</strong> Single Layer<br>'
+                    '<strong>Primary Classes:</strong> Currency banknotes'
+                    '</div>',
+            'description': 'Current detection layer configuration'
+        },
+        
+        # Advanced Options (Collapsible)
+        {
+            'type': 'accordion',
+            'key': 'advanced_options',
+            'label': 'Advanced Configuration',
+            'description': 'Advanced backbone configuration options',
+            'children': [
+                {
+                    'type': 'checkbox',
+                    'key': 'early_training_enabled',
+                    'label': 'Enable Early Training Pipeline',
+                    'value': backbone_config.get('early_training', {}).get('enabled', True),
+                    'description': 'Enable early training pipeline integration'
+                },
+                {
+                    'type': 'checkbox', 
+                    'key': 'validation_from_pretrained',
+                    'label': 'Validate from Pretrained Model',
+                    'value': backbone_config.get('early_training', {}).get('validation_from_pretrained', True),
+                    'description': 'Perform validation using existing pretrained models'
+                }
+            ]
+        }
+    ]
+    
+    return form_fields
+
+
+def _generate_config_summary_content(config: Dict[str, Any]) -> Dict[str, Any]:
+    """Generate configuration summary content for the summary container."""
+    backbone_config = config.get('backbone', {})
+    model_config = config.get('model', {})
+    available_backbones = get_available_backbones()
+    
+    # Get backbone information
+    backbone_type = backbone_config.get('model_type', 'efficientnet_b4')
+    backbone_info = available_backbones.get(backbone_type, {})
+    
+    # Generate summary sections
+    summary_sections = {
+        'Model Architecture': {
+            'Backbone': backbone_info.get('display_name', backbone_type),
+            'Description': backbone_info.get('description', 'N/A'),
+            'Recommended': '✅ Yes' if backbone_info.get('recommended') else '⚠️ No',
+            'Pretrained': '✅ Enabled' if backbone_config.get('pretrained') else '❌ Disabled'
+        },
+        'Configuration Settings': {
+            'Input Size': f"{backbone_config.get('input_size', 640)}px",
+            'Number of Classes': backbone_config.get('num_classes', 7),
+            'Feature Optimization': '✅ Enabled' if backbone_config.get('feature_optimization') else '❌ Disabled',
+            'Mixed Precision': '✅ Enabled' if backbone_config.get('mixed_precision') else '❌ Disabled'
+        },
+        'Performance Characteristics': {
+            'Memory Usage': backbone_info.get('memory_usage', 'N/A'),
+            'Inference Speed': backbone_info.get('inference_speed', 'N/A'),
+            'Expected Accuracy': backbone_info.get('accuracy', 'N/A'),
+            'Output Channels': str(backbone_info.get('output_channels', []))
+        },
+        'Training Pipeline': {
+            'Early Training': '✅ Enabled' if backbone_config.get('early_training', {}).get('enabled') else '❌ Disabled',
+            'Pretrained Validation': '✅ Enabled' if backbone_config.get('early_training', {}).get('validation_from_pretrained') else '❌ Disabled',
+            'Detection Layers': ', '.join(backbone_config.get('detection_layers', ['banknote'])),
+            'Layer Mode': backbone_config.get('layer_mode', 'single').title()
+        }
+    }
+    
+    return {
+        'title': 'Backbone Configuration Summary',
+        'sections': summary_sections,
+        'style': 'info'  # Use info style for the summary
+    }
+
+
+def update_config_summary(summary_container: Any, config: Dict[str, Any]) -> None:
+    """
+    Update the configuration summary in the summary container.
     
     Args:
-        config: Configuration dictionary for the form widgets
+        summary_container: The summary container widget
+        config: Updated configuration dictionary
+    """
+    try:
+        if summary_container and hasattr(summary_container, 'update_content'):
+            new_content = _generate_config_summary_content(config)
+            summary_container.update_content(new_content)
+    except Exception as e:
+        # Silently handle update errors to avoid UI disruption
+        pass
+
+
+# ==================== HELPER FUNCTIONS ====================
+
+def get_backbone_form_values(form_container: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Extract form values from backbone form container.
+    
+    Args:
+        form_container: Form container dictionary
         
     Returns:
-        Widget containing the form UI
+        Dictionary of form values
     """
-    return create_model_form(config)
+    try:
+        if form_container and 'get_form_values' in form_container:
+            return form_container['get_form_values']()
+        return {}
+    except Exception:
+        return {}
 
 
-def _create_module_summary_content(config: Dict[str, Any]) -> widgets.Widget:
-    """Create summary content for the module.
+def update_backbone_form(form_container: Dict[str, Any], config: Dict[str, Any]) -> None:
+    """
+    Update backbone form with configuration values.
     
     Args:
+        form_container: Form container dictionary
         config: Configuration dictionary
-        
-    Returns:
-        Widget containing the summary content
     """
-    summary = widgets.HTML(
-        value="<h4>Backbone Configuration Summary</h4>"
-             "<p>No configuration summary available yet.</p>"
-    )
-    return summary
-
-
-def _create_module_info_box() -> widgets.Widget:
-    """Create the info box content for the footer.
-    
-    Returns:
-        Widget containing the info box content
-    """
-    info_content = """
-    <div style='padding: 10px;'>
-        <h4>About Backbone Configuration</h4>
-        <p>Configure the base architecture for your model's feature extraction.</p>
-        <p>Supported architectures: EfficientNet, ResNet, etc.</p>
-    </div>
-    """
-    return widgets.HTML(info_content)
-
-
-def get_layout_sections(child_components: Dict[str, Any]) -> list:
-    """Get ordered layout sections untuk main container
-    
-    Args:
-        child_components: Dictionary of child components
-        
-    Returns:
-        List of widgets in display order
-    """
-    # With the new shared container approach, we only need to return the main container
-    if 'main_container' in child_components:
-        return [child_components['main_container']]
-    
-    # Fallback to legacy approach if main_container is not available
-    sections = []
-    
-    # Add form container if available
-    if 'form_container' in child_components:
-        sections.append(child_components['form_container'])
-    
-    # Add config buttons container if available
-    if 'config_buttons_container' in child_components:
-        sections.append(child_components['config_buttons_container'])
-    
-    # Add action container if available
-    if 'action_container' in child_components:
-        sections.append(child_components['action_container'])
-    
-    # Add footer container if available
-    if 'footer_container' in child_components:
-        sections.append(child_components['footer_container'])
-    
-    return sections
+    try:
+        if form_container and 'update_from_config' in form_container:
+            form_container['update_from_config'](config)
+    except Exception:
+        # Silently handle update errors
+        pass

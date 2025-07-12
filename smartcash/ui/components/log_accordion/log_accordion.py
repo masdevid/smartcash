@@ -536,7 +536,12 @@ class LogAccordion(BaseUIComponent):
             
         except Exception as e:
             # Use the inherited logger from BaseUIComponent
-            self.logger.error(f"Error creating log widget: {str(e)}")
+            try:
+                self.logger.error(f"Error creating log widget: {str(e)}")
+            except (TypeError, AttributeError):
+                # Fallback if logger is not properly initialized
+                import logging
+                logging.getLogger(__name__).error(f"Error creating log widget: {str(e)}")
             return widgets.HTML(f"<div class='log-entry' style='color: #dc3545; padding: 4px 8px;'>Error displaying log: {str(e)}</div>")
 
     def _format_timestamp(self, timestamp: datetime) -> str:

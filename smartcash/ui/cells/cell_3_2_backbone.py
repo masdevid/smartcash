@@ -5,5 +5,5 @@ NOTE: Cell Code should remain minimal (import and run initializer only).
       Initializer should handle all the logic.
 """
 
-from smartcash.ui.model.backbone.backbone_initializer import initialize_backbone_ui
+from smartcash.ui.model.backbone.backbone_uimodule import initialize_backbone_ui
 initialize_backbone_ui()

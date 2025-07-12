@@ -1,219 +1,260 @@
 """
 File: smartcash/ui/model/pretrained/configs/pretrained_config_handler.py
-Configuration handler for pretrained models module.
+Description: Configuration handler for pretrained module following UIModule pattern
 """
 
 from typing import Dict, Any, Optional
-from pathlib import Path
-
 from smartcash.ui.core.handlers.config_handler import ConfigHandler
-from .pretrained_defaults import get_pretrained_defaults, get_yaml_schema
-from ..constants import DEFAULT_CONFIG, PretrainedModelType
+from smartcash.ui.logger import get_module_logger
+from .pretrained_defaults import get_default_pretrained_config
 
 
 class PretrainedConfigHandler(ConfigHandler):
     """
-    Configuration handler for pretrained models module.
-    Manages configuration persistence and validation.
+    Configuration handler for pretrained module.
+    
+    Features:
+    - 📋 Configuration validation and merging
+    - 🔄 UI-to-config and config-to-UI synchronization
+    - ✅ Model configuration validation
+    - 💾 Configuration persistence and loading
+    - 🛡️ Error handling and validation rules
     """
     
-    def __init__(self, module_name: str = "pretrained"):
-        """Initialize the pretrained config handler."""
-        super().__init__(module_name, "model")
-        self.config_key = "pretrained_models"
-    
-    def get_default_config(self) -> Dict[str, Any]:
+    def __init__(self, config: Optional[Dict[str, Any]] = None):
         """
-        Get default configuration for pretrained models.
+        Initialize pretrained configuration handler.
         
-        Returns:
-            Dictionary containing default configuration
+        Args:
+            config: Optional initial configuration
         """
-        return get_pretrained_defaults()
-    
-    def get_yaml_schema(self) -> Dict[str, Any]:
-        """
-        Get YAML schema for configuration validation.
+        super().__init__(
+            module_name='pretrained',
+            default_config=get_default_pretrained_config()
+        )
         
-        Returns:
-            Dictionary containing YAML schema
-        """
-        return get_yaml_schema()
-    
-    def initialize(self) -> Dict[str, Any]:
-        """
-        Initialize the config handler (required by base class).
+        self.logger = get_module_logger("smartcash.ui.model.pretrained.config")
         
-        Returns:
-            Dictionary containing initialization result
-        """
-        return {
-            'success': True,
-            'config_handler': self.__class__.__name__,
-            'module': self.module_name
-        }
+        # Load initial configuration
+        if config:
+            self.update_config(config)
     
-    def validate_config(self, config: Dict[str, Any]) -> Dict[str, Any]:
+    def validate_config(self, config: Dict[str, Any]) -> bool:
         """
-        Validate pretrained models configuration.
+        Validate pretrained configuration.
         
         Args:
             config: Configuration to validate
             
         Returns:
-            Validated and sanitized configuration
+            True if valid, False otherwise
         """
-        validated_config = self.get_default_config()
-        
-        if not isinstance(config, dict):
-            return validated_config
-        
-        # Validate models directory
-        models_dir = config.get("models_dir", "")
-        if isinstance(models_dir, str) and models_dir.strip():
-            # Ensure path is absolute and normalized
-            path = Path(models_dir.strip()).expanduser().resolve()
-            validated_config["models_dir"] = str(path)
-        
-        # Validate model URLs
-        model_urls = config.get("model_urls", {})
-        if isinstance(model_urls, dict):
-            for model_type in PretrainedModelType:
-                url = model_urls.get(model_type.value, "")
-                if isinstance(url, str) and url.strip():
-                    # Basic URL validation
-                    url = url.strip()
-                    if url.startswith(("http://", "https://")):
-                        validated_config["model_urls"][model_type.value] = url
-        
-        # Validate boolean flags
-        for flag in ["auto_download", "validate_downloads", "cleanup_failed"]:
-            if flag in config and isinstance(config[flag], bool):
-                validated_config[flag] = config[flag]
-        
-        # Validate numeric values
-        download_timeout = config.get("download_timeout")
-        if isinstance(download_timeout, (int, float)) and download_timeout > 0:
-            validated_config["download_timeout"] = int(download_timeout)
-        
-        return validated_config
+        try:
+            # Check required sections
+            if 'pretrained' not in config:
+                self.logger.error("Missing required section: 'pretrained'")
+                return False
+            
+            pretrained_config = config['pretrained']
+            
+            # Check required fields
+            required_fields = ['models_dir', 'model_urls']
+            for field in required_fields:
+                if field not in pretrained_config:
+                    self.logger.error(f"Missing required field: pretrained.{field}")
+                    return False
+            
+            # Validate models_dir
+            models_dir = pretrained_config['models_dir']
+            if not isinstance(models_dir, str) or not models_dir.strip():
+                self.logger.error("models_dir must be a non-empty string")
+                return False
+            
+            # Validate model_urls
+            model_urls = pretrained_config['model_urls']
+            if not isinstance(model_urls, dict):
+                self.logger.error("model_urls must be a dictionary")
+                return False
+            
+            # Validate timeout if present
+            if 'download_timeout' in pretrained_config:
+                timeout = pretrained_config['download_timeout']
+                if not isinstance(timeout, (int, float)) or timeout <= 0:
+                    self.logger.error("download_timeout must be a positive number")
+                    return False
+            
+            # Validate chunk_size if present
+            if 'chunk_size' in pretrained_config:
+                chunk_size = pretrained_config['chunk_size']
+                if not isinstance(chunk_size, int) or chunk_size <= 0:
+                    self.logger.error("chunk_size must be a positive integer")
+                    return False
+            
+            self.logger.debug("Configuration validation passed")
+            return True
+            
+        except Exception as e:
+            self.logger.error(f"Validation error: {e}")
+            return False
     
-    def extract_ui_config(self, ui_components: Dict[str, Any]) -> Dict[str, Any]:
+    def extract_config_from_ui(self, ui_components: Dict[str, Any]) -> Dict[str, Any]:
         """
         Extract configuration from UI components.
         
         Args:
-            ui_components: Dictionary containing UI components
+            ui_components: Dictionary of UI components
             
         Returns:
-            Dictionary containing extracted configuration
+            Extracted configuration dictionary
         """
-        config = self.get_default_config()
-        
         try:
-            input_options = ui_components.get('input_options', {})
+            form_components = ui_components.get('form_components', {})
             
-            # Extract models directory
-            model_dir_input = input_options.get('model_dir_input')
-            if model_dir_input and hasattr(model_dir_input, 'value'):
-                models_dir = model_dir_input.value.strip()
-                if models_dir:
-                    config["models_dir"] = models_dir
+            # Extract configuration from form components
+            config = {
+                'pretrained': {
+                    'models_dir': self._get_widget_value(form_components, 'models_dir', '/data/pretrained'),
+                    'model_urls': {
+                        'yolov5s': self._get_widget_value(form_components, 'yolov5s_url', ''),
+                        'efficientnet_b4': self._get_widget_value(form_components, 'efficientnet_b4_url', '')
+                    },
+                    'auto_download': self._get_widget_value(form_components, 'auto_download', False),
+                    'validate_downloads': self._get_widget_value(form_components, 'validate_downloads', True),
+                    'cleanup_failed': self._get_widget_value(form_components, 'cleanup_failed', True),
+                    'download_timeout': self._get_widget_value(form_components, 'download_timeout', 300),
+                    'chunk_size': self._get_widget_value(form_components, 'chunk_size', 8192),
+                    'progress_update_interval': self._get_widget_value(form_components, 'progress_update_interval', 1024 * 1024)
+                },
+                'models': {
+                    'yolov5s': {
+                        'enabled': self._get_widget_value(form_components, 'yolov5s_enabled', True),
+                        'priority': self._get_widget_value(form_components, 'yolov5s_priority', 1),
+                        'expected_size': self._get_widget_value(form_components, 'yolov5s_expected_size', 14_400_000),
+                        'validation': self._get_widget_value(form_components, 'yolov5s_validation', True)
+                    },
+                    'efficientnet_b4': {
+                        'enabled': self._get_widget_value(form_components, 'efficientnet_b4_enabled', True),
+                        'priority': self._get_widget_value(form_components, 'efficientnet_b4_priority', 2),
+                        'expected_size': self._get_widget_value(form_components, 'efficientnet_b4_expected_size', 75_000_000),
+                        'validation': self._get_widget_value(form_components, 'efficientnet_b4_validation', True)
+                    }
+                },
+                'operations': {
+                    'download': {
+                        'enabled': self._get_widget_value(form_components, 'download_enabled', True),
+                        'concurrent': self._get_widget_value(form_components, 'download_concurrent', False),
+                        'retry_count': self._get_widget_value(form_components, 'download_retry_count', 3),
+                        'verify_integrity': self._get_widget_value(form_components, 'download_verify_integrity', True)
+                    },
+                    'validate': {
+                        'enabled': self._get_widget_value(form_components, 'validate_enabled', True),
+                        'check_size': self._get_widget_value(form_components, 'validate_check_size', True),
+                        'check_format': self._get_widget_value(form_components, 'validate_check_format', True)
+                    },
+                    'cleanup': {
+                        'enabled': self._get_widget_value(form_components, 'cleanup_enabled', True),
+                        'remove_corrupted': self._get_widget_value(form_components, 'cleanup_remove_corrupted', True),
+                        'backup_before_delete': self._get_widget_value(form_components, 'cleanup_backup_before_delete', False)
+                    }
+                },
+                'ui': {
+                    'show_progress': self._get_widget_value(form_components, 'show_progress', True),
+                    'auto_refresh': self._get_widget_value(form_components, 'auto_refresh', True),
+                    'confirm_cleanup': self._get_widget_value(form_components, 'confirm_cleanup', True)
+                }
+            }
             
-            # Extract custom URLs
-            yolo_url_input = input_options.get('yolo_url_input')
-            if yolo_url_input and hasattr(yolo_url_input, 'value'):
-                yolo_url = yolo_url_input.value.strip()
-                if yolo_url:
-                    config["model_urls"]["yolov5s"] = yolo_url
-            
-            efficientnet_url_input = input_options.get('efficientnet_url_input')
-            if efficientnet_url_input and hasattr(efficientnet_url_input, 'value'):
-                efficientnet_url = efficientnet_url_input.value.strip()
-                if efficientnet_url:
-                    config["model_urls"]["efficientnet_b4"] = efficientnet_url
+            return config
             
         except Exception as e:
-            # Log error but don't fail completely
-            print(f"Warning: Error extracting UI config: {str(e)}")
-        
-        return self.validate_config(config)
+            self.logger.error(f"Error extracting config from UI: {e}")
+            return self.get_config()
     
-    def update_ui_from_config(self, ui_components: Dict[str, Any], config: Dict[str, Any]) -> None:
+    def update_ui_from_config(self, ui_components: Dict[str, Any], config: Optional[Dict[str, Any]] = None) -> None:
         """
         Update UI components from configuration.
         
         Args:
-            ui_components: Dictionary containing UI components
-            config: Configuration to apply to UI
+            ui_components: Dictionary of UI components to update
+            config: Configuration to apply (uses current config if None)
         """
         try:
-            # Validate config first
-            validated_config = self.validate_config(config)
-            input_options = ui_components.get('input_options', {})
+            config = config or self.get_config()
+            form_components = ui_components.get('form_components', {})
             
-            # Update models directory input
-            model_dir_input = input_options.get('model_dir_input')
-            if model_dir_input and hasattr(model_dir_input, 'value'):
-                model_dir_input.value = validated_config.get("models_dir", "/data/pretrained")
+            # Update pretrained configuration
+            pretrained_config = config.get('pretrained', {})
+            self._set_widget_value(form_components, 'models_dir', pretrained_config.get('models_dir'))
+            self._set_widget_value(form_components, 'auto_download', pretrained_config.get('auto_download'))
+            self._set_widget_value(form_components, 'validate_downloads', pretrained_config.get('validate_downloads'))
+            self._set_widget_value(form_components, 'cleanup_failed', pretrained_config.get('cleanup_failed'))
+            self._set_widget_value(form_components, 'download_timeout', pretrained_config.get('download_timeout'))
+            self._set_widget_value(form_components, 'chunk_size', pretrained_config.get('chunk_size'))
+            self._set_widget_value(form_components, 'progress_update_interval', pretrained_config.get('progress_update_interval'))
             
-            # Update URL inputs
-            model_urls = validated_config.get("model_urls", {})
+            # Update model URLs
+            model_urls = pretrained_config.get('model_urls', {})
+            self._set_widget_value(form_components, 'yolov5s_url', model_urls.get('yolov5s'))
+            self._set_widget_value(form_components, 'efficientnet_b4_url', model_urls.get('efficientnet_b4'))
             
-            yolo_url_input = input_options.get('yolo_url_input')
-            if yolo_url_input and hasattr(yolo_url_input, 'value'):
-                yolo_url_input.value = model_urls.get("yolov5s", "")
+            # Update models configuration
+            models_config = config.get('models', {})
+            yolov5s_config = models_config.get('yolov5s', {})
+            self._set_widget_value(form_components, 'yolov5s_enabled', yolov5s_config.get('enabled'))
+            self._set_widget_value(form_components, 'yolov5s_priority', yolov5s_config.get('priority'))
+            self._set_widget_value(form_components, 'yolov5s_expected_size', yolov5s_config.get('expected_size'))
+            self._set_widget_value(form_components, 'yolov5s_validation', yolov5s_config.get('validation'))
             
-            efficientnet_url_input = input_options.get('efficientnet_url_input')
-            if efficientnet_url_input and hasattr(efficientnet_url_input, 'value'):
-                efficientnet_url_input.value = model_urls.get("efficientnet_b4", "")
-                
+            efficientnet_config = models_config.get('efficientnet_b4', {})
+            self._set_widget_value(form_components, 'efficientnet_b4_enabled', efficientnet_config.get('enabled'))
+            self._set_widget_value(form_components, 'efficientnet_b4_priority', efficientnet_config.get('priority'))
+            self._set_widget_value(form_components, 'efficientnet_b4_expected_size', efficientnet_config.get('expected_size'))
+            self._set_widget_value(form_components, 'efficientnet_b4_validation', efficientnet_config.get('validation'))
+            
+            # Update operations configuration
+            operations_config = config.get('operations', {})
+            download_config = operations_config.get('download', {})
+            self._set_widget_value(form_components, 'download_enabled', download_config.get('enabled'))
+            self._set_widget_value(form_components, 'download_concurrent', download_config.get('concurrent'))
+            self._set_widget_value(form_components, 'download_retry_count', download_config.get('retry_count'))
+            self._set_widget_value(form_components, 'download_verify_integrity', download_config.get('verify_integrity'))
+            
+            validate_config = operations_config.get('validate', {})
+            self._set_widget_value(form_components, 'validate_enabled', validate_config.get('enabled'))
+            self._set_widget_value(form_components, 'validate_check_size', validate_config.get('check_size'))
+            self._set_widget_value(form_components, 'validate_check_format', validate_config.get('check_format'))
+            
+            cleanup_config = operations_config.get('cleanup', {})
+            self._set_widget_value(form_components, 'cleanup_enabled', cleanup_config.get('enabled'))
+            self._set_widget_value(form_components, 'cleanup_remove_corrupted', cleanup_config.get('remove_corrupted'))
+            self._set_widget_value(form_components, 'cleanup_backup_before_delete', cleanup_config.get('backup_before_delete'))
+            
+            # Update UI configuration
+            ui_config = config.get('ui', {})
+            self._set_widget_value(form_components, 'show_progress', ui_config.get('show_progress'))
+            self._set_widget_value(form_components, 'auto_refresh', ui_config.get('auto_refresh'))
+            self._set_widget_value(form_components, 'confirm_cleanup', ui_config.get('confirm_cleanup'))
+            
+            self.logger.debug("UI updated from configuration successfully")
+            
         except Exception as e:
-            # Log error but don't fail completely
-            print(f"Warning: Error updating UI from config: {str(e)}")
+            self.logger.error(f"Error updating UI from config: {e}")
     
-    def get_config_summary(self, config: Dict[str, Any]) -> str:
-        """
-        Get a human-readable summary of the configuration.
-        
-        Args:
-            config: Configuration to summarize
-            
-        Returns:
-            String containing configuration summary
-        """
+    def _get_widget_value(self, form_components: Dict[str, Any], widget_name: str, default_value: Any) -> Any:
+        """Get value from widget with fallback to default."""
         try:
-            validated_config = self.validate_config(config)
-            
-            summary_lines = [
-                "🤖 Pretrained Models Configuration:",
-                f"📁 Models Directory: {validated_config.get('models_dir', 'Not set')}",
-                ""
-            ]
-            
-            # Model URLs summary
-            model_urls = validated_config.get("model_urls", {})
-            summary_lines.append("🔗 Download URLs:")
-            
-            for model_type in PretrainedModelType:
-                url = model_urls.get(model_type.value, "")
-                model_name = model_type.value.replace("_", "-").upper()
-                if url:
-                    summary_lines.append(f"  • {model_name}: Custom URL provided")
-                else:
-                    summary_lines.append(f"  • {model_name}: Default URL")
-            
-            summary_lines.append("")
-            
-            # Settings summary
-            flags = ["auto_download", "validate_downloads", "cleanup_failed"]
-            summary_lines.append("⚙️ Settings:")
-            for flag in flags:
-                value = "✅ Enabled" if validated_config.get(flag, False) else "❌ Disabled"
-                flag_name = flag.replace("_", " ").title()
-                summary_lines.append(f"  • {flag_name}: {value}")
-            
-            return "\n".join(summary_lines)
-            
+            widget = form_components.get(widget_name)
+            if widget and hasattr(widget, 'value'):
+                return widget.value
+            return default_value
+        except Exception:
+            return default_value
+    
+    def _set_widget_value(self, form_components: Dict[str, Any], widget_name: str, value: Any) -> None:
+        """Set widget value safely."""
+        try:
+            widget = form_components.get(widget_name)
+            if widget and hasattr(widget, 'value') and value is not None:
+                widget.value = value
         except Exception as e:
-            return f"❌ Error generating config summary: {str(e)}"
+            self.logger.debug(f"Could not set {widget_name} value: {e}")

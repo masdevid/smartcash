@@ -141,8 +141,8 @@ def create_split_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> Dict[s
         
         # Create header
         header_container = create_header_container(
-            title=UI_CONFIG['module_name'],
-            description=UI_CONFIG['module_description'],
+            title=UI_CONFIG['title'],
+            description=UI_CONFIG['description'],
             **kwargs
         )
         

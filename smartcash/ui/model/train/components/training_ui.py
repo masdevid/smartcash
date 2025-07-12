@@ -1,38 +1,26 @@
 """
 File: smartcash/ui/model/train/components/training_ui.py
-Description: Model training UI following SmartCash standardized template.
-
-This module provides the user interface for training YOLOv5 models
-with real-time monitoring, metrics visualization, and training control.
-
-Container Order:
-1. Header Container (Title, Status)
-2. Form Container (Training Configuration)
-3. Action Container (Start/Stop/Resume/Validate Buttons)
-4. Summary Container (Training Overview)
-5. Operation Container (Progress + Logs)
-6. Footer Container (Tips and Info)
+Training UI components with dual live charts following UIModule pattern.
 """
 
-from typing import Optional, Dict, Any
+from typing import Dict, Any, Optional, List
 import ipywidgets as widgets
-
-# Core container imports - standardized across all modules
-from smartcash.ui.components.header_container import create_header_container
-from smartcash.ui.components.form_container import create_form_container, LayoutType
-from smartcash.ui.components.action_container import create_action_container
-from smartcash.ui.components.summary_container import create_summary_container
-from smartcash.ui.components.operation_container import create_operation_container
-from smartcash.ui.components.footer_container import create_footer_container
-from smartcash.ui.components.main_container import create_main_container
-from smartcash.ui.core.errors.handlers import handle_ui_errors
-
-# Module imports
-from ..constants import UI_CONFIG, BUTTON_CONFIG, DEFAULT_CONFIG, VALIDATION_RULES
-
-# Module constants (for validator compliance)
-UI_CONFIG = UI_CONFIG
-BUTTON_CONFIG = BUTTON_CONFIG
+from smartcash.ui.logger import get_module_logger
+from smartcash.ui.core.components.base_component import BaseComponent
+from smartcash.ui.core.components.form_components import (
+    create_form_container, create_form_section, 
+    create_dropdown, create_number_input, create_checkbox_input,
+    create_summary_container
+)
+from smartcash.ui.core.components.chart_components import create_live_chart
+from smartcash.ui.core.components.operation_components import create_operation_container
+from ..constants import (
+    UI_CONFIG, BUTTON_CONFIG, CHART_CONFIG, LAYER_CONFIGS, 
+    LayerMode, OptimizationType, generate_model_name
+)
+from ..configs.train_defaults import (
+    get_layer_mode_configs, get_optimization_types, get_chart_configurations
+)
 
 
 @handle_ui_errors(error_component_title="Training UI Error")

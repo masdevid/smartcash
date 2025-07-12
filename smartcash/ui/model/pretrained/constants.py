@@ -50,16 +50,28 @@ UI_CONFIG = {
     'module_name': 'pretrained',
     'parent_module': 'model',
     'title': '🤖 Pretrained Models',
-    'subtitle': 'Download and manage pretrained models for currency detection',
+    'subtitle': 'Download and manage YOLOv5s and EfficientNet-B4 models',
+    'description': 'Download and manage pretrained models for currency detection',
     'icon': '🤖',
+    'version': '2.0.0'
+}
+
+# Module Metadata
+MODULE_METADATA = {
+    'name': 'pretrained',
+    'title': '🤖 Pretrained Models',
+    'description': 'Pretrained model management module with download, validation, and cleanup operations',
     'version': '2.0.0',
-    "operations": [
-        {
-            "operation_id": "download",
-            "button_text": "📥 Download Models",
-            "button_style": "primary",
-            "description": "Download YOLOv5s and EfficientNet-B4 pretrained models"
-        }
+    'category': 'model',
+    'author': 'SmartCash',
+    'tags': ['pretrained', 'models', 'yolov5', 'efficientnet', 'download'],
+    'features': [
+        'YOLOv5s model download',
+        'EfficientNet-B4 model download',
+        'Model existence validation',
+        'Download progress tracking',
+        'Cleanup corrupted models',
+        'Model integrity verification'
     ]
 }
 

@@ -710,7 +710,11 @@ class OperationHandler(BaseHandler):
                 self.logger.error(f"Error logging to operation container: {e}")
         
         # Fallback to standard logger if no operation container or on error
-        log_func = getattr(self.logger, level, self.logger.info)
+        valid_levels = ['debug', 'info', 'warning', 'error', 'critical']
+        if level in valid_levels:
+            log_func = getattr(self.logger, level)
+        else:
+            log_func = self.logger.info
         log_func(message)
     
     def reset_progress(self) -> None:

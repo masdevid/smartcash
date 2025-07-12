@@ -1,25 +1,62 @@
 """
 File: smartcash/ui/model/backbone/__init__.py
-Deskripsi: Backbone model UI module exports
+Description: Main exports for backbone module using new UIModule pattern
+
+This module provides the main interface for the backbone model configuration module using the new
+UIModule architecture while preserving backbone selection and early training pipeline functionality.
 """
 
-from .backbone_initializer import BackboneInitializer, initialize_backbone_ui, get_backbone_initializer
-from .components import (
-    create_backbone_child_components,
-    create_model_form,
-    create_config_summary,
-    update_config_summary
+# ==================== NEW UIMODULE API ====================
+
+from .backbone_uimodule import (
+    BackboneUIModule,
+    create_backbone_uimodule,
+    get_backbone_uimodule,
+    reset_backbone_uimodule,
+    initialize_backbone_ui,
+    get_backbone_components
 )
 
-__all__ = [
-    # Main initializer
-    'BackboneInitializer',
-    'initialize_backbone_ui',
-    'get_backbone_initializer',
+# ==================== CORE COMPONENTS ====================
+
+from .components.backbone_ui import create_backbone_ui, update_config_summary
+from .configs.backbone_config_handler import BackboneConfigHandler
+from .operations.backbone_operation_manager import BackboneOperationManager
+
+# ==================== CONVENIENCE FUNCTIONS ====================
+
+def display_backbone_ui(
+    config=None,
+    **kwargs
+) -> None:
+    """
+    Display backbone UI with UIModule pattern.
     
-    # Components
-    'create_backbone_child_components',
-    'create_model_form',
-    'create_config_summary',
+    Args:
+        config: Optional configuration dictionary
+        **kwargs: Additional arguments
+    """
+    initialize_backbone_ui(
+        config=config,
+        display=True,
+        **kwargs
+    )
+
+# ==================== EXPORTS ====================
+
+__all__ = [
+    # NEW UIMODULE API
+    'BackboneUIModule',
+    'create_backbone_uimodule',
+    'get_backbone_uimodule',
+    'reset_backbone_uimodule',
+    'initialize_backbone_ui',
+    'get_backbone_components',
+    'display_backbone_ui',
+    
+    # CORE COMPONENTS
+    'create_backbone_ui',
     'update_config_summary',
+    'BackboneConfigHandler',
+    'BackboneOperationManager'
 ]

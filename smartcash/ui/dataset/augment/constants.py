@@ -297,3 +297,22 @@ PERFORMANCE_CONFIG = {
     'cache_enabled': True,
     'cache_size_mb': 256
 }
+
+# =============================================================================
+# MODULE METADATA
+# =============================================================================
+
+MODULE_METADATA = {
+    'name': 'augment',
+    'display_name': 'Data Augmentation',
+    'version': '2.0.0',
+    'description': 'Dataset augmentation with position and lighting transforms',
+    'category': 'dataset',
+    'requires_gpu': False,
+    'supports_batch': True,
+    'supports_progress': True,
+    'supports_preview': True,
+    'augmentation_types': ['position', 'lighting', 'combined', 'custom'],
+    'max_variations': 10,
+    'supported_formats': ['.jpg', '.jpeg', '.png', '.bmp']
+}

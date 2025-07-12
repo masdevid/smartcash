@@ -261,7 +261,11 @@ class ColabUIModule(UIModule):
             self.logger.error(f"❌ Failed to setup event handlers: {e}")
     
     def _handle_setup_button_click(self, button=None) -> None:
-        """Handle setup button click."""
+        """Handle setup button click.
+        
+        Args:
+            button: The button that was clicked (unused, required by ipywidgets)
+        """
         button_states = {}
         try:
             # Log using instance logger to avoid callable errors
@@ -273,8 +277,13 @@ class ColabUIModule(UIModule):
             # Disable all buttons to prevent multiple clicks
             button_states = self._get_operation_manager().disable_all_buttons("⏳ Setting up environment...")
             
-            # Log to UI using operation container
-            self.logger.info("🚀 Starting environment setup...")
+            # Log to UI using operation container if available
+            operation_container = getattr(self, '_operation_container', None)
+            if operation_container:
+                if hasattr(operation_container, 'log_message'):
+                    operation_container.log_message("🚀 Starting environment setup...", level='info')
+                elif hasattr(operation_container, 'log'):
+                    operation_container.log("🚀 Starting environment setup...", level='info')
             
             # Execute full setup
             result = self.execute_full_setup()
@@ -282,22 +291,39 @@ class ColabUIModule(UIModule):
             # Update status based on result
             success = result.get("success", False)
             if success:
-                self._update_status("Environment setup completed successfully!", "success")
-                self.log("✅ Environment setup completed successfully!", 'info')
+                status_msg = "Environment setup completed successfully!"
+                self._update_status(status_msg, "success")
+                self.logger.info("✅ " + status_msg)
+                
+                # Update operation container with success
+                if operation_container:
+                    if hasattr(operation_container, 'log_message'):
+                        operation_container.log_message("✅ " + status_msg, level='success')
+                    elif hasattr(operation_container, 'log'):
+                        operation_container.log("✅ " + status_msg, level='success')
             else:
                 error_msg = result.get("message", "Setup failed")
-                self._update_status(f"Setup failed: {error_msg}", "error")
-                self.logger.error(f"❌ Setup failed: {error_msg}")
+                status_msg = f"Setup failed: {error_msg}"
+                self._update_status(status_msg, "error")
+                self.logger.error("❌ " + status_msg)
+                
+                # Update operation container with error
+                if operation_container:
+                    if hasattr(operation_container, 'log_message'):
+                        operation_container.log_message("❌ " + status_msg, level='error')
+                    elif hasattr(operation_container, 'log'):
+                        operation_container.log("❌ " + status_msg, level='error')
             
             # Restore buttons with appropriate status
             self._get_operation_manager().enable_all_buttons(
                 button_states, 
                 success=success,
-                success_message="✅ Setup Complete" if success else "❌ Setup Failed",
-                error_message="❌ Setup Failed"
+                success_message="✅ Setup Complete" if success else None,
+                error_message="❌ Setup Failed" if not success else None
             )
             
-            self.logger.info(f"Setup completed with result: {result}")
+            self.logger.debug(f"Setup completed with result: {result}")
+            return result
             
         except Exception as e:
             self.logger.error(f"❌ Setup button click failed: {e}")
@@ -329,150 +355,158 @@ class ColabUIModule(UIModule):
                 header_container.update_status(message, status_type)
                 self.logger.debug(f"Updated status panel: {message} ({status_type})")
             else:
-                self.logger.debug(f"Status panel not available, status: {message}")
+                self.logger.debug(f"Status panel not available, status: {message} ({status_type})")
         except Exception as e:
             self.logger.error(f"Failed to update status panel: {e}")
+            self.logger.debug(f"Status message that failed: {message} ({status_type})")
     
     def _handle_save_config(self, button=None) -> None:
-        """Handle save configuration button click."""
+        """Handle save configuration button click.
+        
+        Args:
+            button: The button that was clicked (unused, required by ipywidgets)
+        """
         button_states = {}
         try:
-            # Save current configuration
+            # Log using instance logger to avoid callable errors
             self.logger.info("💾 Saving configuration")
+            
+            # Update status
             self._update_status("Saving configuration...", "info")
+            
+            # Log to UI using operation container if available
+            operation_container = getattr(self, '_operation_container', None)
+            if operation_container:
+                if hasattr(operation_container, 'log_message'):
+                    operation_container.log_message("💾 Saving configuration...", level='info')
+                elif hasattr(operation_container, 'log'):
+                    operation_container.log("💾 Saving configuration...", level='info')
             
             # Disable buttons during save
             button_states = self._get_operation_manager().disable_all_buttons("💾 Saving...")
             
-            # Configuration is automatically saved in memory for Colab
-            self._update_status("Configuration saved successfully", "success")
-            self.log("✅ Configuration saved", 'info')
+            # Get config handler
+            config_handler = self.get_config_handler()
+            if not config_handler:
+                raise ValueError("Configuration handler not available")
+            
+            # Save configuration
+            config_handler.save_config()
+            
+            # Update status and log success
+            status_msg = "Configuration saved successfully"
+            self._update_status(status_msg, "success")
+            self.logger.info("✅ " + status_msg)
+            
+            # Update operation container with success
+            if operation_container:
+                if hasattr(operation_container, 'log_message'):
+                    operation_container.log_message("✅ " + status_msg, level='success')
+                elif hasattr(operation_container, 'log'):
+                    operation_container.log("✅ " + status_msg, level='success')
             
             # Re-enable buttons with success state
-            self._get_operation_manager().enable_all_buttons(
-                button_states, 
-                success=True,
-                success_message="💾 Saved"
-            )
-            
-        except Exception as e:
-            self.logger.error(f"❌ Failed to save configuration: {e}")
-            self._update_status(f"Failed to save configuration: {str(e)}", "error")
-            self.log(f"❌ Failed to save configuration: {str(e)}", 'error')
-            
-            # Re-enable buttons with error state
             if button_states:
                 self._get_operation_manager().enable_all_buttons(
                     button_states, 
-                    success=False,
+                    success=True, 
+                    success_message="💾 Saved"
+                )
+                
+        except Exception as e:
+            error_msg = f"Failed to save configuration: {str(e)}"
+            self.logger.error("❌ " + error_msg)
+            self._update_status(error_msg, "error")
+            
+            # Update operation container with error
+            operation_container = getattr(self, '_operation_container', None)
+            if operation_container:
+                if hasattr(operation_container, 'log_message'):
+                    operation_container.log_message("❌ " + error_msg, level='error')
+                elif hasattr(operation_container, 'log'):
+                    operation_container.log("❌ " + error_msg, level='error')
+            
+            # Re-enable buttons with error state
+            if 'button_states' in locals() and button_states:
+                self._get_operation_manager().enable_all_buttons(
+                    button_states, 
+                    success=False, 
                     error_message="❌ Save Failed"
                 )
     
     def _handle_reset_config(self, button=None) -> None:
-        """Handle reset configuration button click."""
+        """Handle reset configuration button click.
+        
+        Args:
+            button: The button that was clicked (unused, required by ipywidgets)
+        """
         button_states = {}
         try:
-            # Reset to default configuration
+            # Log using instance logger to avoid callable errors
             self.logger.info("🔄 Resetting configuration to defaults")
+            
+            # Update status
             self._update_status("Resetting configuration to defaults...", "info")
+            
+            # Log to UI using operation container if available
+            operation_container = getattr(self, '_operation_container', None)
+            if operation_container:
+                if hasattr(operation_container, 'log_message'):
+                    operation_container.log_message("🔄 Resetting configuration to defaults...", level='info')
+                elif hasattr(operation_container, 'log'):
+                    operation_container.log("🔄 Resetting configuration to defaults...", level='info')
             
             # Disable buttons during reset
             button_states = self._get_operation_manager().disable_all_buttons("🔄 Resetting...")
             
-            if self._config_handler:
-                # Check if the method exists, use appropriate method
-                if hasattr(self._config_handler, 'reset_to_defaults'):
-                    self._config_handler.reset_to_defaults()
-                elif hasattr(self._config_handler, 'reset_config'):
-                    self._config_handler.reset_config()
-                else:
-                    # Fallback: manually reset using default config
-                    from .configs.colab_defaults import get_default_colab_config
-                    default_config = get_default_colab_config()
-                    self.update_config(**default_config)
-                    
-            self._update_status("Configuration reset to defaults successfully", "success")
-            self.log("✅ Configuration reset to defaults", 'info')
+            # Get config handler
+            config_handler = self.get_config_handler()
+            if not config_handler:
+                raise ValueError("Configuration handler not available")
+            
+            # Reset configuration to defaults
+            config_handler.reset_to_defaults()
+            
+            # Update status and log success
+            status_msg = "Configuration reset to defaults successfully"
+            self._update_status(status_msg, "success")
+            self.logger.info("✅ " + status_msg)
+            
+            # Update operation container with success
+            if operation_container:
+                if hasattr(operation_container, 'log_message'):
+                    operation_container.log_message("✅ " + status_msg, level='success')
+                elif hasattr(operation_container, 'log'):
+                    operation_container.log("✅ " + status_msg, level='success')
             
             # Re-enable buttons with success state
-            self._get_operation_manager().enable_all_buttons(
-                button_states, 
-                success=True,
-                success_message="🔄 Reset"
-            )
-            
-        except Exception as e:
-            self.logger.error(f"❌ Failed to reset configuration: {e}")
-            self._update_status(f"Failed to reset configuration: {str(e)}", "error")
-            self.log(f"❌ Failed to reset configuration: {str(e)}", 'error')
-            
-            # Re-enable buttons with error state
             if button_states:
                 self._get_operation_manager().enable_all_buttons(
                     button_states, 
-                    success=False,
+                    success=True, 
+                    success_message="🔄 Reset"
+                )
+                
+        except Exception as e:
+            error_msg = f"Failed to reset configuration: {str(e)}"
+            self.logger.error("❌ " + error_msg)
+            self._update_status(error_msg, "error")
+            
+            # Update operation container with error
+            operation_container = getattr(self, '_operation_container', None)
+            if operation_container:
+                if hasattr(operation_container, 'log_message'):
+                    operation_container.log_message("❌ " + error_msg, level='error')
+                elif hasattr(operation_container, 'log'):
+                    operation_container.log("❌ " + error_msg, level='error')
+            
+            # Re-enable buttons with error state
+            if 'button_states' in locals() and button_states:
+                self._get_operation_manager().enable_all_buttons(
+                    button_states, 
+                    success=False, 
                     error_message="❌ Reset Failed"
                 )
-    
-    def get_environment_status(self) -> Dict[str, Any]:
-        """Get comprehensive environment status.
-        
-        Returns:
-            Dictionary with environment information
-        """
-        status = {
-            "module": self.full_module_name,
-            "environment_type": "colab" if self._environment_detected else "local",
-            "is_colab": self._environment_detected,
-            "module_status": self.get_status().value,
-            "ready": self.is_ready(),
-            "error_count": self._error_count,
-            "components": len(self.list_components()),
-            "operations": len(self.list_operations()),
-            "timestamp": datetime.now().isoformat()
-        }
-        
-        return status
-    
-    def reset_environment(self) -> Dict[str, Any]:
-        """Reset Colab environment to initial state.
-        
-        Returns:
-            Dictionary with reset results
-        """
-        try:
-            # Reset components
-            self.clear_components()
-            
-            # Reset operation manager
-            if self._operation_manager:
-                self._operation_manager.cleanup()
-            
-            # Re-detect environment
-            self._detect_environment()
-            
-            # Re-create components
-            self._create_ui_components()
-            
-            # Re-setup operation manager
-            self._setup_operation_manager()
-            
-            # Re-register operations
-            self._register_operations()
-            
-            return {
-                "success": True,
-                "message": "Colab environment reset successfully",
-                "environment_type": "colab" if self._environment_detected else "local"
-            }
-            
-        except Exception as e:
-            self.logger.error(f"❌ Failed to reset environment: {e}")
-            return {
-                "success": False,
-                "error": str(e),
-                "message": "Failed to reset Colab environment"
-            }
     
     def execute_full_setup(self, **kwargs) -> Dict[str, Any]:
         """Execute complete Colab setup workflow.
@@ -539,6 +573,125 @@ class ColabUIModule(UIModule):
             ColabOperationManager instance or None
         """
         return self._operation_manager
+    
+    def get_environment_status(self) -> Dict[str, Any]:
+        """Get comprehensive environment status.
+        
+        Returns:
+            Dictionary with environment information including:
+            - module: Module name
+            - environment_type: Type of environment (colab/local)
+            - is_colab: Boolean indicating if running in Colab
+            - module_status: Current module status
+            - ready: Boolean indicating if module is ready
+            - error_count: Number of errors encountered
+            - components: Number of registered components
+            - operations: Number of registered operations
+            - timestamp: ISO format timestamp
+        """
+        return {
+            "module": self.full_module_name,
+            "environment_type": "colab" if self._environment_detected else "local",
+            "is_colab": self._environment_detected,
+            "module_status": self.get_status().value,
+            "ready": self.is_ready(),
+            "error_count": getattr(self, '_error_count', 0),
+            "components": len(self.list_components()),
+            "operations": len(self.list_operations()),
+            "timestamp": datetime.now().isoformat()
+        }
+        
+    def reset_environment(self, hard_reset: bool = False, **kwargs) -> Dict[str, Any]:
+        """Reset the Colab environment to initial state.
+        
+        Args:
+            hard_reset: If True, perform a complete reset including configs.
+                        If False, perform a soft reset (reload components).
+            **kwargs: Additional arguments for reset operation.
+            
+        Returns:
+            Dictionary with reset results including:
+            - success: Boolean indicating if reset was successful
+            - message: Status message
+            - reset_type: Type of reset performed ('hard' or 'soft')
+            - timestamp: ISO format timestamp
+        """
+        self.logger.info(f"🔄 Resetting Colab environment (hard_reset={hard_reset})")
+        
+        try:
+            # Get operation container for progress updates
+            operation_container = getattr(self, '_operation_container', None)
+            
+            # Update status
+            self._update_status("Resetting environment...", "info")
+            
+            # Log to operation container if available
+            if operation_container:
+                if hasattr(operation_container, 'log_message'):
+                    operation_container.log_message("🔄 Resetting environment...", level='info')
+                elif hasattr(operation_container, 'log'):
+                    operation_container.log("🔄 Resetting environment...", level='info')
+            
+            # Perform hard reset if requested
+            if hard_reset:
+                # Reset config to defaults
+                if self._config_handler:
+                    self._config_handler.reset_to_defaults()
+                
+                # Clear any cached data
+                self._clear_cached_data()
+                
+                # Reinitialize components
+                self.initialize()
+                
+                message = "Environment reset to default state"
+                reset_type = "hard"
+            else:
+                # Soft reset - just reload components
+                self._create_ui_components()
+                self._setup_event_handlers()
+                
+                message = "Environment components reloaded"
+                reset_type = "soft"
+            
+            # Log success
+            self.logger.info(f"✅ {message}")
+            self._update_status(message, "success")
+            
+            # Update operation container with success
+            if operation_container:
+                if hasattr(operation_container, 'log_message'):
+                    operation_container.log_message(f"✅ {message}", level='success')
+                elif hasattr(operation_container, 'log'):
+                    operation_container.log(f"✅ {message}", level='success')
+            
+            return {
+                "success": True,
+                "message": message,
+                "reset_type": reset_type,
+                "timestamp": datetime.now().isoformat()
+            }
+            
+        except Exception as e:
+            error_msg = f"Failed to reset environment: {str(e)}"
+            self.logger.error(f"❌ {error_msg}")
+            self._update_status(error_msg, "error")
+            
+            # Update operation container with error
+            operation_container = getattr(self, '_operation_container', None)
+            if operation_container:
+                if hasattr(operation_container, 'log_message'):
+                    operation_container.log_message(f"❌ {error_msg}", level='error')
+                elif hasattr(operation_container, 'log'):
+                    operation_container.log(f"❌ {error_msg}", level='error')
+            
+            return {
+                "success": False,
+                "error": str(e),
+                "message": error_msg,
+                "reset_type": "failed",
+                "timestamp": datetime.now().isoformat()
+            }
     
     def get_config_handler(self) -> Optional[ColabConfigHandler]:
         """Get the config handler instance.

@@ -213,9 +213,34 @@ def get_default_package_categories() -> Dict[str, Dict[str, Any]]:
         }
     }
     
-    # Add requirements.txt category
-    requirements_category = get_requirements_category()
-    base_categories.update(requirements_category)
+    # Merge requirements.txt packages into appropriate categories
+    requirements_categorized = categorize_requirements_packages()
+    
+    for category_key, req_packages in requirements_categorized.items():
+        if category_key in base_categories and req_packages:
+            existing_packages = base_categories[category_key]['packages']
+            existing_names = {pkg['name'].lower().replace('_', '-') for pkg in existing_packages}
+            
+            # Add only unique packages from requirements.txt
+            for req_pkg in req_packages:
+                req_name = req_pkg['name'].lower().replace('_', '-')
+                if req_name not in existing_names:
+                    # Update description to indicate it's from requirements.txt
+                    req_pkg['description'] = f"{req_pkg['description']} (from requirements.txt)"
+                    req_pkg['source'] = 'requirements.txt'
+                    existing_packages.append(req_pkg)
+                    existing_names.add(req_name)
+    
+    # Add additional packages category for uncategorized packages
+    additional_packages = requirements_categorized.get('additional_packages', [])
+    if additional_packages:
+        base_categories['additional_packages'] = {
+            'name': 'Additional Packages',
+            'description': 'Packages from requirements.txt not in standard categories',
+            'icon': '📦',
+            'color': '#607D8B',
+            'packages': additional_packages
+        }
     
     return base_categories
 
@@ -356,16 +381,47 @@ def parse_requirements_txt(requirements_path: str = None) -> List[Dict[str, Any]
     
     return packages
 
-def get_requirements_category() -> Dict[str, Any]:
-    """Get requirements.txt category for package selection."""
+def categorize_requirements_packages() -> Dict[str, List[Dict[str, Any]]]:
+    """Categorize packages from requirements.txt into appropriate groups.
+    
+    Returns:
+        Dictionary with categorized packages for each group
+    """
     requirements_packages = parse_requirements_txt()
     
-    return {
-        'requirements_txt': {
-            'name': 'Requirements.txt',
-            'description': 'Packages from requirements.txt file',
-            'icon': '📋',
-            'color': '#FF6B35',
-            'packages': requirements_packages
-        }
+    # Define package mappings based on their purpose
+    core_packages = {
+        'ipywidgets', 'ipython', 'pyyaml', 'python-dotenv', 'pytz', 'albumentations'
     }
+    
+    ml_ai_packages = {
+        'torch', 'torchvision', 'ultralytics', 'timm', 'scikit-learn', 
+        'tensorboard', 'thop'
+    }
+    
+    data_processing_packages = {
+        'pandas', 'numpy', 'opencv-python', 'pillow', 'matplotlib', 'scipy',
+        'pybboxes', 'sahi'
+    }
+    
+    categorized = {
+        'core_requirements': [],
+        'ml_ai_libraries': [],
+        'data_processing': [],
+        'additional_packages': []
+    }
+    
+    for pkg in requirements_packages:
+        pkg_name = pkg['name'].lower().replace('_', '-')
+        
+        if pkg_name in core_packages:
+            categorized['core_requirements'].append(pkg)
+        elif pkg_name in ml_ai_packages:
+            categorized['ml_ai_libraries'].append(pkg)
+        elif pkg_name in data_processing_packages:
+            categorized['data_processing'].append(pkg)
+        else:
+            # Unknown packages go to additional packages
+            categorized['additional_packages'].append(pkg)
+    
+    return categorized

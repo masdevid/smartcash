@@ -215,7 +215,7 @@ class DependencyUIModule(UIModule):
             'core_requirements',
             'ml_ai_libraries', 
             'data_processing',
-            'requirements_txt'
+            'additional_packages'
         ]
         
         for category_key in categories:
@@ -236,8 +236,10 @@ class DependencyUIModule(UIModule):
             # Create checkboxes for this category
             category_checkboxes = []
             for pkg in packages:
+                # Core requirements are selected by default, others are not
+                default_selected = category_key == 'core_requirements'
                 checkbox = widgets.Checkbox(
-                    value=True if category_key in ['core_requirements', 'requirements_txt'] else False,
+                    value=default_selected,
                     description=f"{pkg['name']} ({pkg.get('version', '')})",
                     style={'description_width': 'initial'},
                     layout=widgets.Layout(margin='1px 0')
@@ -426,7 +428,7 @@ class DependencyUIModule(UIModule):
             def __init__(self, module):
                 self.module = module
             
-            def update_progress(self, progress, message="", level="primary", **kwargs):
+            def update_progress(self, progress, message="", level="primary", **_):
                 """Update progress bar."""
                 try:
                     progress_tracker = self.module.get_component("progress_tracker")

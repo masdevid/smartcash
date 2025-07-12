@@ -9,6 +9,7 @@ from datetime import datetime
 from smartcash.ui.core.ui_module import UIModule, SharedMethodRegistry, register_operation_method
 from smartcash.ui.core.ui_module_factory import create_template
 from smartcash.ui.logger import get_module_logger
+from smartcash.ui.core.handlers.operation_handler import OperationHandler, OperationStatus
 from smartcash.ui.core.errors.handlers import handle_ui_errors
 
 # Import existing Colab components and handlers

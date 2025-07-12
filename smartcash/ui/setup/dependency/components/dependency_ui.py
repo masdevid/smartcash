@@ -158,8 +158,8 @@ def create_dependency_ui_components(module_config: Dict[str, Any]) -> Dict[str, 
             'uninstall_button': action_container['buttons'].get('uninstall'),
             
             # Operation components
+            'operation_container': operation_container.get('container'),
             'progress_tracker': operation_container.get('progress_tracker'),
-            'log_output': operation_container.get('log_output'),
             'log_accordion': operation_container.get('log_accordion')
         }
         

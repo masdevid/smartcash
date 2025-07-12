@@ -183,15 +183,12 @@ class DependencyUIModule(UIModule):
     def _setup_operation_manager(self) -> None:
         """Setup operation manager for Dependency operations."""
         try:
-            # Create wrapper for operation container
-            operation_container_wrapper = self._create_operation_container_wrapper()
-            
-            # Get operation container component
+            # Get operation container instance directly
             operation_container = self.get_component("operation_container")
             
             self._operation_manager = DependencyOperationManager(
                 config=self.get_config(),
-                operation_container=operation_container_wrapper,
+                operation_container=operation_container,
                 ui_components={'operation_container': operation_container}
             )
             
@@ -201,42 +198,6 @@ class DependencyUIModule(UIModule):
             logger.error(f"❌ Failed to setup operation manager: {e}")
             raise
     
-    def _create_operation_container_wrapper(self):
-        """Create a wrapper object that provides operation container methods."""
-        class OperationContainerWrapper:
-            def __init__(self, module):
-                self.module = module
-            
-            def update_progress(self, progress, message="", level="primary", **_):
-                """Update progress bar."""
-                try:
-                    progress_tracker = self.module.get_component("progress_tracker")
-                    if progress_tracker and hasattr(progress_tracker, 'set_progress'):
-                        progress_tracker.set_progress(progress, message, level)
-                except Exception as e:
-                    logger.debug(f"Progress update failed: {e}")
-            
-            def log_message(self, message, level='info'):
-                """Log message to UI log output."""
-                try:
-                    # Try log_accordion first
-                    log_accordion = self.module.get_component("log_accordion")
-                    if log_accordion and hasattr(log_accordion, 'log'):
-                        log_accordion.log(message, level)
-                        return
-                    
-                    # Fallback to log_output
-                    log_output = self.module.get_component("log_output")
-                    if log_output and hasattr(log_output, 'log'):
-                        log_output.log(message, level)
-                        return
-                        
-                    # Last resort: use logger
-                    getattr(logger, level, logger.info)(message)
-                except Exception as e:
-                    logger.debug(f"Log message failed: {e}")
-        
-        return OperationContainerWrapper(self)
     
     def _setup_config_handler(self) -> None:
         """Setup config handler."""
@@ -499,24 +460,34 @@ class DependencyUIModule(UIModule):
         return selected
     
     def _log_to_ui(self, message: str, level: str = "info") -> None:
-        """Log message to UI components."""
+        """Log message to UI components using operation container's log_accordion."""
         try:
-            # Log to operation container
-            log_accordion = self.get_component("log_accordion")
-            if log_accordion and hasattr(log_accordion, 'log'):
-                log_accordion.log(message, level)
-            
-            # Also log to log accordion (primary logging location)
-            # Status output removed to avoid duplication
+            # Get operation container and use its log_accordion
+            operation_container = self.get_component("operation_container")
+            if operation_container and hasattr(operation_container, 'log'):
+                # Map log levels to LogLevel enum if needed
+                from smartcash.ui.components.log_accordion import LogLevel
+                level_map = {
+                    'info': LogLevel.INFO,
+                    'success': LogLevel.INFO,
+                    'warning': LogLevel.WARNING,
+                    'error': LogLevel.ERROR,
+                    'debug': LogLevel.DEBUG
+                }
+                log_level = level_map.get(level, LogLevel.INFO)
+                operation_container.log(message, log_level)
+            else:
+                # Fallback to logger if operation container not available
+                getattr(logger, level, logger.info)(message)
         except Exception as e:
             logger.debug(f"UI logging failed: {e}")
     
     def _update_progress(self, progress: int, message: str = "", level: str = "primary") -> None:
-        """Update progress tracker."""
+        """Update progress tracker using operation container."""
         try:
-            progress_tracker = self.get_component("progress_tracker")
-            if progress_tracker and hasattr(progress_tracker, 'set_progress'):
-                progress_tracker.set_progress(progress, message, level)
+            operation_container = self.get_component("operation_container")
+            if operation_container and hasattr(operation_container, 'update_progress'):
+                operation_container.update_progress(progress, message, level)
             else:
                 # Fallback to logging
                 self._log_to_ui(f"Progress {progress}%: {message}", "info")

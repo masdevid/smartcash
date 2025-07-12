@@ -124,16 +124,26 @@ class ColabOperationManager(OperationHandler):
             message: Status message to display
             level: Message level ('info', 'warning', 'error', 'success')
         """
-        # Log the message
-        log_method = getattr(self.logger, level, self.logger.info)
-        log_method(f"Status update: {message}")
-        
-        # Update operation container if available
+        # Only update operation container to avoid duplicate logging
         if hasattr(self, 'operation_container') and self.operation_container is not None:
-            if hasattr(self.operation_container, 'update_status'):
+            if hasattr(self.operation_container, 'log'):
+                # Map string levels to LogLevel enum
+                from smartcash.ui.components.log_accordion import LogLevel
+                level_map = {
+                    'info': LogLevel.INFO,
+                    'warning': LogLevel.WARNING,
+                    'error': LogLevel.ERROR,
+                    'success': LogLevel.INFO,
+                    'debug': LogLevel.DEBUG
+                }
+                log_level = level_map.get(level, LogLevel.INFO)
+                self.operation_container.log(f"Status update: {message}", log_level)
+            elif hasattr(self.operation_container, 'update_status'):
                 self.operation_container.update_status(message, level=level)
-            elif hasattr(self.operation_container, 'log'):
-                self.operation_container.log(message, level=level)
+        else:
+            # Fallback to logger only if no operation container
+            log_method = getattr(self.logger, level, self.logger.info)
+            log_method(f"Status update: {message}")
     
     def _init_operation(self, progress_callback: Optional[Callable] = None) -> Dict[str, Any]:
         """Execute initialization operation."""
@@ -338,3 +348,31 @@ class ColabOperationManager(OperationHandler):
                 
         except Exception as e:
             self.logger.error(f"Error updating progress: {e}")
+    
+    def log(self, message: str, level: str = 'info') -> None:
+        """Override parent log method to avoid duplicate logging.
+        
+        Args:
+            message: Message to log
+            level: Log level (debug, info, warning, error, critical)
+        """
+        # Only log to operation container to avoid duplication
+        if hasattr(self, 'operation_container') and self.operation_container is not None:
+            if hasattr(self.operation_container, 'log'):
+                # Map string levels to LogLevel enum
+                from smartcash.ui.components.log_accordion import LogLevel
+                level_map = {
+                    'info': LogLevel.INFO,
+                    'warning': LogLevel.WARNING,
+                    'error': LogLevel.ERROR,
+                    'success': LogLevel.INFO,
+                    'debug': LogLevel.DEBUG,
+                    'critical': LogLevel.ERROR
+                }
+                log_level = level_map.get(level, LogLevel.INFO)
+                self.operation_container.log(message, log_level)
+                return
+        
+        # Fallback to standard logger only if no operation container
+        log_func = getattr(self.logger, level, self.logger.info)
+        log_func(message)

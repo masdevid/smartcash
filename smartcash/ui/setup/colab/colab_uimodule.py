@@ -179,12 +179,12 @@ class ColabUIModule(UIModule):
     def _setup_operation_manager(self) -> None:
         """Setup operation manager for Colab operations."""
         try:
-            # Create a wrapper object with necessary methods for operation container
-            operation_container_wrapper = self._create_operation_container_wrapper()
+            # Get operation container instance directly
+            operation_container = self.get_component("operation_container")
             
             self._operation_manager = ColabOperationManager(
                 config=self.get_config(),
-                operation_container=operation_container_wrapper
+                operation_container=operation_container
             )
             
             logger.debug("⚙️ Setup operation manager")
@@ -227,57 +227,6 @@ class ColabUIModule(UIModule):
             logger.error(f"❌ Failed to register operations: {e}")
             raise
     
-    def _create_operation_container_wrapper(self):
-        """Create a wrapper object that provides operation container methods."""
-        class OperationContainerWrapper:
-            def __init__(self, module):
-                self.module = module
-            
-            def update_progress(self, progress, message="", level="primary", **kwargs):
-                """Update progress bar."""
-                try:
-                    progress_tracker = self.module.get_component("progress_tracker")
-                    if progress_tracker and hasattr(progress_tracker, 'set_progress'):
-                        progress_tracker.set_progress(progress, message, level)
-                except Exception as e:
-                    logger.debug(f"Progress update failed: {e}")
-            
-            def log_message(self, message, level='info'):
-                """Log message to UI log output."""
-                try:
-                    # Try log_accordion first
-                    log_accordion = self.module.get_component("log_accordion")
-                    if log_accordion and hasattr(log_accordion, 'log'):
-                        log_accordion.log(message, level)
-                        return
-                    
-                    # Fallback to log_output
-                    log_output = self.module.get_component("log_output")
-                    if log_output and hasattr(log_output, 'log'):
-                        log_output.log(message, level)
-                        return
-                    
-                    # Fallback to log_message function
-                    log_message_func = self.module.get_component("log_message")
-                    if log_message_func and callable(log_message_func):
-                        log_message_func(message, level)
-                        return
-                        
-                    # Last resort: use logger
-                    getattr(logger, level, logger.info)(message)
-                except Exception as e:
-                    logger.debug(f"Log message failed: {e}")
-            
-            def show_dialog(self, title, content, dialog_type="info"):
-                """Show dialog."""
-                try:
-                    show_dialog_func = self.module.get_component("show_dialog")
-                    if show_dialog_func and callable(show_dialog_func):
-                        show_dialog_func(title, content, dialog_type)
-                except Exception as e:
-                    logger.debug(f"Show dialog failed: {e}")
-        
-        return OperationContainerWrapper(self)
     
     def _setup_event_handlers(self) -> None:
         """Setup event handlers for UI components."""
@@ -314,23 +263,25 @@ class ColabUIModule(UIModule):
                 button.description = "⏳ Processing..."
                 button.disabled = True
             
-            # Get log output for logging to UI
-            log_output = self.get_component("log_output") or self.get_component("log_accordion")
+            # Get operation container for logging to UI
+            operation_container = self.get_component("operation_container")
             
-            # Log to UI if available
-            if log_output and hasattr(log_output, 'log'):
-                log_output.log("🚀 Starting environment setup...", "info")
+            # Log to UI using operation container
+            if operation_container and hasattr(operation_container, 'log'):
+                from smartcash.ui.components.log_accordion import LogLevel
+                operation_container.log("🚀 Starting environment setup...", LogLevel.INFO)
             
             # Execute full setup
             result = self.execute_full_setup()
             
-            # Log result to UI
-            if log_output and hasattr(log_output, 'log'):
+            # Log result to UI using operation container
+            if operation_container and hasattr(operation_container, 'log'):
+                from smartcash.ui.components.log_accordion import LogLevel
                 if result.get("success", False):
-                    log_output.log("✅ Environment setup completed successfully!", "success")
+                    operation_container.log("✅ Environment setup completed successfully!", LogLevel.INFO)
                 else:
                     error_msg = result.get("message", "Setup failed")
-                    log_output.log(f"❌ Setup failed: {error_msg}", "error")
+                    operation_container.log(f"❌ Setup failed: {error_msg}", LogLevel.ERROR)
             
             # Update button based on result
             if button:
@@ -458,22 +409,22 @@ class ColabUIModule(UIModule):
             }
         
         try:
-            # Get progress tracker for UI updates
-            progress_tracker = self.get_component("progress_tracker")
+            # Get operation container for progress updates
+            operation_container = self.get_component("operation_container")
             
             # Initialize progress
-            if progress_tracker and hasattr(progress_tracker, 'set_progress'):
-                progress_tracker.set_progress(0, "Initializing setup...", "primary")
+            if operation_container and hasattr(operation_container, 'update_progress'):
+                operation_container.update_progress(0, "Initializing setup...", "primary")
             
             # Execute full setup operation
             result = self._operation_manager.execute_named_operation("full_setup", **kwargs)
             
             # Update final progress
-            if progress_tracker and hasattr(progress_tracker, 'set_progress'):
+            if operation_container and hasattr(operation_container, 'update_progress'):
                 if result.status.value == "completed":
-                    progress_tracker.set_progress(100, "Setup completed successfully!", "success")
+                    operation_container.update_progress(100, "Setup completed successfully!", "primary")
                 else:
-                    progress_tracker.set_progress(0, f"Setup failed: {result.message}", "danger")
+                    operation_container.update_progress(0, f"Setup failed: {result.message}", "primary")
             
             return {
                 "success": result.status.value == "completed",

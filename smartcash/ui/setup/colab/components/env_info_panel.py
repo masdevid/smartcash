@@ -136,7 +136,8 @@ def _format_env_info_content(env_info: Any) -> str:
         storage_status = _format_enhanced_storage_info(storage_info)
         
         # Dapatkan informasi GPU
-        gpu_info = _format_gpu_info(env_info.get('gpu', {}))
+        gpu_data = env_info.get('gpu', {})
+        gpu_info = _format_gpu_info(gpu_data)
         
         # Dapatkan status drive
         drive_status = _get_enhanced_drive_status(env_info)
@@ -211,17 +212,22 @@ def _format_env_info_content(env_info: Any) -> str:
     except Exception as e:
         return f'<div style="color: #d32f2f; padding: 15px; background: #ffebee; border-radius: 4px; margin: 10px 0;">Error memformat konten environment: {str(e)}</div>'
 
-def _format_gpu_info(env_info: Dict[str, Any]) -> str:
+def _format_gpu_info(gpu_info: Any) -> str:
     """Format informasi GPU untuk ditampilkan.
     
     Args:
-        env_info: Dictionary berisi informasi GPU
+        gpu_info: Dictionary berisi informasi GPU atau string error
         
     Returns:
         String informasi GPU yang sudah diformat
     """
     try:
-        gpu_info = env_info.get('gpu', {})
+        # Handle case where gpu_info is a string (error message)
+        if not isinstance(gpu_info, dict):
+            if isinstance(gpu_info, str) and gpu_info != 'No GPU available':
+                return f'<p><em>{gpu_info}</em></p>'
+            return '<p><em>Tidak terdeteksi GPU</em></p>'
+        
         if not gpu_info or not gpu_info.get('available', False):
             return '<p><em>Tidak terdeteksi GPU</em></p>'
             

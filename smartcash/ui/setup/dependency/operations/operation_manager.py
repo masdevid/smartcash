@@ -308,7 +308,20 @@ class DependencyOperationManager(OperationHandler):
         try:
             # Log to operation container
             if hasattr(self, '_operation_container') and self._operation_container:
-                self._operation_container.log_message(message, level)
+                # Use operation container's log method with proper LogLevel enum
+                from smartcash.ui.components.log_accordion import LogLevel
+                level_map = {
+                    'INFO': LogLevel.INFO,
+                    'WARNING': LogLevel.WARNING,
+                    'ERROR': LogLevel.ERROR,
+                    'DEBUG': LogLevel.DEBUG
+                }
+                log_level = level_map.get(level, LogLevel.INFO)
+                
+                if hasattr(self._operation_container, 'log'):
+                    self._operation_container.log(message, log_level)
+                elif hasattr(self._operation_container, 'log_message'):
+                    self._operation_container.log_message(message, level)
             
             # Also log to original logger
             if level == 'INFO' and hasattr(self, '_original_info'):

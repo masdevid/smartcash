@@ -319,8 +319,8 @@ def create_colab_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> Dict[s
     ui_components['show_dialog'] = operation_container['show_dialog']
     ui_components['show_info_dialog'] = operation_container['show_info_dialog']
     ui_components['clear_dialog'] = operation_container['clear_dialog']
+    ui_components['operation_container'] = operation_container.get('container')
     ui_components['progress_tracker'] = operation_container.get('progress_tracker')
-    ui_components['log_output'] = operation_container.get('log_output')
     ui_components['log_accordion'] = operation_container.get('log_accordion')
     
     # === 6. FOOTER CONTAINER ===

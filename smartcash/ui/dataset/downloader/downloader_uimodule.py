@@ -607,7 +607,7 @@ class DownloaderUIModule(UIModule):
             if success:
                 count = result.get("count", 0)
                 self._update_status(f"Dataset check completed - {count} files found", "success")
-                self.logger.info(f"✅ Dataset check completed - {count} files found", 'info')
+                self.logger.info(f"✅ Dataset check completed - {count} files found")
             else:
                 error_msg = result.get("error", "Check failed")
                 self._update_status(f"Check failed: {error_msg}", "error")
@@ -646,7 +646,9 @@ class DownloaderUIModule(UIModule):
     def _extract_ui_config(self) -> Dict[str, Any]:
         """Extract configuration from UI form inputs."""
         try:
-            form_widgets = self.get_component("form_widgets", {})
+            form_widgets = self.get_component("form_widgets")
+            if form_widgets is None:
+                form_widgets = {}
             
             # Extract values from form inputs
             ui_config = {
@@ -661,7 +663,7 @@ class DownloaderUIModule(UIModule):
             return ui_config
             
         except Exception as e:
-            self.logger.error(f"Error extracting UI config: {e}")
+            self.logger.error(f"Error extracting UI config: {e}", exc_info=True)
             return {}
     
     def _update_status(self, message: str, status_type: str = "info") -> None:
@@ -775,15 +777,48 @@ class DownloaderUIModule(UIModule):
             
             # Execute download operation
             import asyncio
-            if asyncio.iscoroutinefunction(self._operation_manager.execute_download):
-                result = asyncio.run(self._operation_manager.execute_download(ui_config))
-            else:
-                result = self._operation_manager.execute_download(ui_config)
             
-            return result
+            # Check if we're in a Jupyter notebook environment with an existing event loop
+            try:
+                from IPython import get_ipython
+                
+                if get_ipython() is not None:
+                    # In Jupyter, schedule the coroutine to run in the existing event loop
+                    future = asyncio.ensure_future(self._operation_manager.execute_download(ui_config))
+                    # Return a placeholder result, the actual result will be handled by the event loop
+                    return {
+                        "success": True,
+                        "message": "Download operation started in background"
+                    }
+            except (ImportError, AttributeError):
+                # Not in Jupyter, handle normally
+                pass
+                
+            # Fall back to synchronous execution if not in Jupyter or if there was an error
+            if asyncio.iscoroutinefunction(self._operation_manager.execute_download):
+                # If there's no running event loop, create one
+                try:
+                    loop = asyncio.get_event_loop()
+                except RuntimeError:
+                    loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(loop)
+                
+                if loop.is_running():
+                    # If loop is already running, schedule the task
+                    future = asyncio.ensure_future(self._operation_manager.execute_download(ui_config))
+                    return {
+                        "success": True,
+                        "message": "Download operation started in background"
+                    }
+                else:
+                    # Otherwise, run the coroutine directly
+                    return loop.run_until_complete(self._operation_manager.execute_download(ui_config))
+            else:
+                # Not a coroutine, just call it directly
+                return self._operation_manager.execute_download(ui_config)
             
         except Exception as e:
-            self.logger.error(f"❌ Failed to execute download: {e}")
+            self.logger.error(f"❌ Failed to execute download: {e}", exc_info=True)
             return {
                 "success": False,
                 "error": str(e),
@@ -869,17 +904,50 @@ class DownloaderUIModule(UIModule):
             }
         
         try:
-            # Execute cleanup operation
+            # Import asyncio only when needed
             import asyncio
+            
+            # Check if we're in a Jupyter notebook environment with an existing event loop
+            try:
+                from IPython import get_ipython
+                
+                if get_ipython() is not None:
+                    # In Jupyter, schedule the coroutine to run in the existing event loop
+                    future = asyncio.ensure_future(self._operation_manager.execute_cleanup(targets))
+                    # Return a placeholder result, the actual result will be handled by the event loop
+                    return {
+                        "success": True,
+                        "message": "Cleanup operation started in background"
+                    }
+            except (ImportError, AttributeError):
+                # Not in Jupyter, handle normally
+                pass
+                
+            # Fall back to synchronous execution if not in Jupyter or if there was an error
             if asyncio.iscoroutinefunction(self._operation_manager.execute_cleanup):
-                result = asyncio.run(self._operation_manager.execute_cleanup(targets))
+                # If there's no running event loop, create one
+                try:
+                    loop = asyncio.get_event_loop()
+                except RuntimeError:
+                    loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(loop)
+                
+                if loop.is_running():
+                    # If loop is already running, schedule the task
+                    future = asyncio.ensure_future(self._operation_manager.execute_cleanup(targets))
+                    return {
+                        "success": True,
+                        "message": "Cleanup operation started in background"
+                    }
+                else:
+                    # Otherwise, run the coroutine directly
+                    return loop.run_until_complete(self._operation_manager.execute_cleanup(targets))
             else:
-                result = self._operation_manager.execute_cleanup(targets)
-            
-            return result
-            
+                # Not a coroutine, just call it directly
+                return self._operation_manager.execute_cleanup(targets)
+                
         except Exception as e:
-            self.logger.error(f"❌ Failed to execute cleanup: {e}")
+            self.logger.error(f"❌ Failed to execute cleanup: {e}", exc_info=True)
             return {
                 "success": False,
                 "error": str(e)

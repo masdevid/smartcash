@@ -164,8 +164,10 @@ class DependencyUIModule(UIModule):
     def _create_ui_components(self) -> None:
         """Create and register UI components."""
         try:
-            # Create simplified UI components
-            ui_components = self._create_simple_dependency_ui()
+            # Use the new component structure
+            from smartcash.ui.setup.dependency.components import create_dependency_ui_components
+            
+            ui_components = create_dependency_ui_components(self.get_config())
             
             # Register each component
             for component_type, component in ui_components.items():
@@ -177,234 +179,6 @@ class DependencyUIModule(UIModule):
             logger.error(f"❌ Failed to create UI components: {e}")
             raise
     
-    def _create_simple_dependency_ui(self) -> Dict[str, Any]:
-        """Create simplified dependency UI with essential functionality."""
-        from smartcash.ui.components.header_container import create_header_container
-        from smartcash.ui.components.form_container import create_form_container, LayoutType
-        from smartcash.ui.components.action_container import create_action_container
-        from smartcash.ui.components.operation_container import create_operation_container
-        from smartcash.ui.components.footer_container import create_footer_container, PanelConfig, PanelType
-        from smartcash.ui.components.main_container import create_main_container
-        import ipywidgets as widgets
-        
-        # 1. Header Container
-        header_container = create_header_container(
-            title="📦 Package Dependencies",
-            subtitle="Manage Python packages for SmartCash environment",
-            status_message="Ready for package management",
-            status_type="info"
-        )
-        
-        # 2. Simple Form Container - Package selection
-        form_container = create_form_container(
-            layout_type=LayoutType.COLUMN,
-            container_margin="0",
-            container_padding="10px",
-            gap="10px"
-        )
-        
-        # Package categories for grid layout
-        package_categories = self.get_config("package_categories", {})
-        
-        # Create grid layout for package categories (4 columns)
-        package_checkboxes = {}
-        category_containers = []
-        
-        # Get all categories
-        categories = [
-            'core_requirements',
-            'ml_ai_libraries', 
-            'data_processing',
-            'additional_packages'
-        ]
-        
-        for category_key in categories:
-            category = package_categories.get(category_key, {})
-            if not category:
-                continue
-                
-            packages = category.get("packages", [])
-            if not packages:
-                continue
-            
-            # Create category header
-            category_header = widgets.HTML(
-                value=f"<h4 style='margin: 5px 0; color: {category.get('color', '#333')};'>"
-                      f"{category.get('icon', '📦')} {category.get('name', category_key)}</h4>"
-            )
-            
-            # Create checkboxes for this category
-            category_checkboxes = []
-            for pkg in packages:
-                # All core packages (from all categories) should be selected by default
-                # Core packages are those marked as is_default=True or from requirements.txt
-                is_core_package = pkg.get('is_default', False) or pkg.get('source') == 'requirements.txt'
-                checkbox = widgets.Checkbox(
-                    value=is_core_package,
-                    description=f"{pkg['name']} ({pkg.get('version', '')})",
-                    style={'description_width': 'initial'},
-                    layout=widgets.Layout(margin='1px 0')
-                )
-                category_checkboxes.append(checkbox)
-            
-            # Store checkboxes by category
-            package_checkboxes[category_key] = category_checkboxes
-            
-            # Create container for this category
-            category_container = widgets.VBox(
-                [category_header] + category_checkboxes,
-                layout=widgets.Layout(
-                    margin='5px',
-                    padding='10px',
-                    border='1px solid #ddd',
-                    border_radius='5px',
-                    width='22%'  # 4 columns with some margin
-                )
-            )
-            category_containers.append(category_container)
-        
-        # Create 4-column grid using HBox
-        grid_rows = []
-        for i in range(0, len(category_containers), 4):
-            row = widgets.HBox(
-                category_containers[i:i+4],
-                layout=widgets.Layout(
-                    justify_content='space-between',
-                    width='100%'
-                )
-            )
-            grid_rows.append(row)
-        
-        # Package grid container
-        package_grid = widgets.VBox(
-            grid_rows,
-            layout=widgets.Layout(width='100%')
-        )
-        
-        # Custom packages text area
-        custom_packages = widgets.Textarea(
-            placeholder="Enter additional packages (one per line)\nExample:\nnumpy>=1.21.0\npandas>=1.3.0",
-            layout=widgets.Layout(height='100px', width='100%')
-        )
-        
-        # Package status display
-        status_output = widgets.Output()
-        
-        # Add to form
-        packages_label = widgets.HTML("<h3 style='margin: 10px 0;'>📦 Package Categories</h3>")
-        custom_label = widgets.HTML("<h4>➕ Additional Packages</h4>")
-        status_label = widgets.HTML("<h4>📊 Package Status</h4>")
-        
-        form_items = [packages_label, package_grid, custom_label, custom_packages, status_label, status_output]
-        
-        for item in form_items:
-            form_container['add_item'](item, height="auto")
-        
-        # 3. Action Container - All action buttons (no primary to allow multiple buttons)
-        action_container = create_action_container(
-            buttons=[
-                {
-                    'id': 'save_config',
-                    'text': '💾 Save Configuration',
-                    'style': 'success',
-                    'tooltip': 'Save selected packages to configuration'
-                },
-                {
-                    'id': 'install',
-                    'text': '📥 Install Selected',
-                    'style': 'info',  # Changed from 'primary' to 'info' 
-                    'tooltip': 'Install selected packages'
-                },
-                {
-                    'id': 'check_status', 
-                    'text': '🔍 Check Status',
-                    'style': 'info',
-                    'tooltip': 'Check installation status'
-                },
-                {
-                    'id': 'update',
-                    'text': '⬆️ Update All',
-                    'style': 'warning',
-                    'tooltip': 'Update installed packages'
-                },
-                {
-                    'id': 'uninstall',
-                    'text': '🗑️ Uninstall',
-                    'style': 'danger', 
-                    'tooltip': 'Uninstall selected packages'
-                }
-            ],
-            title="🔧 Package Operations"
-        )
-        
-        # 4. Operation Container
-        operation_container = create_operation_container(
-            show_progress=True,
-            show_dialog=True,
-            show_logs=True
-        )
-        
-        # 5. Footer Container
-        footer_container = create_footer_container(
-            panels=[
-                PanelConfig(
-                    panel_type=PanelType.INFO_ACCORDION,
-                    title="💡 Package Management Tips",
-                    content="""
-                    <div style="padding: 10px;">
-                        <ul>
-                            <li><strong>Install Selected:</strong> Install checked packages and custom packages</li>
-                            <li><strong>Check Status:</strong> Verify which packages are installed and their versions</li>
-                            <li><strong>Update All:</strong> Update all installed packages to latest versions</li>
-                            <li><strong>Uninstall:</strong> Remove selected packages from environment</li>
-                        </ul>
-                    </div>
-                    """,
-                    style="info",
-                    open_by_default=False
-                )
-            ]
-        )
-        
-        # 6. Main Container
-        components = [
-            {'type': 'header', 'component': header_container.container, 'order': 0},
-            {'type': 'form', 'component': form_container['container'], 'order': 1},
-            {'type': 'action', 'component': action_container['container'], 'order': 2},
-            {'type': 'operation', 'component': operation_container['container'], 'order': 3},
-            {'type': 'footer', 'component': footer_container.container, 'order': 4}
-        ]
-        
-        main_container = create_main_container(components=components)
-        
-        # Return UI components dictionary
-        return {
-            # Container components
-            'main_container': main_container.container,
-            'ui': main_container.container,
-            'header_container': header_container,
-            'form_container': form_container,
-            'action_container': action_container,
-            'footer_container': footer_container,
-            'operation_container': operation_container,
-            
-            # Form elements
-            'package_checkboxes': package_checkboxes,
-            'custom_packages': custom_packages,
-            'status_output': status_output,
-            
-            # Buttons
-            'save_button': action_container['buttons'].get('save_config'),
-            'install_button': action_container['buttons'].get('install'),
-            'check_button': action_container['buttons'].get('check_status'),
-            'update_button': action_container['buttons'].get('update'),
-            'uninstall_button': action_container['buttons'].get('uninstall'),
-            
-            # Operation components
-            'progress_tracker': operation_container.get('progress_tracker'),
-            'log_output': operation_container.get('log_output'),
-            'log_accordion': operation_container.get('log_accordion')
-        }
     
     def _setup_operation_manager(self) -> None:
         """Setup operation manager for Dependency operations."""
@@ -412,9 +186,13 @@ class DependencyUIModule(UIModule):
             # Create wrapper for operation container
             operation_container_wrapper = self._create_operation_container_wrapper()
             
+            # Get operation container component
+            operation_container = self.get_component("operation_container")
+            
             self._operation_manager = DependencyOperationManager(
                 config=self.get_config(),
-                operation_container=operation_container_wrapper
+                operation_container=operation_container_wrapper,
+                ui_components={'operation_container': operation_container}
             )
             
             logger.debug("⚙️ Setup operation manager")
@@ -495,10 +273,10 @@ class DependencyUIModule(UIModule):
     def _setup_event_handlers(self) -> None:
         """Setup event handlers for UI components."""
         try:
-            # Connect buttons to handlers
-            save_button = self.get_component("save_button")
-            if save_button:
-                save_button.on_click(self._handle_save_click)
+            # Connect buttons to handlers (updated button names)
+            add_button = self.get_component("add_button")
+            if add_button:
+                add_button.on_click(self._handle_add_click)
             
             install_button = self.get_component("install_button")
             if install_button:
@@ -521,10 +299,10 @@ class DependencyUIModule(UIModule):
         except Exception as e:
             logger.error(f"❌ Failed to setup event handlers: {e}")
     
-    def _handle_save_click(self, _=None) -> None:
-        """Handle save configuration button click."""
+    def _handle_add_click(self, _=None) -> None:
+        """Handle add packages button click."""
         try:
-            self._log_to_ui("💾 Saving configuration...", "info")
+            self._log_to_ui("➕ Adding packages to configuration...", "info")
             
             # Get selected packages
             selected_packages = self._get_selected_packages()
@@ -545,18 +323,18 @@ class DependencyUIModule(UIModule):
                 success = True
                 
                 if success:
-                    self._log_to_ui(f"✅ Configuration saved! {len(selected_packages)} packages selected", "success")
+                    self._log_to_ui(f"✅ Packages added to configuration! {len(selected_packages)} packages selected", "success")
                     
                     # Update UI display
                     self._update_ui_after_save()
                 else:
-                    self._log_to_ui("❌ Failed to save configuration", "error")
+                    self._log_to_ui("❌ Failed to add packages to configuration", "error")
             else:
                 self._log_to_ui("❌ Config handler not available", "error")
                 
         except Exception as e:
-            logger.error(f"❌ Save click failed: {e}")
-            self._log_to_ui(f"❌ Save error: {str(e)}", "error")
+            logger.error(f"❌ Add packages failed: {e}")
+            self._log_to_ui(f"❌ Add packages error: {str(e)}", "error")
     
     def _update_ui_after_save(self) -> None:
         """Update UI components after saving configuration."""
@@ -605,13 +383,53 @@ class DependencyUIModule(UIModule):
             self._log_to_ui(f"❌ Install error: {str(e)}", "error")
     
     def _handle_check_click(self, _=None) -> None:
-        """Handle check status button click."""
+        """Handle check status button click - automatically check for missing packages."""
         try:
-            self._log_to_ui("🔍 Checking package status...", "info")
+            self._log_to_ui("🔍 Checking package status and finding missing packages...", "info")
+            
+            # Refresh package status first
             self.refresh_package_status()
+            
+            # Check for missing packages and suggest them
+            self._check_missing_packages()
+            
         except Exception as e:
             logger.error(f"❌ Check click failed: {e}")
             self._log_to_ui(f"❌ Check error: {str(e)}", "error")
+    
+    def _check_missing_packages(self) -> None:
+        """Check for missing packages and automatically select them."""
+        try:
+            missing_packages = []
+            
+            # Get all packages that should be installed (selected ones)
+            selected_packages = self._get_selected_packages()
+            
+            # Check which ones are actually missing
+            for package in selected_packages:
+                # Extract package name (before version specifiers)
+                pkg_name = package.split('>=')[0].split('==')[0].split('>')[0].split('<')[0].strip()
+                
+                # Check if package is installed
+                status = self.get_package_status(pkg_name)
+                if not status.get("installed", False):
+                    missing_packages.append(package)
+            
+            # Report findings
+            if missing_packages:
+                self._log_to_ui(f"⚠️ Found {len(missing_packages)} missing packages:", "warning")
+                for pkg in missing_packages[:5]:  # Show first 5
+                    self._log_to_ui(f"   - {pkg}", "warning")
+                if len(missing_packages) > 5:
+                    self._log_to_ui(f"   ... and {len(missing_packages) - 5} more", "warning")
+                
+                self._log_to_ui("💡 Tip: Click 'Install Selected' to install missing packages", "info")
+            else:
+                self._log_to_ui("✅ All selected packages are installed!", "success")
+                
+        except Exception as e:
+            logger.error(f"❌ Failed to check missing packages: {e}")
+            self._log_to_ui(f"❌ Missing package check error: {str(e)}", "error")
     
     def _handle_update_click(self, _=None) -> None:
         """Handle update button click."""

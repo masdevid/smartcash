@@ -201,7 +201,9 @@ class DependencyOperationManager(OperationHandler):
         # Extract operation container from ui_components if not provided
         operation_container = kwargs.pop('operation_container', None)
         if operation_container is None and ui_components is not None:
-            if 'containers' in ui_components and 'operation' in ui_components['containers']:
+            if 'operation_container' in ui_components:
+                operation_container = ui_components['operation_container']
+            elif 'containers' in ui_components and 'operation' in ui_components['containers']:
                 operation_container = ui_components['containers']['operation']
         
         # Remove logger from kwargs to prevent passing it to OperationHandler.__init__
@@ -217,6 +219,10 @@ class DependencyOperationManager(OperationHandler):
         self.config = config
         self.ui_components = ui_components or {}
         self.operation_manager = OperationManager(ui_components=self.ui_components)
+        
+        # Ensure operation_container is accessible
+        if not hasattr(self, 'operation_container') and operation_container:
+            self.operation_container = operation_container
     
     def initialize(self):
         """Initialize the dependency operation manager."""

@@ -674,6 +674,9 @@ class OperationHandler(BaseHandler):
         # Prefer OperationContainer to avoid duplicate logging
         if hasattr(self, '_operation_container') and self._operation_container:
             try:
+                # Get module name for namespacing
+                namespace = getattr(self, '_module_name', None)
+                
                 # Try new-style operation container with log method first
                 if hasattr(self._operation_container, 'log'):
                     from smartcash.ui.components.log_accordion import LogLevel
@@ -686,17 +689,27 @@ class OperationHandler(BaseHandler):
                         'success': LogLevel.INFO
                     }
                     log_level = level_map.get(level, LogLevel.INFO)
-                    self._operation_container.log(message, log_level)
+                    self._operation_container.log(
+                        message=message, 
+                        level=log_level,
+                        namespace=namespace
+                    )
                     return
+                    
                 # Fallback to old-style log_message method
                 elif hasattr(self._operation_container, 'log_message'):
-                    self._operation_container.log_message(message=message, level=level)
+                    self._operation_container.log_message(
+                        message=message, 
+                        level=level,
+                        namespace=namespace
+                    )
                     return
+                    
             except Exception as e:
                 # If operation container fails, fall back to logger
-                pass
+                self.logger.error(f"Error logging to operation container: {e}")
         
-        # Fallback to standard logger only if no operation container
+        # Fallback to standard logger if no operation container or on error
         log_func = getattr(self.logger, level, self.logger.info)
         log_func(message)
     

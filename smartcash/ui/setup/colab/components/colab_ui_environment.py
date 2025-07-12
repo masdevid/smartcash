@@ -24,15 +24,7 @@ def create_environment_container(config: Dict[str, Any]) -> widgets.VBox:
     # Create environment container
     return widgets.VBox([
         widgets.HTML("<h4>📊 Environment Information</h4>"),
-        env_info,
-        widgets.HTML(
-            "<div style='margin-top: 15px; padding: 10px; background: #f8f9fa; border-radius: 4px; font-size: 0.9em; color: #666;'>"
-            "<strong>💡 Configuration Tips:</strong><br>"
-            "• Auto-detect will automatically configure environment settings<br>"
-            "• Ensure drive path is correct for Google Drive mounting<br>"
-            "• Project name will be used for folder structure"
-            "</div>"
-        )
+        env_info
     ], layout=widgets.Layout(
         width='100%',
         margin='10px 0',

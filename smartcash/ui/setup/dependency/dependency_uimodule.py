@@ -236,10 +236,11 @@ class DependencyUIModule(UIModule):
             # Create checkboxes for this category
             category_checkboxes = []
             for pkg in packages:
-                # Core requirements are selected by default, others are not
-                default_selected = category_key == 'core_requirements'
+                # All core packages (from all categories) should be selected by default
+                # Core packages are those marked as is_default=True or from requirements.txt
+                is_core_package = pkg.get('is_default', False) or pkg.get('source') == 'requirements.txt'
                 checkbox = widgets.Checkbox(
-                    value=default_selected,
+                    value=is_core_package,
                     description=f"{pkg['name']} ({pkg.get('version', '')})",
                     style={'description_width': 'initial'},
                     layout=widgets.Layout(margin='1px 0')
@@ -299,7 +300,7 @@ class DependencyUIModule(UIModule):
         for item in form_items:
             form_container['add_item'](item, height="auto")
         
-        # 3. Action Container - Simplified buttons
+        # 3. Action Container - All action buttons (no primary to allow multiple buttons)
         action_container = create_action_container(
             buttons=[
                 {
@@ -311,7 +312,7 @@ class DependencyUIModule(UIModule):
                 {
                     'id': 'install',
                     'text': '📥 Install Selected',
-                    'style': 'primary',
+                    'style': 'info',  # Changed from 'primary' to 'info' 
                     'tooltip': 'Install selected packages'
                 },
                 {
@@ -589,7 +590,7 @@ class DependencyUIModule(UIModule):
             
             self._log_to_ui(f"📥 Installing {len(selected_packages)} packages...", "info")
             
-            # Execute install operation
+            # Execute install operation with progress tracking
             result = self.execute_install_operation(selected_packages)
             
             if result.get("success", False):
@@ -695,20 +696,66 @@ class DependencyUIModule(UIModule):
         except Exception as e:
             logger.debug(f"UI logging failed: {e}")
     
+    def _update_progress(self, progress: int, message: str = "", level: str = "primary") -> None:
+        """Update progress tracker."""
+        try:
+            progress_tracker = self.get_component("progress_tracker")
+            if progress_tracker and hasattr(progress_tracker, 'set_progress'):
+                progress_tracker.set_progress(progress, message, level)
+            else:
+                # Fallback to logging
+                self._log_to_ui(f"Progress {progress}%: {message}", "info")
+        except Exception as e:
+            logger.debug(f"Progress update failed: {e}")
+    
     def execute_install_operation(self, packages: List[str]) -> Dict[str, Any]:
         """Execute package installation."""
         if not self._operation_manager:
             return {"success": False, "message": "Operation manager not initialized"}
         
         try:
-            result = self._operation_manager.execute_named_operation("install", packages=packages)
-            return {
-                "success": result.status.value == "completed",
-                "message": result.message,
-                "data": result.data
-            }
+            # Show progress start
+            self._update_progress(0, "Starting installation...")
+            
+            # Execute install operation - this should be async but we'll handle sync
+            import asyncio
+            try:
+                # Try to run in existing event loop
+                loop = asyncio.get_event_loop()
+                if loop.is_running():
+                    # Create a task to run later
+                    import concurrent.futures
+                    with concurrent.futures.ThreadPoolExecutor() as executor:
+                        future = executor.submit(
+                            asyncio.run, 
+                            self._operation_manager.execute_install(packages)
+                        )
+                        result = future.result(timeout=300)  # 5 minute timeout
+                else:
+                    result = asyncio.run(self._operation_manager.execute_install(packages))
+            except RuntimeError:
+                # No event loop running, create new one
+                result = asyncio.run(self._operation_manager.execute_install(packages))
+            
+            # Update progress based on result
+            if result.get("success", False):
+                self._update_progress(100, "Installation completed!")
+                return {
+                    "success": True,
+                    "message": result.get("message", "Installation completed"),
+                    "data": result
+                }
+            else:
+                self._update_progress(100, "Installation failed!")
+                return {
+                    "success": False,
+                    "message": result.get("error", "Installation failed"),
+                    "data": result
+                }
+                
         except Exception as e:
             logger.error(f"❌ Failed to execute install: {e}")
+            self._update_progress(100, f"Installation error: {str(e)}")
             return {"success": False, "message": str(e)}
     
     def execute_uninstall_operation(self, packages: List[str]) -> Dict[str, Any]:
@@ -717,14 +764,45 @@ class DependencyUIModule(UIModule):
             return {"success": False, "message": "Operation manager not initialized"}
         
         try:
-            result = self._operation_manager.execute_named_operation("uninstall", packages=packages)
-            return {
-                "success": result.status.value == "completed", 
-                "message": result.message,
-                "data": result.data
-            }
+            # Show progress start
+            self._update_progress(0, "Starting uninstallation...")
+            
+            # Execute uninstall operation
+            import asyncio
+            try:
+                loop = asyncio.get_event_loop()
+                if loop.is_running():
+                    import concurrent.futures
+                    with concurrent.futures.ThreadPoolExecutor() as executor:
+                        future = executor.submit(
+                            asyncio.run, 
+                            self._operation_manager.execute_uninstall(packages)
+                        )
+                        result = future.result(timeout=300)
+                else:
+                    result = asyncio.run(self._operation_manager.execute_uninstall(packages))
+            except RuntimeError:
+                result = asyncio.run(self._operation_manager.execute_uninstall(packages))
+            
+            # Update progress based on result
+            if result.get("success", False):
+                self._update_progress(100, "Uninstallation completed!")
+                return {
+                    "success": True,
+                    "message": result.get("message", "Uninstallation completed"),
+                    "data": result
+                }
+            else:
+                self._update_progress(100, "Uninstallation failed!")
+                return {
+                    "success": False,
+                    "message": result.get("error", "Uninstallation failed"),
+                    "data": result
+                }
+                
         except Exception as e:
             logger.error(f"❌ Failed to execute uninstall: {e}")
+            self._update_progress(100, f"Uninstallation error: {str(e)}")
             return {"success": False, "message": str(e)}
     
     def execute_update_operation(self) -> Dict[str, Any]:
@@ -733,14 +811,48 @@ class DependencyUIModule(UIModule):
             return {"success": False, "message": "Operation manager not initialized"}
         
         try:
-            result = self._operation_manager.execute_named_operation("update")
-            return {
-                "success": result.status.value == "completed",
-                "message": result.message,
-                "data": result.data
-            }
+            # Show progress start
+            self._update_progress(0, "Starting update...")
+            
+            # Get all installed packages for update
+            selected_packages = self._get_selected_packages()
+            
+            # Execute update operation
+            import asyncio
+            try:
+                loop = asyncio.get_event_loop()
+                if loop.is_running():
+                    import concurrent.futures
+                    with concurrent.futures.ThreadPoolExecutor() as executor:
+                        future = executor.submit(
+                            asyncio.run, 
+                            self._operation_manager.execute_update(selected_packages)
+                        )
+                        result = future.result(timeout=300)
+                else:
+                    result = asyncio.run(self._operation_manager.execute_update(selected_packages))
+            except RuntimeError:
+                result = asyncio.run(self._operation_manager.execute_update(selected_packages))
+            
+            # Update progress based on result
+            if result.get("success", False):
+                self._update_progress(100, "Update completed!")
+                return {
+                    "success": True,
+                    "message": result.get("message", "Update completed"),
+                    "data": result
+                }
+            else:
+                self._update_progress(100, "Update failed!")
+                return {
+                    "success": False,
+                    "message": result.get("error", "Update failed"),
+                    "data": result
+                }
+                
         except Exception as e:
             logger.error(f"❌ Failed to execute update: {e}")
+            self._update_progress(100, f"Update error: {str(e)}")
             return {"success": False, "message": str(e)}
     
     def get_package_status_summary(self) -> Dict[str, Any]:

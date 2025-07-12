@@ -227,7 +227,10 @@ class DependencyOperationManager(OperationHandler):
         
         # Set up operation container if available
         if hasattr(self, 'operation_container') and self.operation_container:
-            self.operation_container.clear_output()
+            if hasattr(self.operation_container, 'clear_output'):
+                self.operation_container.clear_output()
+            elif hasattr(self.operation_container, 'clear_outputs'):
+                self.operation_container.clear_outputs()
             
         # Initialize operation handlers
         self.operation_manager.initialize()

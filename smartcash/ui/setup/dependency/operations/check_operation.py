@@ -1,7 +1,7 @@
 """
 Handler for package status check operations.
 """
-from typing import Dict, Any, List, Optional, Tuple, Set
+from typing import Dict, Any, List, Optional, Tuple, Set, Callable
 import asyncio
 import re
 import time
@@ -281,3 +281,13 @@ class CheckStatusOperationHandler(BaseOperationHandler):
             
             # Update UI
             package_list.update_package_status(package, ui_status, tooltip)
+    
+    def get_operations(self) -> Dict[str, Callable]:
+        """Get available operations for this handler.
+        
+        Returns:
+            Dictionary of operation name to callable mapping
+        """
+        return {
+            'execute': self.execute_operation
+        }

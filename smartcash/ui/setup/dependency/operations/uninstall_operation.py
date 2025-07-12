@@ -1,7 +1,7 @@
 """
 Handler for package uninstallation operations.
 """
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Callable
 import asyncio
 import re
 import time
@@ -250,3 +250,14 @@ class UninstallOperationHandler(BaseOperationHandler):
         """Cancel the current uninstallation operation."""
         self._cancelled = True
         await self.log("Permintaan pembatalan diterima, menunggu proses saat ini selesai...", 'warning')
+    
+    def get_operations(self) -> Dict[str, Callable]:
+        """Get available operations for this handler.
+        
+        Returns:
+            Dictionary of operation name to callable mapping
+        """
+        return {
+            'execute': self.execute_operation,
+            'cancel': self.cancel_operation
+        }

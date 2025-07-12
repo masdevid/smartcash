@@ -506,11 +506,8 @@ class DependencyUIModule(UIModule):
             if log_accordion and hasattr(log_accordion, 'log'):
                 log_accordion.log(message, level)
             
-            # Also log to status output
-            status_output = self.get_component("status_output")
-            if status_output:
-                with status_output:
-                    print(f"[{datetime.now().strftime('%H:%M:%S')}] {message}")
+            # Also log to log accordion (primary logging location)
+            # Status output removed to avoid duplication
         except Exception as e:
             logger.debug(f"UI logging failed: {e}")
     
@@ -692,16 +689,7 @@ class DependencyUIModule(UIModule):
                 status = self.get_package_status(package)
                 status_info.append(status)
             
-            # Update status display
-            status_output = self.get_component("status_output")
-            if status_output:
-                with status_output:
-                    status_output.clear_output()
-                    print("📊 Package Status:")
-                    for status in status_info:
-                        icon = "✅" if status.get("installed", False) else "❌"
-                        package_name = status.get("package", "unknown")
-                        print(f"  {icon} {package_name}")
+            # Update internal status without logging to UI to avoid extra log_output
             
             self._package_status = {s["package"]: s for s in status_info}
             logger.debug("✅ Package status refreshed")

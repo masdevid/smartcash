@@ -33,7 +33,12 @@ class BaseOperationHandler(OperationHandler):
         super().__init__(operation_type, 'dependency.setup')
         self.ui_components = ui_components
         self.config = config
-        self.error_handler = get_error_handler()
+        
+        # Initialize error handler safely
+        try:
+            self._error_handler = get_error_handler()
+        except Exception:
+            self._error_handler = None
         
         # Set default operation container if available in UI components
         if 'operation_container' in ui_components:
@@ -245,3 +250,13 @@ class BaseOperationHandler(OperationHandler):
         
         results['processed'] = processed
         return results
+    
+    def get_operations(self) -> Dict[str, Callable]:
+        """Get available operations for this handler.
+        
+        Returns:
+            Dictionary of operation name to callable mapping
+        """
+        return {
+            'execute': self.execute_operation
+        }

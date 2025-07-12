@@ -1,7 +1,7 @@
 """
 Handler for package update operations.
 """
-from typing import Dict, Any, List, Tuple, Optional
+from typing import Dict, Any, List, Tuple, Optional, Callable
 import asyncio
 import time
 
@@ -221,3 +221,14 @@ class UpdateOperationHandler(BaseOperationHandler):
         """Cancel the current update operation."""
         self._cancelled = True
         await self.log("Permintaan pembatalan diterima, menunggu proses saat ini selesai...", 'warning')
+    
+    def get_operations(self) -> Dict[str, Callable]:
+        """Get available operations for this handler.
+        
+        Returns:
+            Dictionary of operation name to callable mapping
+        """
+        return {
+            'execute': self.execute_operation,
+            'cancel': self.cancel_operation
+        }

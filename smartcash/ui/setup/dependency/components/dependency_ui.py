@@ -46,14 +46,12 @@ def create_dependency_ui_components(module_config: Dict[str, Any]) -> Dict[str, 
         # Create package grid and additional components
         package_grid, package_checkboxes = _create_package_grid(module_config)
         custom_packages = _create_custom_packages_area()
-        status_output = widgets.Output()
         
-        # Add items to form
+        # Add items to form (removed duplicate status_output)
         packages_label = widgets.HTML("<h3 style='margin: 10px 0;'>📦 Package Categories</h3>")
         custom_label = widgets.HTML("<h4>➕ Additional Packages</h4>")
-        status_label = widgets.HTML("<h4>📊 Package Status</h4>")
         
-        form_items = [packages_label, package_grid, custom_label, custom_packages, status_label, status_output]
+        form_items = [packages_label, package_grid, custom_label, custom_packages]
         
         for item in form_items:
             form_container['add_item'](item, height="auto")
@@ -95,11 +93,12 @@ def create_dependency_ui_components(module_config: Dict[str, Any]) -> Dict[str, 
             title="🔧 Package Operations"
         )
         
-        # 4. Operation Container
+        # 4. Operation Container with prominent progress tracking
         operation_container = create_operation_container(
             show_progress=True,
-            show_dialog=True,
-            show_logs=True
+            show_dialog=False,  # Disable dialog to reduce clutter
+            show_logs=True,
+            progress_style="prominent"  # Make progress more visible
         )
         
         # 5. Footer Container
@@ -150,7 +149,6 @@ def create_dependency_ui_components(module_config: Dict[str, Any]) -> Dict[str, 
             # Form elements
             'package_checkboxes': package_checkboxes,
             'custom_packages': custom_packages,
-            'status_output': status_output,
             
             # Buttons (updated names)
             'add_button': action_container['buttons'].get('add_packages'),

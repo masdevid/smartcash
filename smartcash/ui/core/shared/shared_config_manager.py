@@ -85,6 +85,11 @@ from smartcash.common.config.manager import get_config_manager
 
 T = TypeVar('T')
 
+# Initialize logger function to be called when needed
+def _get_logger():
+    """Get logger for SharedConfigManager to avoid callable errors."""
+    return get_module_logger("smartcash.ui.core.shared.shared_config_manager")
+
 class ConfigDiff(NamedTuple):
     """Represents the difference between two config versions."""
     added: Dict[str, Any]
@@ -104,7 +109,7 @@ class ConfigVersioningError(ConfigError):
     """Raised when there's an error with config versioning."""
     pass
 
-logger = get_module_logger("smartcash.ui.core.shared.shared_config_manager")
+# Logger is now accessed via _get_logger() function to avoid callable errors
 
 class SharedConfigManager:
     """📡 Manager untuk berbagi konfigurasi antar child components.
@@ -192,7 +197,7 @@ class SharedConfigManager:
         # Lock untuk thread safety
         self._config_lock = threading.Lock()
         
-        logger.info(f"📡 SharedConfigManager initialized untuk {parent_module}")
+        _get_logger().info(f"📡 SharedConfigManager initialized untuk {parent_module}")
     
     @classmethod
     def get_instance(cls, parent_module: str) -> 'SharedConfigManager':
@@ -223,15 +228,15 @@ class SharedConfigManager:
             ValueError: If config validation fails
             RuntimeError: If unable to acquire lock
         """
-        logger.debug(f"🔍 [update_config] Entering update_config for module: {module_name}")
-        logger.debug(f"   - persist: {persist}, skip_versioning: {skip_versioning}")
-        logger.debug(f"   - config keys: {list(config.keys()) if config else 'None'}")
-        logger.debug(f"   - Thread: {threading.current_thread().name} (ID: {threading.get_ident()})")
-        logger.debug(f"   - Lock state: {'🔒 LOCKED' if self._config_lock.locked() else '🔓 UNLOCKED'}")
-        logger.debug(f"   - Lock owner: {getattr(self._config_lock, '_owner', 'None')}")
+        _get_logger().debug(f"🔍 [update_config] Entering update_config for module: {module_name}")
+        _get_logger().debug(f"   - persist: {persist}, skip_versioning: {skip_versioning}")
+        _get_logger().debug(f"   - config keys: {list(config.keys()) if config else 'None'}")
+        _get_logger().debug(f"   - Thread: {threading.current_thread().name} (ID: {threading.get_ident()})")
+        _get_logger().debug(f"   - Lock state: {'🔒 LOCKED' if self._config_lock.locked() else '🔓 UNLOCKED'}")
+        _get_logger().debug(f"   - Lock owner: {getattr(self._config_lock, '_owner', 'None')}")
         
         # Log before acquiring lock to check for deadlocks
-        logger.debug(f"🔄 [update_config] Attempting to acquire _config_lock for {module_name}")
+        _get_logger().debug(f"🔄 [update_config] Attempting to acquire _config_lock for {module_name}")
         
         # Use a flag to track if we need to release the lock
         lock_acquired = False
@@ -240,56 +245,56 @@ class SharedConfigManager:
             lock_acquired = self._config_lock.acquire(timeout=5)
             if not lock_acquired:
                 error_msg = f"❌ [update_config] Failed to acquire _config_lock for {module_name} after 5 seconds"
-                logger.error(error_msg)
-                logger.error(f"   - Current lock owner: {getattr(self._config_lock, '_owner', 'Unknown')}")
+                _get_logger().error(error_msg)
+                _get_logger().error(f"   - Current lock owner: {getattr(self._config_lock, '_owner', 'Unknown')}")
                 raise RuntimeError(error_msg)
                 
-            logger.debug(f"✅ [update_config] Successfully acquired _config_lock for {module_name}")
-            logger.debug(f"   - Lock owner: {threading.get_ident()}")
+            _get_logger().debug(f"✅ [update_config] Successfully acquired _config_lock for {module_name}")
+            _get_logger().debug(f"   - Lock owner: {threading.get_ident()}")
             
             # Validate if there are rules
-            logger.debug(f"🔍 [update_config] Checking validation rules for {module_name}")
-            logger.debug(f"   - Available validation rules: {list(self._validation_rules.keys())}")
+            _get_logger().debug(f"🔍 [update_config] Checking validation rules for {module_name}")
+            _get_logger().debug(f"   - Available validation rules: {list(self._validation_rules.keys())}")
             
             if module_name in self._validation_rules:
-                logger.debug(f"🔍 Found validation rule for {module_name}")
+                _get_logger().debug(f"🔍 Found validation rule for {module_name}")
                 validator = self._validation_rules[module_name]
-                logger.debug(f"🔍 Validator type: {type(validator).__name__}")
-                logger.debug(f"🔍 Running validator: {validator}")
+                _get_logger().debug(f"🔍 Validator type: {type(validator).__name__}")
+                _get_logger().debug(f"🔍 Running validator: {validator}")
                 
                 try:
                     # Log before calling validator
-                    logger.debug("🔍 Calling validator function...")
+                    _get_logger().debug("🔍 Calling validator function...")
                     validation_result = validator(config)
-                    logger.debug(f"✅ Validator completed with result: {validation_result}")
+                    _get_logger().debug(f"✅ Validator completed with result: {validation_result}")
                     
                     if not validation_result:
                         error_msg = f"❌ Config validation failed for {module_name}"
-                        logger.error(error_msg)
+                        _get_logger().error(error_msg)
                         raise ValueError(error_msg)
                     
                 except Exception as e:
-                    logger.error(f"❌ Error during validation: {str(e)}")
-                    logger.exception("Validation error details:")
+                    _get_logger().error(f"❌ Error during validation: {str(e)}")
+                    _get_logger().exception("Validation error details:")
                     raise
             
             # Save version history if enabled
-            logger.debug("📝 Processing version history...")
+            _get_logger().debug("📝 Processing version history...")
             if not skip_versioning:
-                logger.debug(f"   - Versioning enabled for {module_name}")
+                _get_logger().debug(f"   - Versioning enabled for {module_name}")
                 if module_name not in self._config_versions:
-                    logger.debug(f"   - Initializing version history for {module_name}")
+                    _get_logger().debug(f"   - Initializing version history for {module_name}")
                     self._config_versions[module_name] = []
                 
                 # Get current config for history
                 current = self.get_config(module_name)
                 if current:
-                    logger.debug(f"   - Adding current config to version history")
+                    _get_logger().debug(f"   - Adding current config to version history")
                     self._config_versions[module_name].append(current.copy())
-                    logger.debug(f"   - Version history length: {len(self._config_versions[module_name])}")
+                    _get_logger().debug(f"   - Version history length: {len(self._config_versions[module_name])}")
             
             # Update in-memory config
-            logger.debug(f"💾 Updating in-memory config for {module_name}")
+            _get_logger().debug(f"💾 Updating in-memory config for {module_name}")
             self._configs[module_name] = config.copy()
             self._last_updated[module_name] = datetime.now()
             
@@ -297,24 +302,24 @@ class SharedConfigManager:
             if persist:
                 try:
                     config_file = f"{module_name}_config.yaml"
-                    logger.debug(f"💾 Attempting to save config to {config_file}")
+                    _get_logger().debug(f"💾 Attempting to save config to {config_file}")
                     self.config_manager.save_config(config, config_file)
-                    logger.debug(f"✅ Config saved to {config_file}")
+                    _get_logger().debug(f"✅ Config saved to {config_file}")
                 except Exception as e:
                     error_msg = f"❌ Failed to persist config: {e}"
-                    logger.error(error_msg)
-                    logger.exception("Persist error details:")
+                    _get_logger().error(error_msg)
+                    _get_logger().exception("Persist error details:")
                     raise ConfigError(f"Failed to persist config: {e}") from e
             
             # Broadcast to subscribers
-            logger.debug(f"📢 Preparing to notify subscribers for {module_name}")
-            logger.debug(f"   - Subscriber count: {len(self._subscribers.get(module_name, []))}")
+            _get_logger().debug(f"📢 Preparing to notify subscribers for {module_name}")
+            _get_logger().debug(f"   - Subscriber count: {len(self._subscribers.get(module_name, []))}")
             
             # Make a copy of the config before notifying subscribers
             config_copy = config.copy()
             
             # Release the lock before notifying subscribers to prevent deadlocks
-            logger.debug("🔓 Releasing lock before notifying subscribers")
+            _get_logger().debug("🔓 Releasing lock before notifying subscribers")
             if lock_acquired:
                 self._config_lock.release()
                 lock_acquired = False
@@ -322,20 +327,20 @@ class SharedConfigManager:
             # Notify subscribers outside the lock to prevent deadlocks
             try:
                 self._notify_subscribers(module_name, config_copy)
-                logger.info(f"✅ Successfully updated config for {module_name}")
+                _get_logger().info(f"✅ Successfully updated config for {module_name}")
             except Exception as e:
-                logger.error(f"❌ Error notifying subscribers: {e}")
-                logger.exception("Subscriber notification error:")
+                _get_logger().error(f"❌ Error notifying subscribers: {e}")
+                _get_logger().exception("Subscriber notification error:")
                 raise
         finally:
             # Ensure the lock is always released
             if lock_acquired and hasattr(self, '_config_lock') and self._config_lock.locked():
-                logger.debug("🔓 Releasing _config_lock in finally block")
+                _get_logger().debug("🔓 Releasing _config_lock in finally block")
                 try:
                     self._config_lock.release()
                 except Exception as release_error:
-                    logger.error(f"❌ Error releasing _config_lock: {release_error}")
-                    logger.exception("Lock release error:")
+                    _get_logger().error(f"❌ Error releasing _config_lock: {release_error}")
+                    _get_logger().exception("Lock release error:")
     
     def set_validation_rule(self, module_name: str, 
                           validator: Callable[[Dict[str, Any]], bool]) -> None:
@@ -345,20 +350,20 @@ class SharedConfigManager:
             module_name: Nama module
             validator: Function yang menerima config dict dan return boolean
         """
-        logger.debug(f"🔍 [set_validation_rule] Setting validation rule for {module_name}")
-        logger.debug(f"   - Validator: {validator}")
+        _get_logger().debug(f"🔍 [set_validation_rule] Setting validation rule for {module_name}")
+        _get_logger().debug(f"   - Validator: {validator}")
         
         with self._config_lock:
-            logger.debug("🔒 Acquired _config_lock in set_validation_rule")
+            _get_logger().debug("🔒 Acquired _config_lock in set_validation_rule")
             self._validation_rules[module_name] = validator
-            logger.debug(f"🔐 Set validation rule for {module_name}")
-            logger.debug(f"   - Current validation rules: {list(self._validation_rules.keys())}")
+            _get_logger().debug(f"🔐 Set validation rule for {module_name}")
+            _get_logger().debug(f"   - Current validation rules: {list(self._validation_rules.keys())}")
             
             # Debug: Check if the validator is callable
             if not callable(validator):
-                logger.error(f"❌ Validator for {module_name} is not callable: {validator}")
+                _get_logger().error(f"❌ Validator for {module_name} is not callable: {validator}")
             else:
-                logger.debug("✅ Validator is callable")
+                _get_logger().debug("✅ Validator is callable")
     
     def register_template(self, template_name: str,
                         template_config: Dict[str, Any]) -> None:
@@ -370,7 +375,7 @@ class SharedConfigManager:
         """
         with self._config_lock:
             self._config_templates[template_name] = template_config.copy()
-            logger.debug(f"📦 Registered template: {template_name}")
+            _get_logger().debug(f"📦 Registered template: {template_name}")
     
     def apply_template(self, module_name: str,
                      template_name: str,
@@ -396,7 +401,7 @@ class SharedConfigManager:
                 template.update(current)
             
             self.update_config(module_name, template, skip_versioning=True)
-            logger.info(f"🔄 Applied template '{template_name}' to {module_name}")
+            _get_logger().info(f"🔄 Applied template '{template_name}' to {module_name}")
     
     def get_config_diff(self, 
                        module_name: str,
@@ -460,12 +465,12 @@ class SharedConfigManager:
         """
         with self._config_lock:
             if module_name not in self._config_versions:
-                logger.warning(f"No version history for {module_name}")
+                _get_logger().warning(f"No version history for {module_name}")
                 return False
                 
             versions = self._config_versions[module_name]
             if len(versions) < steps:
-                logger.warning(f"Not enough versions to rollback {steps} steps")
+                _get_logger().warning(f"Not enough versions to rollback {steps} steps")
                 return False
             
             try:
@@ -484,11 +489,11 @@ class SharedConfigManager:
                 # Notify subscribers
                 self._notify_subscribers(module_name, target_config)
                 
-                logger.info(f"⏪ Rolled back {module_name} config {steps} version(s)")
+                _get_logger().info(f"⏪ Rolled back {module_name} config {steps} version(s)")
                 return True
                 
             except Exception as e:
-                logger.error(f"❌ Failed to rollback config: {e}")
+                _get_logger().error(f"❌ Failed to rollback config: {e}")
                 return False
     
     def get_version_count(self, module_name: str) -> int:
@@ -514,10 +519,10 @@ class SharedConfigManager:
             if module_name is not None:
                 if module_name in self._config_versions:
                     self._config_versions[module_name].clear()
-                    logger.debug(f"🧹 Cleared version history for {module_name}")
+                    _get_logger().debug(f"🧹 Cleared version history for {module_name}")
             else:
                 self._config_versions.clear()
-                logger.debug("🧹 Cleared all version history")
+                _get_logger().debug("🧹 Cleared all version history")
     
     def get_stats(self) -> Dict[str, Any]:
         """Get manager statistics.
@@ -565,7 +570,7 @@ class SharedConfigManager:
                     self._configs[module_name] = config
                     return config.copy()
             except Exception as e:
-                logger.debug(f"No saved config for {module_name}: {e}")
+                _get_logger().debug(f"No saved config for {module_name}: {e}")
             
             return None
     
@@ -584,7 +589,7 @@ class SharedConfigManager:
         
         with self._config_lock:
             self._subscribers[module_name].append(weak_callback)
-            logger.debug(f"📡 New subscriber for {module_name}")
+            _get_logger().debug(f"📡 New subscriber for {module_name}")
         
         # Return unsubscribe function
         def unsubscribe():
@@ -593,7 +598,7 @@ class SharedConfigManager:
                     ref for ref in self._subscribers[module_name]
                     if ref() is not None and ref() != weak_callback
                 ]
-                logger.debug(f"📡 Unsubscribed from {module_name}")
+                _get_logger().debug(f"📡 Unsubscribed from {module_name}")
         
         return unsubscribe
     
@@ -606,34 +611,34 @@ class SharedConfigManager:
             module_name: Module that changed
             config: New configuration (should be a copy of the config)
         """
-        logger.debug(f"\n🔔 [notify_subscribers] Starting notification for {module_name}")
-        logger.debug(f"   - Thread: {threading.current_thread().name} (ID: {threading.get_ident()})")
-        logger.debug(f"   - Lock state: {'🔒 LOCKED' if hasattr(self, '_config_lock') and self._config_lock.locked() else '🔓 UNLOCKED'}")
+        _get_logger().debug(f"\n🔔 [notify_subscribers] Starting notification for {module_name}")
+        _get_logger().debug(f"   - Thread: {threading.current_thread().name} (ID: {threading.get_ident()})")
+        _get_logger().debug(f"   - Lock state: {'🔒 LOCKED' if hasattr(self, '_config_lock') and self._config_lock.locked() else '🔓 UNLOCKED'}")
         if hasattr(self, '_config_lock') and self._config_lock.locked():
-            logger.warning("⚠️  WARNING: _notify_subscribers called while holding _config_lock! This could cause deadlocks!")
-            logger.warning(f"   - Lock owner: {getattr(self._config_lock, '_owner', 'Unknown')}")
+            _get_logger().warning("⚠️  WARNING: _notify_subscribers called while holding _config_lock! This could cause deadlocks!")
+            _get_logger().warning(f"   - Lock owner: {getattr(self._config_lock, '_owner', 'Unknown')}")
         
         start_time = time.time()
         
         # Get a snapshot of current subscribers
         subscribers = []
         try:
-            logger.debug(f"🔍 [notify_subscribers] Getting subscribers for {module_name}")
-            logger.debug(f"   - Subscribers dict keys: {list(self._subscribers.keys())}")
+            _get_logger().debug(f"🔍 [notify_subscribers] Getting subscribers for {module_name}")
+            _get_logger().debug(f"   - Subscribers dict keys: {list(self._subscribers.keys())}")
             
             # Make a thread-safe copy of the subscribers list
-            logger.debug("   - Attempting to acquire _config_lock for subscribers copy")
+            _get_logger().debug("   - Attempting to acquire _config_lock for subscribers copy")
             lock_acquired = False
             try:
                 lock_acquired = self._config_lock.acquire(timeout=2)  # 2 second timeout
                 if not lock_acquired:
-                    logger.error("❌ [notify_subscribers] Failed to acquire _config_lock after 2 seconds!")
-                    logger.error(f"   - Current lock owner: {getattr(self._config_lock, '_owner', 'Unknown')}")
+                    _get_logger().error("❌ [notify_subscribers] Failed to acquire _config_lock after 2 seconds!")
+                    _get_logger().error(f"   - Current lock owner: {getattr(self._config_lock, '_owner', 'Unknown')}")
                     return
                     
-                logger.debug(f"   - Successfully acquired _config_lock (held by: {threading.get_ident()})")
+                _get_logger().debug(f"   - Successfully acquired _config_lock (held by: {threading.get_ident()})")
                 subscribers = list(self._subscribers.get(module_name, []))
-                logger.debug(f"   - Found {len(subscribers)} subscribers for {module_name}")
+                _get_logger().debug(f"   - Found {len(subscribers)} subscribers for {module_name}")
                 
                 # Clean up any dead references while we have the lock
                 if subscribers:
@@ -648,47 +653,47 @@ class SharedConfigManager:
                     
                     # Update the subscribers list if we found dead references
                     if dead_refs:
-                        logger.debug(f"   - Cleaning up {len(dead_refs)} dead references")
+                        _get_logger().debug(f"   - Cleaning up {len(dead_refs)} dead references")
                         self._subscribers[module_name] = live_refs
                     
                     subscribers = live_refs
             except Exception as e:
-                logger.error(f"❌ Unexpected error in update_config: {e}")
-                logger.exception("Update config error:")
+                _get_logger().error(f"❌ Unexpected error in update_config: {e}")
+                _get_logger().exception("Update config error:")
                 raise
             finally:
                 # Always release the lock in finally block to prevent deadlocks
                 if lock_acquired and self._config_lock.locked():
-                    logger.debug("🔓 Releasing _config_lock in finally block")
+                    _get_logger().debug("🔓 Releasing _config_lock in finally block")
                     try:
                         self._config_lock.release()
                     except Exception as release_error:
-                        logger.error(f"❌ Error releasing _config_lock: {release_error}")
-                        logger.exception("Lock release error:")
+                        _get_logger().error(f"❌ Error releasing _config_lock: {release_error}")
+                        _get_logger().exception("Lock release error:")
         
         except Exception as e:
-            logger.error(f"❌ Error getting subscribers: {e}")
-            logger.exception("Subscriber retrieval error:")
+            _get_logger().error(f"❌ Error getting subscribers: {e}")
+            _get_logger().exception("Subscriber retrieval error:")
             return
             
         # Notify all live callbacks (outside the lock to prevent deadlocks)
         elapsed = time.time() - start_time
-        logger.debug(f"⏱️  [notify_subscribers] Prepared subscribers in {elapsed:.4f}s")
+        _get_logger().debug(f"⏱️  [notify_subscribers] Prepared subscribers in {elapsed:.4f}s")
         
         if not subscribers:
-            logger.debug("ℹ️  No subscribers to notify")
+            _get_logger().debug("ℹ️  No subscribers to notify")
             return
             
-        logger.debug(f"📤 [notify_subscribers] Notifying {len(subscribers)} subscribers")
-        logger.debug(f"   - First few subscribers: {[str(s())[:50] + '...' for s in subscribers[:3]]}")
+        _get_logger().debug(f"📤 [notify_subscribers] Notifying {len(subscribers)} subscribers")
+        _get_logger().debug(f"   - First few subscribers: {[str(s())[:50] + '...' for s in subscribers[:3]]}")
             
-        logger.debug(f"   - Notifying {len(subscribers)} live callbacks")
+        _get_logger().debug(f"   - Notifying {len(subscribers)} live callbacks")
         
         # Make a deep copy of the config to prevent race conditions
         try:
             config_copy = copy.deepcopy(config)
         except Exception as e:
-            logger.error(f"❌ Failed to copy config: {e}")
+            _get_logger().error(f"❌ Failed to copy config: {e}")
             config_copy = config.copy()  # Fallback to shallow copy
         
         # Notify each subscriber with timeout protection
@@ -696,11 +701,11 @@ class SharedConfigManager:
             try:
                 callback = ref()
                 if callback is None:
-                    logger.debug(f"   - Subscriber {i}: Reference is dead, skipping")
+                    _get_logger().debug(f"   - Subscriber {i}: Reference is dead, skipping")
                     continue
                     
                 callback_name = getattr(callback, "__name__", str(callback))
-                logger.debug(f"\n📤 [notify_subscribers] Notifying subscriber {i}/{len(subscribers)}: {callback_name}")
+                _get_logger().debug(f"\n📤 [notify_subscribers] Notifying subscriber {i}/{len(subscribers)}: {callback_name}")
                 
                 # Add a timeout to prevent hanging on a single subscriber
                 def call_with_timeout():
@@ -716,25 +721,25 @@ class SharedConfigManager:
                     try:
                         success, error = future.result(timeout=5)  # 5 second timeout per callback
                         if success:
-                            logger.debug(f"✅ Successfully notified callback: {callback_name}")
+                            _get_logger().debug(f"✅ Successfully notified callback: {callback_name}")
                         else:
-                            logger.error(f"❌ Error in subscriber callback {callback_name}: {error}")
-                            logger.debug(f"   - Error details: {error}", exc_info=True)
+                            _get_logger().error(f"❌ Error in subscriber callback {callback_name}: {error}")
+                            _get_logger().debug(f"   - Error details: {error}", exc_info=True)
                     except concurrent.futures.TimeoutError:
-                        logger.error(f"⏱️  Callback {callback_name} timed out after 5 seconds")
+                        _get_logger().error(f"⏱️  Callback {callback_name} timed out after 5 seconds")
                         # Attempt to cancel the future (though it may continue running in the background)
                         future.cancel()
                 
             except Exception as e:
-                logger.error(f"❌ Unexpected error notifying subscriber {i}: {e}")
-                logger.debug(f"   - Error details: {str(e)}", exc_info=True)
+                _get_logger().error(f"❌ Unexpected error notifying subscriber {i}: {e}")
+                _get_logger().debug(f"   - Error details: {str(e)}", exc_info=True)
                 
             # Log progress periodically
             if i % 5 == 0 or i == len(subscribers):
-                logger.debug(f"   - Progress: {i}/{len(subscribers)} subscribers notified")
+                _get_logger().debug(f"   - Progress: {i}/{len(subscribers)} subscribers notified")
         
         total_time = time.time() - start_time
-        logger.debug(f"✅ [notify_subscribers] Completed notifications in {total_time:.4f}s")
+        _get_logger().debug(f"✅ [notify_subscribers] Completed notifications in {total_time:.4f}s")
     
     def get_all_configs(self) -> Dict[str, Dict[str, Any]]:
         """Get all configurations untuk parent module.
@@ -758,7 +763,7 @@ class SharedConfigManager:
             if module_name in self._configs:
                 del self._configs[module_name]
                 del self._last_updated[module_name]
-                logger.info(f"🧹 Cleared config for {module_name}")
+                _get_logger().info(f"🧹 Cleared config for {module_name}")
     
     def get_last_updated(self, module_name: str) -> Optional[datetime]:
         """Get last update time untuk module config.

@@ -17,8 +17,6 @@ from smartcash.ui.setup.colab.configs.colab_config_handler import ColabConfigHan
 from smartcash.ui.setup.colab.configs.colab_defaults import get_default_colab_config
 from smartcash.ui.setup.colab.operations.operation_manager import ColabOperationManager
 
-logger = get_module_logger("smartcash.ui.setup.colab.uimodule")
-
 # Global module instance for singleton pattern
 _colab_uimodule: Optional[UIModule] = None
 
@@ -38,9 +36,12 @@ def register_colab_template() -> None:
     
     try:
         UIModuleFactory.register_template(template, overwrite=True)
-        logger.debug("📋 Registered Colab template")
+        # Use get_module_logger locally to avoid callable errors
+        local_logger = get_module_logger("smartcash.ui.setup.colab.template")
+        local_logger.debug("📋 Registered Colab template")
     except Exception as e:
-        logger.error(f"❌ Failed to register template: {e}")
+        local_logger = get_module_logger("smartcash.ui.setup.colab.template")
+        local_logger.error(f"❌ Failed to register template: {e}")
 
 def register_colab_shared_methods() -> None:
     """Register Colab-specific shared methods."""
@@ -77,7 +78,9 @@ def register_colab_shared_methods() -> None:
             SharedMethodRegistry.register_method(name, method, overwrite=True, 
                                                description=desc, category="operations")
     
-    logger.debug("🔗 Registered Colab shared methods")
+    # Use get_module_logger locally to avoid callable errors
+    local_logger = get_module_logger("smartcash.ui.setup.colab.methods")
+    local_logger.debug("🔗 Registered Colab shared methods")
 
 class ColabUIModule(UIModule):
     """Colab-specific UIModule with enhanced functionality."""
@@ -142,10 +145,14 @@ class ColabUIModule(UIModule):
             # Call parent initialization
             super().initialize()
             
+            # Update status to show module is ready
+            self._update_status("Colab module initialized - ready for environment setup", "success")
+            
             self.logger.debug(f"✅ Initialized Colab UIModule")
             
         except Exception as e:
             self.logger.error(f"❌ Failed to initialize Colab UIModule: {e}")
+            self._update_status(f"Failed to initialize module: {str(e)}", "error")
             raise
         
         return self
@@ -256,7 +263,11 @@ class ColabUIModule(UIModule):
     def _handle_setup_button_click(self, button=None) -> None:
         """Handle setup button click."""
         try:
+            # Log using instance logger to avoid callable errors
             self.logger.info("🚀 Setup button clicked - starting full setup")
+            
+            # Update status panel
+            self._update_status("Starting environment setup...", "info")
             
             # Update button state to show processing
             if button:
@@ -274,13 +285,19 @@ class ColabUIModule(UIModule):
             # Execute full setup
             result = self.execute_full_setup()
             
-            # Log result to UI using operation container
-            if operation_container and hasattr(operation_container, 'log'):
-                from smartcash.ui.components.log_accordion import LogLevel
-                if result.get("success", False):
+            # Update status based on result
+            if result.get("success", False):
+                self._update_status("Environment setup completed successfully!", "success")
+                # Log to UI using operation container
+                if operation_container and hasattr(operation_container, 'log'):
+                    from smartcash.ui.components.log_accordion import LogLevel
                     operation_container.log("✅ Environment setup completed successfully!", LogLevel.INFO)
-                else:
-                    error_msg = result.get("message", "Setup failed")
+            else:
+                error_msg = result.get("message", "Setup failed")
+                self._update_status(f"Setup failed: {error_msg}", "error")
+                # Log to UI using operation container
+                if operation_container and hasattr(operation_container, 'log'):
+                    from smartcash.ui.components.log_accordion import LogLevel
                     operation_container.log(f"❌ Setup failed: {error_msg}", LogLevel.ERROR)
             
             # Update button based on result
@@ -297,26 +314,50 @@ class ColabUIModule(UIModule):
             
         except Exception as e:
             self.logger.error(f"❌ Setup button click failed: {e}")
+            self._update_status(f"Setup error: {str(e)}", "error")
             if button:
                 button.description = "❌ Error"
                 button.button_style = "danger"
                 button.disabled = False
+    
+    def _update_status(self, message: str, status_type: str = "info") -> None:
+        """Update status panel in header container.
+        
+        Args:
+            message: Status message to display
+            status_type: Type of status ('info', 'success', 'warning', 'error')
+        """
+        try:
+            header_container = self.get_component("header_container")
+            if header_container and hasattr(header_container, 'update_status'):
+                header_container.update_status(message, status_type)
+                self.logger.debug(f"Updated status panel: {message} ({status_type})")
+            else:
+                self.logger.debug(f"Status panel not available, status: {message}")
+        except Exception as e:
+            self.logger.error(f"Failed to update status panel: {e}")
     
     def _handle_save_config(self, button=None) -> None:
         """Handle save configuration button click."""
         try:
             # Save current configuration
             self.logger.info("💾 Saving configuration")
+            self._update_status("Saving configuration...", "info")
+            
             # Configuration is automatically saved in memory for Colab
+            self._update_status("Configuration saved successfully", "success")
             self.logger.info("✅ Configuration saved")
         except Exception as e:
             self.logger.error(f"❌ Failed to save configuration: {e}")
+            self._update_status(f"Failed to save configuration: {str(e)}", "error")
     
     def _handle_reset_config(self, button=None) -> None:
         """Handle reset configuration button click."""
         try:
             # Reset to default configuration
             self.logger.info("🔄 Resetting configuration to defaults")
+            self._update_status("Resetting configuration to defaults...", "info")
+            
             if self._config_handler:
                 # Check if the method exists, use appropriate method
                 if hasattr(self._config_handler, 'reset_to_defaults'):
@@ -328,9 +369,12 @@ class ColabUIModule(UIModule):
                     from .configs.colab_defaults import get_default_colab_config
                     default_config = get_default_colab_config()
                     self.update_config(**default_config)
+                    
+            self._update_status("Configuration reset to defaults successfully", "success")
             self.logger.info("✅ Configuration reset to defaults")
         except Exception as e:
             self.logger.error(f"❌ Failed to reset configuration: {e}")
+            self._update_status(f"Failed to reset configuration: {str(e)}", "error")
     
     def get_environment_status(self) -> Dict[str, Any]:
         """Get comprehensive environment status.
@@ -504,11 +548,14 @@ def create_colab_uimodule(config: Dict[str, Any] = None,
         # Store global reference
         _colab_uimodule = module
         
-        logger.debug(f"🏭 Created Colab UIModule")
+        # Use get_module_logger locally to avoid callable errors
+        local_logger = get_module_logger("smartcash.ui.setup.colab.factory")
+        local_logger.debug(f"🏭 Created Colab UIModule")
         return module
         
     except Exception as e:
-        logger.error(f"❌ Failed to create Colab UIModule: {e}")
+        local_logger = get_module_logger("smartcash.ui.setup.colab.factory")
+        local_logger.error(f"❌ Failed to create Colab UIModule: {e}")
         raise
 
 def get_colab_uimodule(create_if_missing: bool = True, **kwargs) -> Optional[ColabUIModule]:
@@ -536,11 +583,13 @@ def reset_colab_uimodule() -> None:
         try:
             _colab_uimodule.cleanup()
         except Exception as e:
-            logger.error(f"Error during cleanup: {e}")
+            local_logger = get_module_logger("smartcash.ui.setup.colab.reset")
+            local_logger.error(f"Error during cleanup: {e}")
         finally:
             _colab_uimodule = None
     
-    logger.debug("🔄 Reset global Colab UIModule instance")
+    local_logger = get_module_logger("smartcash.ui.setup.colab.reset")
+    local_logger.debug("🔄 Reset global Colab UIModule instance")
 
 # === Backward Compatibility Layer ===
 

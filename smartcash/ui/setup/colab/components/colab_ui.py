@@ -233,9 +233,13 @@ def create_colab_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> Dict[s
         title=UI_CONFIG['title'],
         subtitle=UI_CONFIG['subtitle'],
         icon=UI_CONFIG['icon'],
-        status_text="Ready"
+        status_message="Ready for environment setup",
+        status_type="info",
+        show_status_panel=True
     )
-    ui_components['header_container'] = header_container.container
+    # Store both the container widget and the header_container object for status updates
+    ui_components['header_container'] = header_container
+    ui_components['main_header_widget'] = header_container.container
     
     # === 2. FORM CONTAINER ===
     # Custom form layout specific to the module
@@ -355,7 +359,7 @@ def create_colab_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> Dict[s
     
     # Add containers in order, checking each one is not None
     container_order = [
-        ui_components.get('header_container'),
+        ui_components.get('main_header_widget'),  # Use the widget, not the object
         ui_components.get('form_container'), 
         ui_components.get('action_container')
     ]

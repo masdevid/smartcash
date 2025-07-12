@@ -1,27 +1,14 @@
-Initial logs still showing on colab reload:
-[2025-07-12 06:55:04] INFO - ColabConfigHandler - ✅ Environment type set to: colab
+Initial logs still showing on colab reload (should suppressed and redirected to log accordion):
+[2025-07-12 07:09:00] INFO - ColabConfigHandler - ✅ Environment type set to: colab
 INFO:ColabConfigHandler:✅ Environment type set to: colab
-[06:55:04] INFO - 📂 No existing config found: colab_config
-[06:55:04] INFO - 📂 No existing config found: colab_config
-INFO:ui.smartcash.ui.setup.colab:📂 No existing config found: colab_config
-[2025-07-12 06:55:04] INFO - smartcash.ui.core.shared.shared_config_manager - 📡 SharedConfigManager initialized untuk setup
-INFO:smartcash.ui.core.shared.shared_config_manager:📡 SharedConfigManager initialized untuk setup
-[06:55:04] INFO - 🔗 Shared config enabled for: setup
-[06:55:04] INFO - 🔗 Shared config enabled for: setup
-INFO:ui.smartcash.ui.setup.colab:🔗 Shared config enabled for: setup
-[06:55:04] INFO - ✅ Initialized UIModule: setup.colab
-[06:55:04] INFO - ✅ Initialized UIModule: setup.colab
-INFO:ui.smartcash.ui.setup.colab:✅ Initialized UIModule: setup.colab
+[07:09:00] INFO - 📂 No existing config found: colab_config
+[07:09:00] INFO - 📡 SharedConfigManager initialized untuk setup
+[07:09:00] INFO - 🔗 Shared config enabled for: setup
+[07:09:00] INFO - ✅ Initialized UIModule: setup.colab
 
-Error on check environment info:
+Error on click "Muat Informasi Environment":
 ⚠️ Error: Gagal memuat informasi tambahan: 'str' object has no attribute 'get'
 
 Error on setup button click:
-[06:55:45] INFO - 🚀 Setup button clicked - starting full setup
-[06:55:45] INFO - 🚀 Setup button clicked - starting full setup
-[06:55:45] INFO - 🚀 Setup button clicked - starting full setup
-INFO:ui.smartcash.ui.setup.colab.uimodule:🚀 Setup button clicked - starting full setup
-[06:55:45] ERROR - ❌ Setup button click failed: 'Logger' object is not callable
-[06:55:45] ERROR - ❌ Setup button click failed: 'Logger' object is not callable
-[06:55:45] ERROR - ❌ Setup button click failed: 'Logger' object is not callable
-ERROR:ui.smartcash.ui.setup.colab.uimodule:❌ Setup button click failed: 'Logger' object is not callable
+[07:09:09] INFO - 🚀 Setup button clicked - starting full setup
+[07:09:09] ERROR - ❌ Setup button click failed: 'Logger' object is not callable

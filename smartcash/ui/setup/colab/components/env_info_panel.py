@@ -575,7 +575,7 @@ def _get_smartcash_env_status(env_vars: Dict[str, str]) -> str:
             '</div>'
         )
 
-def _format_additional_info(env_info: Dict[str, Any]) -> str:
+def _format_additional_info(env_info: Any) -> str:
     """Format dan tampilkan informasi tambahan tentang environment.
     
     Fungsi ini mengumpulkan dan memformat berbagai informasi tambahan
@@ -583,7 +583,7 @@ def _format_additional_info(env_info: Dict[str, Any]) -> str:
     tampilan HTML yang rapi dan informatif.
     
     Args:
-        env_info: Dictionary berisi informasi lengkap environment
+        env_info: Dictionary berisi informasi lengkap environment atau string error
         
     Returns:
         String HTML yang berisi informasi tambahan yang diformat
@@ -598,8 +598,10 @@ def _format_additional_info(env_info: Dict[str, Any]) -> str:
         
         # 1. Informasi Jaringan
         network_info = env_info.get('network_info', {})
+        if not isinstance(network_info, dict):
+            network_info = {}
         interfaces = network_info.get('interfaces', [])
-        if interfaces:
+        if interfaces and isinstance(interfaces, list):
             interface_count = len(interfaces)
             active_interfaces = [i for i in interfaces if i.get('is_up', False)]
             active_count = len(active_interfaces)
@@ -625,6 +627,8 @@ def _format_additional_info(env_info: Dict[str, Any]) -> str:
         # 2. Informasi CUDA dan GPU
         cuda_version = env_info.get('cuda_version')
         gpu_info = env_info.get('gpu', {})
+        if not isinstance(gpu_info, dict):
+            gpu_info = {}
         
         if cuda_version or gpu_info.get('available', False):
             gpu_html = [
@@ -656,6 +660,8 @@ def _format_additional_info(env_info: Dict[str, Any]) -> str:
         
         # 3. Informasi Runtime
         runtime_info = env_info.get('runtime', {})
+        if not isinstance(runtime_info, dict):
+            runtime_info = {}
         if 'start_time' in runtime_info:
             try:
                 from datetime import datetime
@@ -690,6 +696,8 @@ def _format_additional_info(env_info: Dict[str, Any]) -> str:
         
         # 4. Informasi Python
         python_info = env_info.get('python_info', {})
+        if not isinstance(python_info, dict):
+            python_info = {}
         if python_info:
             implementation = python_info.get('implementation', 'Python')
             version = python_info.get('version', '')

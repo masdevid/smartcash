@@ -291,7 +291,119 @@ smartcash/ui/components/
 - **Dependency Module**: Functional tests verified
 - **Legacy Modules**: Existing test suites maintained
 
+## 📋 Development DO and DON'Ts
+
+### ✅ DO - Best Practices
+
+#### Logger Usage
+- **DO** use instance loggers (`self.logger`) instead of module-level loggers
+- **DO** use function-based logger access (`_get_logger()`) for module-level operations
+- **DO** prevent logger propagation with `logger.propagate = False` in UI logger setup
+- **DO** use operation container logging to redirect logs to UI components
+
+#### Type Safety and Error Handling
+- **DO** add comprehensive type checking with `isinstance(data, dict)` before calling `.get()`
+- **DO** handle both dict and string inputs gracefully in formatting functions
+- **DO** provide fallback values and error messages for invalid data types
+- **DO** use try-catch blocks around all UI operations with proper error logging
+
+#### Status Panel Integration
+- **DO** store both header_container object and widget separately for access to methods
+- **DO** implement `_update_status()` helper methods in UIModule classes
+- **DO** provide real-time feedback for all major operations (start, success, error states)
+- **DO** use consistent status types: 'info', 'success', 'warning', 'error'
+
+#### UIModule Architecture
+- **DO** follow the standardized container order: Header → Form → Action → Summary → Operation → Footer
+- **DO** register components with clear, consistent naming conventions
+- **DO** use SharedMethodRegistry for cross-module functionality
+- **DO** implement proper cleanup in module destructors
+
+#### Code Organization
+- **DO** keep functions under 500 lines by splitting into helper methods
+- **DO** use clear, descriptive function and variable names
+- **DO** add comprehensive docstrings with Args and Returns documentation
+- **DO** group related functionality into logical modules and classes
+
+### ❌ DON'T - Common Pitfalls
+
+#### Logger Anti-Patterns
+- **DON'T** use module-level logger declarations like `logger = get_module_logger(__name__)`
+- **DON'T** call logger objects directly in event handlers (causes "Logger object is not callable" errors)
+- **DON'T** mix standard logging with UI container logging (causes duplicate logs)
+- **DON'T** forget to suppress console output when using operation containers
+
+#### Type and Data Handling
+- **DON'T** assume data structures are always dictionaries without type checking
+- **DON'T** call `.get()` methods on variables that might be strings
+- **DON'T** ignore None or empty values in data formatting functions
+- **DON'T** let exceptions in formatting functions crash the entire UI
+
+#### UI Component Management
+- **DON'T** store only widget containers when you need access to object methods
+- **DON'T** create UI components without proper error handling
+- **DON'T** forget to implement status updates for user feedback
+- **DON'T** mix different UI frameworks or patterns within the same module
+
+#### Architecture Violations
+- **DON'T** bypass the UIModule pattern for new modules
+- **DON'T** create direct dependencies between modules (use SharedMethodRegistry instead)
+- **DON'T** implement complex multi-tab interfaces (use single-screen approach)
+- **DON'T** duplicate functionality across modules without using shared components
+
+#### Performance and Memory
+- **DON'T** create memory leaks by not cleaning up event handlers
+- **DON'T** hold references to large objects in module-level variables
+- **DON'T** initialize heavy operations during module import
+- **DON'T** block the UI thread with long-running operations
+
+### 🔧 Common Fix Patterns
+
+#### Logger Callable Error Fix
+```python
+# ❌ DON'T: Module-level logger
+logger = get_module_logger(__name__)
+
+# ✅ DO: Function-based logger
+def _get_logger():
+    return get_module_logger(__name__)
+
+# ✅ DO: Instance logger in classes
+class MyModule:
+    def __init__(self):
+        self.logger = get_module_logger(f"{__name__}.{self.__class__.__name__}")
+```
+
+#### Type Safety Fix
+```python
+# ❌ DON'T: Assume data type
+def format_info(data):
+    return data.get('field', 'default')
+
+# ✅ DO: Check type first
+def format_info(data):
+    if not isinstance(data, dict):
+        return ''
+    return data.get('field', 'default')
+```
+
+#### Status Panel Integration Fix
+```python
+# ❌ DON'T: Store only widget
+ui_components['header_container'] = header_container.container
+
+# ✅ DO: Store both object and widget
+ui_components['header_container'] = header_container
+ui_components['main_header_widget'] = header_container.container
+
+# ✅ DO: Implement status updates
+def _update_status(self, message: str, status_type: str = "info"):
+    header_container = self.get_component("header_container")
+    if header_container and hasattr(header_container, 'update_status'):
+        header_container.update_status(message, status_type)
+```
+
 ---
 
-*Last Updated: July 11, 2025*  
+*Last Updated: July 12, 2025*  
 *Architecture Version: UIModule Pattern v2.0*

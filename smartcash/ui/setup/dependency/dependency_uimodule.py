@@ -203,20 +203,80 @@ class DependencyUIModule(UIModule):
             gap="10px"
         )
         
-        # Simple package selection
+        # Package categories for grid layout
         package_categories = self.get_config("package_categories", {})
-        core_packages = package_categories.get("core_requirements", {}).get("packages", [])
         
-        # Create checkboxes for core packages
-        package_checkboxes = []
-        for pkg in core_packages:
-            checkbox = widgets.Checkbox(
-                value=True,  # Default selected
-                description=f"{pkg['name']} ({pkg['version']})",
-                style={'description_width': 'initial'},
-                layout=widgets.Layout(margin='2px 0')
+        # Create grid layout for package categories (4 columns)
+        package_checkboxes = {}
+        category_containers = []
+        
+        # Get all categories
+        categories = [
+            'core_requirements',
+            'ml_ai_libraries', 
+            'data_processing',
+            'requirements_txt'
+        ]
+        
+        for category_key in categories:
+            category = package_categories.get(category_key, {})
+            if not category:
+                continue
+                
+            packages = category.get("packages", [])
+            if not packages:
+                continue
+            
+            # Create category header
+            category_header = widgets.HTML(
+                value=f"<h4 style='margin: 5px 0; color: {category.get('color', '#333')};'>"
+                      f"{category.get('icon', '📦')} {category.get('name', category_key)}</h4>"
             )
-            package_checkboxes.append(checkbox)
+            
+            # Create checkboxes for this category
+            category_checkboxes = []
+            for pkg in packages:
+                checkbox = widgets.Checkbox(
+                    value=True if category_key in ['core_requirements', 'requirements_txt'] else False,
+                    description=f"{pkg['name']} ({pkg.get('version', '')})",
+                    style={'description_width': 'initial'},
+                    layout=widgets.Layout(margin='1px 0')
+                )
+                category_checkboxes.append(checkbox)
+            
+            # Store checkboxes by category
+            package_checkboxes[category_key] = category_checkboxes
+            
+            # Create container for this category
+            category_container = widgets.VBox(
+                [category_header] + category_checkboxes,
+                layout=widgets.Layout(
+                    margin='5px',
+                    padding='10px',
+                    border='1px solid #ddd',
+                    border_radius='5px',
+                    width='22%'  # 4 columns with some margin
+                )
+            )
+            category_containers.append(category_container)
+        
+        # Create 4-column grid using HBox
+        grid_rows = []
+        for i in range(0, len(category_containers), 4):
+            row = widgets.HBox(
+                category_containers[i:i+4],
+                layout=widgets.Layout(
+                    justify_content='space-between',
+                    width='100%'
+                )
+            )
+            grid_rows.append(row)
+        
+        # Package grid container
+        package_grid = widgets.VBox(
+            grid_rows,
+            layout=widgets.Layout(width='100%')
+        )
         
         # Custom packages text area
         custom_packages = widgets.Textarea(
@@ -228,11 +288,11 @@ class DependencyUIModule(UIModule):
         status_output = widgets.Output()
         
         # Add to form
-        core_label = widgets.HTML("<h4>📋 Core Packages</h4>")
+        packages_label = widgets.HTML("<h3 style='margin: 10px 0;'>📦 Package Categories</h3>")
         custom_label = widgets.HTML("<h4>➕ Additional Packages</h4>")
         status_label = widgets.HTML("<h4>📊 Package Status</h4>")
         
-        form_items = [core_label] + package_checkboxes + [custom_label, custom_packages, status_label, status_output]
+        form_items = [packages_label, package_grid, custom_label, custom_packages, status_label, status_output]
         
         for item in form_items:
             form_container['add_item'](item, height="auto")
@@ -240,6 +300,12 @@ class DependencyUIModule(UIModule):
         # 3. Action Container - Simplified buttons
         action_container = create_action_container(
             buttons=[
+                {
+                    'id': 'save_config',
+                    'text': '💾 Save Configuration',
+                    'style': 'success',
+                    'tooltip': 'Save selected packages to configuration'
+                },
                 {
                     'id': 'install',
                     'text': '📥 Install Selected',
@@ -325,6 +391,7 @@ class DependencyUIModule(UIModule):
             'status_output': status_output,
             
             # Buttons
+            'save_button': action_container['buttons'].get('save_config'),
             'install_button': action_container['buttons'].get('install'),
             'check_button': action_container['buttons'].get('check_status'),
             'update_button': action_container['buttons'].get('update'),
@@ -426,6 +493,10 @@ class DependencyUIModule(UIModule):
         """Setup event handlers for UI components."""
         try:
             # Connect buttons to handlers
+            save_button = self.get_component("save_button")
+            if save_button:
+                save_button.on_click(self._handle_save_click)
+            
             install_button = self.get_component("install_button")
             if install_button:
                 install_button.on_click(self._handle_install_click)
@@ -447,7 +518,66 @@ class DependencyUIModule(UIModule):
         except Exception as e:
             logger.error(f"❌ Failed to setup event handlers: {e}")
     
-    def _handle_install_click(self, button=None) -> None:
+    def _handle_save_click(self, _=None) -> None:
+        """Handle save configuration button click."""
+        try:
+            self._log_to_ui("💾 Saving configuration...", "info")
+            
+            # Get selected packages
+            selected_packages = self._get_selected_packages()
+            
+            # Get custom packages
+            custom_packages = self.get_component("custom_packages")
+            custom_packages_text = custom_packages.value if custom_packages else ""
+            
+            # Save to config handler
+            if self._config_handler:
+                # Update selected packages
+                current_config = self._config_handler.config.copy()
+                current_config['selected_packages'] = selected_packages
+                current_config['custom_packages'] = custom_packages_text
+                
+                # Save configuration
+                self._config_handler.config = current_config
+                success = True
+                
+                if success:
+                    self._log_to_ui(f"✅ Configuration saved! {len(selected_packages)} packages selected", "success")
+                    
+                    # Update UI display
+                    self._update_ui_after_save()
+                else:
+                    self._log_to_ui("❌ Failed to save configuration", "error")
+            else:
+                self._log_to_ui("❌ Config handler not available", "error")
+                
+        except Exception as e:
+            logger.error(f"❌ Save click failed: {e}")
+            self._log_to_ui(f"❌ Save error: {str(e)}", "error")
+    
+    def _update_ui_after_save(self) -> None:
+        """Update UI components after saving configuration."""
+        try:
+            # Refresh package status to show current state
+            self.refresh_package_status()
+            
+            # Update header status
+            header_container = self.get_component("header_container")
+            if header_container and hasattr(header_container, 'update_status'):
+                selected_count = len(self._get_selected_packages())
+                header_container.update_status(
+                    f"Configuration saved - {selected_count} packages selected",
+                    "success"
+                )
+            
+            # Log configuration file location
+            config_path = getattr(self._config_handler, 'config_file', "dependency_config.yaml") if self._config_handler else "dependency_config.yaml"
+            self._log_to_ui(f"📁 Configuration saved to: {config_path}", "info")
+            
+        except Exception as e:
+            logger.error(f"❌ Failed to update UI after save: {e}")
+    
+    def _handle_install_click(self, _=None) -> None:
         """Handle install button click."""
         try:
             selected_packages = self._get_selected_packages()
@@ -471,7 +601,7 @@ class DependencyUIModule(UIModule):
             logger.error(f"❌ Install click failed: {e}")
             self._log_to_ui(f"❌ Install error: {str(e)}", "error")
     
-    def _handle_check_click(self, button=None) -> None:
+    def _handle_check_click(self, _=None) -> None:
         """Handle check status button click."""
         try:
             self._log_to_ui("🔍 Checking package status...", "info")
@@ -480,7 +610,7 @@ class DependencyUIModule(UIModule):
             logger.error(f"❌ Check click failed: {e}")
             self._log_to_ui(f"❌ Check error: {str(e)}", "error")
     
-    def _handle_update_click(self, button=None) -> None:
+    def _handle_update_click(self, _=None) -> None:
         """Handle update button click."""
         try:
             self._log_to_ui("⬆️ Updating packages...", "info")
@@ -499,7 +629,7 @@ class DependencyUIModule(UIModule):
             logger.error(f"❌ Update click failed: {e}")
             self._log_to_ui(f"❌ Update error: {str(e)}", "error")
     
-    def _handle_uninstall_click(self, button=None) -> None:
+    def _handle_uninstall_click(self, _=None) -> None:
         """Handle uninstall button click."""
         try:
             selected_packages = self._get_selected_packages()
@@ -527,14 +657,17 @@ class DependencyUIModule(UIModule):
         """Get list of selected packages from UI."""
         selected = []
         
-        # Get core packages from checkboxes
-        checkboxes = self.get_component("package_checkboxes", [])
+        # Get packages from all category checkboxes
+        package_checkboxes = self.get_component("package_checkboxes") or {}
         package_categories = self.get_config("package_categories", {})
-        core_packages = package_categories.get("core_requirements", {}).get("packages", [])
         
-        for i, checkbox in enumerate(checkboxes):
-            if checkbox.value and i < len(core_packages):
-                selected.append(core_packages[i]['pip_name'])
+        for category_key, checkboxes in package_checkboxes.items():
+            category = package_categories.get(category_key, {})
+            packages = category.get("packages", [])
+            
+            for i, checkbox in enumerate(checkboxes):
+                if checkbox.value and i < len(packages):
+                    selected.append(packages[i]['pip_name'])
         
         # Get custom packages from text area
         custom_packages = self.get_component("custom_packages")
@@ -645,13 +778,16 @@ class DependencyUIModule(UIModule):
             logger.error(f"❌ Failed to refresh package status: {e}")
     
     def _get_all_packages(self) -> List[str]:
-        """Get list of all packages (core + custom)."""
+        """Get list of all packages from all categories + custom."""
         all_packages = []
         
-        # Core packages
+        # Get packages from all categories
         package_categories = self.get_config("package_categories", {})
-        core_packages = package_categories.get("core_requirements", {}).get("packages", [])
-        all_packages.extend([pkg['name'] for pkg in core_packages])
+        for category_key, category in package_categories.items():
+            if category_key == 'custom_packages':  # Skip custom packages category
+                continue
+            packages = category.get("packages", [])
+            all_packages.extend([pkg['name'] for pkg in packages])
         
         # Custom packages from UI
         custom_packages = self.get_component("custom_packages")

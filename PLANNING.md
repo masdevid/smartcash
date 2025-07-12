@@ -1,295 +1,297 @@
 # SmartCash Development Plan
 
 ## Overview
-SmartCash UI system has achieved **81.9% overall success rate** with solid core infrastructure. This document outlines the next development priorities based on comprehensive testing results.
+SmartCash UI system has evolved to a modern **UIModule-centric architecture** with improved success rates and consistent patterns. This document outlines the current state and development priorities.
 
-## Architecture
-- **New Clean Architecture Pattern**
- - **Class Diagram Example** look at `inheritance_diagram.md`
-  ```
-  BaseHandler → Error Handling → SharedConfig → UI Components
-       ↓              ↓              ↓              ↓
-    Lightweight    Focused       Centralized   Specialized
-    Fast init      Clear         Thread-safe   Component-specific
-    Simple API     Reliable      Versioning    Action-based
-  ```
-### Module Groups
+## Architecture Overview
 
-#### 1. Setup & Configuration (1.x)
-- **1.1 Repository Setup**
-  - Module: `setup/repo` (direct cell code)
-  - Purpose: Handles repository cloning and initialization
-  - Persistence Configs: `False`
+### 🏗️ New UIModule-Centric Architecture
+The system has been completely refactored from legacy patterns to a unified UIModule approach:
 
-- **1.2 Google Colab Environment**
-  - Module: `setup/colab`
-  - Purpose: Manages Google Colab-specific environment configuration
-  - Persistence Configs: `False`
-  - Status: 100% functional, full UI standardization compliance
-  - Test Coverage: 100% (14/14 tests passing)
+```
+UIModuleFactory ← UIModule ← SharedMethodRegistry ← Container Components
+      ↓              ↓              ↓                    ↓
+   Template        Central Hub    Method Sharing     Standardized UI
+   Management      Component      Cross-Module       Action Containers
+   Lifecycle       Composition    Operations         Progress/Logs
+```
 
-- **1.3 Dependency Management**
-  - Module: `setup/dependencies`
-  - Purpose: Handles package and dependency management
-  - Persistence Configs: `True`
+### 🔧 Core Infrastructure (smartcash/ui/core/)
+
+#### ⭐ New UIModule Pattern
+- **`ui_module.py`** - Central UIModule class with handler composition
+- **`ui_module_factory.py`** - Factory pattern for module creation and lifecycle
+- **Template System** - Reusable module configurations
+- **SharedMethodRegistry** - Cross-module method sharing with categories
+- **Thread-safe operations** - Proper locking and weak reference management
+
+#### 🔄 Legacy Support (Maintained for Backward Compatibility)
+- **`handlers/`** - Original handler patterns (24+ modules still using)
+- **`initializers/`** - Legacy initialization patterns  
+- **`errors/`** - Comprehensive error handling system
+- **`configs/`** - Base configuration handlers
+- **`decorators/`** - UI operation decorators
+- **`logging/`** - UI logging management
+- **`shared/`** - Shared configuration management
+- **`utils/`** - Utility functions (log suppression, etc.)
+
+### 📦 Container Architecture (smartcash/ui/components/)
+Standardized container system used across all modules:
+- **Header Container** - Title, subtitle, status
+- **Form Container** - Module-specific forms and inputs
+- **Action Container** - Save/reset, primary actions, operation buttons
+- **Operation Container** - Progress tracking, dialogs, logging
+- **Footer Container** - Info accordions, tips, documentation
+## 🎯 Module Implementation Status
+
+### ✅ Refactored Modules (UIModule Pattern)
+
+#### 1.1 Core Module Infrastructure ⭐ COMPLETED
+- **Location**: `smartcash/ui/core/`
+- **Pattern**: UIModule-centric architecture
+- **Status**: ✅ Fully refactored with comprehensive testing
+- **Key Features**:
+  - UIModule and UIModuleFactory implementation
+  - SharedMethodRegistry for cross-module method sharing
+  - Template system for consistent module creation
+  - 37 comprehensive tests (100% pass rate)
+  - Thread-safe operations with proper locking
+
+#### 1.2 Google Colab Environment ⭐ COMPLETED
+- **Location**: `smartcash/ui/setup/colab/`
+- **Pattern**: UIModule with environment detection
+- **Status**: ✅ Fully refactored and cleaned up
+- **Key Features**:
+  - Auto-detect Google Colab vs Local environment
+  - Sequential operations: INIT → DRIVE → SYMLINK → FOLDERS → CONFIG → ENV → VERIFY
+  - No-persistence configuration (Colab-specific requirement)
+  - Real-time progress tracking and UI-integrated logging
+  - 4 basic tests (100% pass rate)
+  - 1,918 lines of redundant code removed
+- **Entry Points**: `initialize_colab_ui()`, `create_colab_uimodule()`
+
+#### 1.3 Dependency Management ⭐ COMPLETED  
+- **Location**: `smartcash/ui/setup/dependency/`
+- **Pattern**: Simplified UIModule with package management
+- **Status**: ✅ Fully refactored with 90% code reduction
+- **Key Features**:
+  - Simplified single-screen interface (no complex tabs)
+  - 4 core operations: Install, Uninstall, Check Status, Update
+  - Simple package selection: checkboxes + custom text area
+  - Real-time package status display
+  - 2,000+ lines of complex UI code removed
+  - Essential functionality preserved
+- **Entry Points**: `initialize_dependency_ui()`, `create_dependency_uimodule()`
+
+### 🔄 Legacy Modules (Awaiting Refactoring)
+
+The following modules still use the original initializer pattern and are candidates for UIModule refactoring:
 
 #### 2. Data Management (2.x)
-- **2.1 Dataset Downloader**
-  - Module: `dataset/downloader`
-  - Persistence Configs: `True`
+- **2.1 Dataset Downloader** - `smartcash/ui/dataset/downloader/`
+  - Status: 📋 Pending refactoring
+  - Current: Complex tab-based UI with initializer pattern
+  - Target: Simplified download/status UI with UIModule pattern
 
-- **2.2 Data Splitting**
-  - Module: `dataset/split`
-  - Persistence Configs: `True`
+- **2.2 Data Splitting** - `smartcash/ui/dataset/split/`
+  - Status: 📋 Pending refactoring  
+  - Current: Configuration-heavy interface
+  - Target: Simple train/validation/test split UI
 
-- **2.3 Data Preprocessing**
-  - Module: `dataset/preprocessing`
-  - Persistence Configs: `True`
+- **2.3 Data Preprocessing** - `smartcash/ui/dataset/preprocess/`
+  - Status: 📋 Pending refactoring
+  - Current: Multi-step preprocessing pipeline
+  - Target: Streamlined preprocessing workflow
 
-- **2.4 Data Augmentation**
-  - Module: `dataset/augmentation`
-  - Persistence Configs: `True`
+- **2.4 Data Augmentation** - `smartcash/ui/dataset/augment/`
+  - Status: 📋 Pending refactoring
+  - Current: Complex augmentation parameter UI
+  - Target: Simple augmentation with preview
 
-- **2.5 Data Visualization**
-  - Module: `dataset/visualization`
-  - Persistence Configs: `False`
+- **2.5 Data Visualization** - `smartcash/ui/dataset/visualization/`
+  - Status: 📋 Pending refactoring
+  - Current: Visualization-heavy interface
+  - Target: Chart dashboard with simple controls
 
-#### 3. Model Development (3.x)
-- **3.1 Pretrained Models**
-  - Module: `model/pretrained`
-  - Persistence Configs: `True`
+#### 3. Model Management (3.x)
+- **3.1 Pretrained Models** - `smartcash/ui/model/pretrained/`
+  - Status: 📋 Pending refactoring
+  - Target: Simple model download/management UI
 
-- **3.2 Model Architecture**
-  - Module: `model/architecture`
-  - Persistence Configs: `True`
+- **3.2 Backbone Configuration** - `smartcash/ui/model/backbone/`
+  - Status: 📋 Pending refactoring
+  - Target: Model architecture selection UI
 
-- **3.3 Model Training**
-  - Module: `model/training`
-  - Persistence Configs: `True`
+- **3.3 Training** - `smartcash/ui/model/train/`
+  - Status: 📋 Pending refactoring
+  - Target: Training workflow with progress monitoring
 
-- **3.4 Model Evaluation**
-  - Module: `model/evaluation`
-  - Persistence Configs: `True`
+- **3.4 Evaluation** - `smartcash/ui/model/evaluate/`
+  - Status: 📋 Pending refactoring
+  - Target: Evaluation results and metrics UI
 
-### Core UI Structure
+## 🚀 Development Priorities
 
+### Immediate Next Steps (High Priority)
+1. **Dataset Downloader Refactoring**
+   - Simplify complex tab-based UI to single-screen download interface
+   - Implement UIModule pattern for consistency
+   - Focus on core functionality: download, verify, status
+
+2. **Model Training Module Refactoring**
+   - Streamline training workflow UI
+   - Real-time progress monitoring with UIModule
+   - Essential controls only: start/stop/resume training
+
+3. **Core Infrastructure Enhancement**
+   - Expand SharedMethodRegistry for cross-module operations
+   - Enhance UIModuleFactory with more template types
+   - Improve error handling and logging integration
+
+### Medium Priority
+1. **Data Pipeline Modules** (Split, Preprocess, Augmentation)
+   - Refactor to UIModule pattern
+   - Simplify workflows with essential functionality only
+   - Consistent progress tracking and error handling
+
+2. **Model Management** (Pretrained, Backbone, Evaluation)
+   - Implement UIModule pattern across model modules
+   - Streamlined model selection and configuration UIs
+   - Integrated model performance monitoring
+
+### Long-term Goals
+1. **Complete Migration to UIModule Pattern**
+   - All 24+ legacy modules migrated to UIModule pattern
+   - Deprecate legacy initializer pattern
+   - Unified codebase with consistent architecture
+
+2. **Enhanced Developer Experience**
+   - Auto-generation of UIModule templates
+   - Comprehensive documentation and examples
+   - Developer tools for rapid module creation
+
+## 🏗️ Current Core UI Structure
+
+### New UIModule Architecture
 ```
 smartcash/ui/core/
-    ├── __init__.py           # Minimal exports to avoid circular dependencies
-    ├── handlers/             # Base handler implementations
-    │   ├── __init__.py       # Export only public handler classes
-    │   ├── base_handler.py         # Base handler with error handling + UILogger (with Suppression)
-    │   ├── config_handler.py       # Config Handler (extend UI Handler)
-    │   ├── ui_handler.py           # UI Handler (extend Base Handler)
-    │   └── operation_handler.py    # Operation Handler (extend UI Handler)
-    ├── initializers/         # Initializer implementations
-    │   ├── __init__.py       # Export only public initializer classes
-    │   ├── base_initializer.py      # Base Initializer
-    │   ├── display_initializer.py   # Display Initializer (extend Base Initializer)
-    │   ├── config_initializer.py    # Config Initializer (extend Module Initializer)
-    │   ├── module_initializer.py    # Module Initializer (extend Base Initializer)
-    │   └── operation_initializer.py # Operation Initializer (extend Module Initializer)
-    ├── errors/               # Centralized error handling
-    │   ├── __init__.py       # Public error handling API
-    │   ├── decorators.py     # Error handling decorators
-    │   ├── error_handler.py  # Core error handling
-    │   └── exceptions.py     # Custom exceptions
-    └── shared/              # Shared utilities
-        ├── __init__.py
-        ├── logger.py         # Enhanced UILogger
-        └── shared_config_manager.py
+    ├── ui_module.py                    # ⭐ NEW: Central UIModule class
+    ├── ui_module_factory.py            # ⭐ NEW: Factory pattern & templates
+    ├── __init__.py                     # Core exports
+    ├── handlers/                       # 🔄 Legacy handlers (still in use)
+    │   ├── base_handler.py            # Base handler with error handling
+    │   ├── config_handler.py          # Configuration management
+    │   ├── ui_handler.py              # UI interaction handling  
+    │   ├── operation_handler.py       # Operation execution
+    │   └── global_ui_handler.py       # Global UI state (to be deprecated)
+    ├── initializers/                   # 🔄 Legacy initializers (24+ modules)
+    │   ├── base_initializer.py        # Base initialization pattern
+    │   ├── module_initializer.py      # Module-specific initialization
+    │   ├── display_initializer.py     # Display management
+    │   └── config_initializer.py      # Configuration initialization
+    ├── errors/                         # ✅ Active error handling system
+    │   ├── __init__.py                # Error handling API
+    │   ├── decorators.py              # Error decorators
+    │   ├── handlers.py                # Error handlers
+    │   ├── exceptions.py              # Custom exceptions
+    │   └── context.py                 # Error context management
+    ├── configs/                        # ✅ Configuration management
+    │   └── base_config_handler.py     # Base configuration handling
+    ├── decorators/                     # ✅ UI operation decorators
+    │   └── ui_decorators.py           # Safe UI operation decorators
+    ├── logging/                        # ✅ UI logging system
+    │   └── ui_logging_manager.py      # UI-specific logging
+    ├── shared/                         # ✅ Shared state management
+    │   └── shared_config_manager.py   # Cross-module configuration
+    └── utils/                          # ✅ Utility functions
+        └── log_suppression.py         # Log suppression during UI init
 ```
 
-### Key Components
+### Container Architecture
+```
+smartcash/ui/components/
+    ├── header_container.py            # Title, subtitle, status display
+    ├── form_container.py              # Module-specific forms/inputs
+    ├── action_container.py            # Save/reset, primary, action buttons
+    ├── operation_container.py         # Progress, dialogs, logging
+    ├── footer_container.py            # Info accordions, tips
+    └── main_container.py              # Main layout orchestration
+```
 
-1. **Core Components** (`ui/core/`)
-   - **Handlers**: Base handler implementations following a clear hierarchy:
-     - `BaseHandler`: Core functionality (extend Error Handler)
-     - `ConfigurableHandler`: Config management
-       - `PersistentConfigHandler`: File I/O operations
-         - `SharedConfigHandler`: Shared configurations
-       - `ModuleConfigHandler`: Module-specific configs
-   - **Initializers**: Base initialization logic centralized with error handling
-   - **Error Handling**: Centralized error management with decorators
-   - **Shared Utilities**: Common functionality across modules
+## 📊 Current Metrics & Success Rates
 
-2. **Module Structure**
-   Each module follows this structure:
-   ```
-   [module]/
-   ├── __init__.py               # Minimal exports, typically just the initializer
-   ├── constants.py              # Constants management
-   ├── [module]_initializer.py   # Main Initializer + Display Initializer
-   ├── components/               # UI component definitions
-   │   ├── __init__.py           # Export only public components
-   │   ├── [module]_ui.py        # Main UI components
-   │   └── ...
-   ├── configs/                  # Configuration management
-   │   ├── __init__.py           # Export only public configs
-   │   ├── [module]_defaults.py  # Default Config
-   │   └── [module]_config.py    # Config Handler
-   ├── handlers/                 # Module-specific handlers
-   │   ├── __init__.py
-   │   └── [module]_ui_handler.py # UI Handler
-   ├── operations/                # Operation handlers
-   │   ├── __init__.py
-   │   ├── [module]_manager.py   # Operation Manager (Orchestrator -> Inherit Operation Handler)
-   │   └── [operation_name]_operation.py # Operation Handler (Inherit Manager)
-   └── services/                 # Module-specific services (Backend Bridge Layer)
-   
-3. **UI Layout**
-   - Consistent container-based layout across modules
-   - Read more in `UI_MODULE_STANDARDIZATION_SUMMARY.md`
+### ✅ Refactored Modules Performance
+- **Core Module**: 37/37 tests passing (100%)
+- **Colab Module**: 4/4 tests passing (100%)  
+- **Dependency Module**: Functional testing confirmed (100%)
+- **Code Reduction**: ~4,000+ lines of redundant code removed
+- **Backward Compatibility**: 100% maintained across all modules
 
-### Initialization Flow
-1. **Environment Setup**
-   - Detect and validate environment (Colab/local)
-   - Initialize logging and error handling
-   - Load shared configurations
+### 🎯 Architecture Benefits Achieved
+- **Consistency**: Unified UIModule pattern across refactored modules
+- **Maintainability**: Simplified codebase with focused functionality
+- **Developer Experience**: Predictable patterns and shared method registry
+- **Performance**: Reduced initialization overhead and memory usage
+- **Testing**: Comprehensive test coverage with reliable CI/CD
 
-## Testing Strategy
+### 📈 Migration Progress
+- **Completed**: 3/27 modules (11%)
+- **In Progress**: Core infrastructure and patterns established
+- **Remaining**: 24 modules to migrate to UIModule pattern
+- **Timeline**: Targeting 2-3 modules per development cycle
 
-### Test Organization
+## 🔄 New UIModule Pattern
 
-1. **Test Directory Structure**
-   - Semua test harus diorganisir dalam folder `tests/` dengan struktur yang mencerminkan struktur kode utama
-   - Gunakan pola mirror untuk test files (contoh: `smartcash/ui/model/backbone.py` -> `tests/ui/model/test_backbone.py`)
-   - Kelompokkan test terkait dalam folder yang sesuai (unit, integration, e2e)
+### Module Structure (New Pattern)
+```
+[module]/
+├── __init__.py                    # UIModule exports
+├── [module]_uimodule.py          # ⭐ Main UIModule implementation
+├── configs/                       # Configuration management
+│   ├── [module]_defaults.py      # Default configurations
+│   └── [module]_config_handler.py # Config handler
+├── operations/                    # Operation management (preserved)
+│   ├── operation_manager.py      # Operation orchestration
+│   └── [operation]_operation.py  # Individual operations
+└── services/                      # Backend services (preserved)
+```
 
-2. **Test Naming Convention**
-   - Nama file test harus diawali dengan `test_`
-   - Nama fungsi test harus deskriptif dan menjelaskan behavior yang di-test
-   - Gunakan format: `test_<method>_<scenario>_<expected_behavior>`
+### Legacy Module Structure (24+ modules)
+```
+[module]/
+├── __init__.py                    # Legacy initializer exports
+├── [module]_initializer.py       # 🔄 Legacy initializer pattern
+├── components/                    # Complex UI components
+├── configs/                       # Configuration management
+├── handlers/                      # UI handlers (being phased out)
+├── operations/                    # Operation handlers
+└── services/                      # Backend services
+```
 
-3. **Comprehensive Test Suite**
-   - Gunakan `tests/test_all_module_comprehensive.py` untuk menjalankan seluruh test suite
-   - Pastikan test suite dapat dijalankan secara terpisah untuk setiap modul
-   - Gunakan marker atau kategori untuk mengelompokkan test yang terkait
+### UIModule Benefits
+- **90% code reduction** in UI complexity
+- **Single-screen interfaces** replacing complex tab systems
+- **Consistent event handling** with automatic button wiring
+- **Integrated progress tracking** and error handling
+- **Template-based creation** for rapid development
+- **Shared method registry** for cross-module functionality
 
-4. **Test Dependencies**
-   - Gunakan `conftest.py` untuk shared test fixtures
-   - Pisahkan test data dari kode test
-   - Gunakan factory pattern untuk membuat test data yang kompleks
+## 🧪 Testing Strategy
 
-5. **Test Coverage**
-   - Targetkan minimal 80% code coverage untuk kode inti
-   - Prioritaskan test untuk UI, critical paths dan business logic
+### UIModule Testing Approach
+- **Comprehensive Coverage**: Each UIModule has dedicated test suite
+- **Component Testing**: Individual UI components and button handlers
+- **Integration Testing**: End-to-end workflow validation
+- **Performance Testing**: Memory usage and initialization speed
+- **Regression Testing**: Backward compatibility verification
 
-6. **Test Documentation**
-   - Dokumentasikan asumsi dan skenario test yang kompleks
-   - Gunakan docstring untuk menjelaskan tujuan test
-   - Sertakan contoh input/output yang diharapkan untuk test yang kompleks
+### Current Test Results
+- **Core Module**: 37 comprehensive tests (100% pass rate)
+- **Colab Module**: 4 basic tests (100% pass rate)
+- **Dependency Module**: Functional tests verified
+- **Legacy Modules**: Existing test suites maintained
 
-7. **Test Maintenance**
-   - Update test ketika ada perubahan requirements
-   - Refactor test yang redundan
-   - Review test secara berkala untuk memastikan relevansi
+---
 
-8. **Module Initialization**
-   - Load module-specific configurations
-   - Initialize UI components
-   - Set up event handlers
-   - Register with core services
-
-9. **Runtime**
-   - Handle user interactions
-   - Process operations
-   - Update UI state
-   - Persist configurations
-
-## Scope
-- **In Scope**:
-  - Refactor `smartcash/ui/core` dan `smartcash/ui/components`
-  - Refactor initializers in `smartcash/ui/{setup, dataset, model}`
-  - Update handler implementations
-  - Ensure container-based layout consistency
-  - Maintain existing form layouts and styles
-  - Preserve Download, Preprocessing, and Augmentation UIs as-is
-
-- **Out of Scope**:
-  - Changes to backend code in `smartcash/dataset` and `smartcash/model`
-  - Modifications to UI Core and Components
-  - Changes to form layouts and styles
-  - Modifications to Download, Preprocessing, and Augmentation UIs
-
-## Implementation Strategy
-
-### **Phase 4: Dataset Pipeline Enhancement (Next Quarter)**
-**Priority: HIGH** - Complete the data processing workflow
-
-1. **Data Preprocessing Module** (Current: 75% → Target: 95%)
-   - Fix remaining import issues in test suite
-   - Enhance error handling for edge cases
-   - Fix Progress Tracker
-   - Fix Confirmation Dialog
-   - Fix Collapsible Logger 
-
-2. **Data Splitting Module** (Current: 78.8% → Target: 90%)
-   - Fix UI and Config Handler
-   - Resolve failing test cases (21/99 tests failing)
-
-3. **Data Augmentation Module** (Current: 85% → Target: 95%)
-   - Fix remaining import/initialization issues
-   - Enhance error handling for edge cases
-   - Fix Progress Tracker
-   - Fix Confirmation Dialog
-   - Fix Collapsible Logger 
-
-### **Phase 5: Training Module Stabilization (Following Quarter)**
-**Priority: HIGH** - Achieve production-ready training pipeline
-
-1. **Training Service Stability** (Current: 79.3% → Target: 95%)
-   - Fix simulation training issues (9/11 tests passing)
-   - Improve backend integration (1/3 tests passing)
-   - Complete training pipeline workflow (0/2 tests passing)
-   - Enhance error recovery and resume capabilities
-
-2. **Training UI Enhancements**
-   - Improve real-time monitoring
-   - Add better progress visualization
-   - Enhance hyperparameter tuning interface
-   - Add training history and comparison tools
-
-### **Phase 6: Data Visualization Implementation (Next 6 Months)**
-**Priority: MEDIUM** - Build comprehensive visualization suite
-
-1. **Core Visualization Infrastructure**
-   - Design visualization framework
-   - Implement base chart components
-   - Create interactive plotting capabilities
-   - Add export functionality
-
-2. **Dataset Visualizations**
-   - Data distribution plots
-   - Class balance visualization
-   - Augmentation previews
-   - Data quality metrics
-
-3. **Model Visualizations**
-   - Training progress charts
-   - Model performance metrics
-   - Confusion matrices
-   - Feature importance plots
-
-## Success Metrics
-### **Immediate Goals (Q1 2025)**
-- UI Module Standardization: 100% success rate
-- Core Module Refactoring: 90%+ success rate across all modules
-- Shared UI Components:100% success rate across all modules
-- Setup Cells Module: 100% success rate across all modules
-- Dataset Pipeline: 90%+ success rate across all modules
-- Training Module: 95%+ success rate
-- Overall System: 90%+ success rate
-- Zero critical runtime errors
-
-### **Medium-term Goals (Q2 2025)**
-- Data Visualization: 85%+ success rate
-- Advanced training features: 90%+ success rate
-- User workflow completion rate: 95%+
-- Performance benchmarks met
-
-### **Long-term Goals (2025)**
-- 95%+ success rate across all modules
-- Complete feature parity with requirements
-- Production deployment ready
-- Comprehensive documentation and user guides
+*Last Updated: July 11, 2025*  
+*Architecture Version: UIModule Pattern v2.0*

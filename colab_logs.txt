@@ -1,0 +1,74 @@
+[05:36:01] INFO - 🚀 Setup button clicked - starting full setup
+[05:36:01] INFO - 🚀 Setup button clicked - starting full setup
+[05:36:01] INFO - 🚀 Setup button clicked - starting full setup
+INFO:ui.smartcash.ui.setup.colab.uimodule:🚀 Setup button clicked - starting full setup
+[05:36:01] INFO - Status update: 🔄 full_setup dimulai...
+[05:36:01] INFO - Status update: 🔄 full_setup dimulai...
+INFO:ui.smartcash.ui.setup.colab_operation_manager:Status update: 🔄 full_setup dimulai...
+[05:36:01] INFO - Progress: Starting full_setup... (?/100)
+[05:36:01] INFO - Progress: Starting full_setup... (?/100)
+INFO:ui.smartcash.ui.setup.colab_operation_manager:Progress: Starting full_setup... (?/100)
+[05:36:01] ERROR - Error updating operation container: ColabUIModule._create_operation_container_wrapper.<locals>.OperationContainerWrapper.update_progress() missing 1 required positional argument: 'progress'
+[05:36:01] ERROR - Error updating operation container: ColabUIModule._create_operation_container_wrapper.<locals>.OperationContainerWrapper.update_progress() missing 1 required positional argument: 'progress'
+ERROR:ui.smartcash.ui.setup.colab_operation_manager:Error updating operation container: ColabUIModule._create_operation_container_wrapper.<locals>.OperationContainerWrapper.update_progress() missing 1 required positional argument: 'progress'
+[05:36:01] INFO - 🚀 Starting complete environment setup
+[05:36:01] INFO - 🚀 Starting complete environment setup
+INFO:ui.smartcash.ui.setup.colab_operation_manager:🚀 Starting complete environment setup
+[05:36:01] INFO - Executing stage: init (weight: 0%)
+[05:36:01] INFO - Executing stage: init (weight: 0%)
+INFO:ui.smartcash.ui.setup.colab_operation_manager:Executing stage: init (weight: 0%)
+[05:36:01] INFO - Progress: INIT: 🔍 Detecting runtime environment... (?/100)
+[05:36:01] INFO - Progress: INIT: 🔍 Detecting runtime environment... (?/100)
+INFO:ui.smartcash.ui.setup.colab_operation_manager:Progress: INIT: 🔍 Detecting runtime environment... (?/100)
+[05:36:01] ERROR - Error updating operation container: ColabUIModule._create_operation_container_wrapper.<locals>.OperationContainerWrapper.update_progress() missing 1 required positional argument: 'progress'
+[05:36:01] ERROR - Error updating operation container: ColabUIModule._create_operation_container_wrapper.<locals>.OperationContainerWrapper.update_progress() missing 1 required positional argument: 'progress'
+ERROR:ui.smartcash.ui.setup.colab_operation_manager:Error updating operation container: ColabUIModule._create_operation_container_wrapper.<locals>.OperationContainerWrapper.update_progress() missing 1 required positional argument: 'progress'
+[05:36:01] INFO - Progress: INIT: ✅ Environment: unknown (?/100)
+[05:36:01] INFO - Progress: INIT: ✅ Environment: unknown (?/100)
+INFO:ui.smartcash.ui.setup.colab_operation_manager:Progress: INIT: ✅ Environment: unknown (?/100)
+[05:36:01] ERROR - Error updating operation container: ColabUIModule._create_operation_container_wrapper.<locals>.OperationContainerWrapper.update_progress() missing 1 required positional argument: 'progress'
+[05:36:01] ERROR - Error updating operation container: ColabUIModule._create_operation_container_wrapper.<locals>.OperationContainerWrapper.update_progress() missing 1 required positional argument: 'progress'
+ERROR:ui.smartcash.ui.setup.colab_operation_manager:Error updating operation container: ColabUIModule._create_operation_container_wrapper.<locals>.OperationContainerWrapper.update_progress() missing 1 required positional argument: 'progress'
+[05:36:01] INFO - Progress: INIT: 🔧 Checking system requirements... (?/100)
+[05:36:01] INFO - Progress: INIT: 🔧 Checking system requirements... (?/100)
+INFO:ui.smartcash.ui.setup.colab_operation_manager:Progress: INIT: 🔧 Checking system requirements... (?/100)
+[05:36:01] ERROR - Error updating operation container: ColabUIModule._create_operation_container_wrapper.<locals>.OperationContainerWrapper.update_progress() missing 1 required positional argument: 'progress'
+[05:36:01] ERROR - Error updating operation container: ColabUIModule._create_operation_container_wrapper.<locals>.OperationContainerWrapper.update_progress() missing 1 required positional argument: 'progress'
+ERROR:ui.smartcash.ui.setup.colab_operation_manager:Error updating operation container: ColabUIModule._create_operation_container_wrapper.<locals>.OperationContainerWrapper.update_progress() missing 1 required positional argument: 'progress'
+[05:36:01] INFO - System: Linux 6.1.123+
+[05:36:01] INFO - System: Linux 6.1.123+
+INFO:ui.smartcash.ui.colab.init_operation:System: Linux 6.1.123+
+[05:36:01] INFO - RAM: 12.7GB available
+[05:36:01] INFO - RAM: 12.7GB available
+INFO:ui.smartcash.ui.colab.init_operation:RAM: 12.7GB available
+[05:36:01] INFO - Progress: INIT: 🔍 Validating configuration... (?/100)
+[05:36:01] INFO - Progress: INIT: 🔍 Validating configuration... (?/100)
+INFO:ui.smartcash.ui.setup.colab_operation_manager:Progress: INIT: 🔍 Validating configuration... (?/100)
+[05:36:01] ERROR - Error updating operation container: ColabUIModule._create_operation_container_wrapper.<locals>.OperationContainerWrapper.update_progress() missing 1 required positional argument: 'progress'
+[05:36:01] ERROR - Error updating operation container: ColabUIModule._create_operation_container_wrapper.<locals>.OperationContainerWrapper.update_progress() missing 1 required positional argument: 'progress'
+ERROR:ui.smartcash.ui.setup.colab_operation_manager:Error updating operation container: ColabUIModule._create_operation_container_wrapper.<locals>.OperationContainerWrapper.update_progress() missing 1 required positional argument: 'progress'
+[05:36:01] INFO - Progress: INIT: ✅ Initialization complete (?/100)
+[05:36:01] INFO - Progress: INIT: ✅ Initialization complete (?/100)
+INFO:ui.smartcash.ui.setup.colab_operation_manager:Progress: INIT: ✅ Initialization complete (?/100)
+[05:36:01] ERROR - Error updating operation container: ColabUIModule._create_operation_container_wrapper.<locals>.OperationContainerWrapper.update_progress() missing 1 required positional argument: 'progress'
+[05:36:01] ERROR - Error updating operation container: ColabUIModule._create_operation_container_wrapper.<locals>.OperationContainerWrapper.update_progress() missing 1 required positional argument: 'progress'
+ERROR:ui.smartcash.ui.setup.colab_operation_manager:Error updating operation container: ColabUIModule._create_operation_container_wrapper.<locals>.OperationContainerWrapper.update_progress() missing 1 required positional argument: 'progress'
+[05:36:01] INFO - ✅ Stage init completed successfully
+[05:36:01] INFO - ✅ Stage init completed successfully
+INFO:ui.smartcash.ui.setup.colab_operation_manager:✅ Stage init completed successfully
+[05:36:01] ERROR - Full setup failed: DRIVE
+[05:36:01] ERROR - Full setup failed: DRIVE
+ERROR:ui.smartcash.ui.setup.colab_operation_manager:Full setup failed: DRIVE
+[05:36:01] INFO - Progress: full_setup completed successfully (100/100)
+[05:36:01] INFO - Progress: full_setup completed successfully (100/100)
+INFO:ui.smartcash.ui.setup.colab_operation_manager:Progress: full_setup completed successfully (100/100)
+[05:36:01] ERROR - Error updating operation container: ColabUIModule._create_operation_container_wrapper.<locals>.OperationContainerWrapper.update_progress() missing 1 required positional argument: 'progress'
+[05:36:01] ERROR - Error updating operation container: ColabUIModule._create_operation_container_wrapper.<locals>.OperationContainerWrapper.update_progress() missing 1 required positional argument: 'progress'
+ERROR:ui.smartcash.ui.setup.colab_operation_manager:Error updating operation container: ColabUIModule._create_operation_container_wrapper.<locals>.OperationContainerWrapper.update_progress() missing 1 required positional argument: 'progress'
+[05:36:01] INFO - Status update: full_setup selesai dalam 0.0 detik
+[05:36:01] INFO - Status update: full_setup selesai dalam 0.0 detik
+INFO:ui.smartcash.ui.setup.colab_operation_manager:Status update: full_setup selesai dalam 0.0 detik
+[05:36:01] INFO - Setup completed with result: {'success': True, 'status': 'completed', 'message': 'full_setup selesai dalam 0.0 detik', 'duration': 0.045028, 'data': {'success': False, 'error': 'Full setup failed: DRIVE'}}
+[05:36:01] INFO - Setup completed with result: {'success': True, 'status': 'completed', 'message': 'full_setup selesai dalam 0.0 detik', 'duration': 0.045028, 'data': {'success': False, 'error': 'Full setup failed: DRIVE'}}
+[05:36:01] INFO - Setup completed with result: {'success': True, 'status': 'completed', 'message': 'full_setup selesai dalam 0.0 detik', 'duration': 0.045028, 'data': {'success': False, 'error': 'Full setup failed: DRIVE'}}
+INFO:ui.smartcash.ui.setup.colab.uimodule:Setup completed with result: {'success': True, 'status': 'completed', 'message': 'full_setup selesai dalam 0.0 detik', 'duration': 0.045028, 'data': {'success': False, 'error': 'Full setup failed: DRIVE'}}

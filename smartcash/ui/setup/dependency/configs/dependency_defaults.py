@@ -4,6 +4,7 @@ Deskripsi: Default configuration untuk dependency management
 """
 
 from typing import Dict, Any, List
+import os
 
 def get_default_dependency_config() -> Dict[str, Any]:
     """Get default dependency configuration"""
@@ -55,7 +56,7 @@ def get_default_dependency_config() -> Dict[str, Any]:
 
 def get_default_package_categories() -> Dict[str, Dict[str, Any]]:
     """Get default package categories untuk SmartCash"""
-    return {
+    base_categories = {
         'core_requirements': {
             'name': 'Core Requirements',
             'description': 'Package inti SmartCash',
@@ -211,6 +212,12 @@ def get_default_package_categories() -> Dict[str, Dict[str, Any]]:
             'packages': []  # Dynamic packages loaded from config
         }
     }
+    
+    # Add requirements.txt category
+    requirements_category = get_requirements_category()
+    base_categories.update(requirements_category)
+    
+    return base_categories
 
 def get_package_status_options() -> Dict[str, Dict[str, Any]]:
     """Get package status options dengan styling"""
@@ -291,5 +298,74 @@ def get_button_actions() -> Dict[str, Dict[str, Any]]:
             'icon': '🔍',
             'color': '#2196F3',
             'disabled_color': '#CCCCCC'
+        }
+    }
+
+def parse_requirements_txt(requirements_path: str = None) -> List[Dict[str, Any]]:
+    """Parse requirements.txt file and convert to package format.
+    
+    Args:
+        requirements_path: Path to requirements.txt file (optional, auto-detects if None)
+        
+    Returns:
+        List of package dictionaries
+    """
+    if requirements_path is None:
+        # Auto-detect requirements.txt in project root
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        project_root = os.path.join(current_dir, '../../../../..')
+        requirements_path = os.path.normpath(os.path.join(project_root, 'requirements.txt'))
+    
+    packages = []
+    
+    if not os.path.exists(requirements_path):
+        return packages
+    
+    try:
+        with open(requirements_path, 'r', encoding='utf-8') as f:
+            lines = f.readlines()
+        
+        for line in lines:
+            line = line.strip()
+            
+            # Skip comments and empty lines
+            if not line or line.startswith('#'):
+                continue
+            
+            # Parse package name and version
+            # Handle different version specifiers: ==, >=, <=, >, <, ~=
+            import re
+            match = re.match(r'^([a-zA-Z0-9_-]+)([><=~!]+.+)?$', line)
+            
+            if match:
+                package_name = match.group(1).replace('_', '-')
+                version_spec = match.group(2) or ''
+                
+                packages.append({
+                    'name': package_name,
+                    'version': version_spec,
+                    'description': f'Package from requirements.txt',
+                    'pip_name': line,
+                    'is_default': True,
+                    'size': '~Unknown',
+                    'source': 'requirements.txt'
+                })
+    
+    except Exception as e:
+        print(f"Warning: Could not parse requirements.txt: {e}")
+    
+    return packages
+
+def get_requirements_category() -> Dict[str, Any]:
+    """Get requirements.txt category for package selection."""
+    requirements_packages = parse_requirements_txt()
+    
+    return {
+        'requirements_txt': {
+            'name': 'Requirements.txt',
+            'description': 'Packages from requirements.txt file',
+            'icon': '📋',
+            'color': '#FF6B35',
+            'packages': requirements_packages
         }
     }

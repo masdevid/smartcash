@@ -274,7 +274,7 @@ class ColabUIModule(UIModule):
             button_states = self._get_operation_manager().disable_all_buttons("⏳ Setting up environment...")
             
             # Log to UI using operation container
-            self.log("🚀 Starting environment setup...", 'info')
+            self.logger.info("🚀 Starting environment setup...")
             
             # Execute full setup
             result = self.execute_full_setup()

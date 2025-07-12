@@ -8,8 +8,6 @@ from typing import Dict, Any
 import ipywidgets as widgets
 from smartcash.ui.logger import get_module_logger
 
-logger = get_module_logger("smartcash.ui.setup.dependency.components.dependency_ui")
-
 def create_dependency_ui_components(module_config: Dict[str, Any]) -> Dict[str, Any]:
     """Create all UI components for dependency management.
     
@@ -164,7 +162,7 @@ def create_dependency_ui_components(module_config: Dict[str, Any]) -> Dict[str, 
         }
         
     except Exception as e:
-        logger.error(f"❌ Failed to create dependency UI components: {e}")
+        get_module_logger("smartcash.ui.setup.dependency.components.dependency_ui").error(f"❌ Failed to create dependency UI components: {e}")
         raise
 
 def _create_package_grid(module_config: Dict[str, Any]) -> tuple:

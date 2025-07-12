@@ -168,7 +168,7 @@ class LogAccordion(BaseUIComponent):
                 line-height: 1.4 !important;
             }}
             
-            /* Log entry styling */
+            /* Log entry styling - original format */
             .log-entry {{
                 width: 100% !important;
                 max-width: 100% !important;
@@ -182,9 +182,22 @@ class LogAccordion(BaseUIComponent):
                 transition: all 0.15s ease !important;
             }}
             
-            /* Hover effect for log entries */
-            .log-entry:hover {{
-                background-color: rgba(0, 0, 0, 0.02) !important;
+            /* Compact log entry styling - new format */
+            .log-entry-compact {{
+                width: 100% !important;
+                max-width: 100% !important;
+                overflow: visible !important;
+                word-wrap: break-word !important;
+                margin: 1px 0 !important;
+                border-radius: 3px !important;
+                transition: all 0.15s ease !important;
+                cursor: default !important;
+            }}
+            
+            /* Hover effect for both log entry types */
+            .log-entry:hover, .log-entry-compact:hover {{
+                transform: translateX(2px) !important;
+                box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1) !important;
             }}
             
             /* Log entry content */
@@ -288,13 +301,14 @@ class LogAccordion(BaseUIComponent):
             .duplicate-counter {{
                 background: #6c757d !important;
                 color: white !important;
-                border-radius: 10px !important;
-                font-size: 10px !important;
-                padding: 0 5px !important;
+                border-radius: 8px !important;
+                font-size: 9px !important;
+                padding: 1px 4px !important;
                 margin-left: 4px !important;
                 display: inline-block !important;
                 vertical-align: middle !important;
-                line-height: 1.4 !important;
+                line-height: 1.2 !important;
+                font-weight: 600 !important;
             }}
         </style>
         
@@ -429,59 +443,92 @@ class LogAccordion(BaseUIComponent):
         return short_ns
 
     def _create_log_widget(self, entry: LogEntry) -> widgets.HTML:
-        """Create an HTML widget for a log entry with enhanced styling."""
+        """Create an HTML widget for a log entry with compact 2-line format."""
         try:
             # Get style for the log level
             style = get_log_level_style(entry.level)
             
-            # Format timestamp if enabled
-            timestamp = f"<span class='log-timestamp'>{self._format_timestamp(entry.timestamp)}</span>" if self.show_timestamps else ""
+            # Format timestamp in GMT+7
+            timestamp = self._format_timestamp(entry.timestamp)
             
-            # Create level badge with consistent styling
-            level_icon = f"{style['icon']} " if self.show_level_icons else ""
-            level_badge = f"<span class='log-level' style='background: {style['bg']}; color: {style['color']}; border: {style['border']}'>{level_icon}{entry.level.value.upper()}</span>"
-            
-            # Create namespace badge if provided
-            namespace = self._shorten_namespace(entry.namespace)
-            namespace_badge = f"<span class='log-namespace' title='{entry.namespace}'>{namespace}</span>" if namespace else ""
+            # Get level emoji/icon
+            level_emoji = style['icon'] if self.show_level_icons else ""
             
             # Add duplicate counter if needed
-            duplicate_counter = f"<span class='duplicate-counter'>{entry.count}</span>" if entry.show_duplicate_indicator else ""
+            duplicate_counter = f" <span class='duplicate-counter'>{entry.count}</span>" if entry.show_duplicate_indicator else ""
             
-            # Check if this is an error with traceback
-            has_traceback = '\n' in entry.message and entry.level in [LogLevel.ERROR, LogLevel.CRITICAL]
-            traceback_id = f"traceback-{id(entry)}" if has_traceback else ""
+            # Shorten namespace for compact display
+            namespace = self._shorten_namespace(entry.namespace) or "unknown"
             
-            if has_traceback:
-                # Split message and traceback
-                message, traceback = entry.message.split('\n', 1)
-                traceback = traceback.strip()
+            # Handle multi-line messages (e.g., tracebacks)
+            message_lines = entry.message.split('\n')
+            main_message = message_lines[0]  # First line only for compact view
+            has_more_lines = len(message_lines) > 1
+            
+            # Create expandable content for multi-line messages
+            if has_more_lines:
+                traceback_id = f"traceback-{id(entry)}"
+                additional_content = '\n'.join(message_lines[1:]).strip()
                 
-                # Create expandable traceback
-                trace_html = f"""
+                expandable_html = f"""
                 <div class='toggle-traceback' onclick='document.getElementById("{traceback_id}").classList.toggle("show-traceback")'>
-                    ▼ Show traceback
+                    ▼ Show details
                 </div>
                 <div class='error-traceback' id='{traceback_id}'>
-                    <pre style='margin:0; white-space:pre-wrap;'>{traceback}</pre>
+                    <pre style='margin:0; white-space:pre-wrap; font-size: 11px;'>{additional_content}</pre>
                 </div>
-                """.format(traceback_id=traceback_id, traceback=traceback)
+                """
             else:
-                message = entry.message
-                trace_html = ""
+                expandable_html = ""
             
-            # Create the log entry HTML with enhanced structure
+            # Create compact 2-line format HTML
             html = f"""
-            <div class='log-entry' style='border-left-color: {style['color']} !important;'>
-                <div class='log-content'>
-                    {timestamp}
-                    {level_badge}
-                    {namespace_badge}
-                    <div class='log-message'>
-                        {message}{duplicate_counter}
-                        {trace_html}
-                    </div>
+            <div class='log-entry-compact' style='
+                padding: 4px 8px; 
+                margin: 1px 0; 
+                border-left: 3px solid {style['color']}; 
+                background: {style['bg']}; 
+                border-radius: 3px;
+                transition: all 0.15s ease;
+            '>
+                <!-- Line 1: [time:GMT+7] [emoji] [message] -->
+                <div style='
+                    display: flex; 
+                    align-items: center; 
+                    gap: 6px; 
+                    line-height: 1.3;
+                    font-size: 13px;
+                    font-weight: 500;
+                '>
+                    <span style='
+                        color: #6c757d; 
+                        font-size: 11px; 
+                        font-weight: 400;
+                        flex-shrink: 0;
+                    '>[{timestamp}:GMT+7]</span>
+                    
+                    <span style='
+                        font-size: 14px;
+                        flex-shrink: 0;
+                    '>{level_emoji}</span>
+                    
+                    <span style='
+                        flex: 1; 
+                        color: {style['text_color']};
+                        word-break: break-word;
+                    '>{main_message}{duplicate_counter}</span>
                 </div>
+                
+                <!-- Line 2: [logger fullnamespace] -->
+                <div style='
+                    font-size: 10px; 
+                    color: #6c757d; 
+                    opacity: 0.8;
+                    margin-top: 1px;
+                    font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+                '>[{entry.namespace or 'unknown'}]</div>
+                
+                {expandable_html}
             </div>
             """
             
@@ -490,17 +537,21 @@ class LogAccordion(BaseUIComponent):
         except Exception as e:
             # Use the inherited logger from BaseUIComponent
             self.logger.error(f"Error creating log widget: {str(e)}")
-            return widgets.HTML(f"<div class='log-entry' style='color: #dc3545;'>Error displaying log: {str(e)}</div>")
+            return widgets.HTML(f"<div class='log-entry' style='color: #dc3545; padding: 4px 8px;'>Error displaying log: {str(e)}</div>")
 
     def _format_timestamp(self, timestamp: datetime) -> str:
-        """Format timestamp with error handling and timezone awareness."""
+        """Format timestamp with error handling and timezone awareness (GMT+7)."""
         try:
-            # Make timezone aware if not already
+            # Convert to GMT+7 (Asia/Jakarta timezone)
+            gmt_plus_7 = pytz.timezone('Asia/Jakarta')
             if timestamp.tzinfo is None:
+                # If naive datetime, assume it's local time first
                 timestamp = timestamp.astimezone()
-            return timestamp.strftime("%H:%M:%S")
+            # Convert to GMT+7
+            timestamp_gmt7 = timestamp.astimezone(gmt_plus_7)
+            return timestamp_gmt7.strftime("%H:%M:%S")
         except Exception:
-            return ""
+            return datetime.now().strftime("%H:%M:%S")
 
     def _create_namespace_badge(self, namespace: Optional[str]) -> str:
         """Create namespace badge with error handling.

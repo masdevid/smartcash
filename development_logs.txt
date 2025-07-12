@@ -1,0 +1,12 @@
+Colab Logs:
+[07:31:26] INFO - 🚀 Setup button clicked - starting full setup
+[07:31:26] ERROR - ❌ Setup button click failed: 'Logger' object is not callable
+Dependency Logs:
+[07:27:11] INFO - 🚀 Memulai instalasi paket...
+ERROR:DependencyOperationManager:Failed to log message: 'Logger' object is not callable
+
+- Initials logs still appear on reload
+- When clicking action buttons, it should disable all buttons.
+- Without disable it will cause user to click many times while operation is running still
+- Create or optimize core module disable/enable all buttons methods helper and use it
+- Logs still not appear in log_accordion inside operation_container both in Colab and Dependency module

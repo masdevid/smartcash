@@ -262,6 +262,7 @@ class ColabUIModule(UIModule):
     
     def _handle_setup_button_click(self, button=None) -> None:
         """Handle setup button click."""
+        button_states = {}
         try:
             # Log using instance logger to avoid callable errors
             self.logger.info("🚀 Setup button clicked - starting full setup")
@@ -269,56 +270,51 @@ class ColabUIModule(UIModule):
             # Update status panel
             self._update_status("Starting environment setup...", "info")
             
-            # Update button state to show processing
-            if button:
-                button.description = "⏳ Processing..."
-                button.disabled = True
-            
-            # Get operation container for logging to UI
-            operation_container = self.get_component("operation_container")
+            # Disable all buttons to prevent multiple clicks
+            button_states = self._get_operation_manager().disable_all_buttons("⏳ Setting up environment...")
             
             # Log to UI using operation container
-            if operation_container and hasattr(operation_container, 'log'):
-                from smartcash.ui.components.log_accordion import LogLevel
-                operation_container.log("🚀 Starting environment setup...", LogLevel.INFO)
+            self.log("🚀 Starting environment setup...", 'info')
             
             # Execute full setup
             result = self.execute_full_setup()
             
             # Update status based on result
-            if result.get("success", False):
+            success = result.get("success", False)
+            if success:
                 self._update_status("Environment setup completed successfully!", "success")
-                # Log to UI using operation container
-                if operation_container and hasattr(operation_container, 'log'):
-                    from smartcash.ui.components.log_accordion import LogLevel
-                    operation_container.log("✅ Environment setup completed successfully!", LogLevel.INFO)
+                self.log("✅ Environment setup completed successfully!", 'info')
             else:
                 error_msg = result.get("message", "Setup failed")
                 self._update_status(f"Setup failed: {error_msg}", "error")
-                # Log to UI using operation container
-                if operation_container and hasattr(operation_container, 'log'):
-                    from smartcash.ui.components.log_accordion import LogLevel
-                    operation_container.log(f"❌ Setup failed: {error_msg}", LogLevel.ERROR)
+                self.log(f"❌ Setup failed: {error_msg}", 'error')
             
-            # Update button based on result
-            if button:
-                if result.get("success", False):
-                    button.description = "✅ Setup Complete"
-                    button.button_style = "success"
-                else:
-                    button.description = "❌ Setup Failed"
-                    button.button_style = "danger"
-                button.disabled = False
+            # Restore buttons with appropriate status
+            self._get_operation_manager().enable_all_buttons(
+                button_states, 
+                success=success,
+                success_message="✅ Setup Complete" if success else "❌ Setup Failed",
+                error_message="❌ Setup Failed"
+            )
             
             self.logger.info(f"Setup completed with result: {result}")
             
         except Exception as e:
             self.logger.error(f"❌ Setup button click failed: {e}")
             self._update_status(f"Setup error: {str(e)}", "error")
-            if button:
-                button.description = "❌ Error"
-                button.button_style = "danger"
-                button.disabled = False
+            self.log(f"❌ Setup error: {str(e)}", 'error')
+            
+            # Restore buttons in error state
+            if button_states:
+                self._get_operation_manager().enable_all_buttons(
+                    button_states, 
+                    success=False,
+                    error_message="❌ Error"
+                )
+    
+    def _get_operation_manager(self):
+        """Get the operation manager instance for button management."""
+        return self._operation_manager if self._operation_manager else self
     
     def _update_status(self, message: str, status_type: str = "info") -> None:
         """Update status panel in header container.
@@ -339,24 +335,49 @@ class ColabUIModule(UIModule):
     
     def _handle_save_config(self, button=None) -> None:
         """Handle save configuration button click."""
+        button_states = {}
         try:
             # Save current configuration
             self.logger.info("💾 Saving configuration")
             self._update_status("Saving configuration...", "info")
             
+            # Disable buttons during save
+            button_states = self._get_operation_manager().disable_all_buttons("💾 Saving...")
+            
             # Configuration is automatically saved in memory for Colab
             self._update_status("Configuration saved successfully", "success")
-            self.logger.info("✅ Configuration saved")
+            self.log("✅ Configuration saved", 'info')
+            
+            # Re-enable buttons with success state
+            self._get_operation_manager().enable_all_buttons(
+                button_states, 
+                success=True,
+                success_message="💾 Saved"
+            )
+            
         except Exception as e:
             self.logger.error(f"❌ Failed to save configuration: {e}")
             self._update_status(f"Failed to save configuration: {str(e)}", "error")
+            self.log(f"❌ Failed to save configuration: {str(e)}", 'error')
+            
+            # Re-enable buttons with error state
+            if button_states:
+                self._get_operation_manager().enable_all_buttons(
+                    button_states, 
+                    success=False,
+                    error_message="❌ Save Failed"
+                )
     
     def _handle_reset_config(self, button=None) -> None:
         """Handle reset configuration button click."""
+        button_states = {}
         try:
             # Reset to default configuration
             self.logger.info("🔄 Resetting configuration to defaults")
             self._update_status("Resetting configuration to defaults...", "info")
+            
+            # Disable buttons during reset
+            button_states = self._get_operation_manager().disable_all_buttons("🔄 Resetting...")
             
             if self._config_handler:
                 # Check if the method exists, use appropriate method
@@ -371,10 +392,27 @@ class ColabUIModule(UIModule):
                     self.update_config(**default_config)
                     
             self._update_status("Configuration reset to defaults successfully", "success")
-            self.logger.info("✅ Configuration reset to defaults")
+            self.log("✅ Configuration reset to defaults", 'info')
+            
+            # Re-enable buttons with success state
+            self._get_operation_manager().enable_all_buttons(
+                button_states, 
+                success=True,
+                success_message="🔄 Reset"
+            )
+            
         except Exception as e:
             self.logger.error(f"❌ Failed to reset configuration: {e}")
             self._update_status(f"Failed to reset configuration: {str(e)}", "error")
+            self.log(f"❌ Failed to reset configuration: {str(e)}", 'error')
+            
+            # Re-enable buttons with error state
+            if button_states:
+                self._get_operation_manager().enable_all_buttons(
+                    button_states, 
+                    success=False,
+                    error_message="❌ Reset Failed"
+                )
     
     def get_environment_status(self) -> Dict[str, Any]:
         """Get comprehensive environment status.

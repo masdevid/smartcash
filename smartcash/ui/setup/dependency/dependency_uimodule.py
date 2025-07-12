@@ -22,8 +22,6 @@ from smartcash.ui.setup.dependency.configs.dependency_config_handler import Depe
 from smartcash.ui.setup.dependency.configs.dependency_defaults import get_default_dependency_config
 from smartcash.ui.setup.dependency.operations.operation_manager import DependencyOperationManager
 
-logger = get_module_logger("smartcash.ui.setup.dependency.uimodule")
-
 # Global module instance for singleton pattern
 _dependency_uimodule: Optional[UIModule] = None
 
@@ -43,9 +41,9 @@ def register_dependency_template() -> None:
     
     try:
         UIModuleFactory.register_template(template, overwrite=True)
-        logger.debug("📋 Registered Dependency template")
+        get_module_logger("smartcash.ui.setup.dependency.uimodule").debug("📋 Registered Dependency template")
     except Exception as e:
-        logger.error(f"❌ Failed to register template: {e}")
+        get_module_logger("smartcash.ui.setup.dependency.uimodule").error(f"❌ Failed to register template: {e}")
 
 def register_dependency_shared_methods() -> None:
     """Register Dependency-specific shared methods."""
@@ -91,7 +89,7 @@ def register_dependency_shared_methods() -> None:
             SharedMethodRegistry.register_method(name, method, overwrite=True, 
                                                description=desc, category="operations")
     
-    logger.debug("🔗 Registered Dependency shared methods")
+    get_module_logger("smartcash.ui.setup.dependency.uimodule").debug("🔗 Registered Dependency shared methods")
 
 class DependencyUIModule(UIModule):
     """Dependency-specific UIModule with package management functionality."""
@@ -153,10 +151,10 @@ class DependencyUIModule(UIModule):
             # Call parent initialization
             super().initialize()
             
-            logger.debug(f"✅ Initialized Dependency UIModule")
+            get_module_logger("smartcash.ui.setup.dependency.uimodule").debug(f"✅ Initialized Dependency UIModule")
             
         except Exception as e:
-            logger.error(f"❌ Failed to initialize Dependency UIModule: {e}")
+            get_module_logger("smartcash.ui.setup.dependency.uimodule").error(f"❌ Failed to initialize Dependency UIModule: {e}")
             raise
         
         return self
@@ -173,10 +171,10 @@ class DependencyUIModule(UIModule):
             for component_type, component in ui_components.items():
                 self.register_component(component_type, component)
             
-            logger.debug(f"📦 Created {len(ui_components)} UI components")
+            get_module_logger("smartcash.ui.setup.dependency.uimodule").debug(f"📦 Created {len(ui_components)} UI components")
             
         except Exception as e:
-            logger.error(f"❌ Failed to create UI components: {e}")
+            get_module_logger("smartcash.ui.setup.dependency.uimodule").error(f"❌ Failed to create UI components: {e}")
             raise
     
     
@@ -192,10 +190,10 @@ class DependencyUIModule(UIModule):
                 ui_components={'operation_container': operation_container}
             )
             
-            logger.debug("⚙️ Setup operation manager")
+            get_module_logger("smartcash.ui.setup.dependency.uimodule").debug("⚙️ Setup operation manager")
             
         except Exception as e:
-            logger.error(f"❌ Failed to setup operation manager: {e}")
+            get_module_logger("smartcash.ui.setup.dependency.uimodule").error(f"❌ Failed to setup operation manager: {e}")
             raise
     
     
@@ -203,9 +201,9 @@ class DependencyUIModule(UIModule):
         """Setup config handler."""
         try:
             self._config_handler = DependencyConfigHandler()
-            logger.debug("🔧 Setup config handler")
+            get_module_logger("smartcash.ui.setup.dependency.uimodule").debug("🔧 Setup config handler")
         except Exception as e:
-            logger.error(f"❌ Failed to setup config handler: {e}")
+            get_module_logger("smartcash.ui.setup.dependency.uimodule").error(f"❌ Failed to setup config handler: {e}")
             raise
     
     def _register_operations(self) -> None:
@@ -225,10 +223,10 @@ class DependencyUIModule(UIModule):
             self.register_operation("get_status", self.get_package_status_summary)
             self.register_operation("refresh_status", self.refresh_package_status)
             
-            logger.debug(f"⚙️ Registered {len(operations)} operations")
+            get_module_logger("smartcash.ui.setup.dependency.uimodule").debug(f"⚙️ Registered {len(operations)} operations")
             
         except Exception as e:
-            logger.error(f"❌ Failed to register operations: {e}")
+            get_module_logger("smartcash.ui.setup.dependency.uimodule").error(f"❌ Failed to register operations: {e}")
             raise
     
     def _setup_event_handlers(self) -> None:
@@ -255,10 +253,10 @@ class DependencyUIModule(UIModule):
             if uninstall_button:
                 uninstall_button.on_click(self._handle_uninstall_click)
             
-            logger.debug("✅ Connected dependency button handlers")
+            get_module_logger("smartcash.ui.setup.dependency.uimodule").debug("✅ Connected dependency button handlers")
             
         except Exception as e:
-            logger.error(f"❌ Failed to setup event handlers: {e}")
+            get_module_logger("smartcash.ui.setup.dependency.uimodule").error(f"❌ Failed to setup event handlers: {e}")
     
     def _handle_add_click(self, _=None) -> None:
         """Handle add packages button click."""
@@ -294,7 +292,7 @@ class DependencyUIModule(UIModule):
                 self._log_to_ui("❌ Config handler not available", "error")
                 
         except Exception as e:
-            logger.error(f"❌ Add packages failed: {e}")
+            get_module_logger("smartcash.ui.setup.dependency.uimodule").error(f"❌ Add packages failed: {e}")
             self._log_to_ui(f"❌ Add packages error: {str(e)}", "error")
     
     def _update_ui_after_save(self) -> None:
@@ -317,7 +315,7 @@ class DependencyUIModule(UIModule):
             self._log_to_ui(f"📁 Configuration saved to: {config_path}", "info")
             
         except Exception as e:
-            logger.error(f"❌ Failed to update UI after save: {e}")
+            get_module_logger("smartcash.ui.setup.dependency.uimodule").error(f"❌ Failed to update UI after save: {e}")
     
     def _handle_install_click(self, _=None) -> None:
         """Handle install button click."""
@@ -340,7 +338,7 @@ class DependencyUIModule(UIModule):
                 self._log_to_ui(f"❌ Installation failed: {error_msg}", "error")
                 
         except Exception as e:
-            logger.error(f"❌ Install click failed: {e}")
+            get_module_logger("smartcash.ui.setup.dependency.uimodule").error(f"❌ Install click failed: {e}")
             self._log_to_ui(f"❌ Install error: {str(e)}", "error")
     
     def _handle_check_click(self, _=None) -> None:
@@ -355,7 +353,7 @@ class DependencyUIModule(UIModule):
             self._check_missing_packages()
             
         except Exception as e:
-            logger.error(f"❌ Check click failed: {e}")
+            get_module_logger("smartcash.ui.setup.dependency.uimodule").error(f"❌ Check click failed: {e}")
             self._log_to_ui(f"❌ Check error: {str(e)}", "error")
     
     def _check_missing_packages(self) -> None:
@@ -389,7 +387,7 @@ class DependencyUIModule(UIModule):
                 self._log_to_ui("✅ All selected packages are installed!", "success")
                 
         except Exception as e:
-            logger.error(f"❌ Failed to check missing packages: {e}")
+            get_module_logger("smartcash.ui.setup.dependency.uimodule").error(f"❌ Failed to check missing packages: {e}")
             self._log_to_ui(f"❌ Missing package check error: {str(e)}", "error")
     
     def _handle_update_click(self, _=None) -> None:
@@ -408,7 +406,7 @@ class DependencyUIModule(UIModule):
                 self._log_to_ui(f"❌ Update failed: {error_msg}", "error")
                 
         except Exception as e:
-            logger.error(f"❌ Update click failed: {e}")
+            get_module_logger("smartcash.ui.setup.dependency.uimodule").error(f"❌ Update click failed: {e}")
             self._log_to_ui(f"❌ Update error: {str(e)}", "error")
     
     def _handle_uninstall_click(self, _=None) -> None:
@@ -432,7 +430,7 @@ class DependencyUIModule(UIModule):
                 self._log_to_ui(f"❌ Uninstallation failed: {error_msg}", "error")
                 
         except Exception as e:
-            logger.error(f"❌ Uninstall click failed: {e}")
+            get_module_logger("smartcash.ui.setup.dependency.uimodule").error(f"❌ Uninstall click failed: {e}")
             self._log_to_ui(f"❌ Uninstall error: {str(e)}", "error")
     
     def _get_selected_packages(self) -> List[str]:
@@ -478,9 +476,9 @@ class DependencyUIModule(UIModule):
                 operation_container.log(message, log_level)
             else:
                 # Fallback to logger if operation container not available
-                getattr(logger, level, logger.info)(message)
+                getattr(logger, level, get_module_logger("smartcash.ui.setup.dependency.uimodule").info)(message)
         except Exception as e:
-            logger.debug(f"UI logging failed: {e}")
+            get_module_logger("smartcash.ui.setup.dependency.uimodule").debug(f"UI logging failed: {e}")
     
     def _update_progress(self, progress: int, message: str = "", level: str = "primary") -> None:
         """Update progress tracker using operation container."""
@@ -492,7 +490,7 @@ class DependencyUIModule(UIModule):
                 # Fallback to logging
                 self._log_to_ui(f"Progress {progress}%: {message}", "info")
         except Exception as e:
-            logger.debug(f"Progress update failed: {e}")
+            get_module_logger("smartcash.ui.setup.dependency.uimodule").debug(f"Progress update failed: {e}")
     
     def execute_install_operation(self, packages: List[str]) -> Dict[str, Any]:
         """Execute package installation."""
@@ -540,7 +538,7 @@ class DependencyUIModule(UIModule):
                 }
                 
         except Exception as e:
-            logger.error(f"❌ Failed to execute install: {e}")
+            get_module_logger("smartcash.ui.setup.dependency.uimodule").error(f"❌ Failed to execute install: {e}")
             self._update_progress(100, f"Installation error: {str(e)}")
             return {"success": False, "message": str(e)}
     
@@ -587,7 +585,7 @@ class DependencyUIModule(UIModule):
                 }
                 
         except Exception as e:
-            logger.error(f"❌ Failed to execute uninstall: {e}")
+            get_module_logger("smartcash.ui.setup.dependency.uimodule").error(f"❌ Failed to execute uninstall: {e}")
             self._update_progress(100, f"Uninstallation error: {str(e)}")
             return {"success": False, "message": str(e)}
     
@@ -637,7 +635,7 @@ class DependencyUIModule(UIModule):
                 }
                 
         except Exception as e:
-            logger.error(f"❌ Failed to execute update: {e}")
+            get_module_logger("smartcash.ui.setup.dependency.uimodule").error(f"❌ Failed to execute update: {e}")
             self._update_progress(100, f"Update error: {str(e)}")
             return {"success": False, "message": str(e)}
     
@@ -663,10 +661,10 @@ class DependencyUIModule(UIModule):
             # Update internal status without logging to UI to avoid extra log_output
             
             self._package_status = {s["package"]: s for s in status_info}
-            logger.debug("✅ Package status refreshed")
+            get_module_logger("smartcash.ui.setup.dependency.uimodule").debug("✅ Package status refreshed")
             
         except Exception as e:
-            logger.error(f"❌ Failed to refresh package status: {e}")
+            get_module_logger("smartcash.ui.setup.dependency.uimodule").error(f"❌ Failed to refresh package status: {e}")
     
     def _get_all_packages(self) -> List[str]:
         """Get list of all packages from all categories + custom."""
@@ -738,11 +736,11 @@ def create_dependency_uimodule(config: Dict[str, Any] = None,
         # Store global reference
         _dependency_uimodule = module
         
-        logger.debug(f"🏭 Created Dependency UIModule")
+        get_module_logger("smartcash.ui.setup.dependency.uimodule").debug(f"🏭 Created Dependency UIModule")
         return module
         
     except Exception as e:
-        logger.error(f"❌ Failed to create Dependency UIModule: {e}")
+        get_module_logger("smartcash.ui.setup.dependency.uimodule").error(f"❌ Failed to create Dependency UIModule: {e}")
         raise
 
 def get_dependency_uimodule(create_if_missing: bool = True, **kwargs) -> Optional[DependencyUIModule]:
@@ -770,11 +768,11 @@ def reset_dependency_uimodule() -> None:
         try:
             _dependency_uimodule.cleanup()
         except Exception as e:
-            logger.error(f"Error during cleanup: {e}")
+            get_module_logger("smartcash.ui.setup.dependency.uimodule").error(f"Error during cleanup: {e}")
         finally:
             _dependency_uimodule = None
     
-    logger.debug("🔄 Reset global Dependency UIModule instance")
+    get_module_logger("smartcash.ui.setup.dependency.uimodule").debug("🔄 Reset global Dependency UIModule instance")
 
 # === Backward Compatibility Layer ===
 

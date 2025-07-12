@@ -815,6 +815,107 @@ class OperationHandler(BaseHandler):
             except Exception as e:
                 self.logger.error(f"Error clearing dialog: {e}")
     
+    def disable_all_buttons(self, processing_message: str = "⏳ Processing...") -> Dict[str, Any]:
+        """Disable all buttons and store their original state.
+        
+        Args:
+            processing_message: Message to show on buttons during processing
+            
+        Returns:
+            Dictionary containing original button states for restoration
+        """
+        button_states = {}
+        
+        try:
+            # Common button references that UIModules typically store
+            button_refs = [
+                'primary_button', 'setup_button', 'install_button', 'uninstall_button',
+                'update_button', 'check_button', 'save_button', 'reset_button',
+                'download_button', 'process_button', 'action_button'
+            ]
+            
+            # Get buttons from the UIModule if available
+            if hasattr(self, 'get_component'):
+                for button_ref in button_refs:
+                    try:
+                        button = self.get_component(button_ref)
+                        if button and hasattr(button, 'disabled'):
+                            # Store original state
+                            button_states[button_ref] = {
+                                'disabled': button.disabled,
+                                'description': getattr(button, 'description', ''),
+                                'button_style': getattr(button, 'button_style', '')
+                            }
+                            
+                            # Disable button and update description
+                            button.disabled = True
+                            if hasattr(button, 'description'):
+                                button.description = processing_message
+                                
+                    except Exception as e:
+                        self.logger.debug(f"Could not disable button {button_ref}: {e}")
+            
+            self.logger.debug(f"Disabled {len(button_states)} buttons")
+            
+        except Exception as e:
+            self.logger.error(f"Error disabling buttons: {e}")
+        
+        return button_states
+    
+    def enable_all_buttons(self, button_states: Dict[str, Any], 
+                          success: bool = True, 
+                          success_message: str = "✅ Complete",
+                          error_message: str = "❌ Error") -> None:
+        """Restore buttons to their original state or update based on operation result.
+        
+        Args:
+            button_states: Dictionary of original button states from disable_all_buttons()
+            success: Whether the operation was successful
+            success_message: Message for successful completion
+            error_message: Message for failed operations
+        """
+        try:
+            if hasattr(self, 'get_component'):
+                for button_ref, original_state in button_states.items():
+                    try:
+                        button = self.get_component(button_ref)
+                        if button and hasattr(button, 'disabled'):
+                            # Restore original disabled state
+                            button.disabled = original_state.get('disabled', False)
+                            
+                            # Update description based on operation result
+                            if hasattr(button, 'description'):
+                                if success:
+                                    button.description = success_message
+                                    if hasattr(button, 'button_style'):
+                                        button.button_style = 'success'
+                                else:
+                                    button.description = error_message
+                                    if hasattr(button, 'button_style'):
+                                        button.button_style = 'danger'
+                            
+                            # Restore original button style after a delay (for visual feedback)
+                            def restore_original_style():
+                                try:
+                                    if hasattr(button, 'description'):
+                                        button.description = original_state.get('description', '')
+                                    if hasattr(button, 'button_style'):
+                                        button.button_style = original_state.get('button_style', '')
+                                except:
+                                    pass  # Ignore errors during restoration
+                            
+                            # Schedule restoration after 2 seconds (visual feedback)
+                            import threading
+                            threading.Timer(2.0, restore_original_style).start()
+                            
+                    except Exception as e:
+                        self.logger.debug(f"Could not restore button {button_ref}: {e}")
+            
+            self.logger.debug(f"Restored {len(button_states)} buttons")
+            
+        except Exception as e:
+            self.logger.error(f"Error restoring buttons: {e}")
+    
     def execute_named_operation(self, 
                               name: str, 
                               *args, 

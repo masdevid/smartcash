@@ -289,10 +289,20 @@ class ColabUIModule(UIModule):
             button_states = self._get_operation_manager().disable_all_buttons("⏳ Setting up...")
 
             try:
-                # Execute the full setup using parent module's operation system
+                # Get the operation manager
+                operation_manager = getattr(self, '_operation_manager', None)
+                if not operation_manager:
+                    raise ValueError("Operation manager not available")
+                
+                # Get the full_setup operation function
+                full_setup_op = operation_manager.get_operations().get('full_setup')
+                if not full_setup_op:
+                    raise ValueError("Full setup operation not found")
+                
+                # Execute the operation with progress tracking
                 result = self.execute_operation(
                     "full_setup",
-                    self.execute_full_setup,
+                    full_setup_op,
                     message="Performing full environment setup..."
                 )
                 

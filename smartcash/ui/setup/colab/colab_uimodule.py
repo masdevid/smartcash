@@ -295,10 +295,8 @@ class ColabUIModule(UIModule):
                     message="Performing full environment setup..."
                 )
                 
-                success = result.get("success", False)
-                
-                # Handle operation result
-                if success:
+                # Handle operation result (result is an OperationResult object)
+                if result.status == OperationStatus.COMPLETED:
                     status_msg = "✅ Environment setup completed successfully!"
                     self._update_status(status_msg, "success")
                     self.logger.info(status_msg)
@@ -306,8 +304,10 @@ class ColabUIModule(UIModule):
                     if operation_container:
                         operation_container.log_message(status_msg, level='success')
                 else:
-                    error_msg = result.get("message", "Setup failed")
-                    status_msg = f"❌ Setup failed: {error_msg}"
+                    error_msg = result.message or "Setup failed"
+                    if result.error:
+                        error_msg = f"{error_msg}: {str(result.error)}"
+                    status_msg = f"❌ {error_msg}"
                     self._update_status(status_msg, "error")
                     self.logger.error(status_msg)
                     

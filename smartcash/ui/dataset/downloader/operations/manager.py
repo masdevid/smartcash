@@ -253,21 +253,26 @@ class DownloadHandlerManager(DownloaderOperationManager):
             self.enable_buttons()
     
     @handle_ui_errors(error_component_title="Cleanup Operation Error", log_error=True)
-    def _execute_cleanup_operation(self, targets: List[str]) -> None:
+    def _execute_cleanup_operation(self, targets: List[str]) -> Dict[str, Any]:
         """Execute cleanup operation with UI feedback.
         
         Args:
             targets: List of targets to clean up
+            
+        Returns:
+            Dictionary with cleanup results
         """
         # Disable buttons during operation
         self.disable_buttons()
         
         try:
-            # Execute cleanup
-            self.cleanup_handler.execute_cleanup(targets)
+            # Execute cleanup and get result
+            result = self.cleanup_handler.execute_cleanup(targets)
             
             # Reset progress tracker
             self._reset_progress_tracker()
+            
+            return result
             
         finally:
             # Always enable buttons after operation

@@ -27,23 +27,23 @@ class CleanupOperationHandler(BaseDownloaderHandler):
         Returns:
             Dictionary dengan status dan cleanup targets
         """
-        self.log_info("🔍 Mencari file yang dapat dibersihkan")
+        self.logger.info("🔍 Mencari file yang dapat dibersihkan")
         
         from smartcash.ui.dataset.downloader.services.backend_utils import get_cleanup_targets
         targets_result = get_cleanup_targets(self.logger)
         
-        if not self.is_success_response(targets_result):
-            self.log_error("Gagal mendapatkan cleanup targets")
-            return {'status': False, 'message': "Gagal mendapatkan cleanup targets"}
+        if not targets_result or 'summary' not in targets_result:
+            self.logger.error("Gagal mendapatkan cleanup targets - respons tidak valid")
+            return {'status': False, 'message': "Gagal mendapatkan cleanup targets - respons tidak valid"}
         
         summary = targets_result.get('summary', {})
         total_files = summary.get('total_files', 0)
         
         if total_files == 0:
-            self.log_info("Tidak ada file untuk dibersihkan")
+            self.logger.info("Tidak ada file untuk dibersihkan")
             return {'status': True, 'message': "Tidak ada file untuk dibersihkan", 'targets': None}
         
-        self.log_info(f"Ditemukan {total_files} file yang dapat dibersihkan")
+        self.logger.info(f"Ditemukan {total_files} file yang dapat dibersihkan")
         return {'status': True, 'message': f"Ditemukan {total_files} file yang dapat dibersihkan", 'targets': targets_result}
     
     @handle_ui_errors(error_component_title="Cleanup Operation Error", log_error=True)
@@ -56,7 +56,7 @@ class CleanupOperationHandler(BaseDownloaderHandler):
         Returns:
             Dictionary dengan status operasi
         """
-        self.log_info("🧹 Memulai pembersihan dataset")
+        self.logger.info("🧹 Memulai pembersihan dataset")
         
         # Setup progress tracker
         self._setup_progress_tracker("Dataset Cleanup")
@@ -64,7 +64,7 @@ class CleanupOperationHandler(BaseDownloaderHandler):
         # Create cleanup service
         cleanup_service = self._create_cleanup_service()
         if not cleanup_service:
-            self.log_error("Gagal membuat cleanup service")
+            self.logger.error("Gagal membuat cleanup service")
             return {'status': False, 'message': "Gagal membuat cleanup service"}
         
         # Setup progress callback
@@ -76,12 +76,22 @@ class CleanupOperationHandler(BaseDownloaderHandler):
         
         if result and result.get('status') == 'success':
             self._update_summary_container(result, targets_result)
-            self.log_info("✅ Pembersihan dataset selesai")
-            return {'status': True, 'message': "Pembersihan dataset selesai", 'result': result}
+            self.logger.info("✅ Pembersihan dataset selesai")
+            return {
+                'success': True, 
+                'message': "Pembersihan dataset selesai", 
+                'deleted_files': result.get('deleted_files', 0),
+                'freed_space': result.get('freed_space', '0B')
+            }
         else:
             error_msg = result.get('message', 'Pembersihan gagal') if result else 'No response from service'
-            self.log_error(f"❌ {error_msg}")
-            return {'status': False, 'message': error_msg, 'result': result}
+            self.logger.error(f"❌ {error_msg}")
+            return {
+                'success': False, 
+                'message': error_msg, 
+                'deleted_files': 0,
+                'freed_space': '0B'
+            }
     
     @handle_ui_errors(error_component_title="Confirmation Dialog Error", log_error=True)
     def show_cleanup_confirmation(self, targets_result: Dict[str, Any], on_confirm: Callable) -> None:

@@ -1,0 +1,25 @@
+# Base Configuration
+# This is a sample configuration file
+
+# Application settings
+app:
+  name: "SmartCash"
+  version: "1.0.0"
+  debug: false
+
+# Data paths
+paths:
+  data: "/content/data"
+  models: "/content/models"
+  logs: "/content/logs"
+
+# Model settings
+model:
+  batch_size: 32
+  learning_rate: 0.001
+  epochs: 10
+
+# Logging
+logging:
+  level: "INFO"
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"

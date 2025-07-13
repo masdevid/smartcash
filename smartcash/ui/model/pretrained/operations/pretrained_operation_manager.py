@@ -4,6 +4,7 @@ Description: Operation manager for pretrained module extending OperationHandler
 """
 
 from typing import Dict, Any, Optional
+import asyncio
 from smartcash.ui.core.handlers.operation_handler import OperationHandler
 from smartcash.ui.logger import get_module_logger
 
@@ -46,6 +47,35 @@ class PretrainedOperationManager(OperationHandler):
         
         # Initialize service instance
         self._initialize_service()
+    
+    def _safe_callback(self, callback_result):
+        """
+        Handle both sync and async callbacks safely.
+        
+        Args:
+            callback_result: Result from callback function (could be coroutine)
+            
+        Returns:
+            Actual result from callback
+        """
+        if asyncio.iscoroutine(callback_result):
+            # If it's a coroutine, run it in the current event loop or create one
+            try:
+                loop = asyncio.get_event_loop()
+                if loop.is_running():
+                    # If loop is running, create a new task
+                    import concurrent.futures
+                    with concurrent.futures.ThreadPoolExecutor() as executor:
+                        future = executor.submit(asyncio.run, callback_result)
+                        return future.result()
+                else:
+                    return loop.run_until_complete(callback_result)
+            except RuntimeError:
+                # No event loop, create one
+                return asyncio.run(callback_result)
+        else:
+            # It's a regular value, return it
+            return callback_result
     
     def _initialize_service(self) -> None:
         """Initialize service instance."""
@@ -94,7 +124,7 @@ class PretrainedOperationManager(OperationHandler):
         """
         try:
             self.log("🔄 Starting pretrained models download operation...", 'info')
-            self.disable_buttons(['download', 'validate', 'cleanup', 'refresh'])
+            button_states = self.disable_all_buttons("⏳ Downloading...")
             
             # Update progress
             self.update_progress(0, "Initializing download operation...")
@@ -125,7 +155,8 @@ class PretrainedOperationManager(OperationHandler):
             return {'success': False, 'message': str(e)}
         
         finally:
-            self.enable_buttons(['download', 'validate', 'cleanup', 'refresh'])
+            success = result.get('success', False) if 'result' in locals() else False
+            self.enable_all_buttons(button_states if 'button_states' in locals() else {}, success)
     
     def execute_validate(self, config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """
@@ -139,7 +170,7 @@ class PretrainedOperationManager(OperationHandler):
         """
         try:
             self.log("🔍 Validating existing models...", 'info')
-            self.disable_buttons(['validate'])
+            button_states = self.disable_all_buttons("⏳ Validating...")
             
             # Update progress
             self.update_progress(0, "Initializing validation...")
@@ -170,7 +201,8 @@ class PretrainedOperationManager(OperationHandler):
             return {'success': False, 'message': str(e)}
         
         finally:
-            self.enable_buttons(['validate'])
+            success = result.get('success', False) if 'result' in locals() else False
+            self.enable_all_buttons(button_states if 'button_states' in locals() else {}, success)
     
     def execute_cleanup(self, config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """
@@ -184,7 +216,7 @@ class PretrainedOperationManager(OperationHandler):
         """
         try:
             self.log("🧹 Starting cleanup operation...", 'info')
-            self.disable_buttons(['cleanup'])
+            button_states = self.disable_all_buttons("⏳ Cleaning up...")
             
             # Update progress
             self.update_progress(0, "Initializing cleanup...")
@@ -215,7 +247,8 @@ class PretrainedOperationManager(OperationHandler):
             return {'success': False, 'message': str(e)}
         
         finally:
-            self.enable_buttons(['cleanup'])
+            success = result.get('success', False) if 'result' in locals() else False
+            self.enable_all_buttons(button_states if 'button_states' in locals() else {}, success)
     
     def execute_refresh(self, config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """
@@ -229,7 +262,7 @@ class PretrainedOperationManager(OperationHandler):
         """
         try:
             self.log("🔄 Refreshing model status...", 'info')
-            self.disable_buttons(['refresh'])
+            button_states = self.disable_all_buttons("⏳ Refreshing...")
             
             # Update progress
             self.update_progress(0, "Checking models directory...")
@@ -260,7 +293,8 @@ class PretrainedOperationManager(OperationHandler):
             return {'success': False, 'message': str(e)}
         
         finally:
-            self.enable_buttons(['refresh'])
+            success = result.get('success', False) if 'result' in locals() else False
+            self.enable_all_buttons(button_states if 'button_states' in locals() else {}, success)
     
     # ==================== SERVICE INTEGRATION ====================
     
@@ -272,19 +306,19 @@ class PretrainedOperationManager(OperationHandler):
             
             # Check existing models first
             self.update_progress(10, "Checking existing models...")
-            existing_check = self._service.check_existing_models(
+            existing_check = self._safe_callback(self._service.check_existing_models(
                 models_dir, 
                 progress_callback=self.update_progress,
                 log_callback=self.log
-            )
+            ))
             
             # Download models if needed
             self.update_progress(30, "Starting model downloads...")
-            download_result = self._service.download_all_models(
+            download_result = self._safe_callback(self._service.download_all_models(
                 pretrained_config,
                 progress_callback=self.update_progress, 
                 log_callback=self.log
-            )
+            ))
             
             return {
                 'success': download_result.get('all_successful', False),
@@ -305,11 +339,11 @@ class PretrainedOperationManager(OperationHandler):
             
             # Check and validate existing models
             self.update_progress(20, "Validating models...")
-            existing_check = self._service.check_existing_models(
+            existing_check = self._safe_callback(self._service.check_existing_models(
                 models_dir,
                 progress_callback=self.update_progress,
                 log_callback=self.log
-            )
+            ))
             
             return {
                 'success': True,
@@ -331,11 +365,11 @@ class PretrainedOperationManager(OperationHandler):
             self.update_progress(20, "Checking for corrupted files...")
             
             # For now, just check what exists
-            existing_check = self._service.check_existing_models(
+            existing_check = self._safe_callback(self._service.check_existing_models(
                 models_dir,
                 progress_callback=self.update_progress,
                 log_callback=self.log
-            )
+            ))
             
             return {
                 'success': True,
@@ -355,11 +389,11 @@ class PretrainedOperationManager(OperationHandler):
             
             # Refresh model status
             self.update_progress(30, "Refreshing model status...")
-            existing_check = self._service.check_existing_models(
+            existing_check = self._safe_callback(self._service.check_existing_models(
                 models_dir,
                 progress_callback=self.update_progress,
                 log_callback=self.log
-            )
+            ))
             
             return {
                 'success': True,

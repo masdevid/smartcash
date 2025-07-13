@@ -395,7 +395,8 @@ class LogAccordion(BaseUIComponent):
         core_namespaces = {
             'smartcash.ui.core',
             'smartcash.common',
-            'smartcash.dataset'
+            'smartcash.dataset',
+            'smartcash.model'
         }
         
         # Add current cell's namespace filter

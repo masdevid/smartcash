@@ -97,28 +97,25 @@ def create_pretrained_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> D
     ui_components['widgets'].update(form_widgets['widgets'])
     
     # === 3. Create Action Container ===
-    # Create action buttons from BUTTON_CONFIG
+    # Create action buttons from BUTTON_CONFIG (matching backbone module format)
     action_buttons = []
     for button_id, btn_config in BUTTON_CONFIG.items():
         action_buttons.append({
-            'name': button_id,
-            'label': btn_config['text'],
-            'button_style': btn_config['style'],
+            'id': button_id,
+            'text': btn_config['text'],
+            'style': btn_config['style'],
             'tooltip': btn_config['tooltip'],
-            'icon': 'download' if button_id == 'download' else 'check' if button_id == 'validate' else 'refresh' if button_id == 'refresh' else 'trash'
+            'disabled': False
         })
     
     action_container = create_action_container(
         buttons=action_buttons,
-        title="🤖 Model Operations",
-        alignment="left"
+        show_save_reset=True
     )
     
-    # Store references
-    ui_components['containers']['actions'] = action_container
-    if hasattr(action_container, 'get'):
-        for btn in action_buttons:
-            ui_components['widgets'][f'{btn["name"]}_button'] = action_container.get(btn['name'])
+    # Store references (matching backbone module format)
+    ui_components['action_container'] = action_container
+    ui_components['containers']['action'] = action_container
     
     # === 4. Create Summary Container ===
     summary_content = _create_module_summary_content(current_config)
@@ -158,7 +155,7 @@ def create_pretrained_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> D
         header=ui_components['containers']['header']['container'],
         body=widgets.VBox([
             ui_components['containers']['form']['container'],
-            ui_components['containers']['actions']['container'],
+            ui_components['action_container']['container'],
             ui_components['containers']['summary'].container,
             ui_components['containers']['operation']['container']
         ]),

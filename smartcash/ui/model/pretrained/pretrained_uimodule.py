@@ -115,7 +115,7 @@ class PretrainedUIModule(UIModule):
                 raise RuntimeError("Failed to create UI components")
             
             # 3. Create operation manager
-            operation_container = self._ui_components.get('operation_container')
+            operation_container = self._ui_components.get('operation')
             if operation_container:
                 self._operation_manager = PretrainedOperationManager(
                     config=self.merged_config,
@@ -123,6 +123,7 @@ class PretrainedUIModule(UIModule):
                 )
                 # Store in components for handler access
                 self._ui_components['operation_manager'] = self._operation_manager
+                self.logger.info("✅ Initialized PretrainedOperationManager")
             
             # 4. Setup event handlers
             self._setup_event_handlers()
@@ -145,30 +146,36 @@ class PretrainedUIModule(UIModule):
             if not self._operation_manager:
                 return
             
-            # Connect button handlers based on available buttons
-            action_container = self._ui_components.get('action_container', {})
+            # Connect button handlers based on available buttons (using correct action container structure)
+            # Try different access patterns for action container
+            action_container = (
+                self._ui_components.get('action_container', {}) or 
+                self._ui_components.get('action', {})
+            )
+            buttons = action_container.get('buttons', {})
             
             # Download button
-            download_btn = action_container.get('download')
+            download_btn = buttons.get('download')
             if download_btn and hasattr(download_btn, 'on_click'):
                 download_btn.on_click(lambda _: self.execute_download())
             
             # Validate button  
-            validate_btn = action_container.get('validate')
+            validate_btn = buttons.get('validate')
             if validate_btn and hasattr(validate_btn, 'on_click'):
                 validate_btn.on_click(lambda _: self.execute_validate())
             
             # Cleanup button
-            cleanup_btn = action_container.get('cleanup')
+            cleanup_btn = buttons.get('cleanup')
             if cleanup_btn and hasattr(cleanup_btn, 'on_click'):
                 cleanup_btn.on_click(lambda _: self.execute_cleanup())
             
             # Refresh button
-            refresh_btn = action_container.get('refresh')
+            refresh_btn = buttons.get('refresh')
             if refresh_btn and hasattr(refresh_btn, 'on_click'):
                 refresh_btn.on_click(lambda _: self.execute_refresh())
             
-            self.logger.info("✅ Event handlers connected")
+            connected_buttons = len([btn for btn in buttons.values() if btn and hasattr(btn, 'on_click')])
+            self.logger.info(f"✅ Event handlers connected for {connected_buttons} buttons")
             
         except Exception as e:
             self.logger.error(f"Error setting up event handlers: {e}")

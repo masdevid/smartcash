@@ -79,7 +79,7 @@ MODULE_METADATA = {
 BUTTON_CONFIG = {
     'download': {
         'text': '📥 Download Models',
-        'style': 'primary',
+        'style': 'success',
         'tooltip': 'Download YOLOv5s and EfficientNet-B4 pretrained models',
         'order': 1
     },

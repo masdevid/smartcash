@@ -678,15 +678,41 @@ class OperationHandler(BaseHandler):
                 namespace = getattr(self, '_module_name', None)
                 
                 # Try log_message method (standard operation container method)
-                if hasattr(self._operation_container, 'log_message'):
-                    self._operation_container.log_message(
-                        message=message, 
-                        level=level,
-                        namespace=namespace
-                    )
+                if isinstance(self._operation_container, dict) and 'log_message' in self._operation_container:
+                    # Operation container is a dict from create_operation_container()
+                    log_message = self._operation_container['log_message']
+                    # Check if log_message accepts namespace parameter
+                    import inspect
+                    try:
+                        sig = inspect.signature(log_message)
+                        if 'namespace' in sig.parameters:
+                            log_message(message, level, namespace=namespace)
+                        else:
+                            log_message(message, level)
+                    except:
+                        # Fallback to basic call
+                        log_message(message, level)
+                    return
+                elif hasattr(self._operation_container, 'log_message'):
+                    # Operation container is an object
+                    self._operation_container.log_message(message, level)
                     return
                 
                 # Try new-style operation container with log method 
+                elif isinstance(self._operation_container, dict) and 'log' in self._operation_container:
+                    from smartcash.ui.components.log_accordion import LogLevel
+                    level_map = {
+                        'debug': LogLevel.DEBUG,
+                        'info': LogLevel.INFO,
+                        'warning': LogLevel.WARNING,
+                        'error': LogLevel.ERROR,
+                        'critical': LogLevel.ERROR,
+                        'success': LogLevel.INFO
+                    }
+                    log_level = level_map.get(level, LogLevel.INFO)
+                    log_func = self._operation_container['log']
+                    log_func(message, log_level)
+                    return
                 elif hasattr(self._operation_container, 'log') and callable(getattr(self._operation_container, 'log')):
                     from smartcash.ui.components.log_accordion import LogLevel
                     level_map = {
@@ -698,11 +724,7 @@ class OperationHandler(BaseHandler):
                         'success': LogLevel.INFO
                     }
                     log_level = level_map.get(level, LogLevel.INFO)
-                    self._operation_container.log(
-                        message=message, 
-                        level=log_level,
-                        namespace=namespace
-                    )
+                    self._operation_container.log(message, log_level)
                     return
                     
             except Exception as e:

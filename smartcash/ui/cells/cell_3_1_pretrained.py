@@ -6,4 +6,4 @@ NOTE: Cell Code should remain minimal (import and run initializer only).
 """
 
 from smartcash.ui.model.pretrained.pretrained_uimodule import initialize_pretrained_ui
-initialize_pretrained_ui()
+initialize_pretrained_ui(display=True)

@@ -1,0 +1,18 @@
+# Colab-Specific Configuration
+# This config is specific to Google Colab environments
+
+colab:
+  gpu: true
+  drive_mount: true
+  drive_path: "/content/drive/MyDrive"
+  
+  # Google Drive settings
+  drive:
+    sync_enabled: true
+    sync_interval: 300  # seconds
+    
+  # Display settings
+  display:
+    show_images: true
+    image_columns: 2
+    image_size: "(10, 8)"

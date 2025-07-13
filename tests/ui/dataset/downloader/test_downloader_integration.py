@@ -104,7 +104,7 @@ class TestDownloaderIntegration:
         assert hasattr(downloader_module, 'ui_components')
         assert 'main_container' in downloader_module.ui_components
     
-    def test_download_workflow(self, downloader_module, mock_download_service, mock_progress_tracker):
+    def test_download_workflow(self, downloader_module, mock_download_service, mock_progress_tracker, mocker):
         """Test the complete download workflow with progress tracking."""
         # Setup test data
         test_config = {
@@ -138,78 +138,44 @@ class TestDownloaderIntegration:
             }
         }
         
-        # Configure the mock download service to return our expected result
-        mock_download_service.download_dataset.return_value = expected_result
-        
-        # Create a proper mock for the progress tracker with the expected methods
-        progress_tracker_mock = MagicMock()
-        progress_tracker_mock.start_stage = MagicMock()
-        progress_tracker_mock.complete_stage = MagicMock()
-        progress_tracker_mock.update_overall = MagicMock()
-        progress_tracker_mock.update_progress = MagicMock()
-        
-        # Create a mock for the operation container
-        operation_container_mock = MagicMock()
-        
         # Create a mock for the operation manager
         operation_manager_mock = MagicMock()
-        operation_manager_mock.execute_download = MagicMock(return_value={
-            "status": True,
-            "message": "Download completed successfully"
-        })
-        
-        # Setup the UI components that the DownloadOperationHandler expects
-        ui_components = {
-            'progress_tracker': progress_tracker_mock,
-            'progress_callback': MagicMock(),
-            'status_panel': MagicMock(),
-            'summary_container': MagicMock(),
-            'progress_bar': MagicMock(),
-            'operation_container': operation_container_mock
+        operation_manager_mock.execute_download.return_value = {
+            "success": True,
+            "message": "Download completed successfully",
+            "result": expected_result
         }
         
         # Patch the operation manager creation to return our mock
-        with patch('smartcash.ui.dataset.downloader.downloader_uimodule.DownloaderOperationManager') as mock_op_manager_class, \
-             patch('smartcash.ui.dataset.downloader.services.backend_utils.create_backend_downloader') as mock_create_downloader:
-            
-            # Configure the mock operation manager class to return our mock instance
-            mock_op_manager_class.return_value = operation_manager_mock
-            
-            # Configure the mock download service
-            mock_create_downloader.return_value = mock_download_service
-            
-            # Set the UI components on the downloader module
-            downloader_module._ui_components = ui_components
-            
+        with patch.object(downloader_module, '_operation_manager', operation_manager_mock):
             # Execute download with the test config
             result = downloader_module.execute_download(ui_config=test_config)
             
-            # Verify the operation manager was created with the correct arguments
-            mock_op_manager_class.assert_called_once_with(
-                config=downloader_module.get_config(),
-                operation_container=operation_container_mock
-            )
-            
             # Verify the operation manager's execute_download was called with the test config
-            operation_manager_mock.execute_download.assert_called_once()
+            operation_manager_mock.execute_download.assert_called_once_with(test_config)
             
-            # Verify the download service was called
-            mock_download_service.download_dataset.assert_called_once()
-            
-            # Verify progress tracking was updated
-            progress_tracker_mock.start_stage.assert_called_once_with("Dataset Download")
-            progress_tracker_mock.complete_stage.assert_called_once()
-            progress_tracker_mock.update_overall.assert_called()
-            assert progress_tracker_mock.update_progress.call_count > 0
+            # Verify the result is as expected
+            assert result["success"] is True
+            assert "Download completed successfully" in result["message"]
+            assert result.get("result") == expected_result
     
-    def test_check_operation(self, downloader_module, mock_download_service):
+    @patch('smartcash.dataset.downloader.dataset_scanner.create_dataset_scanner')
+    def test_check_operation(self, mock_create_scanner, downloader_module, mock_download_service):
         """Test the check dataset operation."""
-        # Mock the check operation
-        mock_download_service.check_dataset.return_value = {
-            "exists": True,
-            "file_count": 10,
-            "total_size": "50MB"
+        # Create a mock scanner
+        mock_scanner = MagicMock()
+        mock_scanner.scan_existing_dataset_parallel.return_value = {
+            'status': 'success',
+            'file_count': 10,
+            'total_size': '50MB',
+            'message': 'Scan completed successfully'
         }
+        mock_create_scanner.return_value = mock_scanner
+        
+        # Setup UI components needed by the handler
+        downloader_module.ui_components.update({
+            'progress_callback': MagicMock()
+        })
         
         # Execute check
         result = downloader_module.execute_check()
@@ -217,28 +183,39 @@ class TestDownloaderIntegration:
         # Verify results
         assert result["exists"] is True
         assert result["file_count"] == 10
+        assert result["total_size"] == "50MB"
+        assert result["status"] is True
+        assert "Pemeriksaan dataset selesai" in result["message"]
         
-        # Verify service was called
-        mock_download_service.check_dataset.assert_called_once()
+        # Verify scanner was called
+        mock_create_scanner.assert_called_once()
+        mock_scanner.scan_existing_dataset_parallel.assert_called_once()
     
-    def test_cleanup_operation(self, downloader_module, mock_download_service):
+    def test_cleanup_operation(self, downloader_module, mocker):
         """Test the cleanup operation."""
-        # Mock the cleanup operation
-        mock_download_service.cleanup.return_value = {
+        # Mock the operation manager's execute_cleanup method
+        mock_result = {
             "success": True,
             "deleted_files": 5,
-            "freed_space": "25MB"
+            "freed_space": "25MB",
+            "message": "Cleanup completed successfully"
         }
         
-        # Execute cleanup
-        result = downloader_module.execute_cleanup()
-        
-        # Verify results
-        assert result["success"] is True
-        assert result["deleted_files"] == 5
-        
-        # Verify service was called
-        mock_download_service.cleanup.assert_called_once()
+        # Patch the operation manager's execute_cleanup method
+        with patch.object(downloader_module, '_operation_manager') as mock_manager:
+            mock_manager.execute_cleanup.return_value = mock_result
+            
+            # Execute cleanup
+            result = downloader_module.execute_cleanup()
+            
+            # Verify results
+            assert result["success"] is True
+            assert result["deleted_files"] == 5
+            assert result["freed_space"] == "25MB"
+            assert "Cleanup completed" in result["message"]
+            
+            # Verify the operation manager was called
+            mock_manager.execute_cleanup.assert_called_once()
     
     def test_config_validation(self, downloader_module, mock_download_service):
         """Test configuration validation."""

@@ -574,9 +574,9 @@ def initialize_pretrained_ui(
         # Display the UI if requested
         if display and ui_components:
             from IPython import get_ipython
-            from IPython.display import display as ipython_display, clear_output
+            from IPython.display import display as ipython_display
             if get_ipython() is not None:
-                clear_output(wait=True)
+                ipython_display.clear_output(wait=True)
             main_ui = ui_components.get('main_container')
             if main_ui is not None:
                 try:

@@ -54,6 +54,9 @@ class TrainOperationManager(OperationHandler):
         
         # Initialize service instance
         self._initialize_service()
+        
+        # Track button states for restore
+        self._button_states = {}
     
     def _initialize_service(self) -> None:
         """Initialize training service instance."""
@@ -119,7 +122,8 @@ class TrainOperationManager(OperationHandler):
                 return {'success': False, 'message': 'Training already in progress'}
             
             self.log("🚀 Starting model training...", 'info')
-            self.disable_buttons(['start', 'resume'])
+            # Note: Using disable_all_buttons for now, individual button control would need implementation
+            self._button_states = self.disable_all_buttons("🚀 Training...")
             
             # Update progress
             self.update_progress(0, "Initializing training...")
@@ -150,7 +154,8 @@ class TrainOperationManager(OperationHandler):
             self.logger.error(f"Training start error: {e}")
             self.log(f"❌ Training start error: {e}", 'error')
             self.update_progress(0, "Training start failed")
-            self.enable_buttons(['start', 'resume'])
+            if self._button_states:
+                self.enable_all_buttons(self._button_states)
             return {'success': False, 'message': str(e)}
     
     def execute_stop(self, config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
@@ -168,7 +173,7 @@ class TrainOperationManager(OperationHandler):
                 return {'success': False, 'message': 'No training in progress'}
             
             self.log("🛑 Stopping training...", 'info')
-            self.disable_buttons(['stop'])
+            self._button_states = self.disable_all_buttons("🛑 Stopping...")
             
             # Update progress
             self.update_progress(90, "Stopping training and saving best model...")
@@ -185,7 +190,8 @@ class TrainOperationManager(OperationHandler):
                     self.log(f"❌ Training stop failed: {stop_result.get('message', 'Unknown error')}", 'error')
                 
                 self._is_training = False
-                self.enable_buttons(['start', 'resume'])
+                if self._button_states:
+                    self.enable_all_buttons(self._button_states)
                 
                 return stop_result
             else:
@@ -194,7 +200,8 @@ class TrainOperationManager(OperationHandler):
         except Exception as e:
             self.logger.error(f"Training stop error: {e}")
             self.log(f"❌ Training stop error: {e}", 'error')
-            self.enable_buttons(['stop'])
+            if self._button_states:
+                self.enable_all_buttons(self._button_states)
             return {'success': False, 'message': str(e)}
     
     def execute_resume(self, config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
@@ -212,7 +219,8 @@ class TrainOperationManager(OperationHandler):
                 return {'success': False, 'message': 'Training already in progress'}
             
             self.log("🔄 Resuming training from checkpoint...", 'info')
-            self.disable_buttons(['start', 'resume'])
+            # Note: Using disable_all_buttons for now, individual button control would need implementation
+            self._button_states = self.disable_all_buttons("🚀 Training...")
             
             # Update progress
             self.update_progress(0, "Loading checkpoint...")
@@ -243,7 +251,8 @@ class TrainOperationManager(OperationHandler):
             self.logger.error(f"Training resume error: {e}")
             self.log(f"❌ Training resume error: {e}", 'error')
             self.update_progress(0, "Training resume failed")
-            self.enable_buttons(['start', 'resume'])
+            if self._button_states:
+                self.enable_all_buttons(self._button_states)
             return {'success': False, 'message': str(e)}
     
     def execute_validate(self, config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
@@ -258,7 +267,7 @@ class TrainOperationManager(OperationHandler):
         """
         try:
             self.log("📊 Running model validation...", 'info')
-            self.disable_buttons(['validate'])
+            self._button_states = self.disable_all_buttons("📊 Validating...")
             
             # Update progress
             self.update_progress(0, "Initializing validation...")
@@ -289,7 +298,8 @@ class TrainOperationManager(OperationHandler):
             return {'success': False, 'message': str(e)}
         
         finally:
-            self.enable_buttons(['validate'])
+            if self._button_states:
+                self.enable_all_buttons(self._button_states)
     
     # ==================== ASYNC TRAINING EXECUTION ====================
     
@@ -347,7 +357,8 @@ class TrainOperationManager(OperationHandler):
         
         finally:
             self._is_training = False
-            self.enable_buttons(['start', 'resume'])
+            if self._button_states:
+                self.enable_all_buttons(self._button_states)
     
     def _execute_resume_async(self, config: Dict[str, Any]) -> None:
         """Execute resume training in background thread."""
@@ -389,7 +400,8 @@ class TrainOperationManager(OperationHandler):
         
         finally:
             self._is_training = False
-            self.enable_buttons(['start', 'resume'])
+            if self._button_states:
+                self.enable_all_buttons(self._button_states)
     
     # ==================== SERVICE INTEGRATION ====================
     

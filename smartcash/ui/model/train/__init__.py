@@ -2,6 +2,18 @@
 Training module for SmartCash UI.
 """
 
-from .training_initializer import initialize_training_ui, get_training_initializer
+from .train_uimodule import (
+    create_train_uimodule,
+    get_train_uimodule,
+    reset_train_uimodule,
+    initialize_training_ui,
+    get_training_components
+)
 
-__all__ = ['initialize_training_ui', 'get_training_initializer']
+__all__ = [
+    'create_train_uimodule',
+    'get_train_uimodule', 
+    'reset_train_uimodule',
+    'initialize_training_ui',
+    'get_training_components'
+]

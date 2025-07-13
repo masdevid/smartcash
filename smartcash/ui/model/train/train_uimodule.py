@@ -6,6 +6,7 @@ Main UIModule implementation for train module following new UIModule pattern.
 from typing import Dict, Any, Optional
 from smartcash.ui.core.ui_module import UIModule
 from smartcash.ui.logger import get_module_logger
+from smartcash.ui.core.utils.log_suppression import suppress_ui_init_logs
 from .configs.train_config_handler import TrainConfigHandler
 from .configs.train_defaults import get_default_train_config
 from .operations.train_operation_manager import TrainOperationManager
@@ -58,7 +59,7 @@ class TrainUIModule(UIModule):
             # Try to integrate backbone configuration
             merged_config = self._try_integrate_backbone_config(merged_config)
             
-            self.update_config(merged_config)
+            self.update_config(**merged_config)
             self.logger.debug("✅ Config handler initialized")
             
         except Exception as e:
@@ -146,10 +147,10 @@ class TrainUIModule(UIModule):
     def _try_integrate_backbone_config(self, config: Dict[str, Any]) -> Dict[str, Any]:
         """Try to integrate backbone configuration automatically."""
         try:
-            from smartcash.ui.core.shared_methods import get_shared_method
+            from smartcash.ui.core.ui_module import SharedMethodRegistry
             
             # Try to get backbone configuration
-            get_backbone_config = get_shared_method('backbone.get_config')
+            get_backbone_config = SharedMethodRegistry.get_method('backbone.get_config')
             if get_backbone_config:
                 backbone_config = get_backbone_config()
                 
@@ -165,6 +166,7 @@ class TrainUIModule(UIModule):
         
         return config
     
+    @suppress_ui_init_logs(duration=3.0)
     def initialize(self, config: Optional[Dict[str, Any]] = None, **kwargs) -> None:
         """
         Initialize the training module.
@@ -174,8 +176,6 @@ class TrainUIModule(UIModule):
             **kwargs: Additional initialization arguments
         """
         try:
-            self.logger.info("🚀 Initializing model training module")
-            
             # Initialize configuration handler
             self._initialize_config_handler(config)
             
@@ -188,8 +188,8 @@ class TrainUIModule(UIModule):
             # Register shared methods for cross-module integration
             self._register_shared_methods()
             
-            self.set_initialized(True)
-            self.logger.info("✅ Model training module initialized successfully")
+            # Call base class initialization to set status to READY
+            super().initialize(self.get_config())
             
         except Exception as e:
             self.logger.error(f"Failed to initialize training module: {e}")
@@ -198,46 +198,46 @@ class TrainUIModule(UIModule):
     def _register_shared_methods(self) -> None:
         """Register shared methods for cross-module integration."""
         try:
-            from smartcash.ui.core.shared_methods import register_shared_method
+            from smartcash.ui.core.ui_module import SharedMethodRegistry
             
             # Register training operations
-            register_shared_method(
+            SharedMethodRegistry.register_method(
                 'train.execute_start',
                 self.execute_start,
                 description='Start model training'
             )
             
-            register_shared_method(
+            SharedMethodRegistry.register_method(
                 'train.execute_stop',
                 self.execute_stop,
                 description='Stop model training'
             )
             
-            register_shared_method(
+            SharedMethodRegistry.register_method(
                 'train.execute_resume',
                 self.execute_resume,
                 description='Resume model training'
             )
             
-            register_shared_method(
+            SharedMethodRegistry.register_method(
                 'train.execute_validate',
                 self.execute_validate,
                 description='Validate trained model'
             )
             
-            register_shared_method(
+            SharedMethodRegistry.register_method(
                 'train.get_config',
                 self.get_config,
                 description='Get training configuration'
             )
             
-            register_shared_method(
+            SharedMethodRegistry.register_method(
                 'train.update_config',
                 self.update_config,
                 description='Update training configuration'
             )
             
-            register_shared_method(
+            SharedMethodRegistry.register_method(
                 'train.get_training_status',
                 self.get_training_status,
                 description='Get current training status'
@@ -261,7 +261,7 @@ class TrainUIModule(UIModule):
             Training start result dictionary
         """
         try:
-            if not self.is_initialized():
+            if not self.is_ready():
                 self.initialize()
             
             if not self._operation_manager:
@@ -285,7 +285,7 @@ class TrainUIModule(UIModule):
             Training stop result dictionary
         """
         try:
-            if not self.is_initialized():
+            if not self.is_ready():
                 return {'success': False, 'message': 'Module not initialized'}
             
             if not self._operation_manager:
@@ -309,7 +309,7 @@ class TrainUIModule(UIModule):
             Training resume result dictionary
         """
         try:
-            if not self.is_initialized():
+            if not self.is_ready():
                 self.initialize()
             
             if not self._operation_manager:
@@ -333,7 +333,7 @@ class TrainUIModule(UIModule):
             Validation result dictionary
         """
         try:
-            if not self.is_initialized():
+            if not self.is_ready():
                 self.initialize()
             
             if not self._operation_manager:
@@ -357,7 +357,7 @@ class TrainUIModule(UIModule):
         """
         try:
             base_status = {
-                'initialized': self.is_initialized(),
+                'initialized': self.is_ready(),
                 'module_name': self.module_name,
                 'parent_module': self.parent_module,
                 'config_available': self._config_handler is not None,
@@ -412,7 +412,7 @@ class TrainUIModule(UIModule):
                 current_config, backbone_config
             )
             
-            self.update_config(integrated_config)
+            self.update_config(**integrated_config)
             
             self.logger.info("📋 Backbone configuration integrated successfully")
             return {
@@ -441,7 +441,7 @@ class TrainUIModule(UIModule):
             if self._ui_components:
                 ui_config = self._config_handler.sync_from_ui(self._ui_components)
                 if ui_config:
-                    self.update_config(ui_config)
+                    self.update_config(**ui_config)
             
             # Save configuration (implementation depends on storage strategy)
             current_config = self.get_config()
@@ -471,7 +471,7 @@ class TrainUIModule(UIModule):
             
             # Reset to default configuration
             default_config = get_default_train_config()
-            self.update_config(default_config)
+            self.update_config(**default_config)
             
             # Sync to UI if available
             if self._ui_components:
@@ -641,22 +641,22 @@ def get_training_components() -> Dict[str, Any]:
 def register_train_shared_methods() -> None:
     """Register training shared methods for cross-module access."""
     try:
-        from smartcash.ui.core.shared_methods import register_shared_method
+        from smartcash.ui.core.ui_module import SharedMethodRegistry
         
         # Register module factory functions
-        register_shared_method(
+        SharedMethodRegistry.register_method(
             'train.create_module',
             create_train_uimodule,
             description='Create training UIModule instance'
         )
         
-        register_shared_method(
+        SharedMethodRegistry.register_method(
             'train.get_module',
             get_train_uimodule,
             description='Get training UIModule singleton'
         )
         
-        register_shared_method(
+        SharedMethodRegistry.register_method(
             'train.reset_module',
             reset_train_uimodule,
             description='Reset training UIModule singleton'
@@ -669,25 +669,9 @@ def register_train_shared_methods() -> None:
 
 def register_train_template() -> None:
     """Register training module template."""
-    try:
-        from smartcash.ui.core.template_registry import register_template
-        
-        template_info = {
-            'name': 'train',
-            'title': '🚀 Model Training',
-            'description': 'Model training with live monitoring and dual charts',
-            'category': 'model',
-            'factory_function': create_train_uimodule,
-            'config_function': get_default_train_config,
-            'singleton_function': get_train_uimodule,
-            'reset_function': reset_train_uimodule
-        }
-        
-        register_template('train', template_info)
-        
-    except Exception as e:
-        # Silently fail if template registry not available
-        pass
+    # Template registry not available in current core implementation
+    # This is a placeholder for future template system
+    pass
 
 
 # Auto-register shared methods and template

@@ -7,7 +7,7 @@ from typing import Dict, Any, Optional
 from smartcash.ui.core.ui_module import UIModule
 from smartcash.ui.logger import get_module_logger
 from smartcash.ui.core.decorators import suppress_ui_init_logs
-from .configs.train_config_handler import TrainConfigHandler
+from .configs.simple_train_config_handler import SimpleTrainConfigHandler
 from .configs.train_defaults import get_default_train_config
 from .operations.train_operation_manager import TrainOperationManager
 
@@ -44,50 +44,31 @@ class TrainUIModule(UIModule):
         self.logger.debug("✅ TrainUIModule initialized")
     
     def _initialize_config_handler(self, config: Optional[Dict[str, Any]] = None) -> None:
-        """Initialize configuration handler with shared config support."""
+        """Initialize configuration handler (simplified without shared config dependency)."""
         try:
             # Get default config first
             default_config = get_default_train_config()
             
-            # Ensure required sections exist in the provided config
+            # Merge provided config with defaults
             if config:
-                # Ensure all required sections exist in the provided config
+                # Ensure all required sections exist
                 for section in ['training', 'optimizer', 'scheduler', 'monitoring', 'ui']:
                     if section not in config:
                         config[section] = default_config.get(section, {})
+                merged_config = config
+            else:
+                merged_config = default_config
             
-            # Initialize with proper config and shared settings
-            self._config_handler = TrainConfigHandler()
-            
-            # Ensure shared manager is initialized
-            if not hasattr(self._config_handler, '_shared_manager'):
-                self._config_handler.initialize()
-            
-            # If config was provided, update the handler with it
-            if config:
-                # First ensure we have all required sections in the config
-                for section in ['training', 'optimizer', 'scheduler', 'monitoring', 'ui']:
-                    if section not in config:
-                        config[section] = default_config.get(section, {})
-                
-                # Update the config handler with the provided config
-                self._config_handler.update_config(config)
-            
-            # Get the current config from handler (which now has all required sections)
-            current_config = self._config_handler.get_config()
+            # Initialize simple config handler (not shared config)
+            self._config_handler = SimpleTrainConfigHandler()
             
             # Try to integrate backbone configuration
-            current_config = self._try_integrate_backbone_config(current_config)
+            merged_config = self._try_integrate_backbone_config(merged_config)
             
-            # Update the config with the merged configuration
-            self.update_config(**current_config)
+            # Update our module's config
+            self.update_config(**merged_config)
             
-            # Validate the configuration
-            if not self._config_handler.validate_config(current_config):
-                self.logger.warning("Configuration validation failed, but continuing with default values")
-            
-            self.logger.debug("✅ Config handler initialized with config: %s", 
-                           {k: '...' for k in current_config.keys()})
+            self.logger.debug(f"✅ Config handler initialized with config sections: {list(merged_config.keys())}")
             
         except Exception as e:
             self.logger.error(f"Failed to initialize config handler: {e}", exc_info=True)

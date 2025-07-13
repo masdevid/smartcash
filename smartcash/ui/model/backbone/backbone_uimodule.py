@@ -138,40 +138,40 @@ class BackboneUIModule(UIModule):
     def _register_shared_methods(self) -> None:
         """Register shared methods for cross-module integration."""
         try:
-            from smartcash.ui.core.shared_methods import register_shared_method
+            from smartcash.ui.core.ui_module import SharedMethodRegistry
             
             # Register backbone operations
-            register_shared_method(
+            SharedMethodRegistry.register_method(
                 'backbone.execute_validate',
                 self.execute_validate,
                 description='Validate backbone configuration'
             )
             
-            register_shared_method(
+            SharedMethodRegistry.register_method(
                 'backbone.execute_build', 
                 self.execute_build,
                 description='Build backbone model'
             )
             
-            register_shared_method(
+            SharedMethodRegistry.register_method(
                 'backbone.execute_load',
                 self.execute_load,
                 description='Load pretrained backbone'
             )
             
-            register_shared_method(
+            SharedMethodRegistry.register_method(
                 'backbone.execute_summary',
                 self.execute_summary,
                 description='Generate model summary'
             )
             
-            register_shared_method(
+            SharedMethodRegistry.register_method(
                 'backbone.get_config',
                 self.get_config,
                 description='Get backbone configuration'
             )
             
-            register_shared_method(
+            SharedMethodRegistry.register_method(
                 'backbone.update_config',
                 self.update_config,
                 description='Update backbone configuration'
@@ -506,6 +506,7 @@ def initialize_backbone_ui(
             main_ui = result['ui_components'].get('main_container')
             if main_ui:
                 ipython_display(main_ui)
+                return None  # Don't return data when display=True
         
         return result
         
@@ -538,22 +539,22 @@ def get_backbone_components() -> Dict[str, Any]:
 def register_backbone_shared_methods() -> None:
     """Register backbone shared methods for cross-module access."""
     try:
-        from smartcash.ui.core.shared_methods import register_shared_method
+        from smartcash.ui.core.ui_module import SharedMethodRegistry
         
         # Register module factory functions
-        register_shared_method(
+        SharedMethodRegistry.register_method(
             'backbone.create_module',
             create_backbone_uimodule,
             description='Create backbone UIModule instance'
         )
         
-        register_shared_method(
+        SharedMethodRegistry.register_method(
             'backbone.get_module',
             get_backbone_uimodule,
             description='Get backbone UIModule singleton'
         )
         
-        register_shared_method(
+        SharedMethodRegistry.register_method(
             'backbone.reset_module',
             reset_backbone_uimodule,
             description='Reset backbone UIModule singleton'

@@ -113,9 +113,10 @@ class BackboneOperationManager(OperationHandler):
         Returns:
             Operation result dictionary
         """
+        button_states = None
         try:
             self.log("🔍 Starting backbone validation operation...", 'info')
-            self.disable_buttons(['validate', 'build', 'load', 'summary'])
+            button_states = self.disable_all_buttons("⏳ Validating...")
             
             # Update progress
             self.update_progress(0, "Initializing validation...")
@@ -146,7 +147,8 @@ class BackboneOperationManager(OperationHandler):
             return {'success': False, 'message': str(e)}
         
         finally:
-            self.enable_buttons(['validate', 'build', 'load', 'summary'])
+            if button_states:
+                self.enable_all_buttons(button_states)
     
     def execute_build(self, config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """
@@ -158,9 +160,10 @@ class BackboneOperationManager(OperationHandler):
         Returns:
             Build result dictionary
         """
+        button_states = None
         try:
             self.log("🏗️ Starting backbone build operation...", 'info')
-            self.disable_buttons(['validate', 'build', 'load', 'summary'])
+            button_states = self.disable_all_buttons("⏳ Building...")
             
             # Update progress
             self.update_progress(0, "Initializing model build...")
@@ -191,7 +194,8 @@ class BackboneOperationManager(OperationHandler):
             return {'success': False, 'message': str(e)}
         
         finally:
-            self.enable_buttons(['validate', 'build', 'load', 'summary'])
+            if button_states:
+                self.enable_all_buttons(button_states)
     
     def execute_load(self, config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """
@@ -203,9 +207,10 @@ class BackboneOperationManager(OperationHandler):
         Returns:
             Load result dictionary
         """
+        button_states = None
         try:
             self.log("📥 Starting backbone load operation...", 'info')
-            self.disable_buttons(['validate', 'build', 'load', 'summary'])
+            button_states = self.disable_all_buttons("⏳ Loading...")
             
             # Update progress
             self.update_progress(0, "Initializing model loading...")
@@ -236,7 +241,8 @@ class BackboneOperationManager(OperationHandler):
             return {'success': False, 'message': str(e)}
         
         finally:
-            self.enable_buttons(['validate', 'build', 'load', 'summary'])
+            if button_states:
+                self.enable_all_buttons(button_states)
     
     def execute_summary(self, config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """
@@ -248,9 +254,10 @@ class BackboneOperationManager(OperationHandler):
         Returns:
             Summary result dictionary
         """
+        button_states = None
         try:
             self.log("📊 Starting model summary generation...", 'info')
-            self.disable_buttons(['summary'])
+            button_states = self.disable_all_buttons("⏳ Generating...")
             
             # Update progress
             self.update_progress(0, "Generating model summary...")
@@ -281,7 +288,8 @@ class BackboneOperationManager(OperationHandler):
             return {'success': False, 'message': str(e)}
         
         finally:
-            self.enable_buttons(['summary'])
+            if button_states:
+                self.enable_all_buttons(button_states)
     
     # ==================== SERVICE INTEGRATION ====================
     
@@ -291,27 +299,37 @@ class BackboneOperationManager(OperationHandler):
             backbone_config = config.get('backbone', {})
             model_type = backbone_config.get('model_type', 'efficientnet_b4')
             
-            # Validate configuration
-            self.update_progress(20, "Validating configuration...")
-            validation_result = self._service.validate_config(
-                backbone_config,
-                progress_callback=self.update_progress,
-                log_callback=self.log
-            )
+            # Create async wrapper for progress and log callbacks
+            def sync_progress_callback(progress, message):
+                self.update_progress(progress, message)
             
-            # Check backbone compatibility
-            self.update_progress(60, "Checking backbone compatibility...")
-            compatibility_result = self._service.check_backbone_compatibility(
-                model_type,
-                progress_callback=self.update_progress,
-                log_callback=self.log
-            )
+            def sync_log_callback(level, message):
+                self.log(message, level.lower())
+            
+            # Run async validation in sync context
+            import asyncio
+            
+            async def async_validate():
+                return await self._service.validate_backbone_config(
+                    backbone_config,
+                    progress_callback=lambda step, total, msg: sync_progress_callback(
+                        int((step + 1) / total * 100), msg
+                    ),
+                    log_callback=lambda level, msg: sync_log_callback(level, msg)
+                )
+            
+            # Execute async operation
+            try:
+                loop = asyncio.get_event_loop()
+                validation_result = loop.run_until_complete(async_validate())
+            except RuntimeError:
+                # No event loop running, create new one
+                validation_result = asyncio.run(async_validate())
             
             return {
-                'success': validation_result.get('valid', False) and compatibility_result.get('compatible', False),
+                'success': validation_result.get('valid', False),
                 'message': 'Backbone validation completed',
                 'validation_results': validation_result,
-                'compatibility_results': compatibility_result,
                 'model_type': model_type
             }
             
@@ -322,56 +340,35 @@ class BackboneOperationManager(OperationHandler):
         """Execute build operation with service integration."""
         try:
             backbone_config = config.get('backbone', {})
-            model_config = config.get('model', {})
             
-            # Use model builder for early training pipeline
-            if self._model_builder:
-                self.update_progress(20, "Building backbone with model builder...")
-                
-                backbone_type = backbone_config.get('model_type', 'efficientnet_b4')
-                detection_layers = backbone_config.get('detection_layers', ['banknote'])
-                layer_mode = backbone_config.get('layer_mode', 'single')
-                num_classes = backbone_config.get('num_classes', 7)
-                input_size = backbone_config.get('input_size', 640)
-                feature_optimization = backbone_config.get('feature_optimization', {})
-                
-                # Build model using backend model builder
-                self.update_progress(50, "Constructing model architecture...")
-                model = self._model_builder.build(
-                    backbone=backbone_type,
-                    detection_layers=detection_layers,
-                    layer_mode=layer_mode,
-                    num_classes=num_classes,
-                    img_size=input_size,
-                    feature_optimization=feature_optimization
-                )
-                
-                self.update_progress(80, "Calculating model parameters...")
-                
-                # Get model statistics
-                total_params = sum(p.numel() for p in model.parameters())
-                trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
-                
-                return {
-                    'success': True,
-                    'message': 'Backbone model built successfully',
-                    'model': model,
-                    'model_stats': {
-                        'total_parameters': total_params,
-                        'trainable_parameters': trainable_params,
-                        'backbone_type': backbone_type,
-                        'input_size': input_size,
-                        'num_classes': num_classes
-                    },
-                    'backbone_config': backbone_config
-                }
-            else:
-                # Fallback to service build
-                return self._service.build_backbone(
+            # Create async wrapper for progress and log callbacks
+            def sync_progress_callback(progress, message):
+                self.update_progress(progress, message)
+            
+            def sync_log_callback(level, message):
+                self.log(message, level.lower())
+            
+            # Run async build in sync context
+            import asyncio
+            
+            async def async_build():
+                return await self._service.build_backbone_architecture(
                     backbone_config,
-                    progress_callback=self.update_progress,
-                    log_callback=self.log
+                    progress_callback=lambda step, total, msg: sync_progress_callback(
+                        int((step + 1) / total * 100), msg
+                    ),
+                    log_callback=lambda level, msg: sync_log_callback(level, msg)
                 )
+            
+            # Execute async operation
+            try:
+                loop = asyncio.get_event_loop()
+                build_result = loop.run_until_complete(async_build())
+            except RuntimeError:
+                # No event loop running, create new one
+                build_result = asyncio.run(async_build())
+            
+            return build_result
             
         except Exception as e:
             return {'success': False, 'message': f'Service build failed: {e}'}
@@ -380,28 +377,33 @@ class BackboneOperationManager(OperationHandler):
         """Execute load operation with service integration."""
         try:
             backbone_config = config.get('backbone', {})
-            model_type = backbone_config.get('model_type', 'efficientnet_b4')
-            pretrained = backbone_config.get('pretrained', True)
             
-            # Load pretrained backbone
-            self.update_progress(30, "Loading pretrained model...")
-            load_result = self._service.load_pretrained_backbone(
-                model_type,
-                pretrained=pretrained,
-                progress_callback=self.update_progress,
-                log_callback=self.log
-            )
+            # Create async wrapper for progress and log callbacks
+            def sync_progress_callback(progress, message):
+                self.update_progress(progress, message)
             
-            # Validate from existing pretrained model if available
-            if load_result.get('success') and backbone_config.get('early_training', {}).get('validation_from_pretrained'):
-                self.update_progress(70, "Validating from pretrained model...")
-                validation_result = self._service.validate_from_pretrained(
-                    load_result.get('model'),
+            def sync_log_callback(level, message):
+                self.log(message, level.lower())
+            
+            # Run async load in sync context
+            import asyncio
+            
+            async def async_load():
+                return await self._service.load_backbone_model(
                     backbone_config,
-                    progress_callback=self.update_progress,
-                    log_callback=self.log
+                    progress_callback=lambda step, total, msg: sync_progress_callback(
+                        int((step + 1) / total * 100), msg
+                    ),
+                    log_callback=lambda level, msg: sync_log_callback(level, msg)
                 )
-                load_result['validation_from_pretrained'] = validation_result
+            
+            # Execute async operation
+            try:
+                loop = asyncio.get_event_loop()
+                load_result = loop.run_until_complete(async_load())
+            except RuntimeError:
+                # No event loop running, create new one
+                load_result = asyncio.run(async_load())
             
             return load_result
             
@@ -413,20 +415,34 @@ class BackboneOperationManager(OperationHandler):
         try:
             backbone_config = config.get('backbone', {})
             
-            # Generate model summary
-            self.update_progress(30, "Analyzing model architecture...")
-            summary_result = self._service.generate_model_summary(
-                backbone_config,
-                progress_callback=self.update_progress,
-                log_callback=self.log
-            )
+            # Create async wrapper for progress and log callbacks
+            def sync_progress_callback(progress, message):
+                self.update_progress(progress, message)
             
-            return {
-                'success': True,
-                'message': 'Model summary generated',
-                'summary': summary_result,
-                'backbone_config': backbone_config
-            }
+            def sync_log_callback(level, message):
+                self.log(message, level.lower())
+            
+            # Run async summary in sync context
+            import asyncio
+            
+            async def async_summary():
+                return await self._service.generate_model_summary(
+                    backbone_config,
+                    progress_callback=lambda step, total, msg: sync_progress_callback(
+                        int((step + 1) / total * 100), msg
+                    ),
+                    log_callback=lambda level, msg: sync_log_callback(level, msg)
+                )
+            
+            # Execute async operation
+            try:
+                loop = asyncio.get_event_loop()
+                summary_result = loop.run_until_complete(async_summary())
+            except RuntimeError:
+                # No event loop running, create new one
+                summary_result = asyncio.run(async_summary())
+            
+            return summary_result
             
         except Exception as e:
             return {'success': False, 'message': f'Service summary failed: {e}'}

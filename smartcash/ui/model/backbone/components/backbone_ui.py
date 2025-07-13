@@ -126,7 +126,7 @@ def create_backbone_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> Dic
         show_logs=True,
         collapsible=True
     )
-    ui_components['operation_container'] = operation_container['container']
+    ui_components['operation_container'] = operation_container  # Store full container object
     ui_components['containers']['operation'] = operation_container
     
     # === 6. Create Footer Container ===
@@ -154,7 +154,7 @@ def create_backbone_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> Dic
         ui_components['form_container'],
         ui_components['action_container'],
         ui_components['summary_container'],  # Config summary panel here
-        ui_components['operation_container'],
+        ui_components['operation_container']['container'],  # Use the widget part for layout
         ui_components['footer_container']
     ]
     

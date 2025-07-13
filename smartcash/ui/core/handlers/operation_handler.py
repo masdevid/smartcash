@@ -677,8 +677,17 @@ class OperationHandler(BaseHandler):
                 # Get module name for namespacing
                 namespace = getattr(self, '_module_name', None)
                 
-                # Try new-style operation container with log method first
-                if hasattr(self._operation_container, 'log'):
+                # Try log_message method (standard operation container method)
+                if hasattr(self._operation_container, 'log_message'):
+                    self._operation_container.log_message(
+                        message=message, 
+                        level=level,
+                        namespace=namespace
+                    )
+                    return
+                
+                # Try new-style operation container with log method 
+                elif hasattr(self._operation_container, 'log') and callable(getattr(self._operation_container, 'log')):
                     from smartcash.ui.components.log_accordion import LogLevel
                     level_map = {
                         'debug': LogLevel.DEBUG,
@@ -696,15 +705,6 @@ class OperationHandler(BaseHandler):
                     )
                     return
                     
-                # Fallback to old-style log_message method
-                elif hasattr(self._operation_container, 'log_message'):
-                    self._operation_container.log_message(
-                        message=message, 
-                        level=level,
-                        namespace=namespace
-                    )
-                    return
-                    
             except Exception as e:
                 # If operation container fails, fall back to logger
                 self.logger.error(f"Error logging to operation container: {e}")
@@ -715,7 +715,12 @@ class OperationHandler(BaseHandler):
             log_func = getattr(self.logger, level)
         else:
             log_func = self.logger.info
-        log_func(message)
+        
+        # Ensure log_func is callable before calling
+        if callable(log_func):
+            log_func(message)
+        else:
+            self.logger.info(message)
     
     def reset_progress(self) -> None:
         """Reset progress tracking to initial state."""

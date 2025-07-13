@@ -112,7 +112,7 @@ BUTTON_CONFIG = {
     },
     'build': {
         'text': '🏗️ Build Model',
-        'style': 'primary',
+        'style': 'success',
         'tooltip': 'Build backbone architecture with current configuration',
         'order': 2
     },

@@ -33,6 +33,14 @@ class BackboneService:
         self.model_builder = None
         self._current_backbone = None
         self._current_config = None
+    
+    async def _safe_callback(self, callback, *args):
+        """Safely call callback, handling both sync and async functions."""
+        if callback:
+            if asyncio.iscoroutinefunction(callback):
+                await callback(*args)
+            else:
+                callback(*args)
         
     async def validate_backbone_config(self, 
                                      config: Dict[str, Any], 
@@ -54,38 +62,31 @@ class BackboneService:
             total_steps = len(steps)
             
             # Step 1: Validate configuration format
-            if progress_callback:
-                await progress_callback(0, total_steps, steps[0])
-            if log_callback:
-                await log_callback("INFO", "Starting backbone configuration validation")
+            await self._safe_callback(progress_callback, 0, total_steps, steps[0])
+            await self._safe_callback(log_callback, "INFO", "Starting backbone configuration validation")
             
             validation_result = self._validate_config_format(config)
             await asyncio.sleep(0.5)  # Simulate processing
             
             # Step 2: Check backbone compatibility  
-            if progress_callback:
-                await progress_callback(1, total_steps, steps[1])
-            if log_callback:
-                await log_callback("INFO", f"Checking compatibility for {config.get('backbone_type', 'unknown')}")
+            await self._safe_callback(progress_callback, 1, total_steps, steps[1])
+            await self._safe_callback(log_callback, "INFO", f"Checking compatibility for {config.get('backbone_type', 'unknown')}")
             
             compatibility_result = await self._check_backbone_compatibility(config)
             validation_result.update(compatibility_result)
             await asyncio.sleep(0.5)
             
             # Step 3: Complete validation
-            if progress_callback:
-                await progress_callback(2, total_steps, steps[2])
-            if log_callback:
-                status = "SUCCESS" if validation_result['valid'] else "ERROR"
-                message = SUCCESS_MESSAGES['validation_success'] if validation_result['valid'] else "Validation failed"
-                await log_callback(status, message)
+            await self._safe_callback(progress_callback, 2, total_steps, steps[2])
+            status = "SUCCESS" if validation_result['valid'] else "ERROR"
+            message = SUCCESS_MESSAGES['validation_success'] if validation_result['valid'] else "Validation failed"
+            await self._safe_callback(log_callback, status, message)
             
             return validation_result
             
         except Exception as e:
             self.logger.error(f"Validation error: {e}")
-            if log_callback:
-                await log_callback("ERROR", f"Validation failed: {str(e)}")
+            await self._safe_callback(log_callback, "ERROR", f"Validation failed: {str(e)}")
             return {
                 'valid': False,
                 'error': str(e),
@@ -113,10 +114,8 @@ class BackboneService:
             total_steps = len(steps)
             
             # Step 1: Loading backbone model
-            if progress_callback:
-                await progress_callback(0, total_steps, steps[0])
-            if log_callback:
-                await log_callback("INFO", f"Loading {config.get('backbone_type')} backbone")
+            await self._safe_callback(progress_callback, 0, total_steps, steps[0])
+            await self._safe_callback(log_callback, "INFO", f"Loading {config.get('backbone_type')} backbone")
             
             backbone_type = config.get('backbone_type', 'cspdarknet')
             pretrained = config.get('pretrained', True)

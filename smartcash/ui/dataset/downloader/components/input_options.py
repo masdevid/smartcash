@@ -6,7 +6,7 @@ Deskripsi: Form input components untuk downloader dengan responsive layout
 import ipywidgets as widgets
 from typing import Dict, Any, Optional
 from smartcash.ui.utils.constants import COLORS, ICONS
-from smartcash.ui.dataset.downloader.services.colab_secrets import get_api_key_from_secrets, create_api_key_info_html
+from smartcash.ui.dataset.downloader.services import get_secret_manager
 
 
 def create_downloader_input_options(config: Optional[Dict[str, Any]] = None) -> widgets.VBox:
@@ -25,8 +25,9 @@ def create_downloader_input_options(config: Optional[Dict[str, Any]] = None) -> 
     roboflow_config = config.get('data', {}).get('roboflow', {})
     download_config = config.get('download', {})
     
-    # Auto-detect API key dari Colab secrets
-    detected_api_key = get_api_key_from_secrets()
+    # Cek API key dari secrets
+    secret_manager = get_secret_manager()
+    api_key = secret_manager.get_api_key()
     
     # === KOLOM KIRI: Dataset Info (Fixed Width) ===
     
@@ -58,11 +59,11 @@ def create_downloader_input_options(config: Optional[Dict[str, Any]] = None) -> 
     )
     
     # API Key input dengan auto-detection
-    api_key_value = detected_api_key or roboflow_config.get('api_key', '')
+    api_key_value = api_key or roboflow_config.get('api_key', '')
     api_key_input = widgets.Password(
         value=api_key_value,
         description='API Key:',
-        placeholder='🔑 Auto-detect dari Colab secrets' if detected_api_key else 'Masukkan API Key Roboflow',
+        placeholder='🔑 Auto-detect dari Colab secrets' if api_key else 'Masukkan API Key Roboflow',
         style={'description_width': '80px'},
         layout=widgets.Layout(width='100%', margin='3px 0')
     )
@@ -112,7 +113,10 @@ def create_downloader_input_options(config: Optional[Dict[str, Any]] = None) -> 
     
     # API key status info
     api_key_status = widgets.HTML(
-        create_api_key_info_html({'_api_key_source': 'colab_secret' if detected_api_key else 'manual_required', '_api_key_valid': bool(detected_api_key)}),
+        value=secret_manager.create_api_key_info_html({
+            'has_api_key': bool(api_key),
+            'is_valid': bool(api_key)  # Asumsikan valid jika ada key
+        }),
         layout=widgets.Layout(width='100%', margin='6px 0')
     )
     

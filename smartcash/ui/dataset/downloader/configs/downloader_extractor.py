@@ -36,8 +36,7 @@ def extract_downloader_config(ui_components: Dict[str, Any]) -> Dict[str, Any]:
             'file_naming': {
                 'uuid_format': True,
                 'naming_strategy': 'research_uuid',
-                'preserve_original': False,
-                'backup_before_rename': get_value('backup_checkbox', False)
+                'preserve_original': False
             },
             
             'local': {
@@ -69,8 +68,8 @@ def extract_downloader_config(ui_components: Dict[str, Any]) -> Dict[str, Any]:
             'parallel_workers': get_rename_workers(5000),  # Estimate 5k files
             'validate_consistency': True,
             'target_splits': ['train', 'valid', 'test'],
-            'file_patterns': ['*.jpg', '*.jpeg', '*.png', '*.bmp'],
-            'label_patterns': ['*.txt'],
+            'file_patterns': ['.jpg', '.jpeg', '.png', '.bmp'],
+            'label_patterns': ['.txt'],
             'progress_reporting': True
         },
         

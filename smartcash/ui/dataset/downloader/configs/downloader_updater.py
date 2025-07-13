@@ -134,18 +134,22 @@ def _apply_basic_defaults(ui_components: Dict[str, Any]) -> None:
 def update_api_key_status(ui_components: Dict[str, Any], api_key_info: Dict[str, Any]) -> None:
     """Update API key status display dengan info dari colab secrets"""
     try:
-        from smartcash.ui.dataset.downloader.services.colab_secrets import create_api_key_info_html
+        from smartcash.ui.dataset.downloader.services import get_secret_manager
         
+        secret_manager = get_secret_manager()
         api_key_status_widget = ui_components.get('api_key_status')
         if api_key_status_widget and hasattr(api_key_status_widget, 'value'):
-            api_key_status_widget.value = create_api_key_info_html(api_key_info)
-    except Exception:
+            api_key_status_widget.value = secret_manager.create_api_key_info_html(api_key_info)
+    except Exception as e:
+        logger.debug(f"Error updating API key status: {e}")
         pass  # Silent fail untuk widget update issues
 
 
 def validate_ui_inputs(ui_components: Dict[str, Any]) -> Dict[str, Any]:
     """Validate UI inputs dan return validation result"""
-    from smartcash.ui.dataset.downloader.services.validation_utils import validate_ui_inputs as validate_ui_inputs_central
+    from smartcash.ui.dataset.downloader.services import get_config_validator
+    
+    validator = get_config_validator()
     
     try:
         # Extract values untuk validation

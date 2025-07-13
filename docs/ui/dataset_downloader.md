@@ -24,13 +24,12 @@ smartcash/ui/dataset/downloader/
 │   ├── __init__.py
 │   ├── input_options.py     # Form input dan konfigurasi
 │   └── ui_components.py     # Komponen UI utama
-├── handlers/                # Penangan logika bisnis
+├── operations/             # Operasi bisnis
 │   ├── __init__.py
-│   ├── config_extractor.py  # Ekstraksi konfigurasi
-│   ├── config_handler.py    # Handler konfigurasi
-│   ├── config_updater.py    # Pembaruan konfigurasi
-│   ├── defaults.py          # Nilai default
-│   └── download_handler.py  # Handler download
+│   ├── manager.py          # Manajer operasi
+│   ├── download_operation.py  # Operasi download
+│   ├── check_operation.py     # Operasi pengecekan
+│   └── cleanup_operation.py   # Operasi pembersihan
 ├── utils/                   # Utilitas pendukung
 │   ├── backend_utils.py     # Fungsi backend
 │   ├── button_manager.py    # Manajemen tombol
@@ -60,44 +59,45 @@ smartcash/ui/dataset/downloader/
   - Tombol aksi (Download, Check, Cleanup)
   - Area konfirmasi operasi
 
-### 3. DownloadHandler
-- **Lokasi**: `handlers/download_handler.py`
-- **Fungsi**: Menangani logika download
+### 3. DownloaderOperationManager
+- **Lokasi**: `operations/manager.py`
+- **Fungsi**: Mengelola semua operasi downloader
 - **Fitur**:
-  - Validasi konfigurasi
-  - Konfirmasi operasi
-  - Manajemen progress
-  - Penanganan error
+  - Mengkoordinasikan operasi download, check, dan cleanup
+  - Manajemen status UI
+  - Penanganan error terpusat
+  - Integrasi dengan komponen UI
 
-### 4. Utilitas
-- **Lokasi**: `utils/`
-- **Fitur**:
-  - Manajemen kredensial
-  - Dialog interaktif
-  - Tracking progress
-  - Validasi input
+### 4. Operation Handlers
+- **Lokasi**: `operations/`
+- **Fungsi**: Menangani operasi spesifik
+- **Jenis Operasi**:
+  - `download_operation.py`: Operasi download dataset
+  - `check_operation.py`: Operasi pengecekan dataset
+  - `cleanup_operation.py`: Operasi pembersihan dataset
 
 ## Alur Kerja
 
 1. **Inisialisasi**
-   - Memuat konfigurasi yang tersimpan
-   - Membuat komponen UI
-   - Menyiapkan handler interaksi
+   - DownloaderUIModule memuat komponen UI
+   - DownloaderConfigHandler memuat konfigurasi
+   - DownloaderOperationManager diinisialisasi dengan komponen UI
 
 2. **Konfigurasi**
-   - Masukkan kredensial Roboflow
-   - Atur path penyimpanan
-   - Konfigurasi opsi download
+   - User mengisi form konfigurasi
+   - Input divalidasi oleh validation_utils
+   - Konfigurasi disimpan oleh DownloaderConfigHandler
 
-3. **Validasi**
-   - Verifikasi koneksi
-   - Cek dataset yang ada
-   - Konfirmasi operasi
+3. **Operasi**
+   - User memicu operasi (download/check/cleanup)
+   - DownloaderOperationManager menangani operasi yang sesuai
+   - Progress dan status ditampilkan di operation container
+   - Hasil operasi dilaporkan ke user
 
-4. **Eksekusi**
-   - Unduh dataset
-   - Ekstrak dan validasi
-   - Update status
+4. **Manajemen**
+   - User dapat memeriksa dataset yang sudah didownload
+   - User dapat membersihkan dataset yang tidak diperlukan
+   - Log aktivitas disimpan untuk keperluan audit
 
 ## Diagram
 

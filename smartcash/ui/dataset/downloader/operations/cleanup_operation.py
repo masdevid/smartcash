@@ -4,7 +4,7 @@ Deskripsi: Handler untuk operasi cleanup dataset dengan centralized error handli
 """
 
 from typing import Dict, Any, Optional, Callable
-from smartcash.ui.dataset.downloader.handlers.base_downloader_handler import BaseDownloaderHandler
+from smartcash.ui.dataset.downloader.operations.base_operation import BaseDownloaderHandler
 from smartcash.ui.core.errors.handlers import handle_ui_errors
 
 class CleanupOperationHandler(BaseDownloaderHandler):
@@ -29,8 +29,9 @@ class CleanupOperationHandler(BaseDownloaderHandler):
         """
         self.logger.info("🔍 Mencari file yang dapat dibersihkan")
         
-        from smartcash.ui.dataset.downloader.services.backend_utils import get_cleanup_targets
-        targets_result = get_cleanup_targets(self.logger)
+        from smartcash.ui.dataset.downloader.services import get_dataset_scanner
+        scanner = get_dataset_scanner()
+        targets_result = scanner.get_cleanup_targets()
         
         if not targets_result or 'summary' not in targets_result:
             self.logger.error("Gagal mendapatkan cleanup targets - respons tidak valid")
@@ -131,8 +132,10 @@ class CleanupOperationHandler(BaseDownloaderHandler):
     @handle_ui_errors(error_component_title="Backend Service Error", log_error=True)
     def _create_cleanup_service(self):
         """Create cleanup service."""
-        from smartcash.ui.dataset.downloader.services.backend_utils import create_backend_cleanup_service
-        return create_backend_cleanup_service(self.logger)
+        from smartcash.ui.dataset.downloader.services import get_dataset_scanner
+        scanner = get_dataset_scanner()
+        cleanup_service = scanner.create_cleanup_service()
+        return cleanup_service
         
     @handle_ui_errors(error_component_title="Summary Update Error", log_error=True)
     def _update_summary_container(self, result: Dict[str, Any], targets_result: Dict[str, Any]):

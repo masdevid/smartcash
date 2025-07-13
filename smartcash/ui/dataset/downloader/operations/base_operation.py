@@ -1,11 +1,12 @@
 """
-File: smartcash/ui/dataset/downloader/handlers/base_downloader_handler.py
-Description: Base handler for downloader module with centralized error handling
+File: smartcash/ui/dataset/downloader/operations/base_operation.py
+Description: Base operation handler for downloader module with centralized error handling
 """
 
 from typing import Dict, Any, Optional
 from smartcash.ui.core.handlers import BaseHandler
 from smartcash.ui.core.errors.handlers import handle_ui_errors
+
 
 class BaseDownloaderHandler(BaseHandler):
     """Base handler for downloader module with centralized error handling."""

@@ -24,14 +24,12 @@ smartcash/ui/pretrained_model/
 ├── components/             # Komponen UI
 │   ├── __init__.py
 │   └── ui_components.py    # Komponen antarmuka pengguna
-├── handlers/               # Penangan logika bisnis
+├── operations/             # Operasi bisnis
 │   ├── __init__.py
-│   ├── check_handler.py    # Pemeriksaan model
-│   ├── config_handler.py   # Manajemen konfigurasi
-│   ├── download_handler.py # Pengunduhan model
-│   ├── pretrained_handlers.py # Handler terpadu
-│   ├── reset_handler.py    # Reset konfigurasi
-│   └── status_handler.py   # Manajemen status
+│   ├── manager.py          # Manajer operasi
+│   ├── download_operation.py  # Operasi download model
+│   ├── check_operation.py     # Operasi pemeriksaan model
+│   └── reset_operation.py     # Operasi reset konfigurasi
 ├── services/               # Layanan backend
 │   ├── __init__.py
 │   ├── model_checker.py    # Pemeriksa model
@@ -59,20 +57,21 @@ smartcash/ui/pretrained_model/
   - Panel status dan log
   - Progress tracker
 
-### 3. Handlers
-- **Lokasi**: `handlers/`
+### 3. Operation Manager
+- **Lokasi**: `operations/manager.py`
+- **Fungsi**: Mengelola semua operasi model pretrained
 - **Fitur**:
-  - `download_handler.py`: Menangani proses pengunduhan
-  - `check_handler.py`: Memeriksa ketersediaan model
-  - `status_handler.py`: Mengelola status operasi
-  - `reset_handler.py`: Mengatur ulang konfigurasi
+  - Mengkoordinasikan operasi download, check, dan reset
+  - Manajemen status UI
+  - Penanganan error terpusat
+  - Integrasi dengan komponen UI
 
-### 4. Services
-- **Lokasi**: `services/`
+### 4. Operation Handlers
+- **Lokasi**: `operations/`
 - **Fitur**:
-  - `model_downloader.py`: Logika pengunduhan model
-  - `model_checker.py`: Verifikasi model
-  - `model_syncer.py`: Sinkronisasi model
+  - `download_operation.py`: Menangani logika pengunduhan model
+  - `check_operation.py`: Memeriksa ketersediaan dan integritas model
+  - `reset_operation.py`: Menangani reset konfigurasi model
 
 ## Alur Kerja
 

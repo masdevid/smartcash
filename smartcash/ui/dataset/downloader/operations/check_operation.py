@@ -4,7 +4,7 @@ Deskripsi: Handler untuk operasi check dataset dengan centralized error handling
 """
 
 from typing import Dict, Any, Optional
-from smartcash.ui.dataset.downloader.handlers.base_downloader_handler import BaseDownloaderHandler
+from smartcash.ui.dataset.downloader.operations.base_operation import BaseDownloaderHandler
 from smartcash.ui.core.errors.handlers import handle_ui_errors
 
 class CheckOperationHandler(BaseDownloaderHandler):
@@ -107,11 +107,53 @@ class CheckOperationHandler(BaseDownloaderHandler):
         from smartcash.dataset.downloader.dataset_scanner import create_dataset_scanner
         return create_dataset_scanner(self.logger)
     
+    @classmethod
+    @handle_ui_errors(error_component_title="UI Operation Error", log_error=True)
+    def display_check_results(cls, ui_components: Dict[str, Any], result: Dict[str, Any]) -> None:
+        """Display scan results in a clean format for UI components.
+        
+        Args:
+            ui_components: Dictionary of UI components
+            result: Dictionary containing scan results
+        """
+        summary_container = ui_components.get('summary_container')
+        if not summary_container:
+            return
+            
+        summary = result.get('summary', {})
+        
+        # Format HTML content
+        html_lines = [
+            "<div style='padding: 10px; background-color: #f0f8ff; border-radius: 5px; border-left: 5px solid #4682b4;'>",
+            "<h3>📊 Ringkasan Dataset</h3>",
+            f"<p>📂 Path: {result.get('dataset_path')}</p>",
+            f"<p>🖼️ Total Gambar: <b>{summary.get('total_images', 0):,}</b></p>",
+            f"<p>🏷️ Total Label: <b>{summary.get('total_labels', 0):,}</b>"
+        ]
+        
+        # Splits detail
+        splits = result.get('splits', {})
+        if splits:
+            html_lines.append("<h4>Detail per Split:</h4>")
+            html_lines.append("<ul>")
+            for split_name, split_data in splits.items():
+                if split_data.get('status') == 'success':
+                    img_count = split_data.get('images', 0)
+                    label_count = split_data.get('labels', 0)
+                    size_formatted = split_data.get('size_formatted', '0 B')
+                    html_lines.append(f"<li><b>{split_name}</b>: {img_count:,} gambar, {label_count:,} label ({size_formatted})</li>")
+            html_lines.append("</ul>")
+        
+        html_lines.append("</div>")
+        
+        # Update summary container
+        summary_container.clear_output()
+        summary_container.append_html("".join(html_lines))
+    
     @handle_ui_errors(error_component_title="UI Operation Error", log_error=True)
     def _display_check_results(self, result: Dict[str, Any]):
         """Display check results di UI."""
-        from smartcash.ui.dataset.downloader.handlers.utils import display_check_results
-        display_check_results(self.ui_components, result)
+        self.display_check_results(self.ui_components, result)
         
     @handle_ui_errors(error_component_title="Summary Update Error", log_error=True)
     def _update_summary_container(self, result: Dict[str, Any]):

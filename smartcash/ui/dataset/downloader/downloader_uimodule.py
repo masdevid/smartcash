@@ -5,19 +5,22 @@ Description: Dataset Downloader UIModule implementation using new core UIModule 
 This module refactors the dataset downloader to use the new UIModule architecture
 while preserving its unique form, backend integration flow, and existing functionality.
 """
-
 from typing import Dict, Any, Optional, List
 from datetime import datetime
 
-from smartcash.ui.core.ui_module import UIModule, SharedMethodRegistry, register_operation_method
-from smartcash.ui.core.ui_module_factory import create_template
+# Core UI imports
+from smartcash.ui.core.ui_module import UIModule, register_operation_method, SharedMethodRegistry
 from smartcash.ui.logger import get_module_logger
-from smartcash.ui.core.errors.handlers import handle_ui_errors
+from smartcash.ui.core.utils.log_suppression import suppress_ui_init_logs
 
-# Import existing downloader components and handlers
+# Downloader module imports
 from smartcash.ui.dataset.downloader.components.downloader_ui import create_downloader_ui
-from smartcash.ui.dataset.downloader.configs.downloader_config_handler import DownloaderConfigHandler
-from smartcash.ui.dataset.downloader.configs.downloader_defaults import get_default_downloader_config
+from smartcash.ui.dataset.downloader.configs.downloader_config_handler import (
+    DownloaderConfigHandler
+)
+from smartcash.ui.dataset.downloader.configs.downloader_defaults import (
+    get_default_downloader_config
+)
 from smartcash.ui.dataset.downloader.operations.manager import DownloaderOperationManager
 from smartcash.ui.dataset.downloader.services.downloader_service import DownloaderService
 
@@ -26,9 +29,10 @@ _downloader_uimodule: Optional[UIModule] = None
 
 def register_downloader_template() -> None:
     """Register Downloader module template with UIModuleFactory."""
-    from smartcash.ui.core.ui_module_factory import UIModuleFactory
+    from smartcash.ui.core.ui_module_factory import UIModuleFactory, ModuleTemplate
     
-    template = create_template(
+    # Create a template for the downloader module
+    template = ModuleTemplate(
         module_name="downloader",
         parent_module="dataset",
         default_config=get_default_downloader_config(),
@@ -57,7 +61,8 @@ def register_downloader_shared_methods() -> None:
     def validate_roboflow_config(workspace: str, project: str, version: str, api_key: str) -> Dict[str, Any]:
         """Validate Roboflow configuration parameters."""
         try:
-            from smartcash.ui.dataset.downloader.services.validation_utils import validate_config
+            from smartcash.ui.dataset.downloader.services import get_config_validator
+            validator = get_config_validator()
             config = {
                 'data': {
                     'roboflow': {
@@ -68,16 +73,16 @@ def register_downloader_shared_methods() -> None:
                     }
                 }
             }
-            return validate_config(config)
+            return validator.validate_config(config)
         except Exception as e:
             return {"valid": False, "error": str(e)}
     
     def get_existing_dataset_count() -> Dict[str, Any]:
         """Get count of existing dataset files."""
         try:
-            from smartcash.ui.dataset.downloader.services.backend_utils import get_existing_dataset_count
-            logger = get_module_logger("smartcash.ui.dataset.downloader.shared")
-            count = get_existing_dataset_count(logger)
+            from smartcash.ui.dataset.downloader.services import get_dataset_scanner
+            scanner = get_dataset_scanner()
+            count = scanner.get_existing_dataset_count()
             return {"success": True, "count": count}
         except Exception as e:
             return {"success": False, "error": str(e), "count": 0}
@@ -85,8 +90,9 @@ def register_downloader_shared_methods() -> None:
     def get_api_key_from_secrets() -> Dict[str, Any]:
         """Get API key from Colab secrets."""
         try:
-            from smartcash.ui.dataset.downloader.services.colab_secrets import get_api_key_from_secrets
-            api_key = get_api_key_from_secrets()
+            from smartcash.ui.dataset.downloader.services import get_secret_manager
+            secret_manager = get_secret_manager()
+            api_key = secret_manager.get_api_key()
             return {"success": True, "api_key": api_key}
         except Exception as e:
             return {"success": False, "error": str(e), "api_key": None}
@@ -109,7 +115,17 @@ def register_downloader_shared_methods() -> None:
     local_logger.debug("🔗 Registered Downloader shared methods")
 
 class DownloaderUIModule(UIModule):
-    """Dataset Downloader UIModule with enhanced functionality."""
+    """
+    Dataset Downloader UIModule following the backbone module pattern.
+    
+    Features:
+    - 📥 Dataset download operations
+    - 🔍 Dataset verification and validation
+    - 🧹 Cleanup operations
+    - 📊 Progress tracking and logging integration
+    - 🛡️ Error handling with user feedback
+    - 🎯 Button management with disable/enable functionality
+    """
     
     def __init__(self, config: Dict[str, Any] = None):
         """Initialize Downloader UIModule.
@@ -117,26 +133,39 @@ class DownloaderUIModule(UIModule):
         Args:
             config: Downloader configuration (optional, uses defaults if not provided)
         """
-        # Get default config and merge with provided config
-        default_config = get_default_downloader_config()
-        if config:
-            default_config.update(config)
+        # Initialize instance variables first
+        self._ui_components = {}
+        self._operation_manager = None
+        self._downloader_service = None
+        self._config_handler = None
         
+        # Initialize with module metadata
         super().__init__(
-            module_name="downloader",
-            parent_module="dataset", 
-            config=default_config,
+            module_name='downloader',
+            parent_module='dataset',
+            config=config or {},
             auto_initialize=False
         )
         
         # Initialize logger
         self.logger = get_module_logger("smartcash.ui.dataset.downloader")
         
-        # Downloader-specific attributes
-        self._operation_manager: Optional[DownloaderOperationManager] = None
-        self._config_handler: Optional[DownloaderConfigHandler] = None
-        self._downloader_service: Optional[DownloaderService] = None
+        # Initialize configuration handler
+        self._initialize_config_handler()
         
+    def log(self, message: str, level: str = 'info') -> None:
+        """Log a message with the specified log level.
+        
+        Args:
+            message: The message to log
+            level: Log level ('debug', 'info', 'warning', 'error', 'critical')
+        """
+        log_method = getattr(self.logger, level.lower(), self.logger.info)
+        log_method(message)
+        
+        self.logger.debug("✅ DownloaderUIModule initialized")
+        
+    @suppress_ui_init_logs(duration=3.0)
     def initialize(self, config: Dict[str, Any] = None) -> 'DownloaderUIModule':
         """Initialize Downloader module with backend service integration.
         
@@ -145,76 +174,65 @@ class DownloaderUIModule(UIModule):
             
         Returns:
             Self for method chaining
+            
+        Raises:
+            RuntimeError: If initialization fails
         """
-        self.logger.info("🔄 Starting DownloaderUIModule initialization...")
+        self.logger.info("🔄 Initializing Downloader module...")
         
         try:
             # Update config if provided
             if config:
-                self.logger.debug("Updating config with provided values")
-                self.update_config(**config)
+                self.logger.debug("Merging provided configuration")
+                self.update_config(config)
             
-            # Step 1: Create UI components
-            self.logger.info("🔧 Creating UI components...")
-            self._create_ui_components()
-            self.logger.info("✅ UI components created")
-            
-            # Step 2: Setup downloader service
-            self.logger.info("🛠 Setting up downloader service...")
-            self._setup_downloader_service()
-            self.logger.info("✅ Downloader service setup complete")
-            
-            # Step 3: Setup operation manager
-            self.logger.info("⚙️ Setting up operation manager...")
+            # Initialize components in proper order
+            self._ui_components = self._create_ui_components()
+            self._initialize_config_handler()
             self._setup_operation_manager()
-            self.logger.info("✅ Operation manager setup complete")
+            self._setup_downloader_service()
             
-            # Step 4: Setup config handler
-            self.logger.info("⚙️ Setting up config handler...")
-            self._setup_config_handler()
-            self.logger.info("✅ Config handler setup complete")
-            
-            # Step 5: Register operations
-            self.logger.info("📝 Registering operations...")
+            # Register operations and set up handlers
             self._register_operations()
-            self.logger.info("✅ Operations registered")
-            
-            # Step 6: Inject shared methods
-            self.logger.info("🔌 Injecting shared methods...")
-            SharedMethodRegistry.inject_methods(self, category="operations")
-            self.logger.info("✅ Shared methods injected")
-            
-            # Step 7: Setup event handlers
-            self.logger.info("🖱 Setting up event handlers...")
             self._setup_event_handlers()
-            self.logger.info("✅ Event handlers set up")
             
-            # Step 8: Call parent initialization
-            self.logger.info("🔄 Initializing parent UIModule...")
+            # Initialize parent
             super().initialize()
+            
+            # Log initialization completion to operation container
+            self._log_initialization_complete()
             
             # Mark as initialized
             self._is_initialized = True
             self._initialization_error = None
             
-            # Update status to show module is ready
-            self._update_status("Downloader module initialized - ready for dataset operations", "success")
-            
-            self.logger.info("✅ DownloaderUIModule initialized successfully")
+            self.logger.info("✅ Downloader module initialized successfully")
+            return self
             
         except Exception as e:
-            import traceback
-            tb = traceback.format_exc()
-            error_msg = f"❌ Failed to initialize DownloaderUIModule: {str(e)}\n\n{tb}"
-            self.logger.error(error_msg)
+            error_msg = f"Failed to initialize Downloader module: {str(e)}"
+            self.logger.error(error_msg, exc_info=True)
+            self._initialization_error = str(e)
             self._is_initialized = False
-            self._initialization_error = error_msg
             self._update_status(f"Initialization failed: {str(e)}", "error")
+            raise RuntimeError(error_msg) from e
+    
+    def _log_initialization_complete(self) -> None:
+        """Log initialization completion to operation container."""
+        try:
+            if self._operation_manager and hasattr(self._operation_manager, 'log'):
+                self._operation_manager.log("✅ Downloader module initialized successfully", 'info')
+                self._operation_manager.log("📥 Ready for dataset download operations", 'info')
+                
+                # Log available operations
+                if hasattr(self._operation_manager, 'get_operations'):
+                    operations = self._operation_manager.get_operations()
+                    self._operation_manager.log(f"📋 Available operations: {', '.join(operations.keys())}", 'info')
+                    
+            self.logger.debug("✅ Initialization complete logs sent to operation container")
             
-            # Re-raise the exception to be caught by the caller
-            raise RuntimeError(f"Failed to initialize DownloaderUIModule: {str(e)}") from e
-        
-        return self
+        except Exception as e:
+            self.logger.warning(f"Failed to log initialization complete: {e}")
     
     def get_main_widget(self):
         """Get the main widget for display."""
@@ -243,112 +261,74 @@ class DownloaderUIModule(UIModule):
             self.logger.error(f"❌ Error getting main widget: {e}")
             return None
     
-    def _create_ui_components(self) -> None:
+    def _create_ui_components(self) -> Dict[str, Any]:
         """Create and register UI components."""
         try:
-            # 1. Create UI components using existing function
-            ui_components = create_downloader_ui(self.get_config())
+            self.logger.info("🛠️ Creating UI components...")
             
-            # Debug: Print detailed info about ui_components
-            self.logger.info("🔍 Detailed UI components structure:")
-            for key, value in ui_components.items():
-                if key == 'config':
-                    self.logger.info(f"  - {key}: {type(value).__name__} (keys: {list(value.keys()) if hasattr(value, 'keys') else 'N/A'})")
-                else:
-                    self.logger.info(f"  - {key}: {type(value).__name__}")
+            # Initialize UI components dictionary
+            ui_components = {}
+            registered_components = set()
             
-            # 2. Store the main container reference
-            if 'main_container' in ui_components:
-                self._main_container = ui_components['main_container']
-            elif 'ui' in ui_components and hasattr(ui_components['ui'], 'container'):
-                self._main_container = ui_components['ui'].container
+            # 1. Create operation container first (needed for logging during other component creation)
+            from smartcash.ui.components.operation_container import OperationContainer
+            operation_container = OperationContainer(
+                title="Download Operations",
+                show_header=True,
+                collapsible=True,
+                collapsed=False
+            )
             
-            # 3. Store the full components dictionary
-            self._ui_components = ui_components
+            if operation_container:
+                ui_components['operation_container'] = operation_container
+                self.register_component('operation_container', operation_container)
+                registered_components.add('operation_container')
+                self.logger.info("✅ Created operation container")
             
-            # 4. Register all components
-            for name, component in ui_components.items():
-                if component is not None:
-                    self.register_component(name, component)
+            # 2. Create the full downloader UI to get the action container and buttons
+            from smartcash.ui.dataset.downloader.components.downloader_ui import create_downloader_ui
             
-            self.logger.info("✅ UI components created and registered successfully")
-            all_component_keys = list(ui_components.keys())
-            self.logger.info(f"📦 UI components to register: {all_component_keys}")
+            # Create the downloader UI which includes the action container
+            downloader_ui = create_downloader_ui(config=self._config)
             
-            # 3. Extract and store action container
-            action_container = ui_components.get('action_container')
-            if action_container is not None:
-                self._action_container = action_container
-                self.logger.info("💾 Stored action container reference")
+            # Extract the action container and buttons from the UI
+            action_container = downloader_ui.get('action_container')
+            if action_container:
+                ui_components['action_container'] = action_container
+                self.register_component('action_container', action_container)
+                registered_components.add('action_container')
+                self.logger.debug("✅ Created action container with buttons")
                 
-                # Extract buttons from action container
-                buttons = {}
-                if hasattr(action_container, 'get') and callable(action_container.get):
-                    buttons = action_container.get('buttons', {})
-                
-                self.logger.info(f"🔘 Found buttons in action_container: {list(buttons.keys())}")
-                
-                # Add buttons directly to ui_components if not already present
-                for btn_id, button in buttons.items():
-                    if button is not None and btn_id not in ui_components:
-                        ui_components[btn_id] = button
-                        self.logger.info(f"✅ Added button to components: {btn_id}")
-            
-            # 4. Register all components
-            registered_components = {}
-            for component_type, component in ui_components.items():
-                try:
-                    # Skip None components
-                    if component is None:
-                        self.logger.warning(f"⚠️ Skipping None component: {component_type}")
-                        continue
-                    
-                    # Register the component
-                    self.register_component(component_type, component)
-                    
-                    # Verify registration
-                    registered = self.get_component(component_type)
-                    if registered is not None:
-                        registered_components[component_type] = component.__class__.__name__
-                        self.logger.info(f"✅ Registered: {component_type} ({component.__class__.__name__})")
-                        
-                        # Store direct reference for buttons
-                        if component_type in ['download_button', 'check_button', 'cleanup_button']:
-                            setattr(self, f'_{component_type}', component)
-                            self.logger.info(f"💾 Stored direct reference to {component_type}")
+                # Register individual buttons
+                for btn_id in ['download_button', 'check_button', 'cleanup_button']:
+                    if btn_id in downloader_ui and downloader_ui[btn_id] is not None:
+                        ui_components[btn_id] = downloader_ui[btn_id]
+                        self.register_component(btn_id, downloader_ui[btn_id])
+                        registered_components.add(btn_id)
+                        self.logger.debug(f"✅ Registered button: {btn_id}")
                     else:
-                        self.logger.error(f"❌ Failed to verify registration of: {component_type}")
-                        
-                except Exception as e:
-                    self.logger.error(f"❌ Error registering component {component_type}: {str(e)}", exc_info=True)
+                        self.logger.warning(f"⚠️ Button not found in downloader UI: {btn_id}")
             
-            # 5. Verify all required buttons are registered and valid
+            # 3. Extract and register any additional components from downloader_ui
+            for comp_name, comp in downloader_ui.items():
+                if comp_name not in ui_components and comp is not None:
+                    ui_components[comp_name] = comp
+                    self.register_component(comp_name, comp)
+                    registered_components.add(comp_name)
+                    self.logger.debug(f"✅ Registered component: {comp_name}")
+            
+            # 4. Verify all required buttons are registered and valid
             button_references = {}
             for btn_id in ['download_button', 'check_button', 'cleanup_button']:
-                # Try to get button from multiple sources
-                btn = (
-                    self.get_component(btn_id) or 
-                    getattr(self, f'_{btn_id}', None) or 
-                    getattr(self, btn_id, None) or
-                    (action_container and hasattr(action_container, 'get') and action_container.get('buttons', {}).get(btn_id))
-                )
-                
-                if btn is not None:
-                    # Ensure it's a valid button widget
-                    if not hasattr(btn, 'on_click'):
-                        self.logger.error(f"❌ {btn_id} is not a valid button (missing on_click)")
-                        continue
-                        
-                    # Store the reference
+                btn = self.get_component(btn_id)
+                if btn is not None and hasattr(btn, 'on_click'):
                     button_references[btn_id] = btn
                     setattr(self, f'_{btn_id}', btn)
-                    self.register_component(btn_id, btn)
-                    
                     self.logger.info(f"✅ Verified button: {btn_id} ({type(btn).__name__})")
                 else:
-                    self.logger.error(f"❌ Button not found: {btn_id}")
+                    self.logger.error(f"❌ Button not found or invalid: {btn_id}")
             
-            # 6. Log final status
+            # 5. Log final status
             if len(button_references) == 3:
                 self.logger.info("🎉 Successfully registered all buttons!")
             else:
@@ -356,73 +336,108 @@ class DownloaderUIModule(UIModule):
             
             self.logger.info(f"📊 Total registered components: {len(registered_components)}")
             
-            # 7. Return the UI components for use by other methods
+            # 6. Store the UI components for use by other methods
+            self._ui_components = ui_components
+            
+            # 9. Return the UI components for use by other methods
             return ui_components
             
         except Exception as e:
             self.logger.error(f"❌ Failed to create UI components: {e}", exc_info=True)
             raise
+    
+    def _initialize_config_handler(self) -> None:
+        """Initialize the configuration handler with defaults and UI components.
+        
+        This method sets up the configuration handler with default values and any
+        provided configuration, then initializes it with the current UI components.
+        
+        Raises:
+            RuntimeError: If configuration handler initialization fails
+        """
+        try:
+            self.logger.debug("🔄 Initializing configuration handler...")
+            
+            # Get default config
+            default_config = get_default_downloader_config()
+            
+            # Create config handler with merged config
+            self._config_handler = DownloaderConfigHandler(
+                module_name='downloader',
+                parent_module='dataset',
+                ui_components=self._ui_components or {},
+                config=self._config or {},
+                use_shared_config=True
+            )
+            
+            # Load and validate config
+            config = self._config_handler.load_config()
+            self._config = self._config_handler.merge_config(default_config, config)
+            
+            # Update config in handler
+            self._config_handler.update_config(self._config)
+            
+            self.logger.debug("✅ Configuration handler initialized")
             
         except Exception as e:
-            self.logger.error(f"❌ Failed to create UI components: {e}")
-            raise
-    
+            error_msg = f"❌ Failed to initialize configuration handler: {str(e)}"
+            self.logger.error(error_msg, exc_info=True)
+            self.log(error_msg, 'error')
+            raise RuntimeError(error_msg) from e
+
     def _setup_downloader_service(self) -> None:
-        """Setup downloader service for backend integration."""
+        """Setup downloader service for backend integration.
+        
+        This method initializes the DownloaderService instance that handles
+        communication with the backend downloader functionality.
+        
+        Raises:
+            RuntimeError: If downloader service initialization fails
+        """
         try:
             self._downloader_service = DownloaderService(logger=self.logger)
             self.logger.debug("🔧 Setup downloader service")
             
         except Exception as e:
-            self.logger.error(f"❌ Failed to setup downloader service: {e}")
-            raise
-    
+            error_msg = f"❌ Failed to setup downloader service: {e}"
+            self.logger.error(error_msg, exc_info=True)
+            raise RuntimeError(error_msg) from e
+            
     def _setup_operation_manager(self) -> None:
-        """Setup operation manager for downloader operations."""
+        """Setup the operation manager for handling download operations.
+        
+        This method initializes the DownloaderOperationManager which handles
+        the execution of download, check, and cleanup operations.
+        
+        Raises:
+            RuntimeError: If operation manager initialization fails
+        """
+        if not hasattr(self, '_ui_components') or not self._ui_components:
+            error_msg = "UI components not available for operation manager"
+            self.logger.error(error_msg)
+            raise RuntimeError(error_msg)
+            
         try:
-            # Get operation container instance directly
-            operation_container = self.get_component("operation_container")
+            self.logger.info("Initializing operation manager...")
             
-            # Get all UI components first
-            all_components = {name: self.get_component(name) for name in self.list_components()}
+            operation_container = self._ui_components.get('operation_container')
+            if not operation_container:
+                raise ValueError("Operation container not found in UI components")
             
-            # Create operation manager with UI components
             self._operation_manager = DownloaderOperationManager(
                 config=self.get_config(),
                 operation_container=operation_container
             )
             
-            # Store UI components reference in operation manager
-            if hasattr(self._operation_manager, '_ui_components'):
-                self._operation_manager._ui_components.update(all_components)
-            else:
-                self._operation_manager._ui_components = all_components
-            
-            # Initialize the operation manager
-            self._operation_manager.initialize()
-            
-            # Register button callbacks if the method exists
-            if hasattr(self._operation_manager, 'register_button_callbacks'):
-                self._operation_manager.register_button_callbacks()
-            
-            self.logger.debug("⚙️ Setup operation manager with UI components")
+            self.logger.info("✅ Operation manager initialized")
             
         except Exception as e:
-            self.logger.error(f"❌ Failed to setup operation manager: {e}")
-            raise
-    
-    def _setup_config_handler(self) -> None:
-        """Setup config handler for downloader configurations."""
-        try:
-            self._config_handler = DownloaderConfigHandler()
-            self.logger.debug("🔧 Setup config handler")
-            
-        except Exception as e:
-            self.logger.error(f"❌ Failed to setup config handler: {e}")
-            raise
+            error_msg = f"Failed to initialize operation manager: {e}"
+            self.logger.error(error_msg, exc_info=True)
+            raise RuntimeError(error_msg) from e
     
     def _register_operations(self) -> None:
-        """Register downloader operations."""
+        """Register downloader operations with the operation manager."""
         try:
             if not self._operation_manager:
                 raise ValueError("Operation manager not initialized")
@@ -1032,6 +1047,14 @@ class DownloaderUIModule(UIModule):
             DownloaderService instance or None
         """
         return self._downloader_service
+    
+    def get_ui_components(self) -> Dict[str, Any]:
+        """Get UI components dictionary.
+        
+        Returns:
+            UI components dictionary
+        """
+        return self._ui_components or {}
 
 def create_downloader_uimodule(config: Dict[str, Any] = None, 
                               auto_initialize: bool = True,
@@ -1113,7 +1136,7 @@ def reset_downloader_uimodule() -> None:
     local_logger = get_module_logger("smartcash.ui.dataset.downloader.reset")
     local_logger.debug("🔄 Reset global Downloader UIModule instance")
 
-def initialize_downloader_ui(config: Dict[str, Any] = None):
+def initialize_downloader_ui(config: Dict[str, Any] = None, display: bool = True):
     """Initialize and display the downloader UI.
     
     This is the main entry point for the downloader UI, typically called from a notebook cell.
@@ -1121,23 +1144,56 @@ def initialize_downloader_ui(config: Dict[str, Any] = None):
     
     Args:
         config: Optional configuration dictionary
+        display: Whether to display the UI immediately (True) or return components (False)
         
     Returns:
-        The initialized downloader module instance
+        If display=True: Returns the initialized downloader module instance
+        If display=False: Returns a dictionary with module and components
     """
-    from IPython.display import display
-    
-    # Create and initialize the downloader module
-    module = create_downloader_uimodule(config=config, auto_initialize=True)
-    
-    # Display the UI if it has a main widget
-    if hasattr(module, 'get_main_widget'):
-        widget = module.get_main_widget()
-        if widget is not None:
-            display(widget)
-            return module
-    
-    return module
+    try:
+        # Create and initialize the downloader module
+        module = create_downloader_uimodule(config=config, auto_initialize=True)
+        
+        if display:
+            # Display mode: show UI and return module
+            try:
+                from IPython.display import display as ipython_display
+                
+                # Display the UI if it has a main widget
+                if hasattr(module, 'get_main_widget'):
+                    widget = module.get_main_widget()
+                    if widget is not None:
+                        ipython_display(widget)
+                
+                return module
+                
+            except ImportError:
+                # Not in IPython environment, just return module
+                return module
+        else:
+            # Return components mode: return dictionary with module and components
+            return {
+                'success': True,
+                'module': module,
+                'ui_components': module.get_ui_components(),
+                'status': module.get_downloader_status()
+            }
+            
+    except Exception as e:
+        if display:
+            # In display mode, log error and return None
+            logger = get_module_logger("smartcash.ui.dataset.downloader.init")
+            logger.error(f"Failed to initialize downloader UI: {e}")
+            return None
+        else:
+            # In components mode, return error dictionary
+            return {
+                'success': False,
+                'error': str(e),
+                'module': None,
+                'ui_components': {},
+                'status': {}
+            }
 
 # Note: Template and shared methods are registered on-demand in create_downloader_uimodule()
 # to avoid logs during import

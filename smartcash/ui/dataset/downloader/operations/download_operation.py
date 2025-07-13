@@ -4,7 +4,7 @@ Deskripsi: Handler untuk operasi download dataset dengan centralized error handl
 """
 
 from typing import Dict, Any, Optional
-from smartcash.ui.dataset.downloader.handlers.base_downloader_handler import BaseDownloaderHandler
+from smartcash.ui.dataset.downloader.operations.base_operation import BaseDownloaderHandler
 from smartcash.ui.core.errors.handlers import handle_ui_errors
 
 class DownloadOperationHandler(BaseDownloaderHandler):
@@ -101,8 +101,9 @@ class DownloadOperationHandler(BaseDownloaderHandler):
     @handle_ui_errors(error_component_title="Backend Service Error", log_error=True)
     def _create_backend_downloader(self, ui_config: Dict[str, Any]):
         """Create backend downloader service."""
-        from smartcash.ui.dataset.downloader.services.backend_utils import create_backend_downloader
-        return create_backend_downloader(ui_config, self.logger)
+        from smartcash.ui.dataset.downloader.services import get_dataset_scanner
+        scanner = get_dataset_scanner()
+        return scanner.create_downloader(ui_config)
     
     @handle_ui_errors(error_component_title="UI Operation Error", log_error=True)
     def _log_download_config(self, ui_config: Dict[str, Any]):

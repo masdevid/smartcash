@@ -151,23 +151,24 @@ def create_pretrained_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> D
     }
     
     # === 7. Create Main Container ===
+    # Combine form, action, summary, and operation into the form container slot
+    combined_body = widgets.VBox([
+        ui_components['containers']['form']['container'],
+        ui_components['action_container']['container'],
+        ui_components['containers']['summary'].container,
+        ui_components['containers']['operation']['container']
+    ])
+    
     main_container = create_main_container(
-        header=ui_components['containers']['header']['container'],
-        body=widgets.VBox([
-            ui_components['containers']['form']['container'],
-            ui_components['action_container']['container'],
-            ui_components['containers']['summary'].container,
-            ui_components['containers']['operation']['container']
-        ]),
-        footer=ui_components['containers']['footer']['container'],
-        container_config={
-            'margin': '0 auto',
-            'max_width': '1200px',
-            'padding': '10px',
-            'border': '1px solid #e0e0e0',
-            'border_radius': '5px',
-            'box_shadow': '0 1px 3px rgba(0,0,0,0.1)'
-        }
+        header_container=ui_components['containers']['header']['container'],
+        form_container=combined_body,
+        footer_container=ui_components['containers']['footer']['container'],
+        margin='0 auto',
+        max_width='1200px',
+        padding='10px',
+        border='1px solid #e0e0e0',
+        border_radius='5px',
+        box_shadow='0 1px 3px rgba(0,0,0,0.1)'
     )
     
     # Store main UI references

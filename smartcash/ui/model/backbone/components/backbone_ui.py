@@ -149,23 +149,29 @@ def create_backbone_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> Dic
     ui_components['containers']['footer'] = footer_container
     
     # === 7. Create Main Container ===
-    container_layout = [
-        ui_components['header_container'],
+    # Combine form, action, summary, and operation into the form container slot
+    combined_body = widgets.VBox([
         ui_components['form_container'],
-        ui_components['action_container'],
-        ui_components['summary_container'],  # Config summary panel here
-        ui_components['operation_container']['container'],  # Use the widget part for layout
-        ui_components['footer_container']
-    ]
+        ui_components['action_container']['container'],
+        ui_components['summary_container'].container,
+        ui_components['operation_container']['container']
+    ])
     
     main_container = create_main_container(
-        containers=container_layout,
-        title=f"{UI_CONFIG['title']} - Configuration Interface"
+        header_container=ui_components['header_container'],
+        form_container=combined_body,
+        footer_container=ui_components['footer_container'],
+        margin='0 auto',
+        max_width='1200px',
+        padding='10px',
+        border='1px solid #e0e0e0',
+        border_radius='5px',
+        box_shadow='0 1px 3px rgba(0,0,0,0.1)'
     )
-    ui_components['main_container'] = main_container
     
-    # Add reference to main UI for display
-    ui_components['ui'] = main_container
+    # Store main UI references
+    ui_components['ui'] = main_container.container
+    ui_components['main_container'] = main_container
     
     return ui_components
 

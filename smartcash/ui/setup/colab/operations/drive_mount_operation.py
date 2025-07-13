@@ -50,18 +50,23 @@ class DriveMountOperation(OperationHandler):
         """
         try:
             # Get detailed environment information
-            from ..utils.env_detector import detect_environment_info
-            env_info = detect_environment_info()
-            env_type = self.config.get('environment', {}).get('type', 'local')
+            from ..utils.env_detector import detect_environment_info, _is_google_colab
             
-            if env_type != 'colab':
-                # Get runtime type with debug info
-                runtime_info = get_runtime_type()
-                
-                # Build detailed error message
+            # Check if running in Colab first
+            is_colab = _is_google_colab()
+            runtime_info = get_runtime_type()
+            
+            # If we're in Colab but config doesn't reflect that, update it
+            if is_colab and self.config.get('environment', {}).get('type') != 'colab':
+                if 'environment' not in self.config:
+                    self.config['environment'] = {}
+                self.config['environment']['type'] = 'colab'
+                self.logger.info("Updated environment type to 'colab' based on runtime detection")
+            
+            # If we're not in Colab, return error with debug info
+            if not is_colab:
                 error_msg = [
                     "Google Drive mounting is only available in Colab environment. ",
-                    f"Detected environment type: {env_type}",
                     f"Runtime type: {runtime_info.get('type')}",
                     f"GPU status: {runtime_info.get('gpu')}",
                     "\nEnvironment details:",
@@ -88,8 +93,7 @@ class DriveMountOperation(OperationHandler):
                     'error': '\n'.join(error_msg),
                     'environment_info': {
                         'detected_type': runtime_info.get('type'),
-                        'config_type': env_type,
-                        'is_colab': _is_google_colab(),
+                        'is_colab': is_colab,
                         'has_gpu': runtime_info.get('gpu') == 'available',
                         'debug': runtime_info.get('debug', {})
                     }

@@ -55,23 +55,56 @@ class ConfigSyncOperation(OperationHandler):
             
             # Check if COLAB_DATA_ROOT exists
             if not os.path.exists(COLAB_DATA_ROOT):
-                return {
-                    'success': False,
-                    'error': f'COLAB_DATA_ROOT does not exist: {COLAB_DATA_ROOT}'
-                }
+                os.makedirs(COLAB_DATA_ROOT, exist_ok=True)
+                self.log(f"Created COLAB_DATA_ROOT directory: {COLAB_DATA_ROOT}", 'info')
+            
+            # Ensure config directory exists
+            config_dir = Path('/content/smartcash/configs')
+            if not config_dir.exists():
+                self.log(f"Config directory not found at {config_dir}, creating...", 'warning')
+                try:
+                    config_dir.mkdir(parents=True, exist_ok=True)
+                    self.log(f"Created config directory: {config_dir}", 'info')
+                    
+                    # Create a sample config file if none exist
+                    sample_config = config_dir / 'sample_config.yaml'
+                    if not sample_config.exists():
+                        sample_config.write_text("# Sample Configuration\n# Add your configuration here\n")
+                        self.log(f"Created sample config: {sample_config}", 'info')
+                except Exception as e:
+                    self.log(f"Error creating config directory: {str(e)}", 'error')
+                    return {
+                        'success': False,
+                        'error': f'Failed to create config directory: {str(e)}',
+                        'config_dir': str(config_dir),
+                        'cwd': os.getcwd(),
+                        'ls_content': os.listdir('/content/smartcash' if os.path.exists('/content/smartcash') else '/content')
+                    }
             
             if progress_callback:
                 progress_callback(25, "📋 Discovering available configs...")
             
             # Discover configs from repo
             available_configs = self.config_manager.discover_repo_configs()
-            self.log(f"Found {len(available_configs)} config templates", 'info')
+            self.log(f"Found {len(available_configs)} config templates in {config_dir}", 'info')
             
             if not available_configs:
-                return {
-                    'success': False,
-                    'error': 'No configuration templates found in repository'
-                }
+                # List directory contents for debugging
+                try:
+                    contents = os.listdir(config_dir)
+                    self.log(f"No config files found in {config_dir}. Contents: {contents}", 'warning')
+                    return {
+                        'success': False,
+                        'error': f'No configuration templates found in {config_dir}. Directory contents: {contents}',
+                        'config_dir': str(config_dir),
+                        'directory_contents': contents
+                    }
+                except Exception as e:
+                    return {
+                        'success': False,
+                        'error': f'Error reading config directory: {str(e)}',
+                        'config_dir': str(config_dir)
+                    }
             
             if progress_callback:
                 progress_callback(40, f"🔄 Syncing {len(available_configs)} configs...")

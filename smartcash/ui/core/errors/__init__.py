@@ -6,7 +6,7 @@ UI error components, and configurable error handling strategies.
 """
 from .enums import ErrorLevel
 from .handlers import CoreErrorHandler, get_error_handler
-from .decorators import handle_errors
+from smartcash.ui.core.decorators.error_decorators import handle_errors
 from .validators import (
     handle_component_validation,
     safe_component_operation,

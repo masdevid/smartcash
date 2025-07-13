@@ -9,7 +9,7 @@ This module provides comprehensive model evaluation capabilities with:
 - Total: 8 evaluation tests with complete metrics analysis
 """
 
-from .evaluation_uimodule import EvaluationUIModule
+from .evaluation_uimodule import EvaluationUIModule, initialize_evaluation_ui
 from .components.evaluation_ui import create_evaluation_ui
 from .constants import (
     UI_CONFIG,
@@ -30,7 +30,8 @@ __all__ = [
     'MODEL_COMBINATIONS',
     'EVALUATION_MATRIX',
     'EVALUATION_METRICS',
-    'create_evaluation_module'
+    'create_evaluation_module',
+    'initialize_evaluation_ui'
 ]
 
 def create_evaluation_module(config=None):

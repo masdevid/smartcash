@@ -187,18 +187,40 @@ class VisualizationUIModule(UIModule):
             raise
     
     def display(self):
-        """Display the visualization UI."""
-        main_container = self.get_component("main_container")
-        if main_container is None:
-            self.logger.warning("Main container not found in visualization module")
-            return None
-            
-        # Import display here to avoid circular imports
-        from IPython.display import display as ipy_display
+        """Display the visualization UI.
         
-        # Display the main container
-        ipy_display(main_container)
-        return main_container
+        Returns:
+            The main container widget if display is successful, None otherwise
+        """
+        try:
+            main_container = self.get_component("main_container")
+            if main_container is None:
+                self.logger.warning("Main container not found in visualization module")
+                return None
+                
+            # Import display here to avoid circular imports
+            from IPython.display import display as ipy_display
+            
+            try:
+                # Try displaying with the standard IPython display
+                ipy_display(main_container)
+                return main_container
+                
+            except TypeError as e:
+                if "unexpected keyword argument 'display'" in str(e):
+                    # Fallback for ZMQDisplayPublisher issue
+                    self.logger.debug("Using fallback display method due to ZMQDisplayPublisher issue")
+                    from IPython.core.display import publish_display_data
+                    publish_display_data(data={
+                        'text/plain': str(main_container),
+                        'text/html': main_container._repr_html_() if hasattr(main_container, '_repr_html_') else str(main_container)
+                    })
+                    return main_container
+                raise
+                
+        except Exception as e:
+            self.logger.error(f"Failed to display visualization UI: {e}", exc_info=True)
+            return None
 
 
 # Register the module template with the factory

@@ -195,26 +195,47 @@ def create_colab_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> Dict[s
         ui_components['summary_container'] = summary_container.container
     
     # === 5. OPERATION CONTAINER ===
-    # Progress tracking, dialog, and logging
+    # Progress tracking, dialog, and logging with standardized configuration
     operation_container = create_operation_container(
-        title=f"📊 {UI_CONFIG['module_name']} Status",
-        show_progress=True,
-        show_dialog=True,
-        show_logs=True,
-        log_module_name=UI_CONFIG['module_name'],
-        log_namespace_filter='colab'  # Filter logs for colab namespace only
+        show_progress=True,  # Enable progress tracking
+        show_dialog=True,    # Enable dialog functionality
+        show_logs=True,      # Enable logging
+        log_module_name=UI_CONFIG['module_name'],  # Module name for log filtering
+        log_namespace_filter='colab',  # Filter logs for colab namespace only
+        progress_levels='dual'  # Use dual-level progress tracking
     )
+    
+    # Store the main container reference
     ui_components['operation_container'] = operation_container['container']
     
-    # Store operation container functions for handlers
-    ui_components['log_message'] = operation_container['log_message']
-    ui_components['update_progress'] = operation_container['update_progress']
-    ui_components['show_dialog'] = operation_container['show_dialog']
-    ui_components['show_info_dialog'] = operation_container['show_info_dialog']
-    ui_components['clear_dialog'] = operation_container['clear_dialog']
-    ui_components['operation_container'] = operation_container.get('container')
-    ui_components['progress_tracker'] = operation_container.get('progress_tracker')
-    ui_components['log_accordion'] = operation_container.get('log_accordion')
+    # Store operation container components and functions for easy access
+    operation_components = {
+        # Core container
+        'container': operation_container['container'],
+        
+        # Progress tracking
+        'progress_tracker': operation_container['progress_tracker'],
+        'update_progress': operation_container['update_progress'],
+        
+        # Logging
+        'log_accordion': operation_container['log_accordion'],
+        'log_message': operation_container['log_message'],
+        
+        # Dialogs
+        'show_dialog': operation_container['show_dialog'],
+        'show_info_dialog': operation_container['show_info_dialog'],
+        'clear_dialog': operation_container['clear_dialog'],
+        'dialog_area': operation_container.get('dialog_area')
+    }
+    
+    # Update ui_components with all operation container components
+    ui_components.update(operation_components)
+    
+    # Log initialization
+    ui_components['log_message'](
+        f"{UI_CONFIG['module_name']} UI initialized successfully.",
+        level='info'
+    )
     
     # === 5.1 ENVIRONMENT CONTAINER ===
     # Environment information and status

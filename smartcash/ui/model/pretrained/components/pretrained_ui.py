@@ -85,12 +85,16 @@ def create_pretrained_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> D
     
     # Create form container with the widgets
     form_container = create_form_container(
-        form_rows=form_widgets['form_rows'],
         layout_type=LayoutType.COLUMN,
         container_margin="0",
         container_padding="16px",
         gap="12px"
     )
+    
+    # Add form rows to the container
+    for row in form_widgets['form_rows']:
+        for widget in row:
+            form_container['add_item'](widget)
     
     # Store references
     ui_components['containers']['form'] = form_container

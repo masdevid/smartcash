@@ -144,6 +144,8 @@ class OperationContainer(BaseUIComponent):
                 component_name=f"{self.component_name}_progress",
                 config=progress_config or ProgressConfig()
             )
+            # Initialize the progress tracker
+            self.progress_tracker.initialize()
             
             # Initialize progress bars based on the number of levels
             levels = {

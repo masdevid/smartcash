@@ -121,6 +121,9 @@ class TrainOperationManager(OperationHandler):
             if self._is_training:
                 return {'success': False, 'message': 'Training already in progress'}
             
+            # Clear logs from previous operations
+            self.clear_logs()
+            
             self.log("🚀 Starting model training...", 'info')
             # Note: Using disable_all_buttons for now, individual button control would need implementation
             self._button_states = self.disable_all_buttons("🚀 Training...")
@@ -172,6 +175,9 @@ class TrainOperationManager(OperationHandler):
             if not self._is_training:
                 return {'success': False, 'message': 'No training in progress'}
             
+            # Clear logs from previous operations
+            self.clear_logs()
+            
             self.log("🛑 Stopping training...", 'info')
             self._button_states = self.disable_all_buttons("🛑 Stopping...")
             
@@ -217,6 +223,9 @@ class TrainOperationManager(OperationHandler):
         try:
             if self._is_training:
                 return {'success': False, 'message': 'Training already in progress'}
+            
+            # Clear logs from previous operations
+            self.clear_logs()
             
             self.log("🔄 Resuming training from checkpoint...", 'info')
             # Note: Using disable_all_buttons for now, individual button control would need implementation
@@ -266,6 +275,9 @@ class TrainOperationManager(OperationHandler):
             Validation result dictionary
         """
         try:
+            # Clear logs from previous operations
+            self.clear_logs()
+            
             self.log("📊 Running model validation...", 'info')
             self._button_states = self.disable_all_buttons("📊 Validating...")
             

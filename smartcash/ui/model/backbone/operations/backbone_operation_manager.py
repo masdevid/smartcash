@@ -115,6 +115,9 @@ class BackboneOperationManager(OperationHandler):
         """
         button_states = None
         try:
+            # Clear logs from previous operations
+            self.clear_logs()
+            
             self.log("🔍 Starting backbone validation operation...", 'info')
             button_states = self.disable_all_buttons("⏳ Validating...")
             
@@ -162,6 +165,9 @@ class BackboneOperationManager(OperationHandler):
         """
         button_states = None
         try:
+            # Clear logs from previous operations
+            self.clear_logs()
+            
             self.log("🏗️ Starting backbone build operation...", 'info')
             button_states = self.disable_all_buttons("⏳ Building...")
             
@@ -209,6 +215,9 @@ class BackboneOperationManager(OperationHandler):
         """
         button_states = None
         try:
+            # Clear logs from previous operations
+            self.clear_logs()
+            
             self.log("📥 Starting backbone load operation...", 'info')
             button_states = self.disable_all_buttons("⏳ Loading...")
             
@@ -256,6 +265,9 @@ class BackboneOperationManager(OperationHandler):
         """
         button_states = None
         try:
+            # Clear logs from previous operations
+            self.clear_logs()
+            
             self.log("📊 Starting model summary generation...", 'info')
             button_states = self.disable_all_buttons("⏳ Generating...")
             

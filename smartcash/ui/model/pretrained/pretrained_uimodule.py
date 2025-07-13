@@ -110,12 +110,15 @@ class PretrainedUIModule(UIModule):
             self._config_handler = PretrainedConfigHandler(self.merged_config)
             
             # 2. Create UI components
-            self._ui_components = create_pretrained_ui(config=self.merged_config)
-            if not self._ui_components:
+            ui_result = create_pretrained_ui(config=self.merged_config)
+            if not ui_result:
                 raise RuntimeError("Failed to create UI components")
             
-            # 3. Create operation manager
-            operation_container = self._ui_components.get('operation')
+            # Store the nested ui_components instead of the flattened result
+            self._ui_components = ui_result.get('ui_components', {})
+            
+            # 3. Create operation manager  
+            operation_container = self._ui_components.get('containers', {}).get('operation')
             if operation_container:
                 self._operation_manager = PretrainedOperationManager(
                     config=self.merged_config,
@@ -150,7 +153,7 @@ class PretrainedUIModule(UIModule):
             # Try different access patterns for action container
             action_container = (
                 self._ui_components.get('action_container', {}) or 
-                self._ui_components.get('action', {})
+                self._ui_components.get('containers', {}).get('action', {})
             )
             buttons = action_container.get('buttons', {})
             
@@ -203,12 +206,13 @@ class PretrainedUIModule(UIModule):
         components = self.get_ui_components()
         
         # Try to get the main container from different possible locations
-        if 'ui_components' in components and 'ui' in components['ui_components']:
-            return components['ui_components']['ui']
         if 'ui' in components:
             return components['ui']
         if 'main_container' in components:
-            return components['main_container']
+            main_container = components['main_container']
+            if hasattr(main_container, 'container'):
+                return main_container.container
+            return main_container
             
         # If we get here, try to find the main container in the UI components
         if 'containers' in components:

@@ -123,6 +123,9 @@ class PretrainedOperationManager(OperationHandler):
             Operation result dictionary
         """
         try:
+            # Clear logs from previous operations
+            self.clear_logs()
+            
             self.log("🔄 Starting pretrained models download operation...", 'info')
             button_states = self.disable_all_buttons("⏳ Downloading...")
             
@@ -169,6 +172,9 @@ class PretrainedOperationManager(OperationHandler):
             Validation result dictionary
         """
         try:
+            # Clear logs from previous operations
+            self.clear_logs()
+            
             self.log("🔍 Validating existing models...", 'info')
             button_states = self.disable_all_buttons("⏳ Validating...")
             
@@ -215,6 +221,8 @@ class PretrainedOperationManager(OperationHandler):
             Cleanup result dictionary
         """
         try:
+            # Clear logs from previous operations
+            self.clear_logs()
             self.log("🧹 Starting cleanup operation...", 'info')
             button_states = self.disable_all_buttons("⏳ Cleaning up...")
             
@@ -261,6 +269,8 @@ class PretrainedOperationManager(OperationHandler):
             Refresh result dictionary
         """
         try:
+            # Clear logs from previous operations
+            self.clear_logs()
             self.log("🔄 Refreshing model status...", 'info')
             button_states = self.disable_all_buttons("⏳ Refreshing...")
             

@@ -79,15 +79,21 @@ def create_backbone_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> Dic
     ui_components['containers']['header'] = header_container
     
     # === 2. Create Form Container ===
-    form_fields = _create_backbone_form_fields(current_config)
+    form_widgets = _create_backbone_form_widgets(current_config)
     form_container = create_form_container(
-        title="Backbone Configuration",
-        fields=form_fields,
         layout_type=LayoutType.COLUMN,
-        collapsible=False
+        container_margin="0",
+        container_padding="16px",
+        gap="12px"
     )
+    
+    # Add form widgets to the container
+    for widget in form_widgets['widgets']:
+        form_container['add_item'](widget)
+    
     ui_components['form_container'] = form_container['container']
     ui_components['containers']['form'] = form_container
+    ui_components['widgets'].update(form_widgets['widget_refs'])
     
     # === 3. Create Action Container ===
     action_buttons = []
@@ -176,10 +182,9 @@ def create_backbone_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> Dic
     return ui_components
 
 
-def _create_backbone_form_fields(config: Dict[str, Any]) -> list:
-    """Create form fields for backbone configuration."""
+def _create_backbone_form_widgets(config: Dict[str, Any]) -> Dict[str, Any]:
+    """Create actual form widgets for backbone configuration."""
     backbone_config = config.get('backbone', {})
-    available_backbones = get_available_backbones()
     
     # Get current values
     current_backbone = backbone_config.get('model_type', 'efficientnet_b4')
@@ -189,107 +194,98 @@ def _create_backbone_form_fields(config: Dict[str, Any]) -> list:
     current_input_size = backbone_config.get('input_size', 640)
     current_num_classes = backbone_config.get('num_classes', 7)
     
-    form_fields = [
-        # Backbone Selection
-        {
-            'type': 'dropdown',
-            'key': 'backbone_type',
-            'label': 'Backbone Architecture',
-            'options': [
-                ('EfficientNet-B4 (Recommended)', 'efficientnet_b4'),
-                ('CSPDarknet (YOLOv5 Default)', 'cspdarknet')
-            ],
-            'value': current_backbone,
-            'description': 'Select the backbone architecture for feature extraction'
-        },
-        
-        # Pretrained Models
-        {
-            'type': 'checkbox',
-            'key': 'pretrained',
-            'label': 'Use Pretrained Weights',
-            'value': current_pretrained,
-            'description': 'Load pretrained weights for better initialization'
-        },
-        
-        # Feature Optimization
-        {
-            'type': 'checkbox',
-            'key': 'feature_optimization',
-            'label': 'Enable Feature Optimization',
-            'value': current_feature_opt,
-            'description': 'Apply feature optimization techniques for currency detection'
-        },
-        
-        # Mixed Precision
-        {
-            'type': 'checkbox',
-            'key': 'mixed_precision',
-            'label': 'Mixed Precision Training',
-            'value': current_mixed_precision,
-            'description': 'Use FP16 mixed precision for faster training and inference'
-        },
-        
-        # Input Size
-        {
-            'type': 'int_slider',
-            'key': 'input_size',
-            'label': 'Input Image Size',
-            'value': current_input_size,
-            'min': 320,
-            'max': 1280,
-            'step': 32,
-            'description': 'Input image size (must be multiple of 32)'
-        },
-        
-        # Number of Classes
-        {
-            'type': 'int_text',
-            'key': 'num_classes',
-            'label': 'Number of Classes',
-            'value': current_num_classes,
-            'description': 'Total number of detection classes (including background)'
-        },
-        
-        # Detection Layers (Read-only info)
-        {
-            'type': 'html',
-            'key': 'detection_info',
-            'label': 'Detection Configuration',
-            'value': '<div style="padding: 10px; background: #f5f5f5; border-radius: 4px;">'
-                    '<strong>Detection Layers:</strong> Banknote Detection<br>'
-                    '<strong>Layer Mode:</strong> Single Layer<br>'
-                    '<strong>Primary Classes:</strong> Currency banknotes'
-                    '</div>',
-            'description': 'Current detection layer configuration'
-        },
-        
-        # Advanced Options (Collapsible)
-        {
-            'type': 'accordion',
-            'key': 'advanced_options',
-            'label': 'Advanced Configuration',
-            'description': 'Advanced backbone configuration options',
-            'children': [
-                {
-                    'type': 'checkbox',
-                    'key': 'early_training_enabled',
-                    'label': 'Enable Early Training Pipeline',
-                    'value': backbone_config.get('early_training', {}).get('enabled', True),
-                    'description': 'Enable early training pipeline integration'
-                },
-                {
-                    'type': 'checkbox', 
-                    'key': 'validation_from_pretrained',
-                    'label': 'Validate from Pretrained Model',
-                    'value': backbone_config.get('early_training', {}).get('validation_from_pretrained', True),
-                    'description': 'Perform validation using existing pretrained models'
-                }
-            ]
-        }
+    # Create section headers
+    header_architecture = widgets.HTML("<h4>🧬 Backbone Architecture</h4>")
+    
+    # Backbone Selection Dropdown
+    backbone_dropdown = widgets.Dropdown(
+        options=[
+            ('EfficientNet-B4 (Recommended)', 'efficientnet_b4'),
+            ('CSPDarknet (YOLOv5 Default)', 'cspdarknet')
+        ],
+        value=current_backbone,
+        description='Backbone:',
+        style={'description_width': '120px'},
+        layout=widgets.Layout(width='100%', margin='5px 0')
+    )
+    
+    # Pretrained checkbox
+    pretrained_checkbox = widgets.Checkbox(
+        value=current_pretrained,
+        description='Use Pretrained Weights',
+        layout=widgets.Layout(width='100%', margin='5px 0')
+    )
+    
+    # Feature optimization checkbox
+    feature_opt_checkbox = widgets.Checkbox(
+        value=current_feature_opt,
+        description='Enable Feature Optimization',
+        layout=widgets.Layout(width='100%', margin='5px 0')
+    )
+    
+    # Mixed precision checkbox
+    mixed_precision_checkbox = widgets.Checkbox(
+        value=current_mixed_precision,
+        description='Mixed Precision Training',
+        layout=widgets.Layout(width='100%', margin='5px 0')
+    )
+    
+    # Model parameters header
+    header_params = widgets.HTML("<h4>⚙️ Model Parameters</h4>")
+    
+    # Input size slider
+    input_size_slider = widgets.IntSlider(
+        value=current_input_size,
+        min=320,
+        max=1280,
+        step=32,
+        description='Input Size:',
+        style={'description_width': '120px'},
+        layout=widgets.Layout(width='100%', margin='5px 0')
+    )
+    
+    # Number of classes input
+    num_classes_input = widgets.IntText(
+        value=current_num_classes,
+        description='Num Classes:',
+        style={'description_width': '120px'},
+        layout=widgets.Layout(width='100%', margin='5px 0')
+    )
+    
+    # Detection info
+    detection_info = widgets.HTML("""
+        <div style='margin-top: 10px; padding: 10px; background: #f5f5f5; border-radius: 4px; font-size: 0.9em;'>
+            <strong>🎯 Detection Configuration:</strong><br>
+            • <strong>Detection Layers:</strong> Banknote Detection<br>
+            • <strong>Layer Mode:</strong> Single Layer<br>
+            • <strong>Primary Classes:</strong> Currency banknotes
+        </div>
+    """)
+    
+    # Create widget list in order
+    form_widgets = [
+        header_architecture,
+        backbone_dropdown,
+        pretrained_checkbox,
+        feature_opt_checkbox,
+        mixed_precision_checkbox,
+        header_params,
+        input_size_slider,
+        num_classes_input,
+        detection_info
     ]
     
-    return form_fields
+    return {
+        'widgets': form_widgets,
+        'widget_refs': {
+            'backbone_dropdown': backbone_dropdown,
+            'pretrained_checkbox': pretrained_checkbox,
+            'feature_opt_checkbox': feature_opt_checkbox,
+            'mixed_precision_checkbox': mixed_precision_checkbox,
+            'input_size_slider': input_size_slider,
+            'num_classes_input': num_classes_input
+        }
+    }
 
 
 def _generate_config_summary_content(config: Dict[str, Any]) -> Dict[str, Any]:

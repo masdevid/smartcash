@@ -84,6 +84,14 @@ def create_training_ui(config: Dict[str, Any]) -> Dict[str, Any]:
                 'icon': 'check',
                 'tooltip': 'Run model validation',
                 'disabled': False
+            },
+            {
+                'id': 'refresh_backbone_config',
+                'text': 'Refresh Config',
+                'style': 'secondary',
+                'icon': 'sync',
+                'tooltip': 'Refresh backbone configuration from backbone module',
+                'disabled': False
             }
         ]
         

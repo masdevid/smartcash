@@ -88,7 +88,8 @@ class TrainOperationManager(OperationHandler):
             'start': 'Start training with current configuration',
             'stop': 'Stop current training and save best model',
             'resume': 'Resume training from last checkpoint',
-            'validate': 'Run validation on current best model'
+            'validate': 'Run validation on current best model',
+            'refresh_backbone_config': 'Refresh backbone configuration from backbone module'
         }
     
     def set_chart_callbacks(self, loss_chart_callback: callable, map_chart_callback: callable) -> None:
@@ -307,6 +308,69 @@ class TrainOperationManager(OperationHandler):
             self.logger.error(f"Validation operation error: {e}")
             self.log(f"❌ Validation operation error: {e}", 'error')
             self.update_progress(0, "Validation failed")
+            return {'success': False, 'message': str(e)}
+        
+        finally:
+            if self._button_states:
+                self.enable_all_buttons(self._button_states)
+    
+    def execute_refresh_backbone_config(self, config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """
+        Execute refresh backbone configuration operation.
+        
+        Args:
+            config: Optional configuration override
+            
+        Returns:
+            Refresh result dictionary
+        """
+        try:
+            # Clear logs from previous operations
+            self.clear_logs()
+            
+            self.log("🔄 Refreshing backbone configuration...", 'info')
+            self._button_states = self.disable_all_buttons("🔄 Refreshing...")
+            
+            # Update progress
+            self.update_progress(0, "Loading latest backbone configuration...")
+            
+            # Try to refresh backbone config using shared methods
+            try:
+                from smartcash.ui.core.ui_module import SharedMethodRegistry
+                
+                # Get the refresh method from the training module
+                refresh_method = SharedMethodRegistry.get_method('train.refresh_backbone_config')
+                if refresh_method:
+                    self.update_progress(50, "Refreshing configuration...")
+                    result = refresh_method()
+                    
+                    if result.get('success'):
+                        self.update_progress(100, "Configuration refreshed successfully")
+                        self.log("✅ Backbone configuration refreshed successfully", 'success')
+                        
+                        # Update the current config if available
+                        if 'config' in result:
+                            self.config.update(result['config'])
+                        
+                        return {
+                            'success': True,
+                            'message': 'Backbone configuration refreshed successfully',
+                            'updated_config': result.get('config', {})
+                        }
+                    else:
+                        self.update_progress(0, "Refresh failed")
+                        self.log(f"❌ Refresh failed: {result.get('message', 'Unknown error')}", 'error')
+                        return result
+                else:
+                    raise RuntimeError("Training module refresh method not available")
+                    
+            except Exception as e:
+                raise RuntimeError(f"Failed to access shared method registry: {e}")
+            
+        except Exception as e:
+            self.logger.error(f"Refresh backbone config error: {e}")
+            self.log(f"❌ Refresh backbone config error: {e}", 'error')
+            self.update_progress(0, "Refresh failed")
             return {'success': False, 'message': str(e)}
         
         finally:

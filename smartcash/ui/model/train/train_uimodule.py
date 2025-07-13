@@ -166,6 +166,25 @@ class TrainUIModule(UIModule):
         
         return config
     
+    def _log_initialization_complete(self) -> None:
+        """Log initialization completion to operation container."""
+        try:
+            if self._operation_manager and hasattr(self._operation_manager, 'log'):
+                self._operation_manager.log("✅ Training module initialized successfully", 'info')
+                self._operation_manager.log("🔧 Ready for model training operations", 'info')
+                self._operation_manager.log("📊 Live charts and progress tracking enabled", 'info')
+                
+                # Log any backbone integration status
+                backbone_config = self.get_config().get('backbone_integration', {})
+                if backbone_config.get('backbone_type'):
+                    backbone_type = backbone_config.get('backbone_type', 'unknown')
+                    self._operation_manager.log(f"🔗 Integrated with {backbone_type} backbone", 'info')
+                    
+            self.logger.debug("✅ Initialization complete logs sent to operation container")
+            
+        except Exception as e:
+            self.logger.warning(f"Failed to log initialization complete: {e}")
+    
     @suppress_ui_init_logs(duration=3.0)
     def initialize(self, config: Optional[Dict[str, Any]] = None, **kwargs) -> None:
         """
@@ -187,6 +206,9 @@ class TrainUIModule(UIModule):
             
             # Register shared methods for cross-module integration
             self._register_shared_methods()
+            
+            # Log successful initialization to operation container
+            self._log_initialization_complete()
             
             # Call base class initialization to set status to READY
             super().initialize(self.get_config())
@@ -247,6 +269,12 @@ class TrainUIModule(UIModule):
                 'train.refresh_backbone_config',
                 self.refresh_backbone_config,
                 description='Refresh backbone configuration from backbone module'
+            )
+            
+            SharedMethodRegistry.register_method(
+                'train.execute_refresh_backbone_config',
+                self.execute_refresh_backbone_config,
+                description='Execute refresh backbone configuration operation'
             )
             
             self.logger.debug("✅ Shared methods registered")
@@ -349,6 +377,30 @@ class TrainUIModule(UIModule):
             
         except Exception as e:
             error_msg = f"Validation execution failed: {e}"
+            self.logger.error(error_msg)
+            return {'success': False, 'message': error_msg}
+    
+    def execute_refresh_backbone_config(self, config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """
+        Execute refresh backbone configuration operation.
+        
+        Args:
+            config: Optional configuration override
+            
+        Returns:
+            Refresh result dictionary
+        """
+        try:
+            if not self.is_ready():
+                self.initialize()
+            
+            if not self._operation_manager:
+                raise RuntimeError("Operation manager not available")
+            
+            return self._operation_manager.execute_refresh_backbone_config(config)
+            
+        except Exception as e:
+            error_msg = f"Refresh backbone config execution failed: {e}"
             self.logger.error(error_msg)
             return {'success': False, 'message': error_msg}
     

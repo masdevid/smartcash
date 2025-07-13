@@ -14,16 +14,11 @@ from smartcash.ui.core.initializers.base_initializer import BaseInitializer
 from smartcash.ui.core.shared.shared_config_manager import SharedConfigManager, get_shared_config_manager
 
 # Error handling
-from smartcash.ui.core.errors import (
-    ErrorLevel,
-    CoreErrorHandler,
-    get_error_handler,
-    ErrorContext,
-    handle_component_validation,
-    validate_ui_components,
-    ErrorComponent,
-    create_error_component
-)
+from smartcash.ui.core.errors.enums import ErrorLevel
+from smartcash.ui.core.errors.handlers import CoreErrorHandler, get_error_handler
+from smartcash.ui.core.errors.context import ErrorContext
+from smartcash.ui.core.errors.validators import handle_component_validation, validate_ui_components
+from smartcash.ui.core.errors.error_component import ErrorComponent, create_error_component
 
 # Centralized decorators (all UI decorators unified here)
 from smartcash.ui.core.decorators import (

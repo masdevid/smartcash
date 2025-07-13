@@ -13,7 +13,8 @@ from smartcash.ui.logger import get_module_logger
 from smartcash.ui.core.handlers.base_handler import BaseHandler
 from smartcash.common.config.manager import get_config_manager, SimpleConfigManager as ConfigManager
 from smartcash.ui.core.shared.shared_config_manager import SharedConfigManager, get_shared_config_manager
-from smartcash.ui.core.errors import ErrorLevel, handle_errors
+from smartcash.ui.core.errors.enums import ErrorLevel
+from smartcash.ui.core.decorators.error_decorators import handle_errors
 
 class ConfigHandler(BaseHandler):
     """Base config handler dengan in-memory configuration.

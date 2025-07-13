@@ -17,7 +17,9 @@ from smartcash.ui.core.handlers.base_handler import BaseHandler
 from smartcash.ui.core.handlers.ui_handler import UIHandler, ModuleUIHandler
 from smartcash.ui.core.handlers.config_handler import SharedConfigHandler
 from smartcash.ui.core.handlers.operation_handler import OperationHandler, OperationResult, OperationStatus
-from smartcash.ui.core.errors import SmartCashUIError, ErrorContext, handle_errors
+from smartcash.ui.core.errors.exceptions import SmartCashUIError
+from smartcash.ui.core.errors.context import ErrorContext
+from smartcash.ui.core.decorators.error_decorators import handle_errors
 
 T = TypeVar('T')
 

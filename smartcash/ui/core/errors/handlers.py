@@ -19,6 +19,8 @@ from typing import (
 
 from IPython.display import display, HTML
 
+from ..decorators.error_decorators import handle_ui_errors
+
 from .enums import ErrorLevel
 from .context import ErrorContext
 from .error_component import create_error_component
@@ -496,71 +498,6 @@ class CoreErrorHandler:
             raise
 
 
-# Decorator function for backward compatibility
-def handle_ui_errors(
-    error_component_title: str = "UI Error",
-    log_error: bool = True,
-    return_type: Optional[type] = None,
-    level: ErrorLevel = ErrorLevel.ERROR,
-    fail_fast: bool = False,
-    create_ui: bool = False
-):
-    """
-    Decorator for handling UI errors with backward compatibility.
-    
-    Args:
-        error_component_title: Title for error component
-        log_error: Whether to log the error
-        return_type: Type to return on error (None, dict, bool, etc.)
-        level: Error level for logging
-        fail_fast: Whether to raise exception after handling
-        create_ui: Whether to create UI error component
-    
-    Returns:
-        Decorator function
-    """
-    def decorator(func):
-        @wraps(func)
-        def wrapper(*args, **kwargs):
-            try:
-                return func(*args, **kwargs)
-            except Exception as e:
-                # Get error handler instance
-                handler = get_error_handler()
-                
-                # Handle the error
-                error_msg = f"[{error_component_title}] {func.__name__}: {str(e)}"
-                
-                if log_error:
-                    handler.handle_error(
-                        error_msg=error_msg,
-                        level=level,
-                        exc_info=True,
-                        fail_fast=fail_fast,
-                        create_ui_error=create_ui
-                    )
-                
-                # Return appropriate value based on return_type
-                if return_type == dict:
-                    return {}
-                elif return_type == list:
-                    return []
-                elif return_type == bool:
-                    return False
-                elif return_type == str:
-                    return ""
-                elif return_type is not None:
-                    try:
-                        return return_type()
-                    except:
-                        return None
-                else:
-                    return None
-        
-        return wrapper
-    return decorator
-
-
 def create_error_response(
     error_message: str,
     error: Optional[Exception] = None,
@@ -617,9 +554,11 @@ def create_error_response(
 # Export for convenience
 __all__ = [
     'CoreErrorHandler',
-    'get_error_handler', 
+    'get_error_handler',
     'set_error_handler',
-    'handle_ui_errors',
     'create_error_response',
-    'create_error_component'
+    'ErrorLevel',
+    'ErrorContext',
+    'create_error_component',
+    'handle_ui_errors',
 ]

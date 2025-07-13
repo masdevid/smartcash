@@ -4,13 +4,11 @@ from typing import Dict, Any, Optional, TYPE_CHECKING, Callable, TypeVar, Type
 import logging
 import ipywidgets as widgets
 
-from smartcash.ui.core.errors import (
-    ErrorLevel,
-    CoreErrorHandler,
-    handle_errors,
-    UIComponentError,
-    ErrorContext
-)
+from smartcash.ui.core.errors.enums import ErrorLevel
+from smartcash.ui.core.errors.handlers import CoreErrorHandler
+from smartcash.ui.core.decorators.error_decorators import handle_errors
+from smartcash.ui.core.errors.exceptions import UIComponentError
+from smartcash.ui.core.errors.context import ErrorContext
 from smartcash.ui.core.errors.validators import safe_component_operation
 
 if TYPE_CHECKING:

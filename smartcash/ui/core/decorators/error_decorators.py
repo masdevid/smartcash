@@ -13,10 +13,12 @@ from dataclasses import asdict
 from functools import wraps
 from typing import Any, Callable, Dict, Optional, Type, TypeVar, cast, Union, List
 
-from smartcash.ui.core.errors.handlers import CoreErrorHandler, get_error_handler
 from smartcash.ui.core.errors.context import ErrorContext
 from smartcash.ui.core.errors.enums import ErrorLevel
 from smartcash.common.exceptions import ErrorContext as CommonErrorContext
+
+# Import locally in functions to avoid circular imports
+# from smartcash.ui.core.errors.handlers import CoreErrorHandler, get_error_handler
 
 # Type variable for generic function typing
 F = TypeVar('F', bound=Callable[..., Any])
@@ -28,7 +30,7 @@ def handle_errors(
     reraise: bool = True,
     log_error: bool = True,
     create_ui: bool = False,
-    handler: Optional[CoreErrorHandler] = None,
+    handler: Optional[Any] = None,  # Using Any to avoid circular import
     context_attr: Optional[str] = None
 ) -> Callable[[F], F]:
     """
@@ -51,6 +53,9 @@ def handle_errors(
     def decorator(func: F) -> F:
         @functools.wraps(func)
         def wrapper(*args: Any, **kwargs: Any) -> Any:
+            # Import locally to avoid circular imports
+            from smartcash.ui.core.errors.handlers import get_error_handler
+            
             # Get the error handler instance
             error_handler = handler or get_error_handler()
             
@@ -108,7 +113,10 @@ def handle_ui_errors(
     error_component_title: str = "UI Operation Error",
     level: ErrorLevel = ErrorLevel.ERROR,
     reraise: bool = True,
-    show_dialog: bool = True
+    show_dialog: bool = True,
+    create_ui: Optional[bool] = None,  # For backward compatibility
+    return_type: Optional[type] = None,  # For backward compatibility
+    log_error: bool = True,  # For backward compatibility
 ) -> Callable[[F], F]:
     """
     Decorator specifically for UI operations with user-friendly error handling.
@@ -118,15 +126,22 @@ def handle_ui_errors(
         level: Error severity level
         reraise: Whether to re-raise the exception
         show_dialog: Whether to show error dialog to user
+        create_ui: Alias for show_dialog (for backward compatibility)
+        return_type: For backward compatibility (ignored)
+        log_error: For backward compatibility (ignored)
     
     Returns:
         Decorated function with UI error handling
     """
+    # Use create_ui if explicitly provided, otherwise use show_dialog
+    use_create_ui = show_dialog if create_ui is None else create_ui
+    
     return handle_errors(
         error_msg=error_component_title,
         level=level,
         reraise=reraise,
-        create_ui=show_dialog
+        create_ui=use_create_ui,
+        log_error=log_error
     )
 
 def safe_ui_operation(

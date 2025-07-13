@@ -98,11 +98,8 @@ def _create_module_info_box() -> widgets.Widget:
 
 @handle_ui_errors(
     error_component_title=f"{UI_CONFIG['module_name']} Error",
-    log_error=True,
-    return_type=dict,
     level=ErrorLevel.ERROR,
-    fail_fast=False,
-    create_ui=True
+    show_dialog=True
 )
 def create_split_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> Dict[str, Any]:
     """Create the dataset split configuration UI.
@@ -139,8 +136,8 @@ def create_split_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> Dict[s
         )
         log_accordion.set_title(0, 'Log Messages')
         
-        # Create header
-        header_container = create_header_container(
+        # Create header container
+        header = create_header_container(
             title=UI_CONFIG['title'],
             description=UI_CONFIG['description'],
             **kwargs
@@ -173,7 +170,7 @@ def create_split_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> Dict[s
         
         action_container = create_action_container(
             buttons=action_buttons,
-            show_save_reset=True,  # This will add default save/reset buttons if buttons list is empty
+            show_save_reset=True,
             **kwargs
         )
         
@@ -190,14 +187,22 @@ def create_split_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> Dict[s
             **kwargs
         )
         
-        # Create main container
+        # Create main container using the new container API
+        components = [
+            # Header is a HeaderContainer object with .container attribute
+            {'type': 'header', 'component': header.container, 'order': 0},
+            # Form container is a dict with 'container' key
+            {'type': 'form', 'component': form_container['container'], 'order': 1},
+            # Action container is a dict with 'container' key
+            {'type': 'action', 'component': action_container['container'], 'order': 2},
+            # Operation container is a dict with 'container' key
+            {'type': 'operation', 'component': operation_container['container'], 'order': 3},
+            # Footer is a FooterContainer object with .container attribute
+            {'type': 'footer', 'component': footer_container.container, 'order': 4}
+        ]
+        
         main_container = create_main_container(
-            header=header_container,
-            body=widgets.VBox([
-                form_container['container'],
-                action_container['container']
-            ]),
-            footer=footer_container,
+            components=components,
             **kwargs
         )
         
@@ -237,6 +242,16 @@ def create_split_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> Dict[s
                 'reset_button': reset_btn
             }
         
+        # Get buttons from action container
+        save_btn = action_container.get('save_button')
+        reset_btn = action_container.get('reset_button')
+        
+        # Create button references
+        buttons = {
+            'save_button': save_btn,
+            'reset_button': reset_btn
+        }
+        
         # Update components dictionary
         ui_components.update({
             # Form components
@@ -245,6 +260,7 @@ def create_split_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> Dict[s
             'action_container': action_container,
             'operation_container': operation_container,
             'footer_container': footer_container,
+            'header_container': header,
             
             # Individual components
             'summary_content': summary_content,
@@ -253,12 +269,12 @@ def create_split_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> Dict[s
             
             # Buttons
             'buttons': buttons,
-            'save_button': buttons.get('save_button'),
-            'reset_button': buttons.get('reset_button'),
+            'save_button': save_btn,
+            'reset_button': reset_btn,
             
-            # Additional UI elements
-            'summary_content': summary_content,
-            'main_container': main_container
+            # Main container
+            'main_container': main_container,
+            'container': main_container  # For backward compatibility
         })
         
         return ui_components

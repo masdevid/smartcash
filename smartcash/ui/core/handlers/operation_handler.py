@@ -22,7 +22,8 @@ from smartcash.common.threadpools import (
     optimal_cpu_workers
 )
 from smartcash.ui.core.handlers.base_handler import BaseHandler
-from smartcash.ui.core.errors import handle_errors, ErrorLevel
+from smartcash.ui.core.errors.enums import ErrorLevel
+from smartcash.ui.core.decorators.error_decorators import handle_errors
 from smartcash.ui.components.operation_container import OperationContainer
 
 class ProgressLevel(Enum):

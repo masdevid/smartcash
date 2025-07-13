@@ -9,12 +9,10 @@ component access.
 from typing import Any, Callable, Dict, List, Optional, TypeVar, cast
 from functools import wraps
 
-from smartcash.ui.core.errors import (
-    ErrorLevel,
-    get_error_handler,
-    safe_component_operation as core_safe_component_operation,
-    with_error_handling as core_with_error_handling
-)
+from smartcash.ui.core.errors.enums import ErrorLevel
+from smartcash.ui.core.errors.handlers import get_error_handler
+from smartcash.ui.core.errors.validators import safe_component_operation as core_safe_component_operation
+from smartcash.ui.core.decorators.error_decorators import handle_errors as core_with_error_handling
 
 T = TypeVar('T')
 F = TypeVar('F', bound=Callable[..., Any])

@@ -8,14 +8,11 @@ from abc import ABC, abstractmethod
 from typing import Dict, Any, Optional, List, Union, Callable, Type, TypeVar, Tuple
 
 from smartcash.ui.logger import get_module_logger
-from smartcash.ui.core.errors import (
-    SmartCashUIError,
-    ErrorContext,
-    ErrorLevel,
-    handle_errors,
-    safe_component_operation,
-    get_error_handler
-)
+from smartcash.ui.core.errors.enums import ErrorLevel
+from smartcash.ui.core.errors.context import ErrorContext
+from smartcash.ui.core.errors.exceptions import SmartCashUIError
+from smartcash.ui.core.decorators.error_decorators import handle_errors, safe_component_operation
+from smartcash.ui.core.errors.handlers import get_error_handler
 
 T = TypeVar('T')
 

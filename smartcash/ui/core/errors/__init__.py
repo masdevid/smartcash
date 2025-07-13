@@ -4,17 +4,15 @@ Error handling module for SmartCash UI Core.
 This module provides a centralized error handling system with support for logging,
 UI error components, and configurable error handling strategies.
 """
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from .handlers import CoreErrorHandler  # noqa: F401
+
+# Lazy imports to avoid circular dependencies
 from .enums import ErrorLevel
-from .handlers import CoreErrorHandler, get_error_handler
-from smartcash.ui.core.decorators.error_decorators import handle_errors
-from .validators import (
-    handle_component_validation,
-    safe_component_operation,
-    validate_ui_components
-)
-from .utils import with_error_handling
-from .error_component import ErrorComponent, create_error_component
 from .context import ErrorContext
+from .error_component import ErrorComponent, create_error_component
 from .exceptions import (
     # Base exceptions
     SmartCashUIError,

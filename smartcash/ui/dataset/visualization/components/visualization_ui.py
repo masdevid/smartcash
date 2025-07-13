@@ -192,37 +192,51 @@ def create_visualization_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -
     }
     
     # === 7. Create Main Container ===
+    # Prepare components for main container
+    components = [
+        # Header container (object with .container attribute)
+        {'type': 'header', 'component': header_container.container, 'order': 0},
+        # Form container (dictionary with 'container' key)
+        {'type': 'form', 'component': form_container['container'], 'order': 1},
+        # Action container (dictionary with 'container' key)
+        {'type': 'action', 'component': action_container['container'], 'order': 2},
+        # Summary container (object with .container attribute)
+        {'type': 'summary', 'component': summary_container.container, 'order': 3},
+        # Operation container (dictionary with 'container' key)
+        {'type': 'operation', 'component': operation_container['container'], 'order': 4},
+        # Footer container (object with .container attribute)
+        {'type': 'footer', 'component': footer_container.container, 'order': 5}
+    ]
+    
+    # Create main container with all components
     main_container = create_main_container(
-        header=ui_components['containers']['header']['container'],
-        body=widgets.VBox([
-            ui_components['containers']['form']['container'],
-            ui_components['containers']['actions']['container'],
-            ui_components['containers']['summary'].container,
-            ui_components['containers']['operation']['container']
-        ]),
-        footer=ui_components['containers']['footer']['container'],
-        container_config={
-            'margin': '0 auto',
-            'max_width': '1200px',
-            'padding': '10px',
-            'border': '1px solid #e0e0e0',
-            'border_radius': '5px',
-            'box_shadow': '0 1px 3px rgba(0,0,0,0.1)'
-        }
+        components=components,
+        **kwargs
     )
     
     # Store main UI references
-    ui_components['ui'] = main_container.container
+    ui_components['ui'] = main_container
     ui_components['main_container'] = main_container
     
+    # Add all containers to the ui_components for easy access
+    ui_components['containers']['main'] = main_container
+    
+    # Create the result dictionary with all components
     result = {
         'ui_components': ui_components,
-        'ui': ui_components['ui']
+        'ui': main_container,
+        'main_container': main_container,
+        'containers': ui_components['containers'],
+        'widgets': ui_components['widgets']
     }
     
     # Add all components to the root for backward compatibility
     result.update(ui_components['containers'])
     result.update(ui_components['widgets'])
+    
+    # Add direct references to all containers for easier access
+    for container_name, container in ui_components['containers'].items():
+        result[container_name] = container
     
     return result
 

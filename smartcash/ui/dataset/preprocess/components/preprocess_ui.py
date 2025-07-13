@@ -90,11 +90,8 @@ def _create_module_info_box() -> widgets.Widget:
 
 @handle_ui_errors(
     error_component_title=f"{UI_CONFIG['module_name']} Error",
-    log_error=True,
-    return_type=dict,
     level=ErrorLevel.ERROR,
-    fail_fast=False,
-    create_ui=True
+    show_dialog=True
 )
 def create_preprocessing_main_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> Dict[str, Any]:
     """

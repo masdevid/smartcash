@@ -129,53 +129,111 @@ class ColabUIModule(UIModule):
         self._environment_detected = False
         
     def initialize(self, config: Dict[str, Any] = None) -> 'ColabUIModule':
-        """Initialize Colab module with environment detection.
+        """Initialize Colab module with environment detection and setup all components.
         
         Args:
             config: Additional configuration to merge
             
         Returns:
             Self for method chaining
+            
+        Raises:
+            RuntimeError: If any critical initialization step fails
         """
-        if config:
-            self.update_config(**config)
-        
         try:
-            # Detect environment first
+            self.logger.info("🚀 Initializing Colab UIModule...")
+            
+            # Update config if provided
+            if config:
+                self.logger.debug("Updating module configuration")
+                self.update_config(**config)
+            
+            # 1. Detect environment first
+            self.logger.debug("Detecting environment...")
             self._detect_environment()
+            self.logger.info(f"Environment detected: {'Colab' if self._environment_detected else 'Local'}")
             
-            # Create UI components
-            self._create_ui_components()
-            
-            # Setup operation manager
-            self._setup_operation_manager()
-            
-            # Setup config handler (no persistence for Colab)
-            self._setup_config_handler()
-            
-            # Register operations
-            self._register_operations()
-            
-            # Inject shared methods
-            SharedMethodRegistry.inject_methods(self, category="operations")
-            
-            # Setup event handlers for buttons
-            self._setup_event_handlers()
-            
-            # Call parent initialization
+            # 2. Initialize parent class
+            self.logger.debug("Initializing parent UIModule...")
             super().initialize()
             
-            # Update status to show module is ready
-            self._update_status("Colab module initialized - ready for environment setup", "success")
+            # 3. Create UI components
+            self.logger.debug("Creating UI components...")
+            self._create_ui_components()
             
-            self.logger.debug(f"✅ Initialized Colab UIModule")
+            # 4. Setup operation manager (must be before operation registration)
+            self.logger.debug("Setting up operation manager...")
+            self._setup_operation_manager()
+            
+            # 5. Setup config handler
+            self.logger.debug("Setting up config handler...")
+            self._setup_config_handler()
+            
+            # 6. Register operations
+            self.logger.debug("Registering operations...")
+            self._register_operations()
+            
+            # 7. Inject shared methods
+            self.logger.debug("Injecting shared methods...")
+            SharedMethodRegistry.inject_methods(self, category="operations")
+            
+            # 8. Setup event handlers (must be after UI components are created)
+            self.logger.debug("Setting up event handlers...")
+            self._setup_event_handlers()
+            
+            # Verify all components are properly initialized
+            self._verify_initialization()
+            
+            # Update status to show module is ready
+            status_msg = "✅ Colab module initialized - ready for environment setup"
+            self._update_status(status_msg, "success")
+            self.logger.info(status_msg)
+            
+            return self
             
         except Exception as e:
-            self.logger.error(f"❌ Failed to initialize Colab UIModule: {e}")
-            self._update_status(f"Failed to initialize module: {str(e)}", "error")
-            raise
+            error_msg = f"❌ Failed to initialize Colab UIModule: {str(e)}"
+            self.logger.exception(error_msg)
+            self._update_status(error_msg, "error")
+            raise RuntimeError(error_msg) from e
+    
+    def _verify_initialization(self) -> None:
+        """Verify that all required components are properly initialized.
         
-        return self
+        Raises:
+            RuntimeError: If any required component is not properly initialized
+        """
+        self.logger.debug("Verifying module initialization...")
+        
+        # Check operation manager
+        if not self._operation_manager:
+            error_msg = "Operation manager not initialized"
+            self.logger.error(error_msg)
+            raise RuntimeError(error_msg)
+            
+        # Check config handler
+        if not self._config_handler:
+            error_msg = "Config handler not initialized"
+            self.logger.error(error_msg)
+            raise RuntimeError(error_msg)
+            
+        # Verify required components exist
+        required_components = ["setup_button", "status_panel", "operation_container"]
+        for comp_name in required_components:
+            if not self.get_component(comp_name):
+                error_msg = f"Required component '{comp_name}' not found"
+                self.logger.error(error_msg)
+                raise RuntimeError(error_msg)
+                
+        # Verify required operations are registered
+        required_operations = ["full_setup", "status", "reset"]
+        for op_name in required_operations:
+            if not self.get_operation(op_name):
+                error_msg = f"Required operation '{op_name}' not registered"
+                self.logger.error(error_msg)
+                raise RuntimeError(error_msg)
+                
+        self.logger.debug("✅ Module initialization verified successfully")
     
     def _detect_environment(self) -> None:
         """Detect if running in Google Colab environment."""
@@ -183,9 +241,11 @@ class ColabUIModule(UIModule):
             import google.colab
             self._environment_detected = True
             self.update_config(environment_type="colab", is_colab=True)
+            self.logger.info("Google Colab environment detected")
         except ImportError:
             self._environment_detected = False
             self.update_config(environment_type="local", is_colab=False)
+            self.logger.info("Local environment detected (not Google Colab)")
     
     def _create_ui_components(self) -> None:
         """Create and register UI components."""
@@ -206,18 +266,43 @@ class ColabUIModule(UIModule):
     def _setup_operation_manager(self) -> None:
         """Setup operation manager for Colab operations."""
         try:
+            self.logger.debug("Setting up operation manager...")
+            
             # Get operation container instance directly
             operation_container = self.get_component("operation_container")
+            if not operation_container:
+                self.logger.warning("Operation container not found, creating a new one")
+                from smartcash.ui.components.operation_container import OperationContainer
+                operation_container = OperationContainer()
             
+            # Get current config
+            config = self.get_config()
+            self.logger.debug(f"Initializing operation manager with config: {config}")
+            
+            # Initialize operation manager
             self._operation_manager = ColabOperationManager(
-                config=self.get_config(),
+                config=config,
                 operation_container=operation_container
             )
             
-            self.logger.debug("Operation manager initialized")
+            # Initialize the operation manager
+            self._operation_manager.initialize()
+            
+            # Log available operations for debugging
+            operations = self._operation_manager.get_operations()
+            self.logger.debug(f"Operation manager initialized with {len(operations)} operations: {list(operations.keys())}")
+            
+            # Verify full_setup operation is available
+            if 'full_setup' not in operations:
+                self.logger.error("❌ full_setup operation not found in operation manager")
+                raise ValueError("Required 'full_setup' operation not found in operation manager")
+                
+            self.logger.info("✅ Operation manager initialized successfully")
             
         except Exception as e:
-            self.logger.exception("Failed to setup operation manager")
+            error_msg = f"❌ Failed to setup operation manager: {str(e)}"
+            self.logger.exception(error_msg)
+            self._update_status(error_msg, "error")
             raise
     
     def _setup_config_handler(self) -> None:
@@ -230,31 +315,74 @@ class ColabUIModule(UIModule):
             raise
     
     def _register_operations(self) -> None:
-        """Register Colab operations."""
+        """Register all Colab operations with the operation registry.
+        
+        This method:
+        1. Gets available operations from the operation manager
+        2. Registers each operation with the parent UIModule
+        3. Registers convenience methods (status, reset)
+        4. Ensures required operations exist
+        
+        Raises:
+            RuntimeError: If operation registration fails
+        """
         try:
             if not self._operation_manager:
-                raise ValueError("Operation manager not initialized")
+                error_msg = "Operation manager not initialized"
+                self.logger.error(error_msg)
+                raise RuntimeError(error_msg)
             
             # Get operations from manager
             operations = self._operation_manager.get_operations()
+            if not operations:
+                self.logger.warning("No operations found in operation manager")
+            else:
+                self.logger.debug(f"Found {len(operations)} operations in operation manager")
             
-            # Register each operation
+            # Register each operation from the operation manager
+            registered_ops = []
             for op_name, op_func in operations.items():
-                self.register_operation(op_name, op_func)
+                try:
+                    self.register_operation(op_name, op_func)
+                    registered_ops.append(op_name)
+                    self.logger.debug(f"✅ Registered operation: {op_name}")
+                except Exception as e:
+                    self.logger.error(f"❌ Failed to register operation {op_name}: {e}", exc_info=True)
+                    raise
             
             # Register convenience methods
-            self.register_operation("status", self.get_environment_status)
-            self.register_operation("reset", self.reset_environment)
+            try:
+                self.register_operation("status", self.get_environment_status)
+                registered_ops.append("status")
+                self.logger.debug("✅ Registered convenience operation: status")
+                
+                self.register_operation("reset", self.reset_environment)
+                registered_ops.append("reset")
+                self.logger.debug("✅ Registered convenience operation: reset")
+            except Exception as e:
+                self.logger.error(f"❌ Failed to register convenience operations: {e}", exc_info=True)
+                raise
             
-            # Register full_setup operation if not already registered
-            if 'full_setup' not in operations:
-                self.register_operation('full_setup', self.execute_full_setup)
+            # Ensure required operations exist
+            required_operations = ["full_setup"]
+            for req_op in required_operations:
+                if req_op not in registered_ops:
+                    try:
+                        if req_op == "full_setup":
+                            self.register_operation('full_setup', self.execute_full_setup)
+                            registered_ops.append('full_setup')
+                            self.logger.warning(f"⚠️ Registered fallback {req_op} operation")
+                    except Exception as e:
+                        self.logger.error(f"❌ Failed to register required operation {req_op}: {e}")
+                        raise RuntimeError(f"Required operation {req_op} not available") from e
             
-            self.logger.debug(f"⚙️ Registered {len(operations)} operations including full_setup")
+            self.logger.info(f"✅ Successfully registered {len(registered_ops)} operations: {', '.join(registered_ops)}")
             
         except Exception as e:
-            self.logger.error(f"❌ Failed to register operations: {e}")
-            raise
+            error_msg = f"❌ Failed to register operations: {str(e)}"
+            self.logger.exception(error_msg)
+            self._update_status(error_msg, "error")
+            raise RuntimeError(error_msg) from e
     
     
     def _setup_event_handlers(self) -> None:
@@ -283,42 +411,65 @@ class ColabUIModule(UIModule):
             self.logger.error(f"❌ Failed to setup event handlers: {e}")
     
     def _handle_setup_button_click(self, button=None) -> None:
-        """Handle setup button click event.
+        """Handle setup button click event to initiate environment setup.
+        
+        This method:
+        1. Validates required components are available
+        2. Sets up the operation environment
+        3. Executes the full_setup operation
+        4. Handles success/error states with appropriate user feedback
         
         Args:
             button: The button that was clicked (unused, required by ipywidgets)
+            
+        Returns:
+            OperationResult: The result of the setup operation, or None if failed
         """
+        # Get operation container for logging
+        operation_container = None
         try:
-            # Get operation handler from parent module
+            # Get operation handler and container
             operation_handler = getattr(self, '_operation_handler', None)
-            if not operation_handler:
-                self.logger.error("❌ Operation handler not available")
-                self._update_status("Error: Operation system not initialized", "error")
-                return
-
-            # Get operation container through the handler
-            operation_container = getattr(operation_handler, '_operation_container', None)
+            if operation_handler:
+                operation_container = getattr(operation_handler, '_operation_container', None)
             
             # Log start of operation
-            self.logger.info("🚀 Starting environment setup")
-            self._update_status("Starting environment setup...", "info")
+            start_msg = "🚀 Starting environment setup..."
+            self.logger.info(start_msg)
+            self._update_status(start_msg, "info")
             
             if operation_container:
-                operation_container.log_message("🚀 Starting environment setup...", level='info')
+                operation_container.log_message(start_msg, level='info')
 
-            # Get button states before disabling
+            # Get operation manager
+            operation_manager = self._operation_manager
+            if not operation_manager:
+                error_msg = "❌ Operation manager not available"
+                self.logger.error(error_msg)
+                self._update_status(error_msg, "error")
+                if operation_container:
+                    operation_container.log_message(error_msg, level='error')
+                return None
+            
+            # Log available operations for debugging
+            available_ops = operation_manager.get_operations()
+            self.logger.debug(f"Available operations: {list(available_ops.keys())}")
+            
+            # Get the full_setup operation function
+            full_setup_op = available_ops.get('full_setup')
+            if not full_setup_op:
+                error_msg = "❌ Full setup operation not found in available operations"
+                self.logger.error(error_msg)
+                self._update_status(error_msg, "error")
+                if operation_container:
+                    operation_container.log_message(error_msg, level='error')
+                return None
+            
+            # Disable all buttons during operation
             button_states = self._get_operation_manager().disable_all_buttons("⏳ Setting up...")
-
+            
             try:
-                # Get the operation manager
-                operation_manager = getattr(self, '_operation_manager', None)
-                if not operation_manager:
-                    raise ValueError("Operation manager not available")
-                
-                # Get the full_setup operation function
-                full_setup_op = operation_manager.get_operations().get('full_setup')
-                if not full_setup_op:
-                    raise ValueError("Full setup operation not found")
+                self.logger.info("🔧 Executing full environment setup...")
                 
                 # Execute the operation with progress tracking
                 result = self.execute_operation(
@@ -327,42 +478,32 @@ class ColabUIModule(UIModule):
                     message="Performing full environment setup..."
                 )
                 
-                # Handle operation result (result is an OperationResult object)
-                if result.status == OperationStatus.COMPLETED:
-                    status_msg = "✅ Environment setup completed successfully!"
-                    self._update_status(status_msg, "success")
-                    self.logger.info(status_msg)
-                    
-                    if operation_container:
-                        operation_container.log_message(status_msg, level='success')
-                else:
-                    error_msg = result.message or "Setup failed"
-                    if result.error:
-                        error_msg = f"{error_msg}: {str(result.error)}"
-                    status_msg = f"❌ {error_msg}"
-                    self._update_status(status_msg, "error")
-                    self.logger.error(status_msg)
-                    
-                    if operation_container:
-                        operation_container.log_message(status_msg, level='error')
-
+                # Handle operation result
+                self._handle_setup_result(result, operation_container)
                 return result
-
-            except Exception as e:
-                error_msg = f"❌ Setup failed: {str(e)}"
-                self.logger.error(error_msg)
-                self._update_status(error_msg, "error")
                 
+            except Exception as e:
+                error_msg = f"❌ Unexpected error during setup: {str(e)}"
+                self.logger.exception(error_msg)
+                self._update_status(error_msg, "error")
                 if operation_container:
                     operation_container.log_message(error_msg, level='error')
-                    
                 raise
-
+                
+            finally:
+                # Always restore button states
+                if button_states:
+                    self._get_operation_manager().restore_button_states(button_states)
+        
         except Exception as e:
-            self.logger.error(f"❌ Setup button click failed: {e}")
-            self._update_status(f"Setup error: {str(e)}", "error")
-            self.logger.error(f"❌ Setup error: {str(e)}")
+            error_msg = f"❌ Setup failed: {str(e)}"
+            self.logger.exception("Error in setup button handler")
+            self._update_status(error_msg, "error")
             
+            # Log to operation container if available
+            if operation_container:
+                operation_container.log_message(error_msg, level='error')
+                
             # Restore buttons in error state
             if button_states:
                 self._get_operation_manager().enable_all_buttons(
@@ -370,6 +511,8 @@ class ColabUIModule(UIModule):
                     success=False,
                     error_message="❌ Error"
                 )
+                
+            return None
     
     def _get_operation_manager(self):
         """Get the operation manager instance for button management."""
@@ -392,6 +535,48 @@ class ColabUIModule(UIModule):
         except Exception as e:
             self.logger.error(f"Failed to update status panel: {e}")
             self.logger.debug(f"Status message that failed: {message} ({status_type})")
+    
+    def _handle_setup_result(self, result: Any, operation_container: Any = None) -> None:
+        """Handle the result of a setup operation.
+        
+        Args:
+            result: The operation result object
+            operation_container: Optional operation container for logging
+        """
+        try:
+            if not result:
+                error_msg = "❌ Setup failed: No result returned"
+                self.logger.error(error_msg)
+                self._update_status(error_msg, "error")
+                if operation_container:
+                    operation_container.log_message(error_msg, level='error')
+                return
+                
+            # Handle operation result (result is an OperationResult object)
+            if hasattr(result, 'status') and result.status == OperationStatus.COMPLETED:
+                status_msg = "✅ Environment setup completed successfully!"
+                self._update_status(status_msg, "success")
+                self.logger.info(status_msg)
+                
+                if operation_container:
+                    operation_container.log_message(status_msg, level='success')
+            else:
+                error_msg = getattr(result, 'message', "Setup failed")
+                if hasattr(result, 'error') and result.error:
+                    error_msg = f"{error_msg}: {str(result.error)}"
+                status_msg = f"❌ {error_msg}"
+                self._update_status(status_msg, "error")
+                self.logger.error(status_msg)
+                
+                if operation_container:
+                    operation_container.log_message(status_msg, level='error')
+                    
+        except Exception as e:
+            error_msg = f"❌ Error handling setup result: {str(e)}"
+            self.logger.exception(error_msg)
+            self._update_status(error_msg, "error")
+            if operation_container:
+                operation_container.log_message(error_msg, level='error')
     
     def _handle_save_config(self, button=None) -> None:
         """Handle save configuration button click.

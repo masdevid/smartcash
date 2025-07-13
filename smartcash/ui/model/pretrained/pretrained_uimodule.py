@@ -542,12 +542,11 @@ def register_pretrained_template() -> None:
         logger.error(f"Failed to register template: {e}")
 
 
-# ==================== CONVENIENCE FUNCTIONS ====================
 
 def initialize_pretrained_ui(
     config: Optional[Dict[str, Any]] = None,
     display: bool = True
-) -> Dict[str, Any]:
+) -> Optional[Dict[str, Any]]:
     """
     Initialize and optionally display pretrained UI using UIModule pattern.
     
@@ -556,59 +555,46 @@ def initialize_pretrained_ui(
         display: Whether to display the UI (requires IPython)
         
     Returns:
-        Dictionary containing:
-        - success: bool indicating if initialization was successful
-        - module: reference to the module instance (None if failed)
-        - ui_components: dictionary of UI components (empty if failed)
-        - status: current module status (empty if failed)
+        If display=True: Returns None (displays UI directly)
+        If display=False: Returns a dictionary with UI components and status
     """
     try:
-        # Create and initialize module
+        # Get the module and UI components
         module = create_pretrained_uimodule(config=config, auto_initialize=True)
-        
-        if not module or not module._is_initialized:
-            error_msg = "Failed to initialize pretrained module"
-            print(f"❌ {error_msg}")
-            return {
-                'success': False,
-                'error': error_msg,
-                'module': None,
-                'ui_components': {},
-                'status': {}
-            }
-        
-        # Get UI components and status
         ui_components = module.get_ui_components()
-        status = module.get_status() if hasattr(module, 'get_status') else {}
         
+        # Prepare the result dictionary
         result = {
             'success': True,
             'module': module,
             'ui_components': ui_components,
-            'status': status
+            'status': module.get_pretrained_status()
         }
+        
+        # Display the UI if requested
+        if display and ui_components:
+            from IPython import get_ipython
+            from IPython.display import display as ipython_display
             
-        # Display UI if requested and components are available
-        if display:
-            try:
-                from IPython.display import display as ipython_display
-                
-                # Try to get the main widget first
-                main_widget = module.get_main_widget() if hasattr(module, 'get_main_widget') else None
-                
-                if main_widget is not None:
-                    ipython_display(main_widget)
-                else:
-                    # Fall back to UI components if main widget is not available
-                    if 'ui_components' in ui_components and 'ui' in ui_components['ui_components']:
-                        ipython_display(ui_components['ui_components']['ui'])
-                    elif 'ui' in ui_components:
-                        ipython_display(ui_components['ui'])
-                    
-            except ImportError:
-                print("⚠️ IPython not available, cannot display UI")
-            except Exception as e:
-                print(f"⚠️ Display failed: {str(e)}")
+            # Clear any existing output
+            if get_ipython() is not None:
+                ipython_display.clear_output(wait=True)
+            
+            # Get the main UI container and display it
+            main_ui = ui_components.get('main_container')
+            if main_ui is not None:
+                try:
+                    # Get the widget using the show() method if available
+                    if hasattr(main_ui, 'show'):
+                        ui_widget = main_ui.show()
+                        ipython_display(ui_widget)
+                    else:
+                        ipython_display(main_ui)
+                except Exception as e:
+                    # Fallback to simple display if anything goes wrong
+                    module.logger.error(f"Error displaying UI: {str(e)}")
+                    ipython_display(main_ui)
+                return None  # Don't return data when display=True
         
         return result
         

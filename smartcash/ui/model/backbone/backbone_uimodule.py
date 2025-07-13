@@ -477,11 +477,11 @@ def reset_backbone_uimodule() -> None:
 
 def initialize_backbone_ui(
     config: Optional[Dict[str, Any]] = None,
-    display: bool = False,
+    display: bool = True,
     **kwargs
-) -> Dict[str, Any]:
+) -> Optional[Dict[str, Any]]:
     """
-    Initialize backbone UI with convenience wrapper.
+    Initialize and display the backbone UI.
     
     Args:
         config: Optional configuration dictionary
@@ -489,32 +489,49 @@ def initialize_backbone_ui(
         **kwargs: Additional arguments
         
     Returns:
-        Initialization result dictionary with keys:
-        - success: bool indicating if initialization was successful
-        - module: reference to the module instance
-        - ui_components: dictionary of UI components
-        - status: current module status
+        If display=True: Returns None (displays UI directly)
+        If display=False: Returns a dictionary with UI components and status
     """
     try:
+        # Get the module and UI components
         module = get_backbone_uimodule(config=config, **kwargs)
+        ui_components = module.get_ui_components()
         
+        # Prepare the result dictionary
         result = {
             'success': True,
             'module': module,
-            'ui_components': module.get_ui_components(),
+            'ui_components': ui_components,
             'status': module.get_backbone_status()
         }
         
-        # Display UI if requested and components are available
-        if display and result['ui_components']:
+        # Display the UI if requested
+        if display and ui_components:
+            from IPython import get_ipython
             from IPython.display import display as ipython_display
-            main_ui = result['ui_components'].get('main_container')
-            if main_ui:
-                ipython_display(main_ui)
+            
+            # Clear any existing output
+            if get_ipython() is not None:
+                ipython_display.clear_output(wait=True)
+            
+            # Get the main UI container and display it
+            main_ui = ui_components.get('main_container')
+            if main_ui is not None:
+                try:
+                    # Get the widget using the show() method
+                    ui_widget = main_ui.show()
+                    # Display the widget
+                    ipython_display(ui_widget)
+                except Exception as e:
+                    # Fallback to simple display if anything goes wrong
+                    self.logger.error(f"Error displaying UI: {str(e)}")
+                    ipython_display(main_ui)
+                return None  # Don't return data when display=True
         
         return result
         
     except Exception as e:
+        # Always return a dictionary, even on error
         return {
             'success': False,
             'error': str(e),

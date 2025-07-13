@@ -574,24 +574,18 @@ def initialize_pretrained_ui(
         # Display the UI if requested
         if display and ui_components:
             from IPython import get_ipython
-            from IPython.display import display as ipython_display
-            
-            # Clear any existing output
+            from IPython.display import display as ipython_display, clear_output
             if get_ipython() is not None:
-                ipython_display.clear_output(wait=True)
-            
-            # Get the main UI container and display it
+                clear_output(wait=True)
             main_ui = ui_components.get('main_container')
             if main_ui is not None:
                 try:
-                    # Get the widget using the show() method if available
                     if hasattr(main_ui, 'show'):
                         ui_widget = main_ui.show()
                         ipython_display(ui_widget)
                     else:
                         ipython_display(main_ui)
                 except Exception as e:
-                    # Fallback to simple display if anything goes wrong
                     module.logger.error(f"Error displaying UI: {str(e)}")
                     ipython_display(main_ui)
                 return None  # Don't return data when display=True

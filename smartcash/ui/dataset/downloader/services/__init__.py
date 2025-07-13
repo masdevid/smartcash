@@ -19,6 +19,7 @@ from .core.base_service import BaseService
 from .backends.dataset_scanner import DatasetScannerService
 from .validators.config_validator import ConfigValidatorService
 from .utils.secret_manager import SecretManagerService
+from .downloader_service import DownloaderService
 
 # Type variable for service classes
 T = TypeVar('T', bound=BaseService)

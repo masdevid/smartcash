@@ -89,3 +89,27 @@ class SecretManagerService(BaseService):
             'message': 'API key is valid',
             'key_preview': f"{api_key[:4]}{'*' * (len(api_key) - 8)}{api_key[-4:]}" if len(api_key) > 8 else '****'
         }
+    
+    def create_api_key_info_html(self, config: Dict[str, Any]) -> str:
+        """Create HTML info for API key status.
+        
+        Args:
+            config: Configuration dictionary
+            
+        Returns:
+            HTML string with API key information
+        """
+        api_key = config.get('data', {}).get('roboflow', {}).get('api_key', '')
+        
+        if api_key:
+            return f"""
+            <div style="color: green; font-size: 12px; margin-top: 5px;">
+                ✅ API Key loaded (first 4 chars: {api_key[:4]}...)
+            </div>
+            """
+        else:
+            return """
+            <div style="color: orange; font-size: 12px; margin-top: 5px;">
+                ⚠️ No API key found. Please enter your Roboflow API key.
+            </div>
+            """

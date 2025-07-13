@@ -220,6 +220,12 @@ class SuppressInitialLogs:
         def wrapper(*args, **kwargs):
             with suppress_initial_logs(self.duration, self.suppressed_namespaces):
                 return func(*args, **kwargs)
+        
+        # Set the __wrapped__ attribute for introspection
+        wrapper.__wrapped__ = func
+        wrapper.__name__ = getattr(func, '__name__', 'wrapped')
+        wrapper.__doc__ = getattr(func, '__doc__', None)
+        
         return wrapper
 
 

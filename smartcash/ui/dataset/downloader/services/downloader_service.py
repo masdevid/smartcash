@@ -8,7 +8,9 @@ import logging
 from pathlib import Path
 
 from .core.base_service import BaseService
-from . import get_dataset_scanner, get_config_validator, get_secret_manager
+from .backends.dataset_scanner import DatasetScannerService
+from .validators.config_validator import ConfigValidatorService
+from .utils.secret_manager import SecretManagerService
 
 class DownloaderService(BaseService):
     """Main service for the downloader module that coordinates between different services.
@@ -24,9 +26,9 @@ class DownloaderService(BaseService):
             logger: Optional logger instance
         """
         super().__init__(logger)
-        self._dataset_scanner = get_dataset_scanner(logger)
-        self._config_validator = get_config_validator(logger)
-        self._secret_manager = get_secret_manager(logger)
+        self._dataset_scanner = DatasetScannerService(logger)
+        self._config_validator = ConfigValidatorService(logger)
+        self._secret_manager = SecretManagerService(logger)
     
     def get_existing_dataset_count(self) -> int:
         """Get the count of existing dataset files.

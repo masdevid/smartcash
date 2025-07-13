@@ -7,12 +7,11 @@ This module contains operation-specific handlers for download, check, and cleanu
 from .download_operation import DownloadOperationHandler
 from .check_operation import CheckOperationHandler  
 from .cleanup_operation import CleanupOperationHandler
-from .manager import DownloaderOperationManager, DownloadHandlerManager
+from .manager import DownloaderOperationManager
 
 __all__ = [
     'DownloadOperationHandler',
     'CheckOperationHandler', 
     'CleanupOperationHandler',
-    'DownloaderOperationManager',
-    'DownloadHandlerManager'
+    'DownloaderOperationManager'
 ]

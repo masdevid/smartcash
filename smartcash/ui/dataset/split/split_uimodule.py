@@ -8,9 +8,9 @@ from typing import Dict, Any, Optional
 # Import ipywidgets for UI components
 import ipywidgets as widgets
 
-from smartcash.ui.core.ui_module import UIModule, register_operation_method
-from smartcash.ui.core.ui_module_factory import UIModuleFactory, create_template
+from smartcash.ui.core.ui_module import UIModule
 from smartcash.ui.logger import get_module_logger
+from smartcash.ui.core.decorators import suppress_ui_init_logs
 
 # Import split components
 from smartcash.ui.dataset.split.components.split_ui import create_split_ui
@@ -21,45 +21,32 @@ from smartcash.ui.dataset.split.constants import UI_CONFIG, MODULE_METADATA
 
 class SplitUIModule(UIModule):
     """
-    Main UIModule implementation for split configuration module.
+    UIModule implementation for dataset split configuration.
     
     Features:
     - 📋 Split configuration management (train/val/test ratios)
-    - 💾 Save and reset configuration functionality
-    - 🎯 UIModule pattern consistency with core modules
+    - 💾 Save and reset configuration functionality  
+    - 🎯 New UIModule pattern with operation container logging
     - 🔧 Configuration validation and UI synchronization
-    - 📱 Enhanced error handling and logging
+    - 📱 Button bindings for save/reset operations
     - ♻️ Proper resource management and cleanup
-    
-    Note: This is a configuration-only module with save/reset buttons.
     """
     
-    def __init__(self, config: Optional[Dict[str, Any]] = None):
-        """
-        Initialize split UIModule.
-        
-        Args:
-            config: Optional configuration dictionary
-        """
+    def __init__(self):
+        """Initialize split UI module."""
         super().__init__(
-            module_name=UI_CONFIG['module_name'],
-            parent_module=UI_CONFIG['parent_module']
+            module_name='split',
+            parent_module='dataset'
         )
         
-        # Store module metadata
-        self.module_metadata = MODULE_METADATA
-        
-        # Initialize with provided or default config
-        self.config = config or {}
-        self.merged_config = self._merge_with_defaults(self.config)
+        self.logger = get_module_logger("smartcash.ui.dataset.split")
         
         # Initialize components
         self._config_handler = None
-        self._ui_components = {}
+        self._ui_components = None
+        self._merged_config = {}
         
-        # Track initialization state
-        self._is_initialized = False
-        self._initialization_error = None
+        self.logger.debug("✅ SplitUIModule initialized")
     
     def _merge_with_defaults(self, user_config: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -91,60 +78,153 @@ class SplitUIModule(UIModule):
             self.logger.error(f"Error merging configurations: {e}")
             return user_config
     
-    def initialize(self) -> bool:
+    def _initialize_config_handler(self, config: Optional[Dict[str, Any]] = None) -> None:
+        """Initialize configuration handler."""
+        try:
+            # Get default config first
+            default_config = get_default_split_config()
+            
+            # Merge provided config with defaults
+            if config:
+                merged_config = self._merge_with_defaults(config)
+            else:
+                merged_config = default_config
+            
+            # Initialize config handler
+            self._config_handler = SplitConfigHandler(merged_config)
+            
+            # Store merged config internally
+            self._merged_config = merged_config
+            
+            self.logger.debug(f"✅ Config handler initialized with split configuration")
+            
+        except Exception as e:
+            self.logger.error(f"Failed to initialize config handler: {e}", exc_info=True)
+            raise
+    
+    def _create_ui_components(self, config: Dict[str, Any]) -> Dict[str, Any]:
+        """Create UI components."""
+        try:
+            from .components.split_ui import create_split_ui
+            
+            self.logger.debug("Creating split UI components...")
+            ui_components = create_split_ui(config=config)
+            
+            if not ui_components:
+                raise RuntimeError("Failed to create UI components")
+            
+            self.logger.debug(f"✅ Created {len(ui_components)} UI components")
+            return ui_components
+            
+        except Exception as e:
+            self.logger.error(f"Failed to create UI components: {e}")
+            raise
+    
+    def _setup_button_handlers(self) -> None:
+        """Setup button event handlers for split operations."""
+        try:
+            if not self._ui_components:
+                self.logger.warning("Cannot setup button handlers - missing UI components")
+                return
+                
+            # Get buttons
+            save_button = self._ui_components.get('save_button')
+            reset_button = self._ui_components.get('reset_button')
+            
+            # Setup save button handler
+            if save_button and hasattr(save_button, 'on_click'):
+                save_button.on_click(self._handle_save_config)
+                self.logger.debug("✅ Bound Save button to _handle_save_config")
+            else:
+                self.logger.warning("Save button not found or doesn't support on_click")
+                
+            # Setup reset button handler  
+            if reset_button and hasattr(reset_button, 'on_click'):
+                reset_button.on_click(self._handle_reset_config)
+                self.logger.debug("✅ Bound Reset button to _handle_reset_config")
+            else:
+                self.logger.warning("Reset button not found or doesn't support on_click")
+                
+        except Exception as e:
+            self.logger.error(f"Failed to setup button handlers: {e}")
+    
+    def _handle_save_config(self, button=None):
+        """Handle save config button click."""
+        try:
+            self.log("💾 Save config button clicked", 'info')
+            result = self.save_config()
+            if result.get('success'):
+                self.log(f"✅ Configuration saved: {result.get('message', '')}", 'success')
+            else:
+                self.log(f"❌ Save failed: {result.get('message', '')}", 'error')
+        except Exception as e:
+            self.log(f"❌ Save config error: {e}", 'error')
+    
+    def _handle_reset_config(self, button=None):
+        """Handle reset config button click."""
+        try:
+            self.log("🔄 Reset config button clicked", 'info')
+            result = self.reset_config()
+            if result.get('success'):
+                self.log(f"✅ Configuration reset: {result.get('message', '')}", 'success')
+            else:
+                self.log(f"❌ Reset failed: {result.get('message', '')}", 'error')
+        except Exception as e:
+            self.log(f"❌ Reset config error: {e}", 'error')
+    
+    def log(self, message: str, level: str = 'info') -> None:
+        """Log message to operation container."""
+        try:
+            # Look for operation container with log capability
+            operation_container = self._ui_components.get('operation_container')
+            if operation_container and isinstance(operation_container, dict):
+                log_message_func = operation_container.get('log_message')
+                if log_message_func and callable(log_message_func):
+                    log_message_func(message, level)
+                    return
+            
+            # Fallback to logger
+            getattr(self.logger, level, self.logger.info)(message)
+            
+        except Exception as e:
+            self.logger.error(f"Failed to log message: {e}")
+            getattr(self.logger, level, self.logger.info)(message)
+    
+    @suppress_ui_init_logs(duration=3.0)
+    def initialize(self, config: Optional[Dict[str, Any]] = None, **kwargs) -> None:
         """
         Initialize the split module.
         
-        Returns:
-            True if initialization successful, False otherwise
+        Args:
+            config: Optional configuration dictionary
+            **kwargs: Additional initialization arguments
         """
-        if self._is_initialized:
-            self.logger.info("Split module already initialized")
-            return True
-        
         try:
-            self.logger.info("📊 Initializing split configuration module")
+            # Initialize configuration handler
+            self._initialize_config_handler(config)
             
-            # 1. Create configuration handler
-            self._config_handler = SplitConfigHandler(self.merged_config)
+            # Create UI components
+            self._ui_components = self._create_ui_components(self._merged_config)
             
-            # 2. Create UI components
-            self._ui_components = create_split_ui(config=self.merged_config)
-            if not self._ui_components:
-                raise RuntimeError("Failed to create UI components")
+            # Setup button event handlers
+            self._setup_button_handlers()
             
-            # 3. Setup event handlers for save/reset buttons
-            self._setup_event_handlers()
+            # Log successful initialization to operation container
+            self.log("✅ Split module initialized successfully", 'info')
+            self.log("📊 Ready for dataset split configuration", 'info')
             
-            # 4. Mark as initialized
-            self._is_initialized = True
-            self.logger.info("✅ Split module initialized successfully")
-            
-            return True
+            # Call base class initialization to set status to READY
+            super().initialize()
             
         except Exception as e:
-            error_msg = f"Failed to initialize split module: {str(e)}"
-            self.logger.error(error_msg, exc_info=True)
-            self._initialization_error = error_msg
-            return False
+            self.logger.error(f"Failed to initialize split module: {e}")
+            raise RuntimeError("Failed to initialize split module")
     
-    def _setup_event_handlers(self) -> None:
-        """Setup event handlers for UI components."""
-        try:
-            # Connect save button handler
-            save_btn = self._ui_components.get('save_button')
-            if save_btn and hasattr(save_btn, 'on_click'):
-                save_btn.on_click(lambda _: self.save_config())
-            
-            # Connect reset button handler
-            reset_btn = self._ui_components.get('reset_button')
-            if reset_btn and hasattr(reset_btn, 'on_click'):
-                reset_btn.on_click(lambda _: self.reset_config())
-            
-            self.logger.info("✅ Event handlers connected")
-            
-        except Exception as e:
-            self.logger.error(f"Error setting up event handlers: {e}")
+    def get_config(self) -> Dict[str, Any]:
+        """Get current configuration."""
+        if self._config_handler:
+            return self._config_handler.get_config()
+        return self._merged_config.copy()
     
     def get_ui_components(self) -> Dict[str, Any]:
         """
@@ -153,11 +233,7 @@ class SplitUIModule(UIModule):
         Returns:
             Dictionary of UI components
         """
-        if not self._is_initialized:
-            if not self.initialize():
-                return {'error': self._initialization_error or 'Failed to initialize'}
-        
-        return self._ui_components.copy()
+        return self._ui_components or {}
     
     def get_main_widget(self):
         """
@@ -236,36 +312,8 @@ class SplitUIModule(UIModule):
         """
         if self._config_handler:
             return self._config_handler.get_config()
-        return self.merged_config.copy()
+        return self._merged_config.copy()
     
-    def update_config(self, new_config: Dict[str, Any]) -> bool:
-        """
-        Update module configuration.
-        
-        Args:
-            new_config: New configuration values
-            
-        Returns:
-            True if update successful, False otherwise
-        """
-        try:
-            # Merge with existing config
-            self.merged_config = self._merge_with_defaults(new_config)
-            
-            # Update config handler if available
-            if self._config_handler:
-                self._config_handler.update_config(self.merged_config)
-                
-                # Update UI from new config
-                if self._ui_components:
-                    self._config_handler.update_ui_from_config(self._ui_components)
-            
-            self.logger.info("Configuration updated successfully")
-            return True
-            
-        except Exception as e:
-            self.logger.error(f"Error updating configuration: {e}")
-            return False
     
     # ==================== CONFIGURATION OPERATIONS ====================
     
@@ -277,8 +325,8 @@ class SplitUIModule(UIModule):
             Save operation result
         """
         try:
-            if not self._is_initialized and not self.initialize():
-                return {'success': False, 'message': 'Module not initialized'}
+            if not self.is_ready():
+                self.initialize()
             
             if not self._config_handler:
                 return {'success': False, 'message': 'Configuration handler not available'}
@@ -291,17 +339,10 @@ class SplitUIModule(UIModule):
                 return {'success': False, 'message': 'Configuration validation failed'}
             
             # Update internal config
-            self.merged_config = current_config
+            self._merged_config = current_config
             self._config_handler.update_config(current_config)
             
             self.logger.info("💾 Configuration saved successfully")
-            
-            # Log to UI if available
-            log_accordion = self._ui_components.get('log_accordion')
-            if log_accordion and hasattr(log_accordion, 'children') and log_accordion.children:
-                log_output = log_accordion.children[0]
-                if hasattr(log_output, 'append_stdout'):
-                    log_output.append_stdout("✅ Configuration saved successfully\n")
             
             return {
                 'success': True,
@@ -328,8 +369,8 @@ class SplitUIModule(UIModule):
             Reset operation result
         """
         try:
-            if not self._is_initialized and not self.initialize():
-                return {'success': False, 'message': 'Module not initialized'}
+            if not self.is_ready():
+                self.initialize()
             
             # Get default configuration
             default_config = get_default_split_config()
@@ -343,16 +384,9 @@ class SplitUIModule(UIModule):
                     self._config_handler.update_ui_from_config(self._ui_components, default_config)
             
             # Update internal config
-            self.merged_config = default_config
+            self._merged_config = default_config
             
             self.logger.info("🔄 Configuration reset to defaults")
-            
-            # Log to UI if available
-            log_accordion = self._ui_components.get('log_accordion')
-            if log_accordion and hasattr(log_accordion, 'children') and log_accordion.children:
-                log_output = log_accordion.children[0]
-                if hasattr(log_output, 'append_stdout'):
-                    log_output.append_stdout("🔄 Configuration reset to defaults\n")
             
             return {
                 'success': True,
@@ -429,35 +463,25 @@ _split_uimodule_instance: Optional[SplitUIModule] = None
 def create_split_uimodule(
     config: Optional[Dict[str, Any]] = None,
     auto_initialize: bool = True,
-    reset_existing: bool = False
+    **kwargs
 ) -> SplitUIModule:
     """
-    Factory function to create split UIModule.
+    Create a new split UIModule instance.
     
     Args:
         config: Optional configuration dictionary
-        auto_initialize: Whether to automatically initialize the module
-        reset_existing: Whether to reset existing singleton instance
+        auto_initialize: Whether to auto-initialize the module
+        **kwargs: Additional arguments
         
     Returns:
         SplitUIModule instance
     """
-    global _split_uimodule_instance
+    module = SplitUIModule()
     
-    # Reset existing instance if requested
-    if reset_existing and _split_uimodule_instance:
-        _split_uimodule_instance.cleanup()
-        _split_uimodule_instance = None
+    if auto_initialize:
+        module.initialize(config, **kwargs)
     
-    # Create new instance if none exists
-    if _split_uimodule_instance is None:
-        _split_uimodule_instance = SplitUIModule(config=config)
-    
-    # Initialize if requested and not already initialized
-    if auto_initialize and not _split_uimodule_instance._is_initialized:
-        _split_uimodule_instance.initialize()
-    
-    return _split_uimodule_instance
+    return module
 
 
 def get_split_uimodule() -> Optional[SplitUIModule]:
@@ -484,17 +508,26 @@ def reset_split_uimodule() -> None:
 def register_split_shared_methods() -> None:
     """Register shared methods for split module."""
     try:
-        # Register split-specific shared methods
-        shared_methods = {
-            'save_config': lambda module, **kwargs: module.save_config(),
-            'reset_config': lambda module, **kwargs: module.reset_config(),
-            'get_split_status': lambda module: module.get_split_status(),
-            'update_split_config': lambda module, **kwargs: module.update_config(kwargs.get('config', {}))
-        }
+        from smartcash.ui.core.ui_module import SharedMethodRegistry
         
-        # Register each method individually
-        for method_name, method_func in shared_methods.items():
-            register_operation_method(f"split.{method_name}", method_func)
+        # Register split-specific shared methods
+        SharedMethodRegistry.register_method(
+            'split.save_config',
+            lambda: create_split_uimodule().save_config(),
+            description='Save split configuration'
+        )
+        
+        SharedMethodRegistry.register_method(
+            'split.reset_config', 
+            lambda: create_split_uimodule().reset_config(),
+            description='Reset split configuration'
+        )
+        
+        SharedMethodRegistry.register_method(
+            'split.get_split_status',
+            lambda: create_split_uimodule().get_split_status(),
+            description='Get split configuration status'
+        )
         
         logger = get_module_logger("smartcash.ui.dataset.split.shared")
         logger.debug("📋 Registered split shared methods")
@@ -505,34 +538,6 @@ def register_split_shared_methods() -> None:
         logger.error(f"Failed to register shared methods: {e}")
 
 
-def register_split_template() -> None:
-    """Register split module template with UIModuleFactory."""
-    try:
-        template = create_template(
-            module_name="split",
-            parent_module="dataset",
-            default_config=get_default_split_config(),
-            required_components=[
-                "main_container", "header_container", "form_container", 
-                "action_container", "footer_container"
-            ],
-            required_operations=[
-                "save_config", "reset_config", "get_split_status"
-            ],
-            auto_initialize=False,
-            description="Dataset split configuration module with train/validation/test ratios"
-        )
-        
-        UIModuleFactory.register_template(template, overwrite=True)
-        logger = get_module_logger("smartcash.ui.dataset.split.template")
-        logger.debug("📋 Registered split template")
-        
-    except Exception as e:
-        # Log error but don't raise to avoid breaking module loading
-        logger = get_module_logger("smartcash.ui.dataset.split.template")
-        logger.error(f"Failed to register template: {e}")
-
-
 # ==================== CONVENIENCE FUNCTIONS ====================
 
 def initialize_split_ui(
@@ -540,7 +545,7 @@ def initialize_split_ui(
     display: bool = True
 ) -> Optional[Dict[str, Any]]:
     """
-    Initialize and optionally display split UI using UIModule pattern.
+    Initialize and optionally display split UI using new UIModule pattern.
     
     Args:
         config: Optional configuration dictionary
@@ -551,7 +556,7 @@ def initialize_split_ui(
         If display=False: Returns a dictionary with UI components and status
     """
     try:
-        # Get the module and UI components
+        # Create module instance
         module = create_split_uimodule(config=config, auto_initialize=True)
         ui_components = module.get_ui_components()
         
@@ -560,41 +565,25 @@ def initialize_split_ui(
             'success': True,
             'module': module,
             'ui_components': ui_components,
-            'status': module.get_status() if hasattr(module, 'get_status') else {}
+            'status': module.get_split_status()
         }
         
         # Display the UI if requested
         if display and ui_components:
-            from IPython import get_ipython
-            from IPython.display import display as ipython_display, clear_output
-            
-            # Clear any existing output
-            if get_ipython() is not None:
-                clear_output(wait=True)
+            from IPython.display import display as ipython_display
             
             # Get the main UI container and display it
             main_ui = ui_components.get('main_container')
             if main_ui is not None:
-                try:
-                    # Get the widget using the show() method if available
-                    if hasattr(main_ui, 'show'):
-                        ui_widget = main_ui.show()
-                        ipython_display(ui_widget)
-                    else:
-                        ipython_display(main_ui)
-                except Exception as e:
-                    # Fallback to simple display if anything goes wrong
-                    module.logger.error(f"Error displaying UI: {str(e)}")
-                    ipython_display(main_ui)
+                ipython_display(main_ui)
                 return None  # Don't return data when display=True
         
         return result
         
     except Exception as e:
         error_msg = f"Failed to initialize split UI: {str(e)}"
-        print(f"❌ {error_msg}")
-        import traceback
-        traceback.print_exc()
+        import logging
+        logging.getLogger(__name__).error(error_msg, exc_info=True)
         
         return {
             'success': False,
@@ -623,7 +612,6 @@ def get_split_components() -> Dict[str, Any]:
 # Auto-register when module is imported
 try:
     register_split_shared_methods()
-    register_split_template()
 except Exception as e:
     # Log but continue - registration is optional
     import logging

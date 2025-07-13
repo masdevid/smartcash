@@ -22,16 +22,34 @@ class EvaluationService:
     """Main evaluation service untuk research scenarios dengan comprehensive metrics"""
     
     def __init__(self, model_api=None, config: Dict[str, Any] = None):
-        self.config = config or {}
-        self.logger = get_logger('evaluation_service')
+        # Ensure config is a dictionary and has the expected structure
+        if not isinstance(config, dict):
+            self.logger = get_logger('evaluation_service')
+            self.logger.warning(f"Config is not a dictionary (got {type(config).__name__}), converting to dict")
+            config = {"evaluation": config} if config is not None else {}
+        
+        # Ensure the config has the required structure
+        if "evaluation" not in config:
+            if not hasattr(self, 'logger'):
+                self.logger = get_logger('evaluation_service')
+            self.logger.warning("Config missing 'evaluation' key, adding it")
+            config = {"evaluation": config if config is not None else {}}
+        
+        self.config = config
+        if not hasattr(self, 'logger'):
+            self.logger = get_logger('evaluation_service')
         self.model_api = model_api
         
-        # Initialize components
-        self.scenario_manager = ScenarioManager(config)
-        self.evaluation_metrics = EvaluationMetrics(config)
-        self.checkpoint_selector = CheckpointSelector(config=config)
-        self.inference_timer = InferenceTimer(config)
-        self.results_aggregator = ResultsAggregator(config)
+        try:
+            # Initialize components with proper error handling
+            self.scenario_manager = ScenarioManager(config)
+            self.evaluation_metrics = EvaluationMetrics(config)
+            self.checkpoint_selector = CheckpointSelector(config=config)
+            self.inference_timer = InferenceTimer(config)
+            self.results_aggregator = ResultsAggregator(config)
+        except Exception as e:
+            self.logger.error(f"Failed to initialize evaluation service components: {e}", exc_info=True)
+            raise
         
         # Progress tracking
         self.progress_bridge = None

@@ -16,9 +16,32 @@ class InferenceTimer:
     """Timer untuk measuring inference performance dengan detailed statistics"""
     
     def __init__(self, config: Dict[str, Any] = None):
-        self.config = config or {}
-        self.logger = get_logger('inference_timer')
-        self.timing_config = self.config.get('evaluation', {}).get('metrics', {}).get('inference_time', {})
+        # Ensure config is a dictionary
+        if config is None:
+            self.config = {}
+        elif isinstance(config, dict):
+            self.config = config
+        else:
+            self.logger = get_logger('inference_timer')
+            self.logger.warning(f"Config is not a dictionary (got {type(config).__name__}), converting to dict")
+            self.config = {"evaluation": {"metrics": {"inference_time": config}}} if config is not None else {}
+        
+        if not hasattr(self, 'logger'):
+            self.logger = get_logger('inference_timer')
+            
+        # Safely access nested config with proper defaults
+        try:
+            if not isinstance(self.config, dict):
+                raise ValueError(f"Expected dict for config, got {type(self.config).__name__}")
+                
+            self.timing_config = {}
+            if 'evaluation' in self.config and isinstance(self.config['evaluation'], dict):
+                metrics = self.config['evaluation'].get('metrics', {})
+                if isinstance(metrics, dict):
+                    self.timing_config = metrics.get('inference_time', {})
+        except Exception as e:
+            self.logger.warning(f"Error processing timing config: {e}")
+            self.timing_config = {}
         
         # Timing storage
         self.timings = defaultdict(list)

@@ -18,15 +18,52 @@ class VisualizationConfigHandler(SharedConfigHandler):
         Args:
             config: Optional initial configuration
         """
-        # Initialize with module name and parent module for shared config
-        super().__init__(
-            module_name='visualization',
-            parent_module='dataset',
-            default_config=config or {},
-            enable_sharing=True  # Enable shared configuration
-        )
-        
+        # Initialize logger first
         self.logger = get_module_logger("smartcash.ui.dataset.visualization.config")
+        
+        # Initialize defaults from DEFAULT_CONFIG
+        self._defaults = {}
+        if hasattr(DEFAULT_CONFIG, 'to_dict'):
+            self._defaults = DEFAULT_CONFIG.to_dict()
+        elif hasattr(DEFAULT_CONFIG, '__dict__'):
+            self._defaults = {k: v for k, v in DEFAULT_CONFIG.__dict__.items()
+                           if not k.startswith('_') and not callable(v)}
+        
+        # Initialize config with provided config or defaults
+        if config is None:
+            config = {}
+        elif isinstance(config, str):
+            # If config is a string, treat it as a config name and use defaults
+            config_name = config
+            config = self._defaults.copy()
+            self.logger.info(f"Using default configuration for '{config_name}'")
+        
+        # Initialize with module name and parent module for shared config
+        try:
+            # Try to initialize with shared config if available
+            if hasattr(super(), '__init__'):
+                try:
+                    super().__init__(
+                        module_name='visualization',
+                        parent_module='dataset',
+                        default_config=config,
+                        enable_sharing=True
+                    )
+                    # If we get here, the parent class initialized successfully
+                    return
+                except TypeError as e:
+                    self.logger.debug(f"Falling back to basic initialization: {e}")
+            
+            # Fallback to basic initialization
+            self._config = config.copy() if hasattr(config, 'copy') else dict(config)
+            
+        except Exception as e:
+            self.logger.error(f"Error initializing config handler: {e}", exc_info=True)
+            self._config = self._defaults.copy()
+        
+        # Ensure _config is a dictionary
+        if not hasattr(self, '_config') or not isinstance(self._config, dict):
+            self._config = {}
         
         # Get default values from the VisualizationDefaults class
         self._defaults = {}
@@ -38,7 +75,12 @@ class VisualizationConfigHandler(SharedConfigHandler):
         self._initialize_defaults()
         
         # Initialize shared configuration
-        self.initialize()
+        try:
+            self.initialize()
+        except Exception as e:
+            self.logger.warning(f"Failed to initialize shared config: {e}")
+            # Fall back to local config if shared config fails
+            self._config = config.copy() if hasattr(config, 'copy') else dict(config)
     
     def _initialize_defaults(self):
         """Initialize default configuration values."""

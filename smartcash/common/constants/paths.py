@@ -94,5 +94,5 @@ def get_paths_for_environment(is_colab: bool = False, is_drive_mounted: bool = F
             'valid': VALID_DIR,
             'test': TEST_DIR,
             'backup': BACKUP_DIR,
-            'config': DEFAULT_CONFIG_DIR
+            'config': f"{BASE_PATH}/smartcash/{DEFAULT_CONFIG_DIR}"
         }

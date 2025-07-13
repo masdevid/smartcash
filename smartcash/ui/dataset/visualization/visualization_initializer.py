@@ -536,49 +536,153 @@ def display_visualization_ui(env=None, config=None, **kwargs):
 
 
 # Main entry point function for cell execution
-def init_visualization_ui(**kwargs):
-    """Initialize and display visualization UI.
-    
-    This is the main entry point function that should be called from notebook cells.
-    It creates the visualization initializer and displays the UI directly.
+def init_visualization_ui(config: Optional[Dict[str, Any]] = None, display: bool = True, **kwargs):
+    """Initialize and optionally display the visualization UI.
     
     Args:
-        **kwargs: Additional initialization parameters
+        config: Optional configuration dictionary to override defaults
+        display: If True, display the UI immediately (default: True)
+        **kwargs: Additional keyword arguments for UI customization
         
     Returns:
-        Dictionary containing initialization results and UI components
+        If display=True: Returns the displayed widget
+        If display=False: Returns a dictionary with UI components and initializer
+        
+    Raises:
+        Exception: If initialization fails
     """
     try:
-        # Get or create the global initializer
+        from IPython.display import display as ipython_display, clear_output, HTML
+        from ipywidgets import VBox, Output
+        
+        # Initialize the visualization module
         initializer = get_visualization_initializer()
         
-        # Initialize and get UI components
-        components = initializer.initialize_full(**kwargs)
+        # Create UI components
+        components = {}
+        if hasattr(initializer, 'create_ui_components'):
+            components = initializer.create_ui_components(config=config, **kwargs)
+        elif hasattr(initializer, 'initialize_module_ui'):
+            # Fallback to legacy method if create_ui_components doesn't exist
+            ui = initializer.initialize_module_ui(
+                module_name='visualization', 
+                parent_module='dataset', 
+                config=config, 
+                **kwargs
+            )
+            if ui is not None:
+                if display:
+                    clear_output(wait=True)
+                    ipython_display(ui)
+                    initializer.logger.info("✅ Visualization UI displayed successfully")
+                return ui if display else initializer
+        else:
+            error_msg = "❌ No supported UI initialization method found"
+            if display:
+                ipython_display(HTML(f'<div style="color: red; padding: 10px; border: 1px solid red;">{error_msg}</div>'))
+            raise ValueError(error_msg)
         
-        # Display the UI
-        if 'container' in components:
-            from IPython.display import display
-            display(components['container'])
+        # Get the main container from components
+        main_container = None
+        ui_components = components.get('ui_components', {})
         
-        # Log success
-        initializer.logger.info("✅ Visualization UI initialized successfully")
+        # Try to get the main container from different possible locations
+        for container_key in ['ui', 'main_container', 'container']:
+            if container_key in components:
+                main_container = components[container_key]
+                break
         
-        return {
+        if not main_container and 'containers' in components and 'main' in components['containers']:
+            main_container = components['containers']['main']
+        if not main_container and 'containers' in ui_components and 'main' in ui_components['containers']:
+            main_container = ui_components['containers']['main']
+        
+        # If still no main container, try to create one from available components
+        if not main_container:
+            all_components = {**components, **(ui_components or {})}
+            displayable = [
+                comp for comp in all_components.values() 
+                if hasattr(comp, '_ipython_display_') or hasattr(comp, '_repr_html_')
+            ]
+            
+            if displayable:
+                main_container = VBox(displayable)
+            else:
+                error_msg = "❌ No displayable UI components found in visualization module"
+                if display:
+                    ipython_display(HTML(f'<div style="color: red; padding: 10px; border: 1px solid red;">{error_msg}</div>'))
+                raise ValueError(error_msg)
+        
+        if display:
+            try:
+                clear_output(wait=True)
+                
+                # Try using show() method if available
+                if hasattr(main_container, 'show'):
+                    try:
+                        # Some widgets have a show() method that returns a widget
+                        ui_widget = main_container.show()
+                        ipython_display(ui_widget)
+                    except Exception as show_error:
+                        initializer.logger.warning(f"show() method failed, falling back to direct display: {show_error}")
+                        ipython_display(main_container)
+                else:
+                    # Fallback to direct display
+                    ipython_display(main_container)
+                
+                initializer.logger.info("✅ Visualization UI displayed successfully")
+                
+            except Exception as display_error:
+                error_msg = f"❌ Failed to display visualization UI: {str(display_error)}"
+                initializer.logger.error(error_msg, exc_info=True)
+                
+                # Fallback to error display
+                error_html = (
+                    "<div style='color: #721c24; padding: 15px; margin: 10px 0; "
+                    "border: 1px solid #f5c6cb; background-color: #f8d7da; "
+                    "border-radius: 4px;'>"
+                    "<h3 style='margin-top: 0; color: #721c24;'>❌ Error Displaying Visualization UI</h3>"
+                    f"<p><strong>Error:</strong> {str(display_error)}</p>"
+                    "<p>Please check the logs for more details.</p>"
+                    "</div>"
+                )
+                
+                if display:
+                    ipython_display(HTML(error_html))
+                raise
+        
+        # Return the appropriate result based on display flag
+        if display:
+            return main_container
+        
+        # Return a result dictionary when not displaying
+        result = {
             'status': 'success',
+            'ui': main_container,
+            'main_container': main_container,
             'components': components,
             'initializer': initializer
         }
         
+        # Include all containers and widgets if available
+        if 'containers' in ui_components:
+            result['containers'] = ui_components['containers']
+        if 'widgets' in ui_components:
+            result['widgets'] = ui_components['widgets']
+            
+        return result
+        
     except Exception as e:
         error_msg = f"❌ Failed to initialize visualization UI: {str(e)}"
-        get_module_logger('visualization').error(error_msg, exc_info=True)
+        print(error_msg)
+        import traceback
+        traceback.print_exc()
         
-        # Display error message
-        from IPython.display import display, HTML
-        display(HTML(f'<div class="alert alert-danger">{error_msg}</div>'))
+        if display and 'ipython_display' in locals():
+            ipython_display(HTML(f'<div style="color: red; padding: 10px; border: 1px solid red;">{error_msg}</div>'))
         
         return {
             'status': 'error',
-            'error': str(e),
-            'message': error_msg
+            'message': error_msg,
+            'error': str(e)
         }

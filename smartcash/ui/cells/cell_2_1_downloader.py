@@ -8,4 +8,4 @@ NOTE: Cell Code should remain minimal (import and run initializer only).
 from smartcash.ui.dataset.downloader.downloader_uimodule import initialize_downloader_ui
 
 # Initialize and display the downloader UI
-initialize_downloader_ui()
+initialize_downloader_ui(display=True)

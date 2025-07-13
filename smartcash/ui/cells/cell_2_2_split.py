@@ -6,5 +6,5 @@ NOTE: Cell Code should remain minimal (import and run initializer only).
 """
 
 from smartcash.ui.dataset.split import initialize_split_ui
-initialize_split_ui()
+initialize_split_ui(display=True)
 

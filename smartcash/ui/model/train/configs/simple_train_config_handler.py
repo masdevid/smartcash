@@ -3,10 +3,10 @@ Simplified Training Config Handler - No Shared Config Dependency
 Just handles config validation and backbone integration.
 """
 
-from typing import Dict, Any, Optional
+from typing import Dict, Any
 from smartcash.ui.logger import get_module_logger
 from .train_defaults import get_default_train_config, get_layer_mode_configs, get_optimization_types
-from ..constants import VALIDATION_CONFIG, LayerMode, OptimizationType, generate_model_name
+from ..constants import generate_model_name
 
 
 class SimpleTrainConfigHandler:

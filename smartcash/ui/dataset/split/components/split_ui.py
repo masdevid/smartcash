@@ -230,7 +230,7 @@ def create_split_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> Dict[s
         )
         
         # Create main container using the new container API
-        components = [
+        container_components = [
             # Header is a HeaderContainer object with .container attribute
             {'type': 'header', 'component': header.container, 'order': 0},
             # Form container is a dict with 'container' key
@@ -244,7 +244,7 @@ def create_split_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> Dict[s
         ]
         
         main_container = create_main_container(
-            components=components,
+            components=container_components,
             **kwargs
         )
         

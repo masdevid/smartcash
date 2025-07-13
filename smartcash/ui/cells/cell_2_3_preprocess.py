@@ -6,4 +6,4 @@ NOTE: Cell Code should remain minimal (import and run initializer only).
 """
 
 from smartcash.ui.dataset.preprocess.preprocess_uimodule import initialize_preprocess_ui_uimodule as initialize_preprocess_ui
-initialize_preprocess_ui()
+initialize_preprocess_ui(display=True)

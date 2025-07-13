@@ -53,14 +53,14 @@ class ColabOperationManager(OperationHandler):
         ]
         self.current_stage = 0
         
-        # Initialize individual operation handlers
+        # Initialize individual operation handlers with keys matching setup_stages
         self.operations = {
             'init': InitOperation(config, operation_container=operation_container),
-            'drive': DriveMountOperation(config, operation_container=operation_container),
-            'symlink': SymlinkOperation(config, operation_container=operation_container),
-            'folders': FoldersOperation(config, operation_container=operation_container),
-            'config': ConfigSyncOperation(config, operation_container=operation_container),
-            'env': EnvSetupOperation(config, operation_container=operation_container),
+            'drive_mount': DriveMountOperation(config, operation_container=operation_container),
+            'symlink_setup': SymlinkOperation(config, operation_container=operation_container),
+            'folder_setup': FoldersOperation(config, operation_container=operation_container),
+            'config_sync': ConfigSyncOperation(config, operation_container=operation_container),
+            'env_setup': EnvSetupOperation(config, operation_container=operation_container),
             'verify': VerifyOperation(config, operation_container=operation_container)
         }
     
@@ -68,11 +68,11 @@ class ColabOperationManager(OperationHandler):
         """Get available operations for Colab setup."""
         return {
             'init': self._init_operation,
-            'drive': self._drive_mount_operation,
-            'symlink': self._symlink_operation,
-            'folders': self._folders_operation,
-            'config': self._config_sync_operation,
-            'env': self._env_setup_operation,
+            'drive_mount': self._drive_mount_operation,
+            'symlink_setup': self._symlink_operation,
+            'folder_setup': self._folders_operation,
+            'config_sync': self._config_sync_operation,
+            'env_setup': self._env_setup_operation,
             'verify': self._verify_operation,
             'full_setup': self._full_setup_operation,
             'post_init_check': self._post_init_check
@@ -152,23 +152,23 @@ class ColabOperationManager(OperationHandler):
     
     def _drive_mount_operation(self, progress_callback: Optional[Callable] = None) -> Dict[str, Any]:
         """Execute drive mount operation."""
-        return self.operations['drive'].execute_mount_drive(progress_callback)
+        return self.operations['drive_mount'].execute_mount_drive(progress_callback)
     
     def _symlink_operation(self, progress_callback: Optional[Callable] = None) -> Dict[str, Any]:
         """Execute symlink creation operation."""
-        return self.operations['symlink'].execute_create_symlinks(progress_callback)
+        return self.operations['symlink_setup'].execute_create_symlinks(progress_callback)
     
     def _folders_operation(self, progress_callback: Optional[Callable] = None) -> Dict[str, Any]:
         """Execute folder creation operation."""
-        return self.operations['folders'].execute_create_folders(progress_callback)
+        return self.operations['folder_setup'].execute_create_folders(progress_callback)
     
     def _config_sync_operation(self, progress_callback: Optional[Callable] = None) -> Dict[str, Any]:
         """Execute config sync operation."""
-        return self.operations['config'].execute_sync_configs(progress_callback)
+        return self.operations['config_sync'].execute_sync_configs(progress_callback)
     
     def _env_setup_operation(self, progress_callback: Optional[Callable] = None) -> Dict[str, Any]:
         """Execute environment setup operation."""
-        return self.operations['env'].execute_setup_environment(progress_callback)
+        return self.operations['env_setup'].execute_setup_environment(progress_callback)
     
     def _verify_operation(self, progress_callback: Optional[Callable] = None) -> Dict[str, Any]:
         """Execute verification operation."""

@@ -173,10 +173,19 @@ class ColabOperationManager(OperationHandler):
         """Execute verification operation."""
         return self.operations['verify'].execute_verify_setup(progress_callback)
     
-    def _full_setup_operation(self, progress_callback: Optional[Callable] = None) -> Dict[str, Any]:
-        """Execute complete environment setup with weighted progress tracking."""
+    def _full_setup_operation(self, progress_callback: Optional[Callable] = None, message: Optional[str] = None) -> Dict[str, Any]:
+        """Execute complete environment setup with weighted progress tracking.
+        
+        Args:
+            progress_callback: Optional callback function for progress updates
+            message: Optional message to display during operation
+            
+        Returns:
+            Dict containing operation results
+        """
         try:
-            self.log("🚀 Starting complete environment setup", 'info')
+            start_msg = message or "🚀 Starting complete environment setup"
+            self.log(start_msg, 'info')
             
             stage_results = {}
             cumulative_progress = 0

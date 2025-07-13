@@ -218,12 +218,19 @@ class ColabUIModule(UIModule):
             raise RuntimeError(error_msg)
             
         # Verify required components exist
-        required_components = ["setup_button", "status_panel", "operation_container"]
+        required_components = ["setup_button", "header_container", "operation_container"]
         for comp_name in required_components:
             if not self.get_component(comp_name):
                 error_msg = f"Required component '{comp_name}' not found"
                 self.logger.error(error_msg)
                 raise RuntimeError(error_msg)
+                
+        # Verify header container has status panel
+        header_container = self.get_component('header_container')
+        if not hasattr(header_container, 'status_panel'):
+            error_msg = "Header container is missing status_panel"
+            self.logger.error(error_msg)
+            raise RuntimeError(error_msg)
                 
         # Verify required operations are registered
         required_operations = ["full_setup", "status", "reset"]
@@ -513,6 +520,19 @@ class ColabUIModule(UIModule):
                 )
                 
             return None
+    
+    def get_operation(self, operation_name: str) -> Optional[Callable]:
+        """Get an operation by name.
+        
+        Args:
+            operation_name: Name of the operation to retrieve
+            
+        Returns:
+            Callable operation function if found, None otherwise
+        """
+        if not hasattr(self, '_operations') or not self._operations:
+            return None
+        return self._operations.get(operation_name)
     
     def _get_operation_manager(self):
         """Get the operation manager instance for button management."""

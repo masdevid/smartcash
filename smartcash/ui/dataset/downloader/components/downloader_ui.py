@@ -23,8 +23,7 @@ from smartcash.ui.components.footer_container import create_footer_container
 from smartcash.ui.components.main_container import create_main_container
 from smartcash.ui.core.decorators import handle_ui_errors
 
-# Global UI handler for Save/Reset and status updates
-from smartcash.ui.core.handlers.global_ui_handler import create_global_ui_handler
+# Global UI handler removed - functionality moved to UIModule pattern
 
 # Import downloader specific components
 from .input_options import create_downloader_input_options
@@ -249,63 +248,9 @@ def create_downloader_ui(config: Optional[Dict[str, Any]] = None) -> Dict[str, A
         'show_dialog': show_dialog
     }
     
-    # Create and configure global UI handler for Save/Reset and header status updates
-    try:
-        from smartcash.ui.dataset.downloader.configs.downloader_defaults import get_default_downloader_config
-        
-        default_values = get_default_downloader_config()
-        
-        # Create form widgets dictionary using the attributes defined in input_options
-        form_widgets = {
-            'workspace_input': input_options.workspace_input,
-            'project_input': input_options.project_input,
-            'version_input': input_options.version_input,
-            'api_key_input': input_options.api_key_input,
-            'validate_checkbox': input_options.validate_checkbox,
-            'backup_checkbox': input_options.backup_checkbox
-        }
-        
-        # Extract form-specific defaults from config
-        form_defaults = {
-            'workspace_input': default_values.get('data', {}).get('roboflow', {}).get('workspace', ''),
-            'project_input': default_values.get('data', {}).get('roboflow', {}).get('project', ''),
-            'version_input': default_values.get('data', {}).get('roboflow', {}).get('version', ''),
-            'api_key_input': default_values.get('data', {}).get('roboflow', {}).get('api_key', ''),
-            'validate_checkbox': default_values.get('download', {}).get('validate_download', True),
-            'backup_checkbox': default_values.get('download', {}).get('backup_existing', False)
-        }
-        
-        # Create global UI handler
-        global_ui_handler = create_global_ui_handler(
-            module_name="downloader",
-            header_container=header_container,
-            form_widgets=form_widgets,
-            default_values=form_defaults
-        )
-        
-        # Get Save/Reset buttons from action container object
-        action_container_obj = action_container.get('action_container')
-        save_button = None
-        reset_button = None
-        
-        if action_container_obj:
-            save_button = getattr(action_container_obj, 'save_button', None)
-            reset_button = getattr(action_container_obj, 'reset_button', None)
-        
-        # Bind Save/Reset buttons to the global handler if available
-        if save_button and reset_button:
-            global_ui_handler.bind_save_reset_buttons(save_button, reset_button)
-            
-        # Add global handler to components
-        components['global_ui_handler'] = global_ui_handler
-        
-    except Exception as e:
-        # Log error but don't fail UI creation
-        try:
-            operation_container['log_message'](f"⚠️ Failed to setup global UI handler: {str(e)}", "warning")
-        except:
-            # Fallback: just print the error
-            print(f"⚠️ Failed to setup global UI handler: {str(e)}")
+    # Save/Reset functionality is now handled by the UIModule pattern
+    # DownloaderUIModule provides: _extract_ui_config(), _update_status(), reset_downloader()
+    # This eliminates the need for global_ui_handler
     
     return components
 

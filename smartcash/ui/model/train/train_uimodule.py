@@ -608,6 +608,7 @@ def initialize_training_ui(
             main_ui = result['ui_components'].get('main_container')
             if main_ui:
                 ipython_display(main_ui)
+                return None  # Don't return data when display=True
         
         return result
         

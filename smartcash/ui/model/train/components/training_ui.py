@@ -6,6 +6,9 @@ Training UI components with dual live charts following UIModule pattern.
 from typing import Dict, Any, Optional, List
 import ipywidgets as widgets
 from smartcash.ui.logger import get_module_logger
+from smartcash.ui.components.header_container import create_header_container
+from smartcash.ui.components.action_container import create_action_container
+from smartcash.ui.components.main_container import create_main_container
 from smartcash.ui.components.operation_container import create_operation_container
 from smartcash.ui.components.summary_container import create_summary_container
 from ..constants import (
@@ -19,7 +22,7 @@ from ..configs.train_defaults import (
 
 def create_training_ui(config: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Create training UI components with dual live charts.
+    Create training UI components with proper container structure.
     
     Args:
         config: Training configuration dictionary
@@ -28,75 +31,118 @@ def create_training_ui(config: Dict[str, Any]) -> Dict[str, Any]:
         Dictionary containing all UI components
     """
     logger = get_module_logger("smartcash.ui.model.train.components")
-    logger.debug("Creating training UI components with dual charts...")
+    logger.debug("Creating training UI components with proper container structure...")
     
     try:
         # Extract configurations
         training_config = config.get('training', {})
         ui_config = config.get('ui', {})
-        chart_config = get_chart_configurations()
         
-        # Create main container
-        main_container = widgets.VBox([
-            widgets.HTML(f"<h3>{UI_CONFIG['title']}</h3>"),
-            widgets.HTML(f"<p>{UI_CONFIG['subtitle']}</p>")
-        ], layout=widgets.Layout(width='100%'))
+        # 1. Create header container with title and status panel
+        header_container = create_header_container(
+            title=UI_CONFIG['title'],
+            subtitle=UI_CONFIG['subtitle'],
+            icon="🚀",
+            status_message="Ready for training",
+            status_type="info",
+            show_status_panel=True
+        )
         
-        # Create form container for training configuration
+        # 2. Create form container for training configuration
         form_container = _create_training_form(training_config, ui_config)
         
-        # Create dual chart layout
-        charts_container = _create_dual_charts_layout(chart_config, ui_config)
+        # 3. Create action container with training operation buttons
+        action_buttons = [
+            {
+                'id': 'start_training',
+                'text': 'Start Training',
+                'style': 'success',
+                'icon': 'play',
+                'tooltip': 'Start model training',
+                'disabled': False
+            },
+            {
+                'id': 'stop_training', 
+                'text': 'Stop Training',
+                'style': 'danger',
+                'icon': 'stop',
+                'tooltip': 'Stop current training',
+                'disabled': True
+            },
+            {
+                'id': 'resume_training',
+                'text': 'Resume Training',
+                'style': 'warning',
+                'icon': 'play',
+                'tooltip': 'Resume training from checkpoint',
+                'disabled': True
+            },
+            {
+                'id': 'validate_model',
+                'text': 'Validate Model',
+                'style': 'info',
+                'icon': 'check',
+                'tooltip': 'Run model validation',
+                'disabled': False
+            }
+        ]
         
-        # Create metrics results summary panel
+        action_container_result = create_action_container(
+            buttons=action_buttons,
+            title="Training Operations",
+            show_save_reset=True,
+            container_margin="15px 0"
+        )
+        action_container = action_container_result['container']
+        
+        # 4. Create dual chart layout
+        charts_data = _create_dual_charts_layout(training_config, ui_config)
+        charts_container = widgets.HBox([
+            charts_data['loss_chart'],
+            charts_data['map_chart']
+        ], layout=widgets.Layout(width='100%'))
+        
+        # 5. Create metrics results summary panel
         metrics_summary = _create_metrics_results_panel()
         
-        # Create operation container for training controls (no initial logs)
+        # 6. Create operation container for progress tracking and logs
         operation_container_result = create_operation_container(
-            operations=list(BUTTON_CONFIG.keys()),
-            button_config=BUTTON_CONFIG,
             show_progress=True,
             show_logs=True,
-            suppress_initial_logs=True  # Prevent logs during initialization
+            log_module_name="Training",
+            log_namespace_filter="smartcash.ui.model.train"
         )
         operation_container = operation_container_result.get('container', operation_container_result)
         
-        # Create configuration summary container
+        # 7. Create configuration summary container
         summary_container = _create_configuration_summary(config)
         
-        # Arrange components based on layout preference
-        layout_style = ui_config.get('dual_charts_layout', 'horizontal')
-        
-        if layout_style == 'vertical':
-            # Vertical layout: form, charts stacked, operations, summary
-            charts_layout = widgets.VBox([
-                charts_container['loss_chart'],
-                charts_container['map_chart']
-            ])
-        else:
-            # Horizontal layout: form, charts side-by-side, operations, summary
-            charts_layout = widgets.HBox([
-                charts_container['loss_chart'],
-                charts_container['map_chart']
-            ], layout=widgets.Layout(width='100%'))
-        
-        # Add components to main container
-        main_container.children = [
-            main_container.children[0],  # Title
-            main_container.children[1],  # Subtitle
+        # 8. Include charts and metrics in form container
+        enhanced_form = widgets.VBox([
             form_container,
-            charts_layout,
-            metrics_summary,
-            operation_container,
-            summary_container
-        ]
+            charts_container,
+            metrics_summary
+        ], layout=widgets.Layout(width='100%'))
         
+        # 9. Create main container with proper structure
+        main_container_result = create_main_container(
+            header_container=header_container.container,
+            form_container=enhanced_form,
+            action_container=action_container,
+            operation_container=operation_container,
+            footer_container=summary_container
+        )
+        main_container = main_container_result.container
+        
+        # Prepare UI components dictionary
         ui_components = {
             'main_container': main_container,
+            'header_container': header_container,
             'form_container': form_container,
-            'loss_chart': charts_container['loss_chart'],
-            'map_chart': charts_container['map_chart'],
-            'charts_container': charts_layout,
+            'action_container': action_container_result,  # Store full result for button access
+            'loss_chart': charts_data['loss_chart'],
+            'map_chart': charts_data['map_chart'],
+            'charts_container': charts_container,
             'metrics_summary': metrics_summary,
             'operation_container': operation_container_result,  # Store the full result for operation access
             'summary_container': summary_container

@@ -44,9 +44,18 @@ class TrainUIModule(UIModule):
         self.logger.debug("✅ TrainUIModule initialized")
     
     def _initialize_config_handler(self, config: Optional[Dict[str, Any]] = None) -> None:
-        """Initialize configuration handler."""
+        """Initialize configuration handler with shared config support."""
         try:
+            # Initialize with proper config and shared settings
             self._config_handler = TrainConfigHandler()
+            
+            # Ensure shared manager is initialized
+            if not hasattr(self._config_handler, '_shared_manager'):
+                self._config_handler.initialize()
+                
+            # Load any provided config
+            if config:
+                self._config_handler.update_config(config)
             
             # Set initial configuration
             if config:

@@ -4,15 +4,15 @@ Configuration handler for train module following UIModule pattern.
 """
 
 from typing import Dict, Any, Optional, List
-from smartcash.ui.core.handlers.config_handler import ConfigHandler
+from smartcash.ui.core.handlers.config_handler import SharedConfigHandler
 from smartcash.ui.logger import get_module_logger
 from .train_defaults import get_default_train_config, get_layer_mode_configs, get_optimization_types
 from ..constants import VALIDATION_CONFIG, LayerMode, OptimizationType, generate_model_name
 
 
-class TrainConfigHandler(ConfigHandler):
+class TrainConfigHandler(SharedConfigHandler):
     """
-    Configuration handler for training module.
+    Configuration handler for training module with shared configuration support.
     
     Features:
     - 🚀 Training configuration validation
@@ -21,14 +21,19 @@ class TrainConfigHandler(ConfigHandler):
     - 🎯 UI component sync support
     - 🛡️ Training parameter validation
     - 📊 Chart configuration management
+    - 🔄 Shared configuration across modules
     """
     
     def __init__(self):
-        """Initialize training configuration handler."""
+        """Initialize training configuration handler with shared config support."""
+        # Initialize with shared config enabled
         super().__init__(
             module_name='train',
-            parent_module='model'
+            parent_module='model',
+            default_config=self.get_default_config(),
+            enable_sharing=True
         )
+        
         self.logger = get_module_logger("smartcash.ui.model.train.configs")
         self.layer_configs = get_layer_mode_configs()
         self.optimization_types = get_optimization_types()
@@ -36,7 +41,11 @@ class TrainConfigHandler(ConfigHandler):
         # Config sections that require UI synchronization
         self.ui_sync_sections = ['training', 'optimizer', 'scheduler', 'monitoring', 'ui']
         
-        self.logger.debug("✅ TrainConfigHandler initialized")
+        # Ensure shared manager is initialized
+        if not hasattr(self, '_shared_manager'):
+            self.initialize()
+            
+        self.logger.debug("✅ TrainConfigHandler initialized with shared config support")
     
     def get_default_config(self) -> Dict[str, Any]:
         """

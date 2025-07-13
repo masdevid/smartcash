@@ -16,6 +16,7 @@ from smartcash.ui.core.initializers.display_initializer import DisplayInitialize
 from smartcash.ui.core.errors import SmartCashUIError
 from smartcash.ui.logger import get_module_logger
 from smartcash.ui.core.errors.handlers import create_error_response
+from smartcash.ui.core.errors.error_component import create_error_component
 
 # Import visualization components and handlers
 from .handlers.visualization_ui_handler import VisualizationUIHandler
@@ -36,7 +37,15 @@ class VisualizationInitializer(ModuleInitializer):
     """
     
     def __init__(self, **kwargs):
-        """Initialize the visualization module."""
+        """Initialize the visualization module with shared config support.
+        
+        Args:
+            **kwargs: Additional arguments passed to parent initializer
+        """
+        # Ensure enable_shared_config is True for shared config support
+        kwargs['enable_shared_config'] = kwargs.get('enable_shared_config', True)
+        
+        # Initialize with proper config handler and parent module
         super().__init__(
             module_name="visualization",
             config_handler_class=VisualizationConfigHandler,
@@ -48,6 +57,10 @@ class VisualizationInitializer(ModuleInitializer):
         self.preprocessor = PreprocessingService()
         self.augmentor = AugmentationService()
         self._ui_handler = None
+        
+        # Ensure config handler is properly initialized
+        if not hasattr(self.config_handler, '_shared_manager') and hasattr(self.config_handler, 'initialize'):
+            self.config_handler.initialize()
         
     def create_ui_components(self, config: Optional[Dict[str, Any]] = None, **kwargs) -> Dict[str, Any]:
         """Create visualization UI components.
@@ -438,6 +451,9 @@ def get_visualization_display_initializer() -> VisualizationDisplayInitializer:
 def initialize_visualization_ui(env=None, config=None, **kwargs):
     """Initialize and display visualization UI using DisplayInitializer
     
+    This function initializes the visualization module with proper configuration
+    and error handling, ensuring the shared config manager is properly set up.
+    
     Args:
         env: Optional environment context
         config: Optional configuration dictionary
@@ -447,13 +463,46 @@ def initialize_visualization_ui(env=None, config=None, **kwargs):
         This function displays the UI directly and returns None.
         Use get_visualization_components() if you need access to the components dictionary.
     """
-    if env is not None:
-        kwargs['env'] = env
-    if config is not None:
-        kwargs['config'] = config
+    try:
+        # Set up environment and config in kwargs
+        if env is not None:
+            kwargs['env'] = env
+        if config is not None:
+            kwargs['config'] = config
+        
+        # Get the display initializer
+        display_initializer = get_visualization_display_initializer()
+        
+        # Ensure we have a valid config handler
+        if hasattr(display_initializer, '_visualization_initializer') and \
+           hasattr(display_initializer._visualization_initializer, 'config_handler'):
+            handler = display_initializer._visualization_initializer.config_handler
+            if hasattr(handler, 'initialize') and not hasattr(handler, '_shared_manager'):
+                handler.initialize()
+        
+        # Initialize and display the UI
+        display_initializer.initialize_and_display(**kwargs)
+        
+    except Exception as e:
+        # Create a clean error display
+        error_msg = f"Failed to display visualization UI: {str(e)}"
+        error_component = create_error_component(
+            error_message=error_msg,
+            title="🚨 Visualization Error",
+            error_type="error",
+            show_traceback=True  # Show traceback for debugging
+        )
+        
+        # Display the error using IPython display
+        from IPython.display import display as ipy_display
+        ipy_display(error_component)
+        
+        # Log the full error for debugging
+        import traceback
+        print("\nFull error details:")
+        traceback.print_exc()
     
-    # Display the UI and return None
-    get_visualization_display_initializer().display(**kwargs)
+    return None
 
 
 def get_visualization_components(env=None, config=None, **kwargs) -> Dict[str, Any]:

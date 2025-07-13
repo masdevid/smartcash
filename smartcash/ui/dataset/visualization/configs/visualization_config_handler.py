@@ -1,23 +1,32 @@
 """
 File: smartcash/ui/dataset/visualization/configs/visualization_config_handler.py
-Description: Configuration handler for the visualization module
+Description: Configuration handler for the visualization module with shared config support
 """
 
 from typing import Dict, Any, Optional
 from dataclasses import asdict, fields
-from smartcash.ui.core.handlers.config_handler import ConfigHandler
+from smartcash.ui.core.handlers.config_handler import SharedConfigHandler
+from smartcash.ui.logger import get_module_logger
 from .visualization_defaults import DEFAULT_CONFIG, VisualizationDefaults
 
-class VisualizationConfigHandler(ConfigHandler):
-    """Configuration handler for the visualization module."""
+class VisualizationConfigHandler(SharedConfigHandler):
+    """Configuration handler for the visualization module with shared config support."""
     
     def __init__(self, config: Optional[Dict[str, Any]] = None):
-        """Initialize the config handler.
+        """Initialize the config handler with shared config support.
         
         Args:
             config: Optional initial configuration
         """
-        super().__init__(config or {})
+        # Initialize with module name and parent module for shared config
+        super().__init__(
+            module_name='visualization',
+            parent_module='dataset',
+            default_config=config or {},
+            enable_sharing=True  # Enable shared configuration
+        )
+        
+        self.logger = get_module_logger("smartcash.ui.dataset.visualization.config")
         
         # Get default values from the VisualizationDefaults class
         self._defaults = {}
@@ -25,9 +34,16 @@ class VisualizationConfigHandler(ConfigHandler):
             if field.name != 'DEFAULT_CONFIG':
                 self._defaults[field.name] = getattr(DEFAULT_CONFIG, field.name)
         
-        # Set default values if not provided
+        # Initialize with default values if not provided
+        self._initialize_defaults()
+        
+        # Initialize shared configuration
+        self.initialize()
+    
+    def _initialize_defaults(self):
+        """Initialize default configuration values."""
         for key, value in self._defaults.items():
-            if key not in self._config:
+            if key not in self._config or self._config[key] is None:
                 self._config[key] = value
     
     def validate_config(self, config: Dict[str, Any]) -> Dict[str, Any]:

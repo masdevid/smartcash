@@ -4,6 +4,8 @@ Description: Sync configuration files using the config manager
 """
 
 import os
+import logging
+from pathlib import Path
 from typing import Dict, Any, Optional, Callable
 from smartcash.ui.core.handlers.operation_handler import OperationHandler
 from smartcash.common.config.manager import get_config_manager

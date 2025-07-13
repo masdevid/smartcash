@@ -3,6 +3,18 @@ File: smartcash/ui/setup/colab/colab_uimodule.py
 Description: Colab Module implementation using new UIModule pattern.
 """
 
+import os
+import sys
+import logging
+from typing import Any, Dict, Optional, Callable, List, Tuple, Union
+
+# Import IPython display if available
+try:
+    from IPython.display import display, clear_output
+except ImportError:
+    display = print
+    clear_output = lambda: print("\n" * 100)  # Simple clear for non-IPython environments
+
 """
 file_path: smartcash/ui/setup/colab/colab_uimodule.py
 Description: Main module for Colab UI setup and management.
@@ -395,13 +407,27 @@ class ColabUIModule(UIModule):
     def _setup_event_handlers(self) -> None:
         """Setup event handlers for UI components."""
         try:
-            # Get setup button and connect to execute_full_setup
+            # Connect setup button to handler
             setup_button = self.get_component("setup_button") or self.get_component("primary_button")
             if setup_button:
+                # Remove any existing click handlers
+                if hasattr(setup_button, '_click_handlers') and callable(setup_button._click_handlers):
+                    setup_button.on_click(setup_button._click_handlers[0], remove=True)
+                
+                # Add new click handler
                 setup_button.on_click(self._handle_setup_button_click)
-                self.logger.debug("✅ Connected setup button to handler")
+                
+                # Add debug attributes
+                setup_button._debug_name = "ColabSetupButton"
+                setup_button._debug_handler = self._handle_setup_button_click
+                
+                # Log the connection
+                self.logger.info("✅ Connected setup button to handler")
+                print("✅ [DEBUG] Connected setup button to handler")
             else:
-                self.logger.warning("⚠️ No setup button found to connect")
+                error_msg = "⚠️ No setup button found to connect"
+                self.logger.warning(error_msg)
+                print(f"[WARNING] {error_msg}")
             
             # Get save/reset buttons if they exist
             save_button = self.get_component("save_button")
@@ -415,7 +441,11 @@ class ColabUIModule(UIModule):
                 self.logger.debug("✅ Connected reset button to handler")
                 
         except Exception as e:
-            self.logger.error(f"❌ Failed to setup event handlers: {e}")
+            error_msg = f"❌ Failed to setup event handlers: {e}"
+            self.logger.error(error_msg)
+            print(f"[ERROR] {error_msg}")
+            import traceback
+            traceback.print_exc()
     
     def _handle_setup_button_click(self, button=None) -> None:
         """Handle setup button click event to initiate environment setup.
@@ -432,17 +462,32 @@ class ColabUIModule(UIModule):
         Returns:
             OperationResult: The result of the setup operation, or None if failed
         """
+        # Log button click with debug info
+        self.logger.info("🔄 [SETUP] Setup button clicked")
+        print("\n" + "="*80)
+        print("🔄 [SETUP] Setup button clicked - Starting environment setup...")
+        
         # Get operation container for logging
         operation_container = None
         try:
+            # Log environment information
+            self.logger.info("🔍 [SETUP] Environment information:")
+            self.logger.info(f"- Python version: {sys.version}")
+            self.logger.info(f"- Working directory: {os.getcwd()}")
+            self.logger.info(f"- Environment type: {'Colab' if self.is_colab_environment() else 'Local'}")
+            
             # Get operation handler and container
             operation_handler = getattr(self, '_operation_handler', None)
+            self.logger.info(f"🔍 [SETUP] Operation handler: {'Found' if operation_handler else 'Not found'}")
+            
             if operation_handler:
                 operation_container = getattr(operation_handler, '_operation_container', None)
+                self.logger.info(f"🔍 [SETUP] Operation container: {'Found' if operation_container else 'Not found'}")
             
             # Log start of operation
-            start_msg = "🚀 Starting environment setup..."
+            start_msg = "🚀 [SETUP] Starting environment setup..."
             self.logger.info(start_msg)
+            print(f"\n{start_msg}")
             self._update_status(start_msg, "info")
             
             if operation_container:
@@ -451,25 +496,77 @@ class ColabUIModule(UIModule):
             # Get operation manager
             operation_manager = self._operation_manager
             if not operation_manager:
-                error_msg = "❌ Operation manager not available"
+                error_msg = "❌ [ERROR] Operation manager not available"
                 self.logger.error(error_msg)
+                print(f"\n{error_msg}")
                 self._update_status(error_msg, "error")
                 if operation_container:
                     operation_container.log_message(error_msg, level='error')
                 return None
             
-            # Log available operations for debugging
+            # Log operation manager info
+            self.logger.info(f"🔍 [SETUP] Operation manager: {type(operation_manager).__name__}")
+            
+            # Get available operations
             available_ops = operation_manager.get_operations()
-            self.logger.debug(f"Available operations: {list(available_ops.keys())}")
+            self.logger.info(f"🔍 [SETUP] Available operations: {list(available_ops.keys())}")
+            print(f"\n🔍 [SETUP] Available operations: {list(available_ops.keys())}")
             
             # Get the full_setup operation function
             full_setup_op = available_ops.get('full_setup')
             if not full_setup_op:
-                error_msg = "❌ Full setup operation not found in available operations"
+                error_msg = "❌ [ERROR] Full setup operation not found in available operations"
                 self.logger.error(error_msg)
+                print(f"\n{error_msg}")
                 self._update_status(error_msg, "error")
                 if operation_container:
                     operation_container.log_message(error_msg, level='error')
+                return None
+                
+            # Log operation function details
+            self.logger.info(f"🔍 [SETUP] Full setup operation: {full_setup_op}")
+            print(f"\n🔍 [SETUP] Full setup operation: {full_setup_op}")
+            
+            # Execute the full setup operation
+            try:
+                self.logger.info("⚙️ [SETUP] Executing full setup operation...")
+                print("\n⚙️ [SETUP] Executing full setup operation...")
+                
+                # Create a progress callback function
+                def progress_callback(progress, message=None):
+                    progress_msg = f"📊 [PROGRESS] {int(progress*100)}%"
+                    if message:
+                        progress_msg += f" - {message}"
+                    self.logger.info(progress_msg)
+                    print(f"\r{progress_msg}", end="", flush=True)
+                    
+                    # Update status in UI
+                    self._update_status(message or f"Progress: {int(progress*100)}%", 
+                                     "info" if progress < 1.0 else "success")
+                
+                # Execute the operation with progress callback
+                result = full_setup_op(progress_callback=progress_callback)
+                
+                # Log completion
+                success_msg = "✅ [SUCCESS] Environment setup completed successfully!"
+                self.logger.info(success_msg)
+                print(f"\n\n{success_msg}")
+                self._update_status(success_msg, "success")
+                
+                return result
+                
+            except Exception as op_error:
+                error_msg = f"❌ [ERROR] Error during setup operation: {str(op_error)}"
+                self.logger.error(error_msg, exc_info=True)
+                print(f"\n\n{error_msg}")
+                self._update_status(f"❌ Error: {str(op_error)}", "error")
+                
+                # Log full traceback
+                import traceback
+                tb = traceback.format_exc()
+                self.logger.error(f"[TRACEBACK] {tb}")
+                print(f"\n[TRACEBACK] {tb}")
+                
                 return None
             
             # Disable all buttons during operation
@@ -1022,15 +1119,46 @@ def reset_colab_uimodule() -> None:
 
 # === Backward Compatibility Layer ===
 
-@handle_ui_errors(return_type=None)
-def initialize_colab_ui(config: Dict[str, Any] = None) -> None:
-    """Initialize Colab UI using new UIModule pattern."""
-    from IPython.display import display
+@handle_ui_errors(return_type=object)
+def initialize_colab_ui(config: Dict[str, Any] = None) -> Any:
+    """Initialize Colab UI using new UIModule pattern.
     
-    module = create_colab_uimodule(config, auto_initialize=True)
-    main_container = module.get_component('main_container')
-    if main_container:
-        display(main_container)
+    Args:
+        config: Optional configuration dictionary for the Colab UI
+        
+    Returns:
+        The initialized ColabUIModule instance
+    """
+    # Get logger for this function
+    logger = get_module_logger("smartcash.ui.setup.colab.initialize")
+    
+    try:
+        logger.info("🔄 Initializing Colab UI...")
+        print("[DEBUG] Initializing Colab UI...")  # Fallback log
+        
+        # Create the module instance
+        module = create_colab_uimodule(config, auto_initialize=True)
+        if module is None:
+            raise ValueError("Failed to create Colab UI module")
+            
+        # Get and display the main container if available
+        main_container = module.get_component('main_container')
+        if main_container:
+            from IPython.display import display
+            display(main_container)
+            
+        logger.info("✅ Colab UI initialization completed")
+        print("[DEBUG] Colab UI initialization completed")  # Fallback log
+        
+        return module
+        
+    except Exception as e:
+        error_msg = f"❌ Error initializing Colab UI: {str(e)}"
+        logger.error(error_msg, exc_info=True)
+        print(f"[ERROR] {error_msg}")
+        import traceback
+        traceback.print_exc()
+        raise
 
 @handle_ui_errors(return_type=dict)
 def get_colab_components(config: Dict[str, Any] = None) -> Dict[str, Any]:
@@ -1043,8 +1171,53 @@ def get_colab_components(config: Dict[str, Any] = None) -> Dict[str, Any]:
 
 @handle_ui_errors(return_type=None)
 def display_colab_ui(config: Dict[str, Any] = None) -> None:
-    """Display Colab UI using new UIModule pattern."""
-    initialize_colab_ui(config)
+    """Display Colab UI using new UIModule pattern.
+    
+    This function initializes and displays the Colab UI with the provided configuration.
+    It includes proper logging for debugging and error tracking.
+    
+    Args:
+        config: Optional configuration dictionary for the Colab UI
+    """
+    # Get logger for this function
+    logger = get_module_logger("smartcash.ui.setup.colab.display")
+    
+    try:
+        logger.info("🚀 Starting Colab UI display...")
+        print("[DEBUG] Starting Colab UI display...")  # Fallback log
+        
+        # Initialize the UI with the provided config
+        logger.debug(f"Initializing UI with config: {config}")
+        ui_module = initialize_colab_ui(config)
+        
+        if ui_module is None:
+            error_msg = "❌ Failed to initialize Colab UI: UI module is None"
+            logger.error(error_msg)
+            print(f"[ERROR] {error_msg}")
+            return
+            
+        logger.info("✅ Colab UI initialized successfully")
+        print("[DEBUG] Colab UI initialized successfully")  # Fallback log
+        
+        # Display the main container
+        main_container = ui_module.get_component('main_container')
+        if main_container:
+            display(main_container)
+            logger.info("🎉 Colab UI displayed successfully")
+            print("[DEBUG] Colab UI displayed successfully")  # Fallback log
+        else:
+            error_msg = "❌ Failed to get main container from UI module"
+            logger.error(error_msg)
+            print(f"[ERROR] {error_msg}")
+            raise ValueError("Main container not found in UI module")
+        
+    except Exception as e:
+        error_msg = f"❌ Error displaying Colab UI: {str(e)}"
+        logger.error(error_msg, exc_info=True)
+        print(f"[ERROR] {error_msg}")
+        import traceback
+        traceback.print_exc()
+        raise
 
 # Note: Template and shared methods are registered on-demand in create_colab_uimodule()
 # to avoid logs during import

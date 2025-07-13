@@ -41,14 +41,15 @@ class ColabOperationManager(OperationHandler):
         )
         
         self.config = config
+        # Stage names must match SetupStage enum values exactly (but in lowercase)
         self.setup_stages = [
-            'init',
-            'drive', 
-            'symlink',
-            'folders',
-            'config',
-            'env',
-            'verify'
+            'init',                # INIT
+            'drive_mount',         # DRIVE_MOUNT
+            'symlink_setup',       # SYMLINK_SETUP
+            'folder_setup',        # FOLDER_SETUP
+            'config_sync',         # CONFIG_SYNC
+            'env_setup',           # ENV_SETUP
+            'verify'               # VERIFY
         ]
         self.current_stage = 0
         
@@ -173,7 +174,7 @@ class ColabOperationManager(OperationHandler):
         """Execute verification operation."""
         return self.operations['verify'].execute_verify_setup(progress_callback)
     
-    def _full_setup_operation(self, progress_callback: Optional[Callable] = None, message: Optional[str] = None) -> Dict[str, Any]:
+    def _full_setup_operation(self, *args, **kwargs) -> Dict[str, Any]:
         """Execute complete environment setup with weighted progress tracking.
         
         Args:
@@ -183,6 +184,23 @@ class ColabOperationManager(OperationHandler):
         Returns:
             Dict containing operation results
         """
+        # Log entry with all received arguments for debugging
+        self.log(f"_full_setup_operation called with args: {args}, kwargs: {kwargs}", 'debug')
+        
+        # Extract expected parameters from kwargs to avoid duplicate argument errors
+        progress_callback = kwargs.pop('progress_callback', None)
+        message = kwargs.pop('message', None)
+        
+        # Log the extracted parameters
+        self.log(f"Extracted progress_callback: {progress_callback is not None}, message: {message}", 'debug')
+        
+        # If there are any remaining kwargs, log them for debugging
+        if kwargs:
+            self.log(f"Unexpected kwargs in _full_setup_operation: {kwargs}", 'warning')
+        
+        # Log if we received any positional args
+        if args:
+            self.log(f"Received positional args in _full_setup_operation: {args}", 'warning')
         try:
             start_msg = message or "🚀 Starting complete environment setup"
             self.log(start_msg, 'info')

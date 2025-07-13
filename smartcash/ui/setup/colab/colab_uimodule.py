@@ -411,8 +411,18 @@ class ColabUIModule(UIModule):
             setup_button = self.get_component("setup_button") or self.get_component("primary_button")
             if setup_button:
                 # Remove any existing click handlers
-                if hasattr(setup_button, '_click_handlers') and callable(setup_button._click_handlers):
-                    setup_button.on_click(setup_button._click_handlers[0], remove=True)
+                try:
+                    # For IPython 8.0+ with CallbackDispatcher
+                    if hasattr(setup_button, '_click_handlers') and hasattr(setup_button._click_handlers, 'callbacks'):
+                        # Get all callbacks and remove them
+                        for callback in list(setup_button._click_handlers.callbacks):
+                            setup_button.on_click(callback, remove=True)
+                    # For older IPython versions
+                    elif hasattr(setup_button, '_click_handlers') and isinstance(setup_button._click_handlers, list):
+                        for handler in setup_button._click_handlers[:]:
+                            setup_button.on_click(handler, remove=True)
+                except Exception as e:
+                    self.logger.warning(f"⚠️ Failed to remove existing click handlers: {str(e)}")
                 
                 # Add new click handler
                 setup_button.on_click(self._handle_setup_button_click)

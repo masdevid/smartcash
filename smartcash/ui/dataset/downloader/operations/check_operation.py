@@ -21,7 +21,7 @@ class CheckOperationHandler(BaseDownloaderHandler):
         super().__init__(ui_components=ui_components, **kwargs)
     
     @handle_ui_errors(error_component_title="Check Operation Error", log_error=True)
-    def execute_check(self) -> Dict[str, Any]:
+    async def execute_check(self) -> Dict[str, Any]:
         """Execute check operation dengan backend scanner.
         
         Returns:

@@ -118,7 +118,7 @@ def create_visualization_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -
     }
     
     # === 2. Create Form Container ===
-    # Create form widgets
+    # Create form widgets with two-column layout
     form_widgets = _create_module_form_widgets(current_config)
     
     # Create form container with the widgets
@@ -127,7 +127,15 @@ def create_visualization_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -
         layout_type=LayoutType.COLUMN,
         container_margin="0",
         container_padding="16px",
-        gap="12px"
+        gap="12px",
+        layout_kwargs={
+            'width': '100%',
+            'max_width': '100%',
+            'margin': '0',
+            'padding': '0',
+            'justify_content': 'flex-start',
+            'align_items': 'flex-start'
+        }
     )
     
     # Store references
@@ -243,7 +251,7 @@ def create_visualization_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -
 
 def _create_module_form_widgets(config: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Create module-specific form widgets for visualization options.
+    Create module-specific form widgets for visualization options with a two-column layout.
     
     Args:
         config: Configuration dictionary for the form widgets
@@ -253,13 +261,26 @@ def _create_module_form_widgets(config: Dict[str, Any]) -> Dict[str, Any]:
     """
     from ..constants import CHART_TYPE_OPTIONS, DATA_SPLIT_OPTIONS, EXPORT_FORMAT_OPTIONS
     
+    # Common layout for form elements
+    dropdown_layout = widgets.Layout(
+        width='90%',
+        margin='5px 0',
+        padding='5px 0'
+    )
+    
+    checkbox_layout = widgets.Layout(
+        width='100%',
+        margin='8px 0',
+        padding='5px 0'
+    )
+    
     # Chart type selection
     chart_type_dropdown = widgets.Dropdown(
         options=CHART_TYPE_OPTIONS,
         value=config.get('chart_type', 'bar'),
         description='Chart Type:',
         style={'description_width': '120px'},
-        layout=widgets.Layout(width='100%', margin='5px 0')
+        layout=dropdown_layout
     )
     
     # Data split selection
@@ -268,7 +289,7 @@ def _create_module_form_widgets(config: Dict[str, Any]) -> Dict[str, Any]:
         value=config.get('data_split', 'all'),
         description='Data Split:',
         style={'description_width': '120px'},
-        layout=widgets.Layout(width='100%', margin='5px 0')
+        layout=dropdown_layout
     )
     
     # Export format selection
@@ -277,52 +298,67 @@ def _create_module_form_widgets(config: Dict[str, Any]) -> Dict[str, Any]:
         value=config.get('export_format', 'png'),
         description='Export Format:',
         style={'description_width': '120px'},
-        layout=widgets.Layout(width='100%', margin='5px 0')
+        layout=dropdown_layout
     )
     
-    # Show grid checkbox
+    # Checkbox options
     show_grid_checkbox = widgets.Checkbox(
         value=config.get('show_grid', True),
         description='Show Grid',
-        layout=widgets.Layout(width='50%', margin='5px 0')
+        layout=checkbox_layout
     )
     
-    # Show legend checkbox
     show_legend_checkbox = widgets.Checkbox(
         value=config.get('show_legend', True),
         description='Show Legend',
-        layout=widgets.Layout(width='50%', margin='5px 0')
+        layout=checkbox_layout
     )
     
-    # Auto refresh checkbox
     auto_refresh_checkbox = widgets.Checkbox(
         value=config.get('auto_refresh', False),
         description='Auto Refresh',
-        layout=widgets.Layout(width='50%', margin='5px 0')
+        layout=checkbox_layout
     )
     
     # Refresh interval
     refresh_interval_int = widgets.IntText(
         value=config.get('refresh_interval', 60),
-        description='Refresh Interval (s):',
-        style={'description_width': '120px'},
-        layout=widgets.Layout(width='50%', margin='5px 0')
+        description='Refresh (s):',
+        style={'description_width': '80px'},
+        layout=widgets.Layout(width='80%', margin='8px 0')
     )
     
-    # Create form rows
-    form_rows = [
-        [widgets.HTML("<h4>📊 Chart Configuration</h4>")],
-        [chart_type_dropdown],
-        [data_split_dropdown],
-        [export_format_dropdown],
-        [widgets.HTML("<h4>⚙️ Display Options</h4>")],
-        [widgets.HBox([show_grid_checkbox, show_legend_checkbox])],
-        [widgets.HTML("<h4>🔄 Refresh Settings</h4>")],
-        [widgets.HBox([auto_refresh_checkbox, refresh_interval_int])]
-    ]
+    # Create form sections with two-column layout
+    chart_section = widgets.VBox([
+        widgets.HTML("<h4 style='margin: 10px 0 5px 0;'>📊 Chart Configuration</h4>"),
+        chart_type_dropdown,
+        data_split_dropdown,
+        export_format_dropdown
+    ], layout=widgets.Layout(width='48%', margin='0 1% 10px 0'))
+    
+    display_section = widgets.VBox([
+        widgets.HTML("<h4 style='margin: 10px 0 5px 0;'>⚙️ Display</h4>"),
+        show_grid_checkbox,
+        show_legend_checkbox
+    ], layout=widgets.Layout(width='48%', margin='0 0 10px 1%'))
+    
+    refresh_section = widgets.VBox([
+        widgets.HTML("<h4 style='margin: 10px 0 5px 0;'>🔄 Refresh</h4>"),
+        widgets.HBox([
+            auto_refresh_checkbox,
+            refresh_interval_int
+        ], layout=widgets.Layout(width='100%', justify_content='space-between'))
+    ], layout=widgets.Layout(width='100%', margin='10px 0'))
+    
+    # Combine all sections in a two-column layout
+    form_content = widgets.VBox([
+        widgets.HBox([chart_section, display_section], 
+                    layout=widgets.Layout(justify_content='space-between')),
+        refresh_section
+    ])
     
     return {
-        'form_rows': form_rows,
+        'form_rows': [[form_content]],  # Single row containing our custom layout
         'widgets': {
             'chart_type_dropdown': chart_type_dropdown,
             'data_split_dropdown': data_split_dropdown,

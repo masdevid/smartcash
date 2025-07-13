@@ -166,6 +166,180 @@ class TrainUIModule(UIModule):
         
         return config
     
+    def _setup_button_handlers(self) -> None:
+        """Setup button event handlers for training operations."""
+        try:
+            if not self._ui_components or not self._operation_manager:
+                self.logger.warning("Cannot setup button handlers - missing components or operation manager")
+                return
+                
+            # Get action container
+            action_container = self._ui_components.get('action_container')
+            if not action_container:
+                self.logger.warning("Action container not found in UI components")
+                return
+                
+            # Get buttons from action container
+            buttons = action_container.get('buttons', {})
+            
+            # Setup button handlers
+            button_handlers = {
+                'start_training': self._handle_start_training,
+                'stop_training': self._handle_stop_training,
+                'resume_training': self._handle_resume_training,
+                'validate_model': self._handle_validate_model,
+                'refresh_backbone_config': self._handle_refresh_backbone_config
+            }
+            
+            for button_id, handler in button_handlers.items():
+                button = buttons.get(button_id)
+                if button and hasattr(button, 'on_click'):
+                    button.on_click(handler)
+                    self.logger.debug(f"✅ Bound {button_id} button to {handler.__name__}")
+                else:
+                    self.logger.warning(f"Button {button_id} not found or doesn't support on_click")
+                    
+        except Exception as e:
+            self.logger.error(f"Failed to setup button handlers: {e}")
+    
+    def _handle_start_training(self, button=None):
+        """Handle start training button click."""
+        try:
+            self.log("🚀 Start training button clicked", 'info')
+            result = self.execute_start()
+            if result.get('success'):
+                self.log(f"✅ Training started: {result.get('message', '')}", 'success')
+            else:
+                self.log(f"❌ Training start failed: {result.get('message', '')}", 'error')
+        except Exception as e:
+            self.log(f"❌ Start training error: {e}", 'error')
+    
+    def _handle_stop_training(self, button=None):
+        """Handle stop training button click."""
+        try:
+            self.log("🛑 Stop training button clicked", 'info')
+            result = self.execute_stop()
+            if result.get('success'):
+                self.log(f"✅ Training stopped: {result.get('message', '')}", 'success')
+            else:
+                self.log(f"❌ Training stop failed: {result.get('message', '')}", 'error')
+        except Exception as e:
+            self.log(f"❌ Stop training error: {e}", 'error')
+    
+    def _handle_resume_training(self, button=None):
+        """Handle resume training button click.""" 
+        try:
+            self.log("▶️ Resume training button clicked", 'info')
+            result = self.execute_resume()
+            if result.get('success'):
+                self.log(f"✅ Training resumed: {result.get('message', '')}", 'success')
+            else:
+                self.log(f"❌ Training resume failed: {result.get('message', '')}", 'error')
+        except Exception as e:
+            self.log(f"❌ Resume training error: {e}", 'error')
+    
+    def _handle_validate_model(self, button=None):
+        """Handle validate model button click."""
+        try:
+            self.log("✅ Validate model button clicked", 'info')
+            result = self.execute_validate()
+            if result.get('success'):
+                self.log(f"✅ Model validation completed: {result.get('message', '')}", 'success')
+            else:
+                self.log(f"❌ Model validation failed: {result.get('message', '')}", 'error')
+        except Exception as e:
+            self.log(f"❌ Validate model error: {e}", 'error')
+    
+    def _handle_refresh_backbone_config(self, button=None):
+        """Handle refresh backbone config button click."""
+        try:
+            self.log("🔄 Refresh backbone config button clicked", 'info')
+            result = self.execute_refresh_backbone_config()
+            if result.get('success'):
+                self.log(f"✅ Backbone config refreshed: {result.get('message', '')}", 'success')
+            else:
+                self.log(f"❌ Backbone config refresh failed: {result.get('message', '')}", 'error')
+        except Exception as e:
+            self.log(f"❌ Refresh backbone config error: {e}", 'error')
+    
+    def _setup_save_reset_handlers(self) -> None:
+        """Setup Save/Reset button handlers."""
+        try:
+            if not self._ui_components:
+                self.logger.warning("Cannot setup Save/Reset handlers - missing UI components")
+                return
+                
+            # Get action container
+            action_container = self._ui_components.get('action_container')
+            if not action_container:
+                self.logger.warning("Action container not found for Save/Reset handlers")
+                return
+                
+            # Get ActionContainer object (not just the container widget)
+            action_container_obj = action_container.get('action_container')
+            if not action_container_obj:
+                self.logger.warning("ActionContainer object not found")
+                return
+                
+            # Get Save/Reset buttons
+            save_button = getattr(action_container_obj, 'save_button', None)
+            reset_button = getattr(action_container_obj, 'reset_button', None)
+            
+            if save_button and hasattr(save_button, 'on_click'):
+                save_button.on_click(self._handle_save_config)
+                self.logger.debug("✅ Bound Save button to _handle_save_config")
+            else:
+                self.logger.warning("Save button not found or doesn't support on_click")
+                
+            if reset_button and hasattr(reset_button, 'on_click'):
+                reset_button.on_click(self._handle_reset_config)
+                self.logger.debug("✅ Bound Reset button to _handle_reset_config")
+            else:
+                self.logger.warning("Reset button not found or doesn't support on_click")
+                
+        except Exception as e:
+            self.logger.error(f"Failed to setup Save/Reset handlers: {e}")
+    
+    def _handle_save_config(self, button=None):
+        """Handle save config button click."""
+        try:
+            self.log("💾 Save config button clicked", 'info')
+            # Extract current configuration from UI and save it
+            if self._config_handler:
+                # Use config handler's save functionality
+                result = self._config_handler.save_config()
+                if result:
+                    self.log("✅ Training configuration saved successfully", 'success')
+                else:
+                    self.log("❌ Failed to save training configuration", 'error')
+            else:
+                self.log("❌ Config handler not available", 'error')
+        except Exception as e:
+            self.log(f"❌ Save config error: {e}", 'error')
+    
+    def _handle_reset_config(self, button=None):
+        """Handle reset config button click."""
+        try:
+            self.log("🔄 Reset config button clicked", 'info')
+            # Reset configuration to defaults
+            if self._config_handler:
+                self._config_handler.reset_config()
+                self.log("✅ Training configuration reset to defaults", 'success')
+                # Optionally sync UI with the reset config
+                if hasattr(self._config_handler, 'sync_ui_with_config'):
+                    self._config_handler.sync_ui_with_config()
+            else:
+                self.log("❌ Config handler not available", 'error')
+        except Exception as e:
+            self.log(f"❌ Reset config error: {e}", 'error')
+
+    def log(self, message: str, level: str = 'info') -> None:
+        """Log message to operation container."""
+        if self._operation_manager and hasattr(self._operation_manager, 'log'):
+            self._operation_manager.log(message, level)
+        else:
+            getattr(self.logger, level, self.logger.info)(message)
+
     def _log_initialization_complete(self) -> None:
         """Log initialization completion to operation container."""
         try:
@@ -203,6 +377,12 @@ class TrainUIModule(UIModule):
             
             # Initialize operation manager with chart integration
             self._initialize_operation_manager()
+            
+            # Setup button event handlers
+            self._setup_button_handlers()
+            
+            # Setup Save/Reset button handlers
+            self._setup_save_reset_handlers()
             
             # Register shared methods for cross-module integration
             self._register_shared_methods()
@@ -380,6 +560,40 @@ class TrainUIModule(UIModule):
             self.logger.error(error_msg)
             return {'success': False, 'message': error_msg}
     
+    def refresh_backbone_config(self) -> Dict[str, Any]:
+        """
+        Refresh backbone configuration from backbone module.
+        
+        Returns:
+            Refresh result dictionary
+        """
+        try:
+            from smartcash.ui.core.ui_module import SharedMethodRegistry
+            
+            # Try to get backbone configuration
+            get_backbone_config = SharedMethodRegistry.get_method('backbone.get_config')
+            if not get_backbone_config:
+                return {'success': False, 'message': 'Backbone module not available'}
+            
+            backbone_config = get_backbone_config()
+            if not backbone_config:
+                return {'success': False, 'message': 'No backbone configuration available'}
+            
+            # Integrate backbone configuration
+            if self._config_handler:
+                current_config = self.get_config()
+                integrated_config = self._config_handler.integrate_backbone_config(
+                    current_config, backbone_config
+                )
+                self.update_config(**integrated_config)
+                return {'success': True, 'message': 'Backbone configuration refreshed successfully'}
+            else:
+                return {'success': False, 'message': 'Config handler not available'}
+                
+        except Exception as e:
+            self.logger.error(f"Failed to refresh backbone config: {e}")
+            return {'success': False, 'message': str(e)}
+
     def execute_refresh_backbone_config(self, config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """
         Execute refresh backbone configuration operation.
@@ -394,10 +608,7 @@ class TrainUIModule(UIModule):
             if not self.is_ready():
                 self.initialize()
             
-            if not self._operation_manager:
-                raise RuntimeError("Operation manager not available")
-            
-            return self._operation_manager.execute_refresh_backbone_config(config)
+            return self.refresh_backbone_config()
             
         except Exception as e:
             error_msg = f"Refresh backbone config execution failed: {e}"

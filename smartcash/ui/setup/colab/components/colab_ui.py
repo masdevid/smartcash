@@ -131,21 +131,31 @@ def create_colab_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> Dict[s
     ui_components['main_header_widget'] = header_container.container
     
     # === 2. FORM CONTAINER ===
-    # Custom form layout specific to the module
-    form_container = create_form_container(
-        title=f"⚙️ {UI_CONFIG['title']} Configuration",
-        layout_type="column",  # or "row", "grid" based on needs
-        container_padding="15px",
-        gap="12px"
-    )
-    
-    # Create module-specific form widgets
+    # Create module-specific form widgets first
     form_widgets = _create_module_form_widgets(config)
     
-    # Add form widgets to container
+    # Create form container with consistent styling
+    form_container = create_form_container(
+        title=f"⚙️ {UI_CONFIG['title']} Configuration",
+        layout_type="column",
+        container_margin="0",
+        container_padding="0",
+        gap="12px",
+        layout_kwargs={
+            'width': '100%',
+            'max_width': '100%',
+            'margin': '0',
+            'padding': '0',
+            'justify_content': 'flex-start',
+            'align_items': 'flex-start'
+        }
+    )
+    
+    # Add form widgets to container if available
     if form_widgets and 'form_ui' in form_widgets:
         form_container['add_item'](form_widgets['form_ui'], width='100%')
     
+    # Store references
     ui_components['form_container'] = form_container['container']
     ui_components['form_widgets'] = form_widgets
     

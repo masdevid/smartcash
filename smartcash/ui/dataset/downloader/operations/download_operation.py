@@ -21,7 +21,7 @@ class DownloadOperationHandler(BaseDownloaderHandler):
         super().__init__(ui_components=ui_components, **kwargs)
     
     @handle_ui_errors(error_component_title="Download Operation Error", log_error=True)
-    def execute_download(self, ui_config: Dict[str, Any]) -> Dict[str, Any]:
+    async def execute_download(self, ui_config: Dict[str, Any]) -> Dict[str, Any]:
         """Execute download operation dengan backend service.
         
         Args:

@@ -80,21 +80,29 @@ def create_pretrained_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> D
     }
     
     # === 2. Create Form Container ===
-    # Create form widgets
+    # Create form widgets with the new layout
     form_widgets = _create_module_form_widgets(current_config)
     
-    # Create form container with the widgets
+    # Create form container with consistent styling
     form_container = create_form_container(
         layout_type=LayoutType.COLUMN,
-        container_margin="0",
-        container_padding="16px",
-        gap="12px"
+        container_margin="0 0 20px 0",
+        container_padding="0",
+        gap="15px",
+        layout_kwargs={
+            'width': '100%',
+            'max_width': '100%',
+            'margin': '0',
+            'padding': '0',
+            'justify_content': 'flex-start',
+            'align_items': 'flex-start'
+        }
     )
     
     # Add form rows to the container
     for row in form_widgets['form_rows']:
         for widget in row:
-            form_container['add_item'](widget)
+            form_container['add_item'](widget, width='100%')
     
     # Store references
     ui_components['containers']['form'] = form_container
@@ -201,6 +209,7 @@ def create_pretrained_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> D
 def _create_module_form_widgets(config: Dict[str, Any]) -> Dict[str, Any]:
     """
     Create module-specific form widgets for pretrained models configuration.
+    Matches the preprocess UI style with consistent layout and removes redundant notes.
     
     Args:
         config: Configuration dictionary for the form widgets
@@ -208,13 +217,26 @@ def _create_module_form_widgets(config: Dict[str, Any]) -> Dict[str, Any]:
     Returns:
         Dictionary containing the form UI and widget references
     """
+    # Common layout settings
+    input_layout = widgets.Layout(
+        width='90%',
+        margin='5px 0',
+        padding='5px 0'
+    )
+    
+    checkbox_layout = widgets.Layout(
+        width='100%',
+        margin='8px 0',
+        padding='5px 0'
+    )
+    
     # Models directory input
     models_dir_input = widgets.Text(
         value=config.get('models_dir', DEFAULT_CONFIG['models_dir']),
         description='Models Directory:',
         placeholder='/data/pretrained',
         style={'description_width': '140px'},
-        layout=widgets.Layout(width='100%', margin='5px 0')
+        layout=input_layout
     )
     
     # YOLOv5s URL input  
@@ -223,7 +245,7 @@ def _create_module_form_widgets(config: Dict[str, Any]) -> Dict[str, Any]:
         description='YOLOv5s URL:',
         placeholder='Leave empty for default GitHub URL',
         style={'description_width': '140px'},
-        layout=widgets.Layout(width='100%', margin='5px 0')
+        layout=input_layout
     )
     
     # EfficientNet-B4 URL input
@@ -232,44 +254,56 @@ def _create_module_form_widgets(config: Dict[str, Any]) -> Dict[str, Any]:
         description='EfficientNet URL:',
         placeholder='Leave empty to use timm library',
         style={'description_width': '140px'},
-        layout=widgets.Layout(width='100%', margin='5px 0')
+        layout=input_layout
     )
     
     # Auto download checkbox
     auto_download_checkbox = widgets.Checkbox(
         value=config.get('auto_download', False),
         description='Auto Download Missing Models',
-        layout=widgets.Layout(width='100%', margin='5px 0')
+        layout=checkbox_layout,
+        style={'description_width': 'initial'}
     )
     
     # Validate downloads checkbox
     validate_checkbox = widgets.Checkbox(
         value=config.get('validate_downloads', True),
         description='Validate Downloaded Models',
-        layout=widgets.Layout(width='100%', margin='5px 0')
+        layout=checkbox_layout,
+        style={'description_width': 'initial'}
     )
     
-    # Create form rows
-    form_rows = [
-        [widgets.HTML("<h4>📁 Download Configuration</h4>")],
-        [models_dir_input],
-        [widgets.HTML("<h4>🔗 Custom Download URLs (Optional)</h4>")],
-        [yolo_url_input],
-        [efficientnet_url_input],
-        [widgets.HTML("<h4>⚙️ Download Options</h4>")],
-        [widgets.HBox([auto_download_checkbox, validate_checkbox])],
-        [widgets.HTML("""
-            <div style='margin-top: 8px; padding: 8px; background: #f8f9fa; border-radius: 4px; font-size: 0.9em; color: #666;'>
-                <strong>📝 Notes:</strong><br>
-                • YOLOv5s: Direct download from GitHub release (~14MB)<br>
-                • EfficientNet-B4: Downloaded via timm library (~75MB)<br>
-                • Leave URLs empty to use default/recommended sources
-            </div>
-        """)]
-    ]
+    # Create form sections
+    config_section = widgets.VBox([
+        widgets.HTML("<h4 style='margin: 10px 0 5px 0;'>📁 Download Configuration</h4>"),
+        models_dir_input,
+        widgets.HTML("<div style='margin: 15px 0 5px 0; border-top: 1px solid #eee;'></div>"),
+        widgets.HTML("<h4 style='margin: 5px 0;'>⚙️ Download Options</h4>"),
+        auto_download_checkbox,
+        validate_checkbox
+    ], layout=widgets.Layout(width='100%', margin='0 0 15px 0'))
+    
+    urls_section = widgets.VBox([
+        widgets.HTML("<h4 style='margin: 5px 0;'>🔗 Custom Download URLs</h4>"),
+        yolo_url_input,
+        efficientnet_url_input,
+        widgets.HTML("<div style='font-size: 0.85em; color: #666; margin: 5px 0;'>Leave URLs empty to use default sources</div>")
+    ], layout=widgets.Layout(width='100%', margin='0 0 10px 0'))
+    
+    # Combine sections into a single form
+    form_ui = widgets.VBox([
+        config_section,
+        urls_section
+    ], layout=widgets.Layout(
+        width='100%',
+        padding='10px 15px',
+        border='1px solid #e0e0e0',
+        border_radius='4px',
+        margin='5px 0'
+    ))
     
     return {
-        'form_rows': form_rows,
+        'form_rows': [[form_ui]],  # Single row with the combined form
         'widgets': {
             'models_dir_input': models_dir_input,
             'yolo_url_input': yolo_url_input,

@@ -48,7 +48,7 @@ class CleanupOperationHandler(BaseDownloaderHandler):
         return {'status': True, 'message': f"Ditemukan {total_files} file yang dapat dibersihkan", 'targets': targets_result}
     
     @handle_ui_errors(error_component_title="Cleanup Operation Error", log_error=True)
-    def execute_cleanup(self, targets_result: Dict[str, Any]) -> Dict[str, Any]:
+    async def execute_cleanup(self, targets_result: Dict[str, Any]) -> Dict[str, Any]:
         """Execute cleanup operation dengan backend service.
         
         Args:

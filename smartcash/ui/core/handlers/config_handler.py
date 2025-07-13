@@ -264,7 +264,9 @@ class PersistentConfigHandler(ConfigurableHandler):
         self._config_manager.save_config(config_bundle, config_name)
         
         self.logger.info(f"💾 Saved config: {config_name}")
-        self.update_status("Configuration saved successfully", 'success')
+        # update_status method may not be available in all contexts
+        if hasattr(self, 'update_status'):
+            self.update_status("Configuration saved successfully", 'success')
         return True
     
     @handle_errors(error_msg="Failed to delete configuration", level=ErrorLevel.ERROR, reraise=True)

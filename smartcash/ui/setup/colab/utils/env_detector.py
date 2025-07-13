@@ -154,12 +154,31 @@ def _get_os_info() -> Dict[str, str]:
     }
 
 def _is_google_colab() -> bool:
-    """🔍 Check if running in Google Colab"""
+    """🔍 Check if running in Google Colab using multiple detection methods"""
+    # Method 1: Check for google.colab module
     try:
         import google.colab
         return True
     except ImportError:
-        return False
+        pass
+    
+    # Method 2: Check environment variables
+    if os.environ.get('COLAB_RELEASE_TAG', ''):
+        return True
+        
+    # Method 3: Check if running in IPython and the runtime type is 'google.colab'
+    try:
+        from IPython import get_ipython
+        if 'google.colab' in str(get_ipython()):
+            return True
+    except:
+        pass
+        
+    # Method 4: Check for specific files that exist in Colab
+    if os.path.exists('/content'):
+        return True
+        
+    return False
 
 def _get_gpu_info() -> str:
     """🎮 Get GPU information"""
@@ -340,14 +359,15 @@ def _get_environment_variables() -> Dict[str, str]:
     
     return env_vars
 
-def get_runtime_type() -> Dict[str, str]:
-    """Get detailed runtime type information.
+def get_runtime_type() -> Dict[str, Any]:
+    """Get detailed runtime type information with debug details.
     
     Returns:
         Dictionary containing:
         - type: Runtime type (e.g., 'colab', 'local')
         - gpu: GPU availability ('available' or 'not available')
         - display: Formatted display string
+        - debug: Additional debug information (only included if not in Colab)
     """
     try:
         is_colab = _is_google_colab()
@@ -356,14 +376,34 @@ def get_runtime_type() -> Dict[str, str]:
         runtime_type = 'colab' if is_colab else 'local'
         gpu_status = 'available' if has_gpu else 'not available'
         
-        return {
+        result = {
             'type': runtime_type,
             'gpu': gpu_status,
             'display': f"{runtime_type.capitalize()} ({gpu_status} GPU)"
         }
+        
+        # Add debug info if not in Colab
+        if not is_colab:
+            import sys
+            result['debug'] = {
+                'python_executable': sys.executable,
+                'sys_path': sys.path,
+                'env_vars': {k: v for k, v in os.environ.items() 
+                           if 'COLAB' in k or 'JUPYTER' in k or 'IPYTHON' in k},
+                'files_checked': {
+                    '/content': os.path.exists('/content'),
+                    '/content/drive': os.path.exists('/content/drive')
+                }
+            }
+            
+        return result
+        
     except Exception as e:
+        import traceback
         return {
             'type': 'unknown',
             'gpu': 'unknown',
-            'display': f'Unknown ({str(e)})'
+            'display': f'Unknown ({str(e)})',
+            'error': str(e),
+            'traceback': traceback.format_exc()
         }

@@ -4,8 +4,10 @@ Description: Mount Google Drive with verification
 """
 
 import os
+import sys
 from typing import Dict, Any, Optional, Callable
 from smartcash.ui.core.handlers.operation_handler import OperationHandler
+from ..utils.env_detector import get_runtime_type, _is_google_colab
 
 
 class DriveMountOperation(OperationHandler):
@@ -47,12 +49,50 @@ class DriveMountOperation(OperationHandler):
             Dictionary with operation results
         """
         try:
+            # Get detailed environment information
+            from ..utils.env_detector import detect_environment_info
+            env_info = detect_environment_info()
             env_type = self.config.get('environment', {}).get('type', 'local')
             
             if env_type != 'colab':
+                # Get runtime type with debug info
+                runtime_info = get_runtime_type()
+                
+                # Build detailed error message
+                error_msg = [
+                    "Google Drive mounting is only available in Colab environment. ",
+                    f"Detected environment type: {env_type}",
+                    f"Runtime type: {runtime_info.get('type')}",
+                    f"GPU status: {runtime_info.get('gpu')}",
+                    "\nEnvironment details:",
+                    f"- Python executable: {sys.executable}",
+                    f"- Current working directory: {os.getcwd()}",
+                    f"- /content exists: {os.path.exists('/content')}",
+                    f"- /content/drive exists: {os.path.exists('/content/drive')}",
+                    "\nEnvironment variables:",
+                    *[f"- {k}: {v}" for k, v in os.environ.items() 
+                      if 'COLAB' in k or 'JUPYTER' in k or 'IPYTHON' in k]
+                ]
+                
+                # Add debug info if available
+                if 'debug' in runtime_info:
+                    error_msg.extend([
+                        "\nDebug information:",
+                        f"Python path: {runtime_info['debug'].get('python_executable')}",
+                        "Files checked:",
+                        *[f"- {k}: {v}" for k, v in runtime_info['debug'].get('files_checked', {}).items()]
+                    ])
+                
                 return {
                     'success': False,
-                    'error': 'Google Drive mounting is only available in Colab environment'
+                    'error': '\n'.join(error_msg),
+                    'environment_info': {
+                        'detected_type': runtime_info.get('type'),
+                        'config_type': env_type,
+                        'is_colab': _is_google_colab(),
+                        'has_gpu': runtime_info.get('gpu') == 'available',
+                        'debug': runtime_info.get('debug', {})
+                    }
                 }
             
             if progress_callback:

@@ -158,16 +158,35 @@ class DownloaderUIModule(UIModule):
             self._update_status("Checking dataset status...", "info")
             self.log("🔍 Starting dataset check operation", "info")
             
-            result = self.execute_check()
+            # Create a task to run the async operation
+            async def run_check():
+                try:
+                    result = await self.execute_check()
+                    
+                    if result.get("success", False):
+                        count = result.get("count", 0)
+                        self._update_status(f"Dataset check completed - {count} files found", "success")
+                        self.log(f"✅ Dataset check completed - {count} files found", "success")
+                    else:
+                        error_msg = result.get("error", "Check failed")
+                        self._update_status(f"Check failed: {error_msg}", "error")
+                        self.log(f"❌ Check failed: {error_msg}", "error")
+                except Exception as e:
+                    self.logger.error(f"Error in check operation: {e}", exc_info=True)
+                    self._update_status(f"Check error: {str(e)}", "error")
+                    self.log(f"❌ Check error: {str(e)}", "error")
+                finally:
+                    # Re-enable buttons when done
+                    self._set_buttons_enabled(True)
             
-            if result.get("success", False):
-                count = result.get("count", 0)
-                self._update_status(f"Dataset check completed - {count} files found", "success")
-                self.log(f"✅ Dataset check completed - {count} files found", "success")
-            else:
-                error_msg = result.get("error", "Check failed")
-                self._update_status(f"Check failed: {error_msg}", "error")
-                self.log(f"❌ Check failed: {error_msg}", "error")
+            # Start the async task
+            import asyncio
+            asyncio.create_task(run_check())
+            
+        except Exception as e:
+            self.logger.error(f"Failed to start check operation: {e}", exc_info=True)
+            self._update_status(f"Failed to start check: {str(e)}", "error")
+            self._set_buttons_enabled(True)
                 
         except Exception as e:
             self.logger.error(f"Check failed: {e}")
@@ -282,15 +301,19 @@ class DownloaderUIModule(UIModule):
             self.logger.error(f"Download execution failed: {e}")
             return {"success": False, "error": str(e)}
     
-    def execute_check(self) -> Dict[str, Any]:
-        """Execute dataset check."""
+    async def execute_check(self) -> Dict[str, Any]:
+        """Execute dataset check.
+        
+        Returns:
+            Dictionary containing check results
+        """
         if not self._operation_manager:
             return {"success": False, "error": "Operation manager not initialized"}
         
         try:
-            return self._operation_manager.execute_check()
+            return await self._operation_manager.execute_check()
         except Exception as e:
-            self.logger.error(f"Check execution failed: {e}")
+            self.logger.error(f"Check execution failed: {e}", exc_info=True)
             return {"success": False, "error": str(e)}
     
     def execute_cleanup(self, targets: Optional[List[str]] = None) -> Dict[str, Any]:

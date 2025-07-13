@@ -46,7 +46,8 @@ class TestCoreIntegration:
         # downloader_module._extract_ui_config.assert_called_once_with(test_config)
         # downloader_module._validate_config.assert_called_once()
     
-    def test_check_operation_integration(self, downloader_module, mock_download_service):
+    @pytest.mark.asyncio
+    async def test_check_operation_integration(self, downloader_module, mock_download_service):
         """Test integration of check operation with core service."""
         # Define expected result
         expected_result = {
@@ -58,14 +59,17 @@ class TestCoreIntegration:
         }
         
         # Mock the execute_check method to return expected result
-        with patch.object(downloader_module, 'execute_check') as mock_execute:
+        with patch.object(downloader_module, 'execute_check', new_callable=AsyncMock) as mock_execute:
             mock_execute.return_value = expected_result
             
             # Execute check
-            result = downloader_module.execute_check()
+            result = await downloader_module.execute_check()
             
             # Verify results
             assert result == expected_result
+            
+            # Verify the method was called
+            mock_execute.assert_awaited_once()
         
         # Service call verification removed as we're testing the module's behavior, not the service
     
@@ -169,50 +173,43 @@ class TestCoreIntegration:
             # Verify results
             assert result["success"] is True
     
-    def test_concurrent_operations_integration(self, downloader_module, mock_download_service):
+    @pytest.mark.asyncio
+    async def test_concurrent_operations_integration(self, downloader_module, mock_download_service):
         """Test that concurrent operations don't interfere with each other."""
-        import asyncio
-        
         # Define mock responses
         download_response = {"success": True, "files_downloaded": 10}
-        check_response = {"exists": True, "file_count": 15}
+        check_response = {"exists": True, "file_count": 15, "status": True}
         cleanup_response = {"success": True, "deleted_files": 5}
         
         # Mock the module methods to return our test responses
-        with patch.object(downloader_module, 'execute_download') as mock_download, \
-             patch.object(downloader_module, 'execute_check') as mock_check, \
-             patch.object(downloader_module, 'execute_cleanup') as mock_cleanup:
+        with patch.object(downloader_module, 'execute_download', new_callable=AsyncMock) as mock_download, \
+             patch.object(downloader_module, 'execute_check', new_callable=AsyncMock) as mock_check, \
+             patch.object(downloader_module, 'execute_cleanup', new_callable=AsyncMock) as mock_cleanup:
             
             # Set up the mock return values
             mock_download.return_value = download_response
             mock_check.return_value = check_response
             mock_cleanup.return_value = cleanup_response
             
-            # Define async test function
-            async def run_operations():
-                # Start multiple operations concurrently
-                download_task = asyncio.create_task(
-                    asyncio.to_thread(downloader_module.execute_download)
-                )
-                check_task = asyncio.create_task(
-                    asyncio.to_thread(downloader_module.execute_check)
-                )
-                cleanup_task = asyncio.create_task(
-                    asyncio.to_thread(downloader_module.execute_cleanup)
-                )
-                
-                # Wait for all tasks to complete
-                results = await asyncio.gather(download_task, check_task, cleanup_task)
-                return results
+            # Start multiple operations concurrently
+            download_task = asyncio.create_task(downloader_module.execute_download())
+            check_task = asyncio.create_task(downloader_module.execute_check())
+            cleanup_task = asyncio.create_task(downloader_module.execute_cleanup())
             
-            # Run the test
-            results = asyncio.run(run_operations())
+            # Wait for all tasks to complete
+            results = await asyncio.gather(download_task, check_task, cleanup_task, 
+                                         return_exceptions=True)
             
             # Verify all operations completed successfully
             assert len(results) == 3
             assert results[0] == download_response
             assert results[1] == check_response
             assert results[2] == cleanup_response
+            
+            # Verify all methods were called
+            mock_download.assert_awaited_once()
+            mock_check.assert_awaited_once()
+            mock_cleanup.assert_awaited_once()
             
             # Verify all methods were called once
             mock_download.assert_called_once()

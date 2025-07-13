@@ -10,6 +10,7 @@ This module provides comprehensive model evaluation capabilities with:
 """
 
 from .evaluation_uimodule import EvaluationUIModule
+from .components.evaluation_ui import create_evaluation_ui
 from .constants import (
     UI_CONFIG,
     RESEARCH_SCENARIOS,

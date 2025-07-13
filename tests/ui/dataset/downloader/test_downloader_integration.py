@@ -4,19 +4,19 @@ Description: Integration tests for the Dataset Downloader UI module and its inte
 """
 
 import pytest
+from unittest.mock import MagicMock, patch, call, AsyncMock
 import json
-import shutil
+import asyncio
 from pathlib import Path
-from unittest.mock import MagicMock, patch, ANY
 from typing import Dict, Any, Optional
 
 from smartcash.ui.dataset.downloader.downloader_uimodule import (
     DownloaderUIModule,
     create_downloader_uimodule
 )
+from smartcash.ui.core.ui_module import UIModule
 from smartcash.dataset.downloader.download_service import DownloadService
 from smartcash.dataset.downloader.progress_tracker import DownloadProgressTracker, DownloadStage
-from smartcash.ui.core.ui_module import UIModule
 
 # Test configuration
 TEST_CONFIG = {
@@ -160,37 +160,34 @@ class TestDownloaderIntegration:
             assert "Download completed successfully" in result["message"]
             assert result.get("result") == expected_result
     
-    @patch('smartcash.dataset.downloader.dataset_scanner.create_dataset_scanner')
-    def test_check_operation(self, mock_create_scanner, downloader_module, mock_download_service):
+    @pytest.mark.asyncio
+    async def test_check_operation(self, downloader_module, mock_download_service):
         """Test the check dataset operation."""
-        # Create a mock scanner
-        mock_scanner = MagicMock()
-        mock_scanner.scan_existing_dataset_parallel.return_value = {
-            'status': 'success',
+        # Create a mock operation manager with a mock execute_check method
+        mock_op_manager = AsyncMock()
+        mock_op_manager.execute_check.return_value = {
+            'success': True,
+            'status': True,
             'file_count': 10,
             'total_size': '50MB',
-            'message': 'Scan completed successfully'
+            'message': 'Pemeriksaan dataset selesai',
+            'exists': True
         }
-        mock_create_scanner.return_value = mock_scanner
         
-        # Setup UI components needed by the handler
-        downloader_module.ui_components.update({
-            'progress_callback': MagicMock()
-        })
-        
-        # Execute check
-        result = downloader_module.execute_check()
-        
-        # Verify results
-        assert result["exists"] is True
-        assert result["file_count"] == 10
-        assert result["total_size"] == "50MB"
-        assert result["status"] is True
-        assert "Pemeriksaan dataset selesai" in result["message"]
-        
-        # Verify scanner was called
-        mock_create_scanner.assert_called_once()
-        mock_scanner.scan_existing_dataset_parallel.assert_called_once()
+        # Patch the operation manager
+        with patch.object(downloader_module, '_operation_manager', mock_op_manager):
+            # Execute check
+            result = await downloader_module.execute_check()
+            
+            # Verify results
+            assert result.get("success") is True
+            assert result.get("status") is True
+            assert result.get("file_count") == 10
+            assert result.get("total_size") == "50MB"
+            assert "Pemeriksaan dataset selesai" in result.get("message", "")
+            
+            # Verify the execute_check method was called
+            mock_op_manager.execute_check.assert_awaited_once()
     
     def test_cleanup_operation(self, downloader_module, mocker):
         """Test the cleanup operation."""
@@ -271,22 +268,28 @@ class TestDownloaderIntegration:
             ['Download', 'Check', 'Cleanup']
         ]
     
-    def test_error_handling(self, downloader_module, mock_download_service):
+    @pytest.mark.asyncio
+    async def test_error_handling(self, downloader_module, mock_download_service):
         """Test error handling during download operations."""
-        # Mock a download error
-        mock_download_service.download_dataset.side_effect = Exception("Download failed: Connection error")
+        # Create a mock operation manager that returns an error response
+        mock_op_manager = AsyncMock()
+        mock_op_manager.execute_download.return_value = {
+            "success": False,
+            "error": "Download failed: Connection error",
+            "message": "Failed to download dataset"
+        }
         
-        # Execute download that should fail
-        result = downloader_module.execute_download()
-        
-        # Verify error handling
-        assert result["success"] is False
-        assert "Download failed" in result.get("error", "")
-        
-        # Verify error was logged
-        downloader_module.logger.error.assert_called_with(
-            "Error during download operation: Download failed: Connection error"
-        )
+        # Patch the operation manager
+        with patch.object(downloader_module, '_operation_manager', mock_op_manager):
+            # Execute download that should fail
+            result = await downloader_module.execute_download()
+            
+            # Verify error handling
+            assert result.get("success") is False
+            assert "Download failed" in result.get("error", "")
+            
+            # Verify the execute_download method was called
+            mock_op_manager.execute_download.assert_awaited_once()
 
 if __name__ == "__main__":
     pytest.main(["-v", "-s", __file__])

@@ -5,7 +5,7 @@ Description: Tests for progress logging and UI updates in the dataset downloader
 
 import asyncio
 import pytest
-from unittest.mock import MagicMock, patch, ANY
+from unittest.mock import MagicMock, patch, ANY, AsyncMock
 
 class TestProgressLogging:
     """Test progress logging and UI updates during dataset operations."""
@@ -34,13 +34,18 @@ class TestProgressLogging:
     
     @pytest.fixture
     def mock_operation_manager(self):
-        """Create a mock operation manager."""
-        mock = MagicMock()
+        """Create a mock operation manager with async method support."""
+        mock = AsyncMock()
+        
+        # Setup return values for async methods
         mock.execute_download.return_value = {"success": True, "message": "Download completed"}
         mock.execute_check.return_value = {"success": True, "message": "Check completed"}
         mock.execute_cleanup.return_value = {"success": True, "message": "Cleanup completed"}
+        
+        # Setup sync methods
         mock.update_status.return_value = None
         mock.update_progress.return_value = None
+        
         return mock
     
     @pytest.fixture
@@ -111,37 +116,39 @@ class TestProgressLogging:
         pass
     
     @pytest.mark.asyncio
-    async def test_concurrent_operations(self, downloader_module, mock_download_service):
+    async def test_concurrent_operations(self, downloader_module, mock_download_service, mock_operation_manager):
         """Test that concurrent operations are handled correctly."""
-        # Setup mock to simulate a long-running download
-        async def mock_download():
-            await asyncio.sleep(0.1)
-            return {"success": True, "message": "Download completed"}
+        # Define test responses
+        download_response = {"success": True, "message": "Download completed"}
+        check_response = {"success": True, "message": "Check completed", "exists": True}
+        cleanup_response = {"success": True, "message": "Cleanup completed"}
         
-        mock_download_service.download_dataset.side_effect = mock_download
-        
-        # Mock the execute methods to return coroutines
-        async def mock_execute_download():
-            return await mock_download()
-            
-        async def mock_execute_check():
-            return {"success": True, "message": "Check completed"}
-            
-        async def mock_execute_cleanup():
-            return {"success": True, "message": "Cleanup completed"}
-        
-        downloader_module.execute_download = mock_execute_download
-        downloader_module.execute_check = mock_execute_check
-        downloader_module.execute_cleanup = mock_execute_cleanup
+        # Mock the operation manager methods
+        mock_operation_manager.execute_download.return_value = download_response
+        mock_operation_manager.execute_check.return_value = check_response
+        mock_operation_manager.execute_cleanup.return_value = cleanup_response
         
         # Run the operations concurrently
+        download_task = asyncio.create_task(downloader_module.execute_download())
+        check_task = asyncio.create_task(downloader_module.execute_check())
+        cleanup_task = asyncio.create_task(downloader_module.execute_cleanup())
+        
+        # Wait for all tasks to complete
         results = await asyncio.gather(
-            downloader_module.execute_download(),
-            downloader_module.execute_check(),
-            downloader_module.execute_cleanup(),
+            download_task,
+            check_task,
+            cleanup_task,
             return_exceptions=True
         )
         
-        # Verify all operations completed
+        # Verify all operations completed successfully
         assert len(results) == 3
-        assert all('success' in str(r).lower() for r in results if not isinstance(r, Exception))
+        assert all(isinstance(result, dict) for result in results)
+        assert results[0] == download_response
+        assert results[1] == check_response
+        assert results[2] == cleanup_response
+        
+        # Verify all operation manager methods were called
+        mock_operation_manager.execute_download.assert_called_once()
+        mock_operation_manager.execute_check.assert_called_once()
+        mock_operation_manager.execute_cleanup.assert_called_once()

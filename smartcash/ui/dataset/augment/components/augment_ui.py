@@ -484,26 +484,61 @@ def _create_module_info_box() -> widgets.Widget:
     Returns:
         Widget containing the info accordion content
     """
-    info_content = """
-    <div style="font-size: 0.9em; line-height: 1.5;">
-        <div style="margin-bottom: 10px;">
-            <strong>💡 Augmentation Tips:</strong>
-            <ul style="margin: 5px 0 0 15px; padding: 0;">
-                <li>Use 'Combined' type for balanced position + lighting effects</li>
-                <li>Monitor target count to maintain dataset balance</li>
-                <li>Preview results before running full augmentation</li>
-                <li>Backup data before cleanup operations</li>
-            </ul>
-        </div>
-        <div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid #eee;">
-            <strong>📊 Recommended Settings:</strong>
-            <ul style="margin: 5px 0 0 15px; padding: 0;">
-                <li>Start with low intensity (0.1-0.3) and gradually increase</li>
-                <li>Use 2-4 augmentation types for balanced results</li>
-                <li>Check class distribution after augmentation</li>
-            </ul>
-        </div>
+    # Create content for each accordion tab
+    tips_content = widgets.HTML("""
+    <div style="font-size: 0.9em; line-height: 1.5; padding: 8px 0;">
+        <ul style="margin: 0 0 0 15px; padding: 0;">
+            <li>Use 'Combined' type for balanced position + lighting effects</li>
+            <li>Monitor target count to maintain dataset balance</li>
+            <li>Preview results before running full augmentation</li>
+            <li>Backup data before cleanup operations</li>
+        </ul>
     </div>
-    """
+    """)
     
-    return widgets.HTML(info_content)
+    settings_content = widgets.HTML("""
+    <div style="font-size: 0.9em; line-height: 1.5; padding: 8px 0;">
+        <ul style="margin: 0 0 0 15px; padding: 0;">
+            <li>Start with low intensity (0.1-0.3) and gradually increase</li>
+            <li>Use 2-4 augmentation types for balanced results</li>
+            <li>Check class distribution after augmentation</li>
+        </ul>
+    </div>
+    """)
+    
+    # Create the accordion with two sections
+    accordion = widgets.Accordion(children=[tips_content, settings_content])
+    accordion.set_title(0, '💡 Augmentation Tips')
+    accordion.set_title(1, '📊 Recommended Settings')
+    
+    # Style the accordion
+    accordion.add_class('info-accordion')
+    accordion.layout = widgets.Layout(
+        width='100%',
+        margin='0 0 10px 0',
+        border='1px solid #e0e0e0',
+        border_radius='8px',
+        overflow='hidden'
+    )
+    
+    # Add some custom CSS for the accordion
+    display(widgets.HTML("""
+    <style>
+        .info-accordion .p-Accordion-header {
+            background-color: #f5f5f5;
+            padding: 8px 12px;
+            cursor: pointer;
+            font-weight: 600;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        .info-accordion .p-Accordion-header:hover {
+            background-color: #ebebeb;
+        }
+        .info-accordion .p-Accordion-contents {
+            padding: 8px 12px;
+            background-color: #fafafa;
+        }
+    </style>
+    """))
+    
+    return accordion

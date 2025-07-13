@@ -515,7 +515,7 @@ def register_augment_template() -> None:
 def initialize_augment_ui(
     config: Optional[Dict[str, Any]] = None,
     display: bool = True
-) -> Optional[AugmentUIModule]:
+) -> Dict[str, Any]:
     """
     Initialize and optionally display augmentation UI using UIModule pattern.
     
@@ -524,30 +524,77 @@ def initialize_augment_ui(
         display: Whether to display the UI (requires IPython)
         
     Returns:
-        AugmentUIModule instance if successful, None otherwise
+        Dictionary containing:
+        - success: bool indicating if initialization was successful
+        - module: reference to the module instance (None if failed)
+        - ui_components: dictionary of UI components (empty if failed)
+        - status: current module status (empty if failed)
     """
     try:
         # Create and initialize module
         module = create_augment_uimodule(config=config, auto_initialize=True)
         
+        if not module or not hasattr(module, '_is_initialized') or not module._is_initialized:
+            error_msg = "Failed to initialize augment module"
+            if hasattr(module, '_initialization_error') and module._initialization_error:
+                error_msg += f": {module._initialization_error}"
+            print(f"❌ {error_msg}")
+            return {
+                'success': False,
+                'error': error_msg,
+                'module': None,
+                'ui_components': {},
+                'status': {}
+            }
+        
+        # Get UI components and status
+        ui_components = module.get_ui_components()
+        status = module.get_status() if hasattr(module, 'get_status') else {}
+        
+        result = {
+            'success': True,
+            'module': module,
+            'ui_components': ui_components,
+            'status': status
+        }
+        
+        # Display UI if requested and components are available
         if display:
             try:
                 from IPython.display import display as ipython_display
-                main_widget = module.get_main_widget()
-                if main_widget:
+                
+                # Try to get the main widget first
+                main_widget = module.get_main_widget() if hasattr(module, 'get_main_widget') else None
+                
+                if main_widget is not None:
                     ipython_display(main_widget)
                 else:
-                    print("⚠️ No UI widget available for display")
+                    # Fall back to UI components if main widget is not available
+                    if 'ui_components' in ui_components and 'ui' in ui_components['ui_components']:
+                        ipython_display(ui_components['ui_components']['ui'])
+                    elif 'ui' in ui_components:
+                        ipython_display(ui_components['ui'])
+                    
             except ImportError:
                 print("⚠️ IPython not available, cannot display UI")
             except Exception as e:
-                print(f"⚠️ Display failed: {e}")
+                print(f"⚠️ Display failed: {str(e)}")
         
-        return module
+        return result
         
     except Exception as e:
-        print(f"❌ Failed to initialize augmentation UI: {e}")
-        return None
+        error_msg = f"Failed to initialize augmentation UI: {str(e)}"
+        print(f"❌ {error_msg}")
+        import traceback
+        traceback.print_exc()
+        
+        return {
+            'success': False,
+            'error': error_msg,
+            'module': None,
+            'ui_components': {},
+            'status': {}
+        }
 
 
 def get_augment_components() -> Dict[str, Any]:

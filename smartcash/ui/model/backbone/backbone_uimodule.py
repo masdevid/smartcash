@@ -489,7 +489,11 @@ def initialize_backbone_ui(
         **kwargs: Additional arguments
         
     Returns:
-        Initialization result dictionary
+        Initialization result dictionary with keys:
+        - success: bool indicating if initialization was successful
+        - module: reference to the module instance
+        - ui_components: dictionary of UI components
+        - status: current module status
     """
     try:
         module = get_backbone_uimodule(config=config, **kwargs)
@@ -501,12 +505,12 @@ def initialize_backbone_ui(
             'status': module.get_backbone_status()
         }
         
+        # Display UI if requested and components are available
         if display and result['ui_components']:
             from IPython.display import display as ipython_display
             main_ui = result['ui_components'].get('main_container')
             if main_ui:
                 ipython_display(main_ui)
-                return None  # Don't return data when display=True
         
         return result
         

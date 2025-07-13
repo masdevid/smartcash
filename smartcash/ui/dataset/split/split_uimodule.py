@@ -538,7 +538,7 @@ def register_split_template() -> None:
 def initialize_split_ui(
     config: Optional[Dict[str, Any]] = None,
     display: bool = True
-) -> Optional[SplitUIModule]:
+) -> Dict[str, Any]:
     """
     Initialize and optionally display split UI using UIModule pattern.
     
@@ -547,69 +547,93 @@ def initialize_split_ui(
         display: Whether to display the UI (requires IPython)
         
     Returns:
-        SplitUIModule instance if successful, None otherwise
+        Dictionary containing:
+        - success: bool indicating if initialization was successful
+        - module: reference to the module instance (None if failed)
+        - ui_components: dictionary of UI components (empty if failed)
+        - status: current module status (empty if failed)
     """
     try:
         # Create and initialize module
         module = create_split_uimodule(config=config, auto_initialize=True)
         
         if not module or not hasattr(module, '_is_initialized') or not module._is_initialized:
-            print("❌ Failed to initialize split module")
-            if hasattr(module, '_initialization_error'):
-                print(f"   Error: {module._initialization_error}")
-            return None
+            error_msg = "Failed to initialize split module"
+            if hasattr(module, '_initialization_error') and module._initialization_error:
+                error_msg += f": {module._initialization_error}"
+            print(f"❌ {error_msg}")
+            return {
+                'success': False,
+                'error': error_msg,
+                'module': None,
+                'ui_components': {},
+                'status': {}
+            }
         
-        # Get the main widget
-        main_widget = module.get_main_widget()
+        # Get UI components and status
+        ui_components = module.get_ui_components()
+        status = module.get_status() if hasattr(module, 'get_status') else {}
         
-        if display and main_widget is not None:
+        result = {
+            'success': True,
+            'module': module,
+            'ui_components': ui_components,
+            'status': status
+        }
+        
+        # Display UI if requested and components are available
+        if display:
             try:
-                # Try to import IPython display
                 from IPython import get_ipython
                 from IPython.display import display as ipython_display
                 
-                # Check if we're in a notebook environment
-                if get_ipython() is not None:
-                    # In notebook, use IPython display with full width
-                    if hasattr(main_widget, 'layout'):
-                        try:
-                            if not hasattr(main_widget.layout, 'width'):
-                                main_widget.layout.width = '100%'
-                        except Exception as e:
-                            print(f"⚠️ Could not set widget width: {e}")
-                    ipython_display(main_widget)
-                else:
-                    # In script, just print the widget info
-                    print("Split UI initialized. Running in script mode.")
-                    print(f"Widget type: {type(main_widget).__name__}")
-                    if hasattr(main_widget, 'layout'):
-                        try:
-                            # Try to get layout as dict if possible
-                            if hasattr(main_widget.layout, '_trait_values'):
-                                print(f"Widget layout: {main_widget.layout._trait_values}")
-                            else:
-                                print("Widget layout available (details not shown)")
-                        except Exception as e:
-                            print(f"⚠️ Could not display layout: {e}")
-                    return module
+                # Get the main widget
+                main_widget = module.get_main_widget() if hasattr(module, 'get_main_widget') else None
+                
+                if main_widget is not None:
+                    # Check if we're in a notebook environment
+                    in_notebook = False
+                    try:
+                        in_notebook = get_ipython() is not None
+                    except:
+                        pass
+                    
+                    if in_notebook:
+                        # In notebook, use IPython display with full width
+                        if hasattr(main_widget, 'layout'):
+                            try:
+                                if not hasattr(main_widget.layout, 'width'):
+                                    main_widget.layout.width = '100%'
+                            except Exception as e:
+                                print(f"⚠️ Could not set widget width: {e}")
+                        ipython_display(main_widget)
+                    else:
+                        # In script, just print the widget info
+                        print("Split UI initialized. Running in script mode.")
+                        print(f"Widget type: {type(main_widget).__name__}")
+                
             except ImportError:
-                # IPython not available, just print
-                print("IPython not available. Running in script mode.")
-                print(f"Widget type: {type(main_widget).__name__}")
-                return module
+                print("⚠️ IPython not available, cannot display UI")
             except Exception as e:
                 print(f"⚠️ Failed to display UI: {str(e)}")
                 import traceback
                 traceback.print_exc()
-                return module
         
-        return module
+        return result
         
     except Exception as e:
-        print(f"❌ Failed to initialize split UI: {str(e)}")
+        error_msg = f"Failed to initialize split UI: {str(e)}"
+        print(f"❌ {error_msg}")
         import traceback
         traceback.print_exc()
-        return None
+        
+        return {
+            'success': False,
+            'error': error_msg,
+            'module': None,
+            'ui_components': {},
+            'status': {}
+        }
 
 
 def get_split_components() -> Dict[str, Any]:

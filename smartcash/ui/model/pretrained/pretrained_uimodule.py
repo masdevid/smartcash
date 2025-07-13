@@ -547,7 +547,7 @@ def register_pretrained_template() -> None:
 def initialize_pretrained_ui(
     config: Optional[Dict[str, Any]] = None,
     display: bool = True
-) -> Optional[PretrainedUIModule]:
+) -> Dict[str, Any]:
     """
     Initialize and optionally display pretrained UI using UIModule pattern.
     
@@ -556,53 +556,75 @@ def initialize_pretrained_ui(
         display: Whether to display the UI (requires IPython)
         
     Returns:
-        PretrainedUIModule instance if successful, None otherwise
+        Dictionary containing:
+        - success: bool indicating if initialization was successful
+        - module: reference to the module instance (None if failed)
+        - ui_components: dictionary of UI components (empty if failed)
+        - status: current module status (empty if failed)
     """
     try:
         # Create and initialize module
         module = create_pretrained_uimodule(config=config, auto_initialize=True)
         
         if not module or not module._is_initialized:
-            print("❌ Failed to initialize pretrained module")
-            return None
+            error_msg = "Failed to initialize pretrained module"
+            print(f"❌ {error_msg}")
+            return {
+                'success': False,
+                'error': error_msg,
+                'module': None,
+                'ui_components': {},
+                'status': {}
+            }
+        
+        # Get UI components and status
+        ui_components = module.get_ui_components()
+        status = module.get_status() if hasattr(module, 'get_status') else {}
+        
+        result = {
+            'success': True,
+            'module': module,
+            'ui_components': ui_components,
+            'status': status
+        }
             
+        # Display UI if requested and components are available
         if display:
             try:
                 from IPython.display import display as ipython_display
                 
-                # Get the main widget
-                main_widget = module.get_main_widget()
+                # Try to get the main widget first
+                main_widget = module.get_main_widget() if hasattr(module, 'get_main_widget') else None
                 
                 if main_widget is not None:
-                    # Display the main widget
                     ipython_display(main_widget)
-                    print("✅ Pretrained UI displayed successfully")
                 else:
-                    # Try to get the UI components directly if main widget is None
-                    components = module.get_ui_components()
-                    if 'ui_components' in components and 'ui' in components['ui_components']:
-                        ipython_display(components['ui_components']['ui'])
-                        print("✅ Pretrained UI displayed from components")
-                    elif 'ui' in components:
-                        ipython_display(components['ui'])
-                        print("✅ Pretrained UI displayed from root components")
-                    else:
-                        print("⚠️ No UI widget available for display. Available keys:", list(components.keys()))
-                        if 'ui_components' in components:
-                            print("UI Components keys:", list(components['ui_components'].keys()))
+                    # Fall back to UI components if main widget is not available
+                    if 'ui_components' in ui_components and 'ui' in ui_components['ui_components']:
+                        ipython_display(ui_components['ui_components']['ui'])
+                    elif 'ui' in ui_components:
+                        ipython_display(ui_components['ui'])
+                    
             except ImportError:
                 print("⚠️ IPython not available, cannot display UI")
             except Exception as e:
                 print(f"⚠️ Display failed: {str(e)}")
         
-        return module
+        return result
         
     except Exception as e:
-        print(f"❌ Failed to initialize pretrained UI: {str(e)}")
+        error_msg = f"Failed to initialize pretrained UI: {str(e)}"
+        print(f"❌ {error_msg}")
         import traceback
         traceback.print_exc()
-        return None
-        return None
+        
+        return {
+            'success': False,
+            'error': error_msg,
+            'module': None,
+            'ui_components': {},
+            'status': {}
+        }
 
 
 def get_pretrained_components() -> Dict[str, Any]:

@@ -39,6 +39,15 @@ class PretrainedConfigHandler(ConfigHandler):
         if config:
             self.update_config(config)
     
+    def get_config(self) -> Dict[str, Any]:
+        """
+        Get current configuration.
+        
+        Returns:
+            Current configuration dictionary
+        """
+        return self.config
+        
     def validate_config(self, config: Dict[str, Any]) -> bool:
         """
         Validate pretrained configuration.

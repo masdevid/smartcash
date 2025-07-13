@@ -584,7 +584,12 @@ def initialize_pretrained_ui(
             from IPython.display import display as ipython_display, clear_output
             if get_ipython() is not None:
                 clear_output(wait=True)
-            main_ui = ui_components.get('main_container')
+            # Try different paths to find the main UI container
+            main_ui = (
+                ui_components.get('main_container') or 
+                ui_components.get('ui_components', {}).get('main_container') or
+                ui_components.get('ui')
+            )
             if main_ui is not None:
                 try:
                     if hasattr(main_ui, 'show'):

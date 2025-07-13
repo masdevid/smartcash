@@ -524,7 +524,8 @@ def initialize_backbone_ui(
                     ipython_display(ui_widget)
                 except Exception as e:
                     # Fallback to simple display if anything goes wrong
-                    self.logger.error(f"Error displaying UI: {str(e)}")
+                    logger = get_module_logger("smartcash.ui.model.backbone")
+                    logger.error(f"Error displaying UI: {str(e)}")
                     ipython_display(main_ui)
                 return None  # Don't return data when display=True
         

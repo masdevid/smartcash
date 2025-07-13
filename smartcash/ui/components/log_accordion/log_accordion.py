@@ -470,7 +470,7 @@ class LogAccordion(BaseUIComponent):
         return short_ns
 
     def _create_log_widget(self, entry: LogEntry) -> widgets.HTML:
-        """Create an HTML widget for a log entry with compact 2-line format."""
+        """Create an HTML widget for a log entry in a single row format."""
         try:
             # Get style for the log level
             style = get_log_level_style(entry.level)
@@ -484,8 +484,8 @@ class LogAccordion(BaseUIComponent):
             # Add duplicate counter if needed
             duplicate_counter = f" <span class='duplicate-counter'>{entry.count}</span>" if entry.show_duplicate_indicator else ""
             
-            # Shorten namespace for compact display
-            namespace = self._shorten_namespace(entry.namespace) or "unknown"
+            # Get full namespace or 'unknown' if not available
+            full_namespace = entry.namespace or 'unknown'
             
             # Handle multi-line messages (e.g., tracebacks)
             message_lines = entry.message.split('\n')
@@ -508,52 +508,58 @@ class LogAccordion(BaseUIComponent):
             else:
                 expandable_html = ""
             
-            # Create compact 2-line format HTML
+            # Create single row format HTML
             html = f"""
             <div class='log-entry-compact' style='
                 padding: 4px 8px; 
-                margin: 1px 0; 
+                margin: 2px 0; 
                 border-left: 3px solid {style['color']}; 
                 background: {style['bg']}; 
                 border-radius: 3px;
                 transition: all 0.15s ease;
+                display: flex;
+                align-items: center;
+                gap: 6px;
+                line-height: 1.3;
+                font-size: 13px;
+                font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
             '>
-                <!-- Line 1: [time:GMT+7] [emoji] [message] -->
-                <div style='
-                    display: flex; 
-                    align-items: center; 
-                    gap: 6px; 
-                    line-height: 1.3;
-                    font-size: 13px;
-                    font-weight: 500;
-                '>
-                    <span style='
-                        color: #6c757d; 
-                        font-size: 11px; 
-                        font-weight: 400;
-                        flex-shrink: 0;
-                    '>[{timestamp}:GMT+7]</span>
-                    
-                    <span style='
-                        font-size: 14px;
-                        flex-shrink: 0;
-                    '>{level_emoji}</span>
-                    
-                    <span style='
-                        flex: 1; 
-                        color: {style['text_color']};
-                        word-break: break-word;
-                    '>{main_message}{duplicate_counter}</span>
-                </div>
+                <!-- Namespace -->
+                <span style='
+                    color: #6c757d;
+                    font-size: 11px;
+                    max-width: 200px;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                    white-space: nowrap;
+                    flex-shrink: 0;
+                '>[{full_namespace}]</span>
                 
-                <!-- Line 2: [logger fullnamespace] -->
-                <div style='
-                    font-size: 10px; 
-                    color: #6c757d; 
-                    opacity: 0.8;
-                    margin-top: 1px;
-                    font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
-                '>[{entry.namespace or 'unknown'}]</div>
+                <!-- Icon -->
+                <span style='
+                    font-size: 14px;
+                    flex-shrink: 0;
+                    width: 20px;
+                    text-align: center;
+                '>{level_emoji}</span>
+                
+                <!-- Message -->
+                <span style='
+                    flex: 1;
+                    color: {style['text_color']};
+                    word-break: break-word;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                    white-space: nowrap;
+                '>{main_message}{duplicate_counter}</span>
+                
+                <!-- Timestamp -->
+                <span style='
+                    color: #6c757d;
+                    font-size: 11px;
+                    flex-shrink: 0;
+                    margin-left: 8px;
+                '>{timestamp}</span>
                 
                 {expandable_html}
             </div>

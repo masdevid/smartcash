@@ -38,7 +38,8 @@ class OptimizationType(Enum):
 
 # ==================== Progress Steps ====================
 
-PROGRESS_STEPS = {
+# Legacy alias for backward compatibility
+OPERATION_PROGRESS_STEPS = PROGRESS_STEPS = {
     TrainingOperation.START.value: [
         "🔄 Loading backbone configuration",
         "🏗️ Building model from backbone", 
@@ -296,6 +297,22 @@ SUCCESS_MESSAGES = {
     'training_completed': "Training completed successfully",
     'model_saved': "Best model saved successfully",
     'validation_completed': "Validation completed successfully"
+}
+
+# ==================== Default Metrics ====================
+
+DEFAULT_METRICS = {
+    'train_loss': 0.0,
+    'val_loss': 0.0,
+    'val_map50': 0.0,
+    'val_map75': 0.0,
+    'accuracy': 0.0,
+    'precision': 0.0,
+    'recall': 0.0,
+    'f1_score': 0.0,
+    'learning_rate': 0.001,
+    'epoch': 0,
+    'best_map50': 0.0
 }
 
 # ==================== Defaults ====================

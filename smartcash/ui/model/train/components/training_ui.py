@@ -6,16 +6,10 @@ Training UI components with dual live charts following UIModule pattern.
 from typing import Dict, Any, Optional, List
 import ipywidgets as widgets
 from smartcash.ui.logger import get_module_logger
-from smartcash.ui.core.components.base_component import BaseComponent
-from smartcash.ui.core.components.form_components import (
-    create_form_container, create_form_section, 
-    create_dropdown, create_number_input, create_checkbox_input,
-    create_summary_container
-)
-from smartcash.ui.core.components.chart_components import create_live_chart
-from smartcash.ui.core.components.operation_components import create_operation_container
+from smartcash.ui.components.operation_container import create_operation_container
+from smartcash.ui.components.summary_container import create_summary_container
 from ..constants import (
-    UI_CONFIG, BUTTON_CONFIG, CHART_CONFIG, LAYER_CONFIGS, 
+    UI_CONFIG, BUTTON_CONFIG, CHART_CONFIG, 
     LayerMode, OptimizationType, generate_model_name
 )
 from ..configs.train_defaults import (
@@ -23,430 +17,606 @@ from ..configs.train_defaults import (
 )
 
 
-@handle_ui_errors(error_component_title="Training UI Error")
-def create_training_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> Dict[str, Any]:
+def create_training_ui(config: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Create the model training UI following SmartCash standards.
-    
-    This function creates a complete UI for training YOLOv5 models
-    with the following sections:
-    - Training configuration parameters
-    - Training control operations
-    - Real-time progress monitoring
-    - Metrics visualization and tracking
+    Create training UI components with dual live charts.
     
     Args:
-        config: Optional configuration dictionary for the UI
-        **kwargs: Additional keyword arguments passed to UI components
+        config: Training configuration dictionary
         
     Returns:
-        Dictionary containing all UI components and their references with 'ui_components' key
-        
-    Example:
-        >>> ui = create_training_ui()
-        >>> display(ui['ui'])  # Display the UI
+        Dictionary containing all UI components
     """
-    # Initialize configuration and components dictionary
-    current_config = config or DEFAULT_CONFIG.copy()
-    ui_components = {
-        'config': current_config,
-        'containers': {},
-        'widgets': {}
-    }
+    logger = get_module_logger("smartcash.ui.model.train.components")
+    logger.debug("Creating training UI components with dual charts...")
     
-    # === 1. Create Header Container ===
-    header_container = create_header_container(
-        title=f"{UI_CONFIG['icon']} {UI_CONFIG['title']}",
-        subtitle=UI_CONFIG['subtitle'],
-        status_message="Ready to start training",
-        status_type="info"
-    )
-    # Store both the container object and its widget
-    ui_components['containers']['header'] = {
-        'container': header_container.container,
-        'widget': header_container
-    }
-    
-    # === 2. Create Form Container ===
-    # Create form widgets
-    form_widgets = _create_module_form_widgets(current_config)
-    
-    # Create form container with the widgets
-    form_container = create_form_container(
-        form_rows=form_widgets['form_rows'],
-        layout_type=LayoutType.COLUMN,
-        container_margin="0",
-        container_padding="16px",
-        gap="12px"
-    )
-    
-    # Store references
-    ui_components['containers']['form'] = form_container
-    ui_components['widgets'].update(form_widgets['widgets'])
-    
-    # === 3. Create Action Container ===
-    # Create action buttons from BUTTON_CONFIG
-    action_buttons = []
-    for button_id, btn_config in BUTTON_CONFIG.items():
-        action_buttons.append({
-            'name': button_id,
-            'label': btn_config['text'],
-            'button_style': btn_config['style'],
-            'tooltip': btn_config['tooltip'],
-            'icon': 'play' if button_id == 'start' else 'stop' if button_id == 'stop' else 'refresh' if button_id == 'resume' else 'check'
-        })
-    
-    action_container = create_action_container(
-        buttons=action_buttons,
-        title="🎯 Training Operations",
-        alignment="left"
-    )
-    
-    # Store references
-    ui_components['containers']['actions'] = action_container
-    
-    # Store individual button references for easier access
-    if hasattr(action_container, 'get'):
-        for btn in action_buttons:
-            button_ref = action_container.get(btn['name'])
-            if button_ref:
-                ui_components['widgets'][f'{btn["name"]}_button'] = button_ref
-                # Also store directly under containers.actions for handler access
-                ui_components['containers']['actions'][btn['name']] = button_ref
-    
-    # === 4. Create Summary Container ===
-    summary_content = _create_module_summary_content(current_config)
-    summary_container = create_summary_container(
-        title="📊 Training Overview",
-        theme="primary",
-        icon="🚀"
-    )
-    summary_container.set_content(summary_content)
-    
-    ui_components['containers']['summary'] = summary_container
-    
-    # === 5. Create Operation Container ===
-    operation_container = create_operation_container(
-        title="🔄 Training Progress",
-        show_progress=True,
-        show_logs=True,
-        collapsible=True,
-        collapsed=False
-    )
-    ui_components['containers']['operation'] = operation_container
-    
-    # === 6. Create Footer Container ===
-    footer_container = create_footer_container(
-        info_box=_create_module_info_box(),
-        show_tips=True,
-        show_version=True
-    )
-    # Store both the container object and its widget
-    ui_components['containers']['footer'] = {
-        'container': footer_container.container,
-        'widget': footer_container
-    }
-    
-    # === 7. Create Main Container ===
-    main_container = create_main_container(
-        header=ui_components['containers']['header']['container'],
-        body=widgets.VBox([
-            ui_components['containers']['form']['container'],
-            ui_components['containers']['actions']['container'],
-            ui_components['containers']['summary'].container,
-            ui_components['containers']['operation']['container']
-        ]),
-        footer=ui_components['containers']['footer']['container'],
-        container_config={
-            'margin': '0 auto',
-            'max_width': '1200px',
-            'padding': '10px',
-            'border': '1px solid #e0e0e0',
-            'border_radius': '5px',
-            'box_shadow': '0 1px 3px rgba(0,0,0,0.1)'
+    try:
+        # Extract configurations
+        training_config = config.get('training', {})
+        ui_config = config.get('ui', {})
+        chart_config = get_chart_configurations()
+        
+        # Create main container
+        main_container = widgets.VBox([
+            widgets.HTML(f"<h3>{UI_CONFIG['title']}</h3>"),
+            widgets.HTML(f"<p>{UI_CONFIG['subtitle']}</p>")
+        ], layout=widgets.Layout(width='100%'))
+        
+        # Create form container for training configuration
+        form_container = _create_training_form(training_config, ui_config)
+        
+        # Create dual chart layout
+        charts_container = _create_dual_charts_layout(chart_config, ui_config)
+        
+        # Create metrics results summary panel
+        metrics_summary = _create_metrics_results_panel()
+        
+        # Create operation container for training controls (no initial logs)
+        operation_container_result = create_operation_container(
+            operations=list(BUTTON_CONFIG.keys()),
+            button_config=BUTTON_CONFIG,
+            show_progress=True,
+            show_logs=True,
+            suppress_initial_logs=True  # Prevent logs during initialization
+        )
+        operation_container = operation_container_result.get('container', operation_container_result)
+        
+        # Create configuration summary container
+        summary_container = _create_configuration_summary(config)
+        
+        # Arrange components based on layout preference
+        layout_style = ui_config.get('dual_charts_layout', 'horizontal')
+        
+        if layout_style == 'vertical':
+            # Vertical layout: form, charts stacked, operations, summary
+            charts_layout = widgets.VBox([
+                charts_container['loss_chart'],
+                charts_container['map_chart']
+            ])
+        else:
+            # Horizontal layout: form, charts side-by-side, operations, summary
+            charts_layout = widgets.HBox([
+                charts_container['loss_chart'],
+                charts_container['map_chart']
+            ], layout=widgets.Layout(width='100%'))
+        
+        # Add components to main container
+        main_container.children = [
+            main_container.children[0],  # Title
+            main_container.children[1],  # Subtitle
+            form_container,
+            charts_layout,
+            metrics_summary,
+            operation_container,
+            summary_container
+        ]
+        
+        ui_components = {
+            'main_container': main_container,
+            'form_container': form_container,
+            'loss_chart': charts_container['loss_chart'],
+            'map_chart': charts_container['map_chart'],
+            'charts_container': charts_layout,
+            'metrics_summary': metrics_summary,
+            'operation_container': operation_container_result,  # Store the full result for operation access
+            'summary_container': summary_container
         }
-    )
-    
-    # Store main UI references
-    ui_components['ui'] = main_container.container
-    ui_components['main_container'] = main_container
-    
-    result = {
-        'ui_components': ui_components,
-        'ui': ui_components['ui']
-    }
-    
-    # Add all components to the root for backward compatibility
-    result.update(ui_components['containers'])
-    result.update(ui_components['widgets'])
-    
-    # Add legacy compatibility
-    result.update({
-        'ui_initialized': True,
-        'module_name': 'train',
-        'parent_module': 'model'
-    })
-    
-    return result
-
-
-def _create_module_form_widgets(config: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    Create module-specific form widgets for training configuration.
-    
-    Args:
-        config: Configuration dictionary for the form widgets
         
-    Returns:
-        Dictionary containing the form UI and widget references
-    """
-    training_config = config.get("training", {})
-    optimizer_config = config.get("optimizer", {})
-    scheduler_config = config.get("scheduler", {})
+        logger.debug(f"✅ Created {len(ui_components)} training UI components")
+        return ui_components
+        
+    except Exception as e:
+        logger.error(f"Failed to create training UI: {e}")
+        raise
+
+def _create_training_form(training_config: Dict[str, Any], ui_config: Dict[str, Any]) -> widgets.Widget:
+    """Create training configuration form."""
+    logger = get_module_logger("smartcash.ui.model.train.components")
     
-    # Training Parameters Section
-    epochs_input = widgets.IntSlider(
-        value=training_config.get('epochs', 100),
-        min=VALIDATION_RULES['epochs']['min'],
-        max=VALIDATION_RULES['epochs']['max'],
-        step=1,
-        description='Epochs:',
-        style={'description_width': '120px'},
-        layout=widgets.Layout(width='100%', margin='5px 0')
-    )
+    try:
+        layer_configs = get_layer_mode_configs()
+        optimization_types = get_optimization_types()
+        
+        # Layer mode selection
+        layer_mode_dropdown = widgets.Dropdown(
+            description="Training Mode:",
+            options=[(config['display_name'], key) for key, config in layer_configs.items()],
+            value=training_config.get('layer_mode', 'single'),
+            style={'description_width': '150px'},
+            layout=widgets.Layout(width='100%')
+        )
+        
+        # Basic training parameters
+        epochs_input = widgets.IntSlider(
+            description="Epochs:",
+            value=training_config.get('epochs', 100),
+            min=1,
+            max=1000,
+            step=10,
+            style={'description_width': '150px'},
+            layout=widgets.Layout(width='100%')
+        )
+        
+        batch_size_input = widgets.IntSlider(
+            description="Batch Size:",
+            value=training_config.get('batch_size', 16),
+            min=1,
+            max=256,
+            step=2,
+            style={'description_width': '150px'},
+            layout=widgets.Layout(width='100%')
+        )
+        
+        learning_rate_input = widgets.FloatLogSlider(
+            description="Learning Rate:",
+            value=training_config.get('learning_rate', 0.001),
+            base=10,
+            min=-6,
+            max=0,
+            step=0.1,
+            style={'description_width': '150px'},
+            layout=widgets.Layout(width='100%')
+        )
+        
+        # Optimization type
+        optimization_dropdown = widgets.Dropdown(
+            description="Optimization:",
+            options=[(config['display_name'], key) for key, config in optimization_types.items()],
+            value=training_config.get('optimization_type', 'default'),
+            style={'description_width': '150px'},
+            layout=widgets.Layout(width='100%')
+        )
+        
+        # Advanced options (simplified)
+        early_stopping_config = training_config.get('early_stopping', {})
+        mixed_precision_checkbox = widgets.Checkbox(
+            description="Mixed Precision",
+            value=training_config.get('mixed_precision', True),
+            style={'description_width': '150px'}
+        )
+        
+        early_stopping_checkbox = widgets.Checkbox(
+            description="Early Stopping",
+            value=early_stopping_config.get('enabled', True),
+            style={'description_width': '150px'}
+        )
+        
+        # Create form container using VBox
+        form_widgets = [
+            widgets.HTML("<h4>🚀 Training Configuration</h4>"),
+            layer_mode_dropdown,
+            epochs_input,
+            batch_size_input,
+            learning_rate_input,
+            optimization_dropdown,
+            widgets.HTML("<h5>Advanced Options</h5>"),
+            widgets.HBox([mixed_precision_checkbox, early_stopping_checkbox])
+        ]
+        
+        form_container = widgets.VBox(
+            form_widgets,
+            layout=widgets.Layout(
+                border='1px solid #ddd',
+                padding='15px',
+                margin='10px 0',
+                border_radius='5px'
+            )
+        )
+        
+        # Store references for value retrieval
+        form_container._layer_mode_dropdown = layer_mode_dropdown
+        form_container._epochs_input = epochs_input
+        form_container._batch_size_input = batch_size_input
+        form_container._learning_rate_input = learning_rate_input
+        form_container._optimization_dropdown = optimization_dropdown
+        form_container._mixed_precision_checkbox = mixed_precision_checkbox
+        form_container._early_stopping_checkbox = early_stopping_checkbox
+        
+        # Add method to get form values
+        def get_form_values():
+            values = {
+                'layer_mode': layer_mode_dropdown.value,
+                'epochs': int(epochs_input.value),
+                'batch_size': int(batch_size_input.value),
+                'learning_rate': float(learning_rate_input.value),
+                'optimization_type': optimization_dropdown.value,
+                'mixed_precision': mixed_precision_checkbox.value,
+                'early_stopping_enabled': early_stopping_checkbox.value
+            }
+            return values
+        
+        form_container.get_form_values = get_form_values
+        
+        logger.debug("✅ Training form created successfully")
+        return form_container
+        
+    except Exception as e:
+        logger.error(f"Failed to create training form: {e}")
+        raise
+
+
+def _create_dual_charts_layout(chart_config: Dict[str, Any], ui_config: Dict[str, Any]) -> Dict[str, Any]:
+    """Create dual live charts for loss and mAP monitoring."""
+    logger = get_module_logger("smartcash.ui.model.train.components")
     
-    batch_size_input = widgets.IntSlider(
-        value=training_config.get('batch_size', 16),
-        min=VALIDATION_RULES['batch_size']['min'],
-        max=VALIDATION_RULES['batch_size']['max'],
-        step=1,
-        description='Batch Size:',
-        style={'description_width': '120px'},
-        layout=widgets.Layout(width='100%', margin='5px 0')
-    )
-    
-    learning_rate_input = widgets.FloatLogSlider(
-        value=training_config.get('learning_rate', 0.001),
-        base=10,
-        min=-6,
-        max=0,
-        step=0.1,
-        description='Learning Rate:',
-        style={'description_width': '120px'},
-        layout=widgets.Layout(width='100%', margin='5px 0')
-    )
-    
-    validation_interval_input = widgets.IntSlider(
-        value=training_config.get('validation_interval', 1),
-        min=VALIDATION_RULES['validation_interval']['min'],
-        max=VALIDATION_RULES['validation_interval']['max'],
-        step=1,
-        description='Val Interval:',
-        style={'description_width': '120px'},
-        layout=widgets.Layout(width='100%', margin='5px 0')
-    )
-    
-    # Optimizer Parameters Section
-    optimizer_dropdown = widgets.Dropdown(
-        options=[('Adam', 'adam'), ('SGD', 'sgd'), ('AdamW', 'adamw')],
-        value=optimizer_config.get('type', 'adam'),
-        description='Optimizer:',
-        style={'description_width': '120px'},
-        layout=widgets.Layout(width='100%', margin='5px 0')
-    )
-    
-    weight_decay_input = widgets.FloatLogSlider(
-        value=optimizer_config.get('weight_decay', 0.0005),
-        base=10,
-        min=-6,
-        max=-1,
-        step=0.1,
-        description='Weight Decay:',
-        style={'description_width': '120px'},
-        layout=widgets.Layout(width='100%', margin='5px 0')
-    )
-    
-    # Scheduler Parameters Section
-    scheduler_dropdown = widgets.Dropdown(
-        options=[('Cosine', 'cosine'), ('Step', 'step'), ('Exponential', 'exponential')],
-        value=scheduler_config.get('type', 'cosine'),
-        description='Scheduler:',
-        style={'description_width': '120px'},
-        layout=widgets.Layout(width='100%', margin='5px 0')
-    )
-    
-    warmup_epochs_input = widgets.IntSlider(
-        value=scheduler_config.get('warmup_epochs', 5),
-        min=0,
-        max=20,
-        step=1,
-        description='Warmup Epochs:',
-        style={'description_width': '120px'},
-        layout=widgets.Layout(width='100%', margin='5px 0')
-    )
-    
-    # Advanced Options
-    early_stopping_config = training_config.get('early_stopping', {})
-    early_stopping_checkbox = widgets.Checkbox(
-        value=early_stopping_config.get('enabled', True),
-        description='Enable Early Stopping',
-        layout=widgets.Layout(width='50%', margin='5px 0')
-    )
-    
-    mixed_precision_config = config.get('mixed_precision', {})
-    mixed_precision_checkbox = widgets.Checkbox(
-        value=mixed_precision_config.get('enabled', True),
-        description='Enable Mixed Precision',
-        layout=widgets.Layout(width='50%', margin='5px 0')
-    )
-    
-    # Resume Training
-    checkpoint_path_input = widgets.Text(
-        value='',
-        description='Checkpoint Path:',
-        placeholder='/data/checkpoints/best_model.pt',
-        style={'description_width': '120px'},
-        layout=widgets.Layout(width='100%', margin='5px 0')
-    )
-    
-    # Create form rows
-    form_rows = [
-        [widgets.HTML("<h4>⚙️ Training Parameters</h4>")],
-        [widgets.HBox([epochs_input, batch_size_input])],
-        [widgets.HBox([learning_rate_input, validation_interval_input])],
-        [widgets.HTML("<h4>🔧 Optimizer Configuration</h4>")],
-        [widgets.HBox([optimizer_dropdown, weight_decay_input])],
-        [widgets.HTML("<h4>📈 Learning Rate Scheduler</h4>")],
-        [widgets.HBox([scheduler_dropdown, warmup_epochs_input])],
-        [widgets.HTML("<h4>🎛️ Advanced Options</h4>")],
-        [widgets.HBox([early_stopping_checkbox, mixed_precision_checkbox])],
-        [widgets.HTML("<h4>💾 Resume Training</h4>")],
-        [checkpoint_path_input],
-        [widgets.HTML("""
-            <div style='margin-top: 15px; padding: 10px; background: #f8f9fa; border-radius: 4px; font-size: 0.9em; color: #666;'>
-                <strong>💡 Tips:</strong><br>
-                • Start with default settings for initial training<br>
-                • Reduce learning rate if loss oscillates<br>
-                • Increase batch size if GPU memory allows<br>
-                • Enable mixed precision to reduce memory usage
+    try:
+        # Create placeholder charts using simple HTML widgets
+        loss_chart = widgets.HTML(
+            value="""
+            <div style="border: 2px solid #ff6b6b; padding: 20px; margin: 10px; border-radius: 8px; text-align: center;">
+                <h4 style="color: #ff6b6b; margin-top: 0;">📈 Training Loss Chart</h4>
+                <p>Real-time training and validation loss will be displayed here</p>
+                <div style="background: #fff5f5; padding: 10px; border-radius: 4px; margin-top: 10px;">
+                    <small>Metrics: Train Loss, Validation Loss</small>
+                </div>
             </div>
-        """)]
-    ]
-    
-    return {
-        'form_rows': form_rows,
-        'widgets': {
-            'epochs_input': epochs_input,
-            'batch_size_input': batch_size_input,
-            'learning_rate_input': learning_rate_input,
-            'validation_interval_input': validation_interval_input,
-            'optimizer_dropdown': optimizer_dropdown,
-            'weight_decay_input': weight_decay_input,
-            'scheduler_dropdown': scheduler_dropdown,
-            'warmup_epochs_input': warmup_epochs_input,
-            'early_stopping_checkbox': early_stopping_checkbox,
-            'mixed_precision_checkbox': mixed_precision_checkbox,
-            'checkpoint_path_input': checkpoint_path_input
+            """,
+            layout=widgets.Layout(width='100%', height='200px')
+        )
+        
+        map_chart = widgets.HTML(
+            value="""
+            <div style="border: 2px solid #4ecdc4; padding: 20px; margin: 10px; border-radius: 8px; text-align: center;">
+                <h4 style="color: #4ecdc4; margin-top: 0;">📊 mAP Performance Chart</h4>
+                <p>Real-time mAP performance metrics will be displayed here</p>
+                <div style="background: #f0fdfc; padding: 10px; border-radius: 4px; margin-top: 10px;">
+                    <small>Metrics: mAP@0.5, mAP@0.75</small>
+                </div>
+            </div>
+            """,
+            layout=widgets.Layout(width='100%', height='200px')
+        )
+        
+        # Add update methods to charts
+        def update_loss_data(data):
+            # Placeholder for live update functionality
+            pass
+        
+        def update_map_data(data):
+            # Placeholder for live update functionality  
+            pass
+            
+        loss_chart.add_data = update_loss_data
+        map_chart.add_data = update_map_data
+        
+        charts = {
+            'loss_chart': loss_chart,
+            'map_chart': map_chart
         }
-    }
+        
+        logger.debug("✅ Dual live charts created successfully")
+        return charts
+        
+    except Exception as e:
+        logger.error(f"Failed to create dual charts: {e}")
+        raise
 
 
-def _create_module_summary_content(config: Dict[str, Any]) -> str:
-    """
-    Create summary content for the module.
+def _create_metrics_results_panel() -> widgets.Widget:
+    """Create metrics results summary panel for final training results."""
+    logger = get_module_logger("smartcash.ui.model.train.components")
     
-    Args:
-        config: Configuration dictionary
+    try:
+        # Create metrics table container
+        metrics_html = widgets.HTML(value=_get_initial_metrics_html())
         
-    Returns:
-        HTML string containing the summary content
-    """
-    training_config = config.get("training", {})
-    optimizer_config = config.get("optimizer", {})
-    scheduler_config = config.get("scheduler", {})
-    
-    return f"""
-    <div style="
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        border-radius: 12px;
-        padding: 20px;
-        color: white;
-        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-    ">
-        <h4 style="margin: 0 0 15px 0; font-size: 1.2rem; font-weight: 600;">
-            🚀 Training Configuration
-        </h4>
+        # Create collapsible container for metrics
+        metrics_container = widgets.Accordion(children=[metrics_html])
+        metrics_container.set_title(0, "📊 Training Results Metrics")
+        metrics_container.selected_index = None  # Initially collapsed
         
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
-            <div style="background: rgba(255,255,255,0.1); padding: 12px; border-radius: 8px;">
-                <div style="font-size: 0.9rem; opacity: 0.8; margin-bottom: 5px;">Training</div>
-                <div style="font-size: 1.1rem; font-weight: 600;">
-                    {training_config.get('epochs', 100)} epochs
-                </div>
-                <div style="font-size: 0.8rem; opacity: 0.7;">
-                    Batch: {training_config.get('batch_size', 16)} | 
-                    LR: {training_config.get('learning_rate', 0.001)}
-                </div>
-            </div>
-            
-            <div style="background: rgba(255,255,255,0.1); padding: 12px; border-radius: 8px;">
-                <div style="font-size: 0.9rem; opacity: 0.8; margin-bottom: 5px;">Optimizer</div>
-                <div style="font-size: 1.1rem; font-weight: 600;">
-                    {optimizer_config.get('type', 'adam').upper()}
-                </div>
-                <div style="font-size: 0.8rem; opacity: 0.7;">
-                    Weight Decay: {optimizer_config.get('weight_decay', 0.0005)}
-                </div>
-            </div>
-            
-            <div style="background: rgba(255,255,255,0.1); padding: 12px; border-radius: 8px;">
-                <div style="font-size: 0.9rem; opacity: 0.8; margin-bottom: 5px;">Scheduler</div>
-                <div style="font-size: 1.1rem; font-weight: 600;">
-                    {scheduler_config.get('type', 'cosine').title()}
-                </div>
-                <div style="font-size: 0.8rem; opacity: 0.7;">
-                    Warmup: {scheduler_config.get('warmup_epochs', 5)} epochs
-                </div>
-            </div>
-            
-            <div style="background: rgba(255,255,255,0.1); padding: 12px; border-radius: 8px;">
-                <div style="font-size: 0.9rem; opacity: 0.8; margin-bottom: 5px;">Features</div>
-                <div style="font-size: 1.1rem; font-weight: 600;">
-                    {'✅' if training_config.get('early_stopping', {}).get('enabled', True) else '❌'} Early Stop
-                </div>
-                <div style="font-size: 0.8rem; opacity: 0.7;">
-                    {'✅' if config.get('mixed_precision', {}).get('enabled', True) else '❌'} Mixed Precision
-                </div>
-            </div>
+        # Add method to update metrics
+        def update_metrics(metrics_data: Dict[str, float]):
+            """Update the metrics display with new training results."""
+            try:
+                html_content = _generate_metrics_table_html(metrics_data)
+                metrics_html.value = html_content
+                logger.debug("✅ Metrics panel updated")
+            except Exception as e:
+                logger.error(f"Failed to update metrics: {e}")
+        
+        metrics_container.update_metrics = update_metrics
+        
+        logger.debug("✅ Metrics results panel created")
+        return metrics_container
+        
+    except Exception as e:
+        logger.error(f"Failed to create metrics panel: {e}")
+        raise
+
+
+def _get_initial_metrics_html() -> str:
+    """Get initial HTML for metrics panel when no training has completed."""
+    return """
+    <div style="padding: 20px; text-align: center; color: #666;">
+        <h4 style="margin-top: 0;">🎯 Training Metrics</h4>
+        <p>Training metrics will appear here after completion</p>
+        <div style="margin-top: 15px; padding: 10px; background: #f8f9fa; border-radius: 4px;">
+            <small>Expected metrics: mAP, Accuracy, Precision, Recall, F1-Score</small>
         </div>
     </div>
     """
 
 
-def _create_module_info_box() -> widgets.Widget:
+def _generate_metrics_table_html(metrics: Dict[str, float]) -> str:
+    """Generate HTML table for training metrics results."""
+    return f"""
+    <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;">
+        <h4 style="margin-top: 0; color: #495057; text-align: center;">🏆 Final Training Results</h4>
+        
+        <table style="width: 100%; border-collapse: collapse; margin-top: 15px;">
+            <thead>
+                <tr style="background: #007bff; color: white;">
+                    <th style="padding: 12px; text-align: left; border: 1px solid #ddd;">Metric</th>
+                    <th style="padding: 12px; text-align: center; border: 1px solid #ddd;">Value</th>
+                    <th style="padding: 12px; text-align: center; border: 1px solid #ddd;">Quality</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr style="background: white;">
+                    <td style="padding: 10px; border: 1px solid #ddd; font-weight: 500;">📊 mAP@0.5</td>
+                    <td style="padding: 10px; border: 1px solid #ddd; text-align: center; font-weight: 600; color: #007bff;">
+                        {metrics.get('val_map50', 0.0):.3f}
+                    </td>
+                    <td style="padding: 10px; border: 1px solid #ddd; text-align: center;">
+                        {_get_quality_indicator(metrics.get('val_map50', 0.0), 'map')}
+                    </td>
+                </tr>
+                <tr style="background: #f8f9fa;">
+                    <td style="padding: 10px; border: 1px solid #ddd; font-weight: 500;">📈 mAP@0.75</td>
+                    <td style="padding: 10px; border: 1px solid #ddd; text-align: center; font-weight: 600; color: #007bff;">
+                        {metrics.get('val_map75', 0.0):.3f}
+                    </td>
+                    <td style="padding: 10px; border: 1px solid #ddd; text-align: center;">
+                        {_get_quality_indicator(metrics.get('val_map75', 0.0), 'map')}
+                    </td>
+                </tr>
+                <tr style="background: white;">
+                    <td style="padding: 10px; border: 1px solid #ddd; font-weight: 500;">🎯 Accuracy</td>
+                    <td style="padding: 10px; border: 1px solid #ddd; text-align: center; font-weight: 600; color: #28a745;">
+                        {metrics.get('accuracy', 0.0):.3f}
+                    </td>
+                    <td style="padding: 10px; border: 1px solid #ddd; text-align: center;">
+                        {_get_quality_indicator(metrics.get('accuracy', 0.0), 'accuracy')}
+                    </td>
+                </tr>
+                <tr style="background: #f8f9fa;">
+                    <td style="padding: 10px; border: 1px solid #ddd; font-weight: 500;">🔍 Precision</td>
+                    <td style="padding: 10px; border: 1px solid #ddd; text-align: center; font-weight: 600; color: #17a2b8;">
+                        {metrics.get('precision', 0.0):.3f}
+                    </td>
+                    <td style="padding: 10px; border: 1px solid #ddd; text-align: center;">
+                        {_get_quality_indicator(metrics.get('precision', 0.0), 'precision')}
+                    </td>
+                </tr>
+                <tr style="background: white;">
+                    <td style="padding: 10px; border: 1px solid #ddd; font-weight: 500;">📋 Recall</td>
+                    <td style="padding: 10px; border: 1px solid #ddd; text-align: center; font-weight: 600; color: #fd7e14;">
+                        {metrics.get('recall', 0.0):.3f}
+                    </td>
+                    <td style="padding: 10px; border: 1px solid #ddd; text-align: center;">
+                        {_get_quality_indicator(metrics.get('recall', 0.0), 'recall')}
+                    </td>
+                </tr>
+                <tr style="background: #f8f9fa;">
+                    <td style="padding: 10px; border: 1px solid #ddd; font-weight: 500;">⚖️ F1-Score</td>
+                    <td style="padding: 10px; border: 1px solid #ddd; text-align: center; font-weight: 600; color: #6f42c1;">
+                        {metrics.get('f1_score', 0.0):.3f}
+                    </td>
+                    <td style="padding: 10px; border: 1px solid #ddd; text-align: center;">
+                        {_get_quality_indicator(metrics.get('f1_score', 0.0), 'f1')}
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+        
+        <div style="margin-top: 15px; padding: 10px; background: #e3f2fd; border-radius: 4px;">
+            <small style="color: #1976d2;">
+                <strong>💡 Quality Indicators:</strong> 
+                🟢 Excellent (>0.8) | 🟡 Good (0.6-0.8) | 🟠 Fair (0.4-0.6) | 🔴 Poor (<0.4)
+            </small>
+        </div>
+    </div>
     """
-    Create the info box content for the footer.
+
+
+def _get_quality_indicator(value: float, metric_type: str) -> str:
+    """Get quality indicator emoji based on metric value and type."""
+    if value >= 0.8:
+        return "🟢 Excellent"
+    elif value >= 0.6:
+        return "🟡 Good"
+    elif value >= 0.4:
+        return "🟠 Fair"
+    else:
+        return "🔴 Poor"
+
+
+def _create_configuration_summary(config: Dict[str, Any]) -> widgets.Widget:
+    """Create configuration summary panel."""
+    logger = get_module_logger("smartcash.ui.model.train.components")
     
-    Returns:
-        Widget containing the info box content
-    """
-    return widgets.HTML(
-        value="""
-        <div style="padding: 12px; background: #e3f2fd; border-radius: 4px; margin: 8px 0;">
-            <h4 style="margin-top: 0; color: #0d47a1;">🚀 Training Guide</h4>
-            <p>This module helps you train YOLOv5 models with real-time monitoring and control.</p>
-            <ol style="margin: 8px 0 0 16px; padding-left: 8px;">
-                <li>Configure training parameters (epochs, batch size, learning rate)</li>
-                <li>Set up optimizer and scheduler options</li>
-                <li>Enable advanced features (early stopping, mixed precision)</li>
-                <li>Click 'Start Training' to begin model training</li>
-                <li>Monitor progress and metrics in real-time</li>
-                <li>Use 'Stop' or 'Resume' to control training process</li>
-            </ol>
-            <div style="margin-top: 8px; padding: 6px; background: rgba(0,0,0,0.05); border-radius: 3px;">
-                <strong>💡 Tip:</strong> Monitor loss curves for signs of overfitting and adjust parameters accordingly
+    try:
+        training_config = config.get('training', {})
+        backbone_integration = config.get('backbone_integration', {})
+        model_storage = config.get('model_storage', {})
+        
+        # Generate model name preview
+        backbone_type = backbone_integration.get('backbone_type', 'efficientnet_b4')
+        layer_mode = training_config.get('layer_mode', 'single')
+        optimization_type = training_config.get('optimization_type', 'default')
+        model_name = generate_model_name(backbone_type, layer_mode, optimization_type)
+        
+        # Create summary content
+        summary_html = f"""
+        <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; border-left: 4px solid #007bff;">
+            <h4 style="margin-top: 0; color: #495057;">🚀 Training Configuration Summary</h4>
+            
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 15px;">
+                <div>
+                    <h5 style="color: #6c757d; margin-bottom: 8px;">📋 Training Settings</h5>
+                    <p><strong>Mode:</strong> {training_config.get('layer_mode', 'single').title()}</p>
+                    <p><strong>Epochs:</strong> {training_config.get('epochs', 100)}</p>
+                    <p><strong>Batch Size:</strong> {training_config.get('batch_size', 16)}</p>
+                    <p><strong>Learning Rate:</strong> {training_config.get('learning_rate', 0.001)}</p>
+                    <p><strong>Optimization:</strong> {training_config.get('optimization_type', 'default').title()}</p>
+                </div>
+                
+                <div>
+                    <h5 style="color: #6c757d; margin-bottom: 8px;">🧬 Model Information</h5>
+                    <p><strong>Backbone:</strong> {backbone_type}</p>
+                    <p><strong>Model Name:</strong> <code>{model_name}</code></p>
+                    <p><strong>Mixed Precision:</strong> {'✅' if training_config.get('mixed_precision', True) else '❌'}</p>
+                    <p><strong>Early Stopping:</strong> {'✅' if training_config.get('early_stopping', {}).get('enabled', True) else '❌'}</p>
+                </div>
+            </div>
+            
+            <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #dee2e6;">
+                <h5 style="color: #6c757d; margin-bottom: 8px;">📊 Monitoring Features</h5>
+                <div style="display: flex; gap: 20px;">
+                    <span>📈 Live Loss Chart</span>
+                    <span>📊 Live mAP Chart</span>
+                    <span>🔄 Real-time Progress</span>
+                    <span>💾 Auto-save Best Model</span>
+                    <span>🏆 Final Metrics Table</span>
+                </div>
+            </div>
+            
+            <div style="margin-top: 15px; padding: 10px; background: #e3f2fd; border-radius: 4px;">
+                <small style="color: #1976d2;">
+                    <strong>📝 Note:</strong> Training will continue from backbone configuration. 
+                    Best model will be saved as <code>{model_name}</code> and will overwrite any existing model with the same name.
+                </small>
             </div>
         </div>
         """
-    )
+        
+        summary_container = widgets.HTML(
+            value=summary_html,
+            layout=widgets.Layout(width='100%', margin='10px 0')
+        )
+        
+        logger.debug("✅ Configuration summary created successfully")
+        return summary_container
+        
+    except Exception as e:
+        logger.error(f"Failed to create configuration summary: {e}")
+        # Return simple fallback
+        return widgets.HTML("<p>Configuration summary unavailable</p>")
+
+
+def update_training_ui_from_config(ui_components: Dict[str, Any], config: Dict[str, Any]) -> bool:
+    """
+    Update training UI components from configuration.
+    
+    Args:
+        ui_components: UI components dictionary
+        config: Configuration dictionary
+        
+    Returns:
+        True if update successful, False otherwise
+    """
+    logger = get_module_logger("smartcash.ui.model.train.components")
+    
+    try:
+        if not ui_components or not config:
+            logger.warning("Missing UI components or config for update")
+            return False
+        
+        training_config = config.get('training', {})
+        
+        # Update form container if available
+        form_container = ui_components.get('form_container')
+        if form_container:
+            # Update form values
+            if hasattr(form_container, '_layer_mode_dropdown'):
+                form_container._layer_mode_dropdown.value = training_config.get('layer_mode', 'single')
+            
+            if hasattr(form_container, '_epochs_input'):
+                form_container._epochs_input.value = training_config.get('epochs', 100)
+            
+            if hasattr(form_container, '_batch_size_input'):
+                form_container._batch_size_input.value = training_config.get('batch_size', 16)
+            
+            if hasattr(form_container, '_learning_rate_input'):
+                form_container._learning_rate_input.value = training_config.get('learning_rate', 0.001)
+            
+            if hasattr(form_container, '_optimization_dropdown'):
+                form_container._optimization_dropdown.value = training_config.get('optimization_type', 'default')
+            
+            if hasattr(form_container, '_mixed_precision_checkbox'):
+                form_container._mixed_precision_checkbox.value = training_config.get('mixed_precision', True)
+                
+            if hasattr(form_container, '_early_stopping_checkbox'):
+                early_stopping_config = training_config.get('early_stopping', {})
+                form_container._early_stopping_checkbox.value = early_stopping_config.get('enabled', True)
+        
+        # Update summary container
+        summary_container = ui_components.get('summary_container')
+        if summary_container:
+            updated_summary = _create_configuration_summary(config)
+            # Replace summary content
+            if hasattr(summary_container, 'children') and len(summary_container.children) > 0:
+                summary_container.children = updated_summary.children
+        
+        logger.debug("✅ Training UI updated from configuration")
+        return True
+        
+    except Exception as e:
+        logger.error(f"Failed to update training UI: {e}")
+        return False
+
+
+def get_training_form_values(ui_components: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """
+    Get current form values from training UI.
+    
+    Args:
+        ui_components: UI components dictionary
+        
+    Returns:
+        Form values dictionary or None if failed
+    """
+    logger = get_module_logger("smartcash.ui.model.train.components")
+    
+    try:
+        form_container = ui_components.get('form_container')
+        if form_container and hasattr(form_container, 'get_form_values'):
+            return form_container.get_form_values()
+        
+        logger.warning("Form container not available for value retrieval")
+        return None
+        
+    except Exception as e:
+        logger.error(f"Failed to get training form values: {e}")
+        return None
+
+
+def update_metrics_display(ui_components: Dict[str, Any], metrics: Dict[str, float]) -> bool:
+    """
+    Update the metrics results panel with new training results.
+    
+    Args:
+        ui_components: UI components dictionary
+        metrics: Training metrics dictionary
+        
+    Returns:
+        True if update successful, False otherwise
+    """
+    logger = get_module_logger("smartcash.ui.model.train.components")
+    
+    try:
+        metrics_summary = ui_components.get('metrics_summary')
+        if metrics_summary and hasattr(metrics_summary, 'update_metrics'):
+            metrics_summary.update_metrics(metrics)
+            # Expand the accordion to show results
+            metrics_summary.selected_index = 0
+            logger.info("✅ Training metrics display updated")
+            return True
+        
+        logger.warning("Metrics summary container not available")
+        return False
+        
+    except Exception as e:
+        logger.error(f"Failed to update metrics display: {e}")
+        return False

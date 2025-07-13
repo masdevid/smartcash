@@ -114,8 +114,11 @@ def create_downloader_input_options(config: Optional[Dict[str, Any]] = None) -> 
     # API key status info
     api_key_status = widgets.HTML(
         value=secret_manager.create_api_key_info_html({
-            'has_api_key': bool(api_key),
-            'is_valid': bool(api_key)  # Asumsikan valid jika ada key
+            'data': {
+                'roboflow': {
+                    'api_key': api_key or ''
+                }
+            }
         }),
         layout=widgets.Layout(width='100%', margin='6px 0')
     )

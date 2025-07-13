@@ -21,11 +21,26 @@ class DownloaderConfigHandler(ConfigHandler):
     def load_config(self, config_filename: str = None) -> Dict[str, Any]:
         """Load configuration."""
         try:
+            # Use dataset_config.yaml as the main config file
+            if config_filename is None:
+                config_filename = 'dataset_config.yaml'
+            
+            # Try to load from shared config first
+            try:
+                from smartcash.common.config.manager import ConfigManager
+                config_manager = ConfigManager()
+                shared_config = config_manager.load_config(config_filename)
+                if shared_config and 'downloader' in shared_config:
+                    self._config.update(shared_config['downloader'])
+            except Exception as e:
+                self.logger.info(f"No shared config found, using defaults: {e}")
+            
             config = self._config.copy()
             
             # Initialize API key lazily if needed
             if not config.get('data', {}).get('roboflow', {}).get('api_key'):
                 self._initialize_api_key()
+                config = self._config.copy()  # Get updated config with API key
                 
             return config
         except Exception as e:

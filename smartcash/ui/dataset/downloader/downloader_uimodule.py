@@ -124,65 +124,104 @@ class DownloaderUIModule(UIModule):
     def _handle_download_click(self, button=None) -> None:
         """Handle download button click."""
         try:
+            # Disable all operation buttons
+            self._set_buttons_enabled(False)
+            
             self._update_status("Starting dataset download...", "info")
+            self.log("📥 Starting dataset download operation", "info")
+            
             config = self._extract_ui_config()
             result = self.execute_download(config)
             
             if result.get("success", False):
                 self._update_status("Dataset download completed successfully!", "success")
+                self.log("✅ Dataset download completed successfully", "success")
             else:
                 error_msg = result.get("error", "Download failed")
                 self._update_status(f"Download failed: {error_msg}", "error")
+                self.log(f"❌ Download failed: {error_msg}", "error")
                 
         except Exception as e:
             self.logger.error(f"Download failed: {e}")
             self._update_status(f"Download error: {e}", "error")
+            self.log(f"❌ Download error: {e}", "error")
+        finally:
+            # Re-enable buttons
+            self._set_buttons_enabled(True)
     
     def _handle_check_click(self, button=None) -> None:
         """Handle check button click."""
         try:
+            # Disable all operation buttons
+            self._set_buttons_enabled(False)
+            
             self._update_status("Checking dataset status...", "info")
+            self.log("🔍 Starting dataset check operation", "info")
+            
             result = self.execute_check()
             
             if result.get("success", False):
                 count = result.get("count", 0)
                 self._update_status(f"Dataset check completed - {count} files found", "success")
+                self.log(f"✅ Dataset check completed - {count} files found", "success")
             else:
                 error_msg = result.get("error", "Check failed")
                 self._update_status(f"Check failed: {error_msg}", "error")
+                self.log(f"❌ Check failed: {error_msg}", "error")
                 
         except Exception as e:
             self.logger.error(f"Check failed: {e}")
             self._update_status(f"Check error: {e}", "error")
+            self.log(f"❌ Check error: {e}", "error")
+        finally:
+            # Re-enable buttons
+            self._set_buttons_enabled(True)
     
     def _handle_cleanup_click(self, button=None) -> None:
         """Handle cleanup button click."""
         try:
+            # Disable all operation buttons
+            self._set_buttons_enabled(False)
+            
             self._update_status("Starting dataset cleanup...", "info")
+            self.log("🧹 Starting dataset cleanup operation", "info")
+            
             result = self.execute_cleanup()
             
             if result.get("success", False):
                 cleaned_count = result.get("cleaned_count", 0)
                 self._update_status(f"Cleanup completed - {cleaned_count} items cleaned", "success")
+                self.log(f"✅ Cleanup completed - {cleaned_count} items cleaned", "success")
             else:
                 error_msg = result.get("error", "Cleanup failed")
                 self._update_status(f"Cleanup failed: {error_msg}", "error")
+                self.log(f"❌ Cleanup failed: {error_msg}", "error")
                 
         except Exception as e:
             self.logger.error(f"Cleanup failed: {e}")
             self._update_status(f"Cleanup error: {e}", "error")
+            self.log(f"❌ Cleanup error: {e}", "error")
+        finally:
+            # Re-enable buttons
+            self._set_buttons_enabled(True)
     
     def _extract_ui_config(self) -> Dict[str, Any]:
         """Extract configuration from UI form inputs."""
-        form_widgets = self.get_component("form_widgets") or {}
+        # Get form widgets directly from registered components
+        workspace_input = self.get_component('workspace_input')
+        project_input = self.get_component('project_input')
+        version_input = self.get_component('version_input')
+        api_key_input = self.get_component('api_key_input')
+        validate_checkbox = self.get_component('validate_checkbox')
+        backup_checkbox = self.get_component('backup_checkbox')
         
         return {
-            'workspace': getattr(form_widgets.get('workspace_input'), 'value', ''),
-            'project': getattr(form_widgets.get('project_input'), 'value', ''),
-            'version': getattr(form_widgets.get('version_input'), 'value', ''),
-            'api_key': getattr(form_widgets.get('api_key_input'), 'value', ''),
-            'validate_download': getattr(form_widgets.get('validate_checkbox'), 'value', True),
-            'backup_existing': getattr(form_widgets.get('backup_checkbox'), 'value', False),
+            'workspace': getattr(workspace_input, 'value', ''),
+            'project': getattr(project_input, 'value', ''),
+            'version': getattr(version_input, 'value', ''),
+            'api_key': getattr(api_key_input, 'value', ''),
+            'validate_download': getattr(validate_checkbox, 'value', True),
+            'backup_existing': getattr(backup_checkbox, 'value', False),
         }
     
     def _update_status(self, message: str, status_type: str = "info") -> None:
@@ -190,6 +229,21 @@ class DownloaderUIModule(UIModule):
         header_container = self.get_component("header_container")
         if header_container and hasattr(header_container, 'update_status'):
             header_container.update_status(message, status_type)
+    
+    def _set_buttons_enabled(self, enabled: bool) -> None:
+        """Enable or disable operation buttons."""
+        button_ids = ['download_button', 'check_button', 'cleanup_button']
+        
+        for button_id in button_ids:
+            button = self.get_component(button_id)
+            if button and hasattr(button, 'disabled'):
+                button.disabled = not enabled
+                
+        # Also update button appearance based on state
+        if not enabled:
+            self.log("🔒 Operation buttons disabled during processing", "info")
+        else:
+            self.log("🔓 Operation buttons re-enabled", "info")
     
     def execute_download(self, ui_config: Dict[str, Any] = None) -> Dict[str, Any]:
         """Execute dataset download."""

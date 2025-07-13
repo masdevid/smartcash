@@ -5,5 +5,5 @@ NOTE: Cell Code should remain minimal (import and run initializer only).
       Initializer should handle all the logic.
 """
 
-from smartcash.ui.setup.dependency.dependency_initializer import initialize_dependency_ui
+from smartcash.ui.setup.dependency import initialize_dependency_ui
 initialize_dependency_ui()

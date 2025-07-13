@@ -3,16 +3,31 @@ File: smartcash/ui/setup/colab/colab_uimodule.py
 Description: Colab Module implementation using new UIModule pattern.
 """
 
-from typing import Dict, Any, Optional
-from datetime import datetime
+"""
+file_path: smartcash/ui/setup/colab/colab_uimodule.py
+Description: Main module for Colab UI setup and management.
 
+This module provides the main ColabUIModule class that implements the UI for
+Google Colab environment setup and management.
+"""
+
+# Standard library imports
+import os
+import sys
+from datetime import datetime
+from typing import Dict, Any, Optional, Callable
+
+# Third-party imports
+from IPython.display import display
+
+# Application imports
 from smartcash.ui.core.ui_module import UIModule, SharedMethodRegistry, register_operation_method
 from smartcash.ui.core.ui_module_factory import create_template
 from smartcash.ui.logger import get_module_logger
 from smartcash.ui.core.handlers.operation_handler import OperationHandler, OperationStatus
 from smartcash.ui.core.errors.handlers import handle_ui_errors
 
-# Import existing Colab components and handlers
+# Colab module imports
 from smartcash.ui.setup.colab.components.colab_ui import create_colab_ui
 from smartcash.ui.setup.colab.configs.colab_config_handler import ColabConfigHandler
 from smartcash.ui.setup.colab.configs.colab_defaults import get_default_colab_config
@@ -97,12 +112,16 @@ class ColabUIModule(UIModule):
         if config:
             default_config.update(config)
         
+        # Initialize with module name and parent module
         super().__init__(
             module_name="colab",
             parent_module="setup", 
             config=default_config,
             auto_initialize=False
         )
+        
+        # Initialize instance logger
+        self.logger = get_module_logger(f"smartcash.ui.setup.colab.{self.__class__.__name__}")
         
         # Colab-specific attributes
         self._operation_manager: Optional[ColabOperationManager] = None
@@ -178,10 +197,10 @@ class ColabUIModule(UIModule):
             for component_type, component in ui_components.items():
                 self.register_component(component_type, component)
             
-            self.logger.debug(f"📦 Created {len(ui_components)} UI components")
+            self.logger.debug(f"Created {len(ui_components)} UI components")
             
         except Exception as e:
-            self.logger.error(f"❌ Failed to create UI components: {e}")
+            self.logger.exception("Failed to create UI components")
             raise
     
     def _setup_operation_manager(self) -> None:
@@ -195,21 +214,19 @@ class ColabUIModule(UIModule):
                 operation_container=operation_container
             )
             
-            self.logger.debug("⚙️ Setup operation manager")
+            self.logger.debug("Operation manager initialized")
             
         except Exception as e:
-            self.logger.error(f"❌ Failed to setup operation manager: {e}")
+            self.logger.exception("Failed to setup operation manager")
             raise
     
     def _setup_config_handler(self) -> None:
         """Setup config handler (no persistence for Colab)."""
         try:
             self._config_handler = ColabConfigHandler()
-            
-            self.logger.debug("🔧 Setup config handler (no persistence)")
-            
+            self.logger.debug("Config handler initialized (no persistence)")
         except Exception as e:
-            self.logger.error(f"❌ Failed to setup config handler: {e}")
+            self.logger.exception("Failed to setup config handler")
             raise
     
     def _register_operations(self) -> None:

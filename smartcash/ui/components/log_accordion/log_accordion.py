@@ -35,7 +35,7 @@ class LogAccordion(BaseUIComponent):
         enable_deduplication: bool = True,
         duplicate_window_ms: Optional[int] = None,
         max_duplicate_count: Optional[int] = None,
-        namespace_filter: Optional[str] = None
+        namespace_filter: Optional[Union[str, List[str]]] = None
     ) -> None:
         """Initialize the LogAccordion.
         
@@ -380,13 +380,35 @@ class LogAccordion(BaseUIComponent):
         self._update_log_display()
     
     def _get_filtered_entries(self) -> List[LogEntry]:
-        """Get log entries filtered by namespace if filter is set."""
+        """Get log entries filtered by allowed namespaces.
+        
+        Always includes core namespaces regardless of the current filter:
+        - smartcash.ui.core
+        - smartcash.common
+        - smartcash.dataset
+        """
+        # If no filter, return all entries
         if not self.namespace_filter:
             return self.log_entries
             
-        # Filter entries by namespace
+        # Core namespaces that should always be included
+        core_namespaces = {
+            'smartcash.ui.core',
+            'smartcash.common',
+            'smartcash.dataset'
+        }
+        
+        # Add current cell's namespace filter
+        current_filter = self.namespace_filter.lower() if isinstance(self.namespace_filter, str) else ''
+        if current_filter and current_filter not in {ns.lower() for ns in core_namespaces}:
+            core_namespaces.add(current_filter)
+            
+        # Filter entries by allowed namespaces (case-insensitive)
         return [entry for entry in self.log_entries 
-                if entry.namespace and entry.namespace.startswith(self.namespace_filter)]
+                if entry.namespace and any(
+                    entry.namespace.lower().startswith(ns.lower())
+                    for ns in core_namespaces
+                )]
     
     def _update_log_display(self) -> None:
         """Update the log display with current entries."""
@@ -425,12 +447,16 @@ class LogAccordion(BaseUIComponent):
         # Common prefixes to shorten
         replacements = {
             'smartcash.': '',
+            'smartcash.common.': 'common.',
+            'smartcash.dataset.': 'dataset.',
+            'smartcash.model.': 'model.',
             'smartcash.ui.': 'ui.',
             'smartcash.ui.core.': 'core.',
             'smartcash.ui.core.shared.': 'core.',
             'smartcash.ui.components.': 'components.',
             'smartcash.ui.setup.': 'setup.',
-            'smartcash.ui.setup.colab.': 'colab.'
+            'smartcash.ui.setup.colab.': 'colab.',
+            'smartcash.ui.setup.dependency': 'dependency.',
         }
         
         # Apply replacements

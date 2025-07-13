@@ -26,11 +26,20 @@ class TrainConfigHandler(SharedConfigHandler):
     
     def __init__(self):
         """Initialize training configuration handler with shared config support."""
+        # Get default config first to ensure we have all required sections
+        default_config = self.get_default_config()
+        
+        # Ensure required sections exist in default config
+        required_sections = ['training', 'optimizer', 'scheduler', 'monitoring', 'ui']
+        for section in required_sections:
+            if section not in default_config:
+                default_config[section] = {}
+        
         # Initialize with shared config enabled
         super().__init__(
-            module_name='train',
+            module_name='training',
             parent_module='model',
-            default_config=self.get_default_config(),
+            default_config=default_config,
             enable_sharing=True
         )
         
@@ -39,12 +48,15 @@ class TrainConfigHandler(SharedConfigHandler):
         self.optimization_types = get_optimization_types()
         
         # Config sections that require UI synchronization
-        self.ui_sync_sections = ['training', 'optimizer', 'scheduler', 'monitoring', 'ui']
+        self.ui_sync_sections = required_sections
         
         # Ensure shared manager is initialized
         if not hasattr(self, '_shared_manager'):
             self.initialize()
             
+        # Ensure we have a valid config with all required sections
+        self._ensure_required_sections()
+        
         self.logger.debug("✅ TrainConfigHandler initialized with shared config support")
     
     def get_default_config(self) -> Dict[str, Any]:
@@ -55,6 +67,16 @@ class TrainConfigHandler(SharedConfigHandler):
             Default configuration dictionary
         """
         return get_default_train_config()
+    
+    def _ensure_required_sections(self) -> None:
+        """Ensure all required sections exist in the current config."""
+        current_config = self.get_config()
+        default_config = self.get_default_config()
+        
+        for section in ['training', 'optimizer', 'scheduler', 'monitoring', 'ui']:
+            if section not in current_config:
+                current_config[section] = default_config.get(section, {})
+                self.logger.warning(f"Added missing section to config: {section}")
     
     def validate_config(self, config: Dict[str, Any]) -> bool:
         """
@@ -67,33 +89,25 @@ class TrainConfigHandler(SharedConfigHandler):
             True if configuration is valid, False otherwise
         """
         try:
-            if not isinstance(config, dict):
-                self.logger.error("Configuration must be a dictionary")
+            # Ensure required sections exist
+            self._ensure_required_sections()
+            
+            # Get the current config (which now has all required sections)
+            current_config = self.get_config()
+            
+            # Validate each section
+            if not self._validate_training_section(current_config.get('training', {})):
+                self.logger.error("Training section validation failed")
                 return False
-            
-            # Check required sections
-            required_sections = ['training', 'optimizer', 'scheduler']
-            for section in required_sections:
-                if section not in config:
-                    self.logger.error(f"Missing required section: {section}")
-                    return False
-            
-            # Validate training section
-            training_config = config.get('training', {})
-            if not self._validate_training_section(training_config):
+                
+            if not self._validate_optimizer_section(current_config.get('optimizer', {})):
+                self.logger.error("Optimizer section validation failed")
                 return False
-            
-            # Validate optimizer section
-            optimizer_config = config.get('optimizer', {})
-            if not self._validate_optimizer_section(optimizer_config):
+                
+            if not self._validate_scheduler_section(current_config.get('scheduler', {})):
+                self.logger.error("Scheduler section validation failed")
                 return False
-            
-            # Validate scheduler section
-            scheduler_config = config.get('scheduler', {})
-            if not self._validate_scheduler_section(scheduler_config):
-                return False
-            
-            self.logger.debug("✅ Configuration validation passed")
+                
             return True
             
         except Exception as e:

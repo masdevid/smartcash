@@ -46,33 +46,51 @@ class TrainUIModule(UIModule):
     def _initialize_config_handler(self, config: Optional[Dict[str, Any]] = None) -> None:
         """Initialize configuration handler with shared config support."""
         try:
+            # Get default config first
+            default_config = get_default_train_config()
+            
+            # Ensure required sections exist in the provided config
+            if config:
+                # Ensure all required sections exist in the provided config
+                for section in ['training', 'optimizer', 'scheduler', 'monitoring', 'ui']:
+                    if section not in config:
+                        config[section] = default_config.get(section, {})
+            
             # Initialize with proper config and shared settings
             self._config_handler = TrainConfigHandler()
             
             # Ensure shared manager is initialized
             if not hasattr(self._config_handler, '_shared_manager'):
                 self._config_handler.initialize()
-                
-            # Load any provided config
+            
+            # If config was provided, update the handler with it
             if config:
+                # First ensure we have all required sections in the config
+                for section in ['training', 'optimizer', 'scheduler', 'monitoring', 'ui']:
+                    if section not in config:
+                        config[section] = default_config.get(section, {})
+                
+                # Update the config handler with the provided config
                 self._config_handler.update_config(config)
             
-            # Set initial configuration
-            if config:
-                merged_config = self._config_handler.merge_config(
-                    get_default_train_config(), config
-                )
-            else:
-                merged_config = get_default_train_config()
+            # Get the current config from handler (which now has all required sections)
+            current_config = self._config_handler.get_config()
             
             # Try to integrate backbone configuration
-            merged_config = self._try_integrate_backbone_config(merged_config)
+            current_config = self._try_integrate_backbone_config(current_config)
             
-            self.update_config(**merged_config)
-            self.logger.debug("✅ Config handler initialized")
+            # Update the config with the merged configuration
+            self.update_config(**current_config)
+            
+            # Validate the configuration
+            if not self._config_handler.validate_config(current_config):
+                self.logger.warning("Configuration validation failed, but continuing with default values")
+            
+            self.logger.debug("✅ Config handler initialized with config: %s", 
+                           {k: '...' for k in current_config.keys()})
             
         except Exception as e:
-            self.logger.error(f"Failed to initialize config handler: {e}")
+            self.logger.error(f"Failed to initialize config handler: {e}", exc_info=True)
             raise
     
     def _initialize_operation_manager(self) -> None:

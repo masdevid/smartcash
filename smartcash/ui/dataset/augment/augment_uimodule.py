@@ -543,11 +543,11 @@ def initialize_augment_ui(
         # Display the UI if requested
         if display and ui_components:
             from IPython import get_ipython
-            from IPython.display import display as ipython_display
+            from IPython.display import display as ipython_display, clear_output
             
             # Clear any existing output
             if get_ipython() is not None:
-                ipython_display.clear_output(wait=True)
+                clear_output(wait=True)
             
             # Get the main UI container and display it
             main_ui = ui_components.get('main_container')

@@ -859,6 +859,22 @@ class OperationHandler(BaseHandler):
             except Exception as e:
                 self.logger.error(f"Error clearing dialog: {e}")
     
+    def clear_logs(self) -> None:
+        """Clear all log messages from the operation container."""
+        if hasattr(self, '_operation_container') and self._operation_container:
+            try:
+                if hasattr(self._operation_container, 'clear_logs'):
+                    self._operation_container.clear_logs()
+                elif isinstance(self._operation_container, dict) and 'clear_logs' in self._operation_container:
+                    self._operation_container['clear_logs']()
+            except Exception as e:
+                self.logger.error(f"Error clearing logs: {e}")
+    
+    def clear_outputs(self) -> None:
+        """Clear outputs and logs from the operation container."""
+        self.clear_logs()
+    
+    
     def disable_all_buttons(self, processing_message: str = "⏳ Processing...") -> Dict[str, Any]:
         """Disable all buttons and store their original state.
         

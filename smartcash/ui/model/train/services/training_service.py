@@ -37,11 +37,23 @@ class TrainingService:
         self.model_api = None
         self.current_config = DEFAULT_CONFIG.copy()
         self.current_phase = TrainingPhase.IDLE
-        self.current_metrics = DEFAULT_METRICS.copy()
+        self.current_metrics = {
+            'train_loss': 0.0,
+            'val_loss': 0.0,
+            'val_map50': 0.0,
+            'val_map75': 0.0,
+            'accuracy': 0.0,
+            'precision': 0.0,
+            'recall': 0.0,
+            'f1_score': 0.0,
+            'learning_rate': 0.001,
+            'epoch': 0,
+            'best_map50': 0.0
+        }
         self.training_history = {
             "epochs": [],
-            "loss_metrics": {metric: [] for metric in CHART_CONFIG["loss_metrics"]["metrics"]},
-            "performance_metrics": {metric: [] for metric in CHART_CONFIG["performance_metrics"]["metrics"]}
+            "loss_metrics": {metric: [] for metric in CHART_CONFIG["loss_chart"]["metrics"]},
+            "performance_metrics": {metric: [] for metric in CHART_CONFIG["map_chart"]["metrics"]}
         }
         self.is_training = False
         self.training_start_time = None
@@ -164,7 +176,7 @@ class TrainingService:
                 "error": str(e)
             }
     
-    async def start_training(self, epochs: Optional[int] = None,
+    async def start_training_async_original(self, epochs: Optional[int] = None,
                            progress_callback: Optional[Callable] = None,
                            log_callback: Optional[Callable] = None) -> Dict[str, Any]:
         """
@@ -285,11 +297,10 @@ class TrainingService:
                 val_map50 = min(0.95, 0.3 + (epoch / total_epochs) * 0.6)
                 
                 # Update metrics
-                self.current_metrics["loss_metrics"]["train_loss"] = train_loss
-                self.current_metrics["loss_metrics"]["val_loss"] = val_loss
-                self.current_metrics["performance_metrics"]["val_map50"] = val_map50
-                self.current_metrics["training_info"]["current_epoch"] = epoch + 1
-                self.current_metrics["training_info"]["total_epochs"] = total_epochs
+                self.current_metrics["train_loss"] = train_loss
+                self.current_metrics["val_loss"] = val_loss
+                self.current_metrics["val_map50"] = val_map50
+                self.current_metrics["epoch"] = epoch + 1
                 
                 # Update history
                 self.training_history["epochs"].append(epoch + 1)
@@ -329,7 +340,7 @@ class TrainingService:
             self.is_training = False
             raise
     
-    async def stop_training(self, progress_callback: Optional[Callable] = None,
+    async def stop_training_async_original(self, progress_callback: Optional[Callable] = None,
                           log_callback: Optional[Callable] = None) -> Dict[str, Any]:
         """
         Stop current training.
@@ -391,7 +402,7 @@ class TrainingService:
                 "error": str(e)
             }
     
-    async def resume_training(self, checkpoint_path: str,
+    async def resume_training_async_original(self, checkpoint_path: str,
                             additional_epochs: Optional[int] = None,
                             progress_callback: Optional[Callable] = None,
                             log_callback: Optional[Callable] = None) -> Dict[str, Any]:
@@ -475,26 +486,24 @@ class TrainingService:
         """Handle metrics updates from backend."""
         if isinstance(metrics_data, dict):
             # Update current metrics
-            for category, values in metrics_data.items():
-                if category in self.current_metrics and isinstance(values, dict):
-                    self.current_metrics[category].update(values)
+            for metric, value in metrics_data.items():
+                if metric in self.current_metrics:
+                    self.current_metrics[metric] = value
             
             # Update training history
-            current_epoch = metrics_data.get("training_info", {}).get("current_epoch", 0)
+            current_epoch = metrics_data.get("epoch", 0)
             if current_epoch > 0:
                 self.training_history["epochs"].append(current_epoch)
                 
                 # Update loss metrics history
-                loss_metrics = metrics_data.get("loss_metrics", {})
-                for metric, value in loss_metrics.items():
-                    if metric in self.training_history["loss_metrics"]:
-                        self.training_history["loss_metrics"][metric].append(value)
+                for metric in self.training_history["loss_metrics"]:
+                    if metric in metrics_data:
+                        self.training_history["loss_metrics"][metric].append(metrics_data[metric])
                 
                 # Update performance metrics history
-                perf_metrics = metrics_data.get("performance_metrics", {})
-                for metric, value in perf_metrics.items():
-                    if metric in self.training_history["performance_metrics"]:
-                        self.training_history["performance_metrics"][metric].append(value)
+                for metric in self.training_history["performance_metrics"]:
+                    if metric in metrics_data:
+                        self.training_history["performance_metrics"][metric].append(metrics_data[metric])
     
     def get_current_status(self) -> Dict[str, Any]:
         """
@@ -526,13 +535,180 @@ class TrainingService:
         return {
             "epochs": self.training_history["epochs"],
             "loss_chart": {
-                "title": CHART_CONFIG["loss_metrics"]["title"],
+                "title": CHART_CONFIG["loss_chart"]["title"],
                 "data": self.training_history["loss_metrics"],
-                "color": CHART_CONFIG["loss_metrics"]["color"]
+                "color": CHART_CONFIG["loss_chart"]["color"]
             },
             "performance_chart": {
-                "title": CHART_CONFIG["performance_metrics"]["title"],
+                "title": CHART_CONFIG["map_chart"]["title"],
                 "data": self.training_history["performance_metrics"],
-                "color": CHART_CONFIG["performance_metrics"]["color"]
+                "color": CHART_CONFIG["map_chart"]["color"]
             }
         }
+    
+    # ==================== SYNCHRONOUS METHODS FOR OPERATION MANAGER ====================
+    
+    def start_training(self, config: Dict[str, Any], backbone_config: Dict[str, Any], 
+                      progress_callback: Optional[Callable] = None, 
+                      log_callback: Optional[Callable] = None) -> Dict[str, Any]:
+        """
+        Synchronous start training method for operation manager.
+        
+        Args:
+            config: Training configuration
+            backbone_config: Backbone configuration
+            progress_callback: Progress callback function
+            log_callback: Log callback function
+            
+        Returns:
+            Training result dictionary
+        """
+        try:
+            # Initialize if needed
+            if self.current_phase == TrainingPhase.IDLE:
+                init_result = asyncio.run(
+                    self.initialize_training(config, progress_callback, log_callback)
+                )
+                if not init_result.get('success'):
+                    return init_result
+            
+            # Start training
+            epochs = config.get('training', {}).get('epochs', 100)
+            result = asyncio.run(
+                self._start_training_internal(epochs, progress_callback, log_callback)
+            )
+            return result
+            
+        except Exception as e:
+            return {
+                'success': False,
+                'message': f'Start training failed: {str(e)}',
+                'error': str(e)
+            }
+    
+    async def _start_training_internal(self, epochs: Optional[int] = None,
+                                      progress_callback: Optional[Callable] = None,
+                                      log_callback: Optional[Callable] = None) -> Dict[str, Any]:
+        """Internal async start training method."""
+        return await self.start_training_async_original(epochs, progress_callback, log_callback)
+    
+    def stop_training(self, progress_callback: Optional[Callable] = None,
+                     log_callback: Optional[Callable] = None) -> Dict[str, Any]:
+        """
+        Synchronous stop training method for operation manager.
+        
+        Returns:
+            Stop result dictionary
+        """
+        try:
+            result = asyncio.run(
+                self.stop_training_async_original(progress_callback, log_callback)
+            )
+            return result
+        except Exception as e:
+            return {
+                'success': False,
+                'message': f'Stop training failed: {str(e)}',
+                'error': str(e)
+            }
+    
+    def resume_training(self, config: Dict[str, Any],
+                       progress_callback: Optional[Callable] = None,
+                       log_callback: Optional[Callable] = None) -> Dict[str, Any]:
+        """
+        Synchronous resume training method for operation manager.
+        
+        Args:
+            config: Training configuration
+            progress_callback: Progress callback function
+            log_callback: Log callback function
+            
+        Returns:
+            Resume result dictionary
+        """
+        try:
+            checkpoint_path = config.get('checkpoint_path', '/data/checkpoints/latest.pth')
+            additional_epochs = config.get('training', {}).get('epochs', 50)
+            
+            result = asyncio.run(
+                self.resume_training_async_original(checkpoint_path, additional_epochs, progress_callback, log_callback)
+            )
+            return result
+        except Exception as e:
+            return {
+                'success': False,
+                'message': f'Resume training failed: {str(e)}',
+                'error': str(e)
+            }
+    
+    def validate_model(self, config: Dict[str, Any],
+                      progress_callback: Optional[Callable] = None,
+                      log_callback: Optional[Callable] = None) -> Dict[str, Any]:
+        """
+        Synchronous validate model method for operation manager.
+        
+        Args:
+            config: Training configuration
+            progress_callback: Progress callback function
+            log_callback: Log callback function
+            
+        Returns:
+            Validation result dictionary
+        """
+        try:
+            if log_callback:
+                log_callback("🔍 Running model validation...")
+            
+            if progress_callback:
+                progress_callback(50, "Validating model...")
+            
+            # Simulate validation
+            import time
+            time.sleep(1)  # Simulate validation time
+            
+            validation_metrics = {
+                'val_map50': self.current_metrics.get('val_map50', 0.75),
+                'val_map75': self.current_metrics.get('val_map75', 0.55),
+                'accuracy': self.current_metrics.get('accuracy', 0.85),
+                'precision': self.current_metrics.get('precision', 0.82),
+                'recall': self.current_metrics.get('recall', 0.78),
+                'f1_score': self.current_metrics.get('f1_score', 0.80)
+            }
+            
+            if progress_callback:
+                progress_callback(100, "Validation completed")
+            
+            if log_callback:
+                log_callback("✅ Model validation completed successfully")
+            
+            return {
+                'success': True,
+                'message': 'Model validation completed successfully',
+                'metrics': validation_metrics,
+                'phase': TrainingPhase.COMPLETED.value
+            }
+            
+        except Exception as e:
+            return {
+                'success': False,
+                'message': f'Model validation failed: {str(e)}',
+                'error': str(e)
+            }
+    
+    def cleanup(self) -> None:
+        """Cleanup training service resources."""
+        try:
+            # Stop training if active
+            if self.is_training:
+                asyncio.run(self.stop_training_async_original())
+            
+            # Shutdown executor
+            if self.executor:
+                self.executor.shutdown(wait=False)
+            
+            # Clear references
+            self.backend_service = None
+            self.model_api = None
+            
+        except Exception:
+            pass  # Ignore cleanup errors

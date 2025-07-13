@@ -243,6 +243,12 @@ class TrainUIModule(UIModule):
                 description='Get current training status'
             )
             
+            SharedMethodRegistry.register_method(
+                'train.refresh_backbone_config',
+                self.refresh_backbone_config,
+                description='Refresh backbone configuration from backbone module'
+            )
+            
             self.logger.debug("✅ Shared methods registered")
             
         except Exception as e:
@@ -486,6 +492,40 @@ class TrainUIModule(UIModule):
             
         except Exception as e:
             error_msg = f"Failed to reset config: {e}"
+            self.logger.error(error_msg)
+            return {'success': False, 'message': error_msg}
+    
+    def refresh_backbone_config(self) -> Dict[str, Any]:
+        """
+        Refresh backbone configuration and update the training module.
+        
+        Returns:
+            Refresh operation result
+        """
+        try:
+            if not self._config_handler:
+                raise RuntimeError("Config handler not available")
+            
+            # Get current config and refresh backbone integration
+            current_config = self.get_config()
+            updated_config = self._config_handler.refresh_backbone_config(current_config)
+            
+            # Update module configuration
+            self.update_config(**updated_config)
+            
+            # Sync to UI if available
+            if self._ui_components:
+                self._config_handler.sync_to_ui(self._ui_components, updated_config)
+            
+            self.logger.info("🔄 Backbone configuration refreshed and UI updated")
+            return {
+                'success': True,
+                'message': 'Backbone configuration refreshed successfully',
+                'config': updated_config
+            }
+            
+        except Exception as e:
+            error_msg = f"Failed to refresh backbone config: {e}"
             self.logger.error(error_msg)
             return {'success': False, 'message': error_msg}
     

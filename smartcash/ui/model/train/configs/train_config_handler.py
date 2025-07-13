@@ -200,6 +200,42 @@ class TrainConfigHandler(ConfigHandler):
             self.logger.error(f"Failed to integrate backbone config: {e}")
             return train_config
     
+    def refresh_backbone_config(self, current_config: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Refresh backbone configuration from the backbone module.
+        
+        Args:
+            current_config: Current training configuration
+            
+        Returns:
+            Updated configuration with latest backbone config
+        """
+        try:
+            from smartcash.ui.core.ui_module import SharedMethodRegistry
+            
+            # Try to get latest backbone configuration
+            get_backbone_config = SharedMethodRegistry.get_method('backbone.get_config')
+            if get_backbone_config:
+                latest_backbone_config = get_backbone_config()
+                
+                if latest_backbone_config:
+                    # Integrate the latest backbone config
+                    updated_config = self.integrate_backbone_config(
+                        current_config, latest_backbone_config
+                    )
+                    self.logger.info("🔄 Backbone configuration refreshed successfully")
+                    return updated_config
+                else:
+                    self.logger.warning("No backbone configuration available to refresh")
+            else:
+                self.logger.warning("Backbone module not available for config refresh")
+            
+            return current_config
+            
+        except Exception as e:
+            self.logger.error(f"Failed to refresh backbone config: {e}")
+            return current_config
+    
     def sync_to_ui(self, ui_components: Dict[str, Any], config: Dict[str, Any]) -> bool:
         """
         Synchronize configuration to UI components.

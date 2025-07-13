@@ -246,7 +246,11 @@ class ColabUIModule(UIModule):
             self.register_operation("status", self.get_environment_status)
             self.register_operation("reset", self.reset_environment)
             
-            self.logger.debug(f"⚙️ Registered {len(operations)} operations")
+            # Register full_setup operation if not already registered
+            if 'full_setup' not in operations:
+                self.register_operation('full_setup', self.execute_full_setup)
+            
+            self.logger.debug(f"⚙️ Registered {len(operations)} operations including full_setup")
             
         except Exception as e:
             self.logger.error(f"❌ Failed to register operations: {e}")

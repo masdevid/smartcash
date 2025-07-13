@@ -82,7 +82,7 @@ class OperationContainer(BaseUIComponent):
                  show_dialog: bool = True,
                  progress_config: Optional[ProgressConfig] = None,
                  log_module_name: str = "Operation",
-                 log_height: str = "300px",
+                 log_height: str = "150px",
                  log_namespace_filter: Optional[str] = None,
                  **kwargs):
         """Initialize the OperationContainer.

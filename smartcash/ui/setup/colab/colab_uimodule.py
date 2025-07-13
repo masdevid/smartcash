@@ -38,6 +38,7 @@ from smartcash.ui.core.ui_module_factory import create_template
 from smartcash.ui.logger import get_module_logger
 from smartcash.ui.core.handlers.operation_handler import OperationHandler, OperationStatus
 from smartcash.ui.core.errors.handlers import handle_ui_errors
+from smartcash.ui.core.utils.log_suppression import suppress_ui_init_logs
 
 # Colab module imports
 from smartcash.ui.setup.colab.components.colab_ui import create_colab_ui
@@ -140,6 +141,7 @@ class ColabUIModule(UIModule):
         self._config_handler: Optional[ColabConfigHandler] = None
         self._environment_detected = False
         
+    @suppress_ui_init_logs(duration=3.0)
     def initialize(self, config: Dict[str, Any] = None) -> 'ColabUIModule':
         """Initialize Colab module with environment detection and setup all components.
         
@@ -195,6 +197,9 @@ class ColabUIModule(UIModule):
             
             # Verify all components are properly initialized
             self._verify_initialization()
+            
+            # Log initialization completion to operation container
+            self._log_initialization_complete()
             
             # Update status to show module is ready
             status_msg = "✅ Colab module initialized - ready for environment setup"
@@ -253,6 +258,29 @@ class ColabUIModule(UIModule):
                 raise RuntimeError(error_msg)
                 
         self.logger.debug("✅ Module initialization verified successfully")
+    
+    def _log_initialization_complete(self) -> None:
+        """Log initialization completion to operation container."""
+        try:
+            if self._operation_manager and hasattr(self._operation_manager, 'log'):
+                self._operation_manager.log("✅ Colab module initialized successfully", 'info')
+                self._operation_manager.log("🔧 Ready for Google Colab environment setup", 'info')
+                
+                # Log environment detection status
+                if self._environment_detected:
+                    self._operation_manager.log("🌐 Google Colab environment detected", 'info')
+                else:
+                    self._operation_manager.log("💻 Local environment detected", 'info')
+                
+                # Log available operations
+                if hasattr(self._operation_manager, 'get_operations'):
+                    operations = self._operation_manager.get_operations()
+                    self._operation_manager.log(f"📋 Available operations: {', '.join(operations.keys())}", 'info')
+                    
+            self.logger.debug("✅ Initialization complete logs sent to operation container")
+            
+        except Exception as e:
+            self.logger.warning(f"Failed to log initialization complete: {e}")
     
     def _detect_environment(self) -> None:
         """Detect if running in Google Colab environment."""

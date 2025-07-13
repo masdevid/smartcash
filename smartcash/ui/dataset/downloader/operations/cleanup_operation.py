@@ -5,7 +5,7 @@ Deskripsi: Handler untuk operasi cleanup dataset dengan centralized error handli
 
 from typing import Dict, Any, Optional, Callable
 from smartcash.ui.dataset.downloader.operations.base_operation import BaseDownloaderHandler
-from smartcash.ui.core.errors.handlers import handle_ui_errors
+from smartcash.ui.core.decorators import handle_ui_errors
 
 class CleanupOperationHandler(BaseDownloaderHandler):
     """Handler untuk operasi cleanup dataset dengan centralized error handling."""

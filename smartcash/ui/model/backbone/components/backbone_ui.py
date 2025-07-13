@@ -25,7 +25,7 @@ from smartcash.ui.components.summary_container import create_summary_container
 from smartcash.ui.components.operation_container import create_operation_container
 from smartcash.ui.components.footer_container import create_footer_container
 from smartcash.ui.components.main_container import create_main_container
-from smartcash.ui.core.errors.handlers import handle_ui_errors
+from smartcash.ui.core.decorators import handle_ui_errors
 
 # Module imports
 from ..constants import UI_CONFIG, BUTTON_CONFIG, DEFAULT_CONFIG

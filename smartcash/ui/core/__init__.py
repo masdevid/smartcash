@@ -18,29 +18,71 @@ from smartcash.ui.core.errors import (
     ErrorLevel,
     CoreErrorHandler,
     get_error_handler,
-    handle_errors,
     ErrorContext,
     handle_component_validation,
-    safe_component_operation,
     validate_ui_components,
     ErrorComponent,
     create_error_component
 )
 
+# Centralized decorators (all UI decorators unified here)
+from smartcash.ui.core.decorators import (
+    # Error handling decorators
+    handle_errors,
+    handle_ui_errors,
+    safe_ui_operation,
+    log_errors,
+    suppress_errors,
+    retry_on_failure,
+    safe_component_operation,
+    
+    # Log suppression decorators
+    suppress_ui_init_logs,
+    suppress_all_init_logs,
+    suppress_initial_logs,
+    
+    # UI operation decorators
+    safe_widget_operation,
+    safe_progress_operation,
+    safe_component_access,
+    safe_button_operation,
+    safe_form_operation
+)
+
 __all__ = [
+    # Handlers
     'BaseHandler',
     'UIHandler',
     'BaseInitializer',
+    
+    # Shared utilities
     'SharedConfigManager',
     'get_shared_config_manager',
+    
+    # Error handling
     'ErrorLevel',
     'CoreErrorHandler',
     'get_error_handler',
-    'handle_errors',
     'ErrorContext',
     'handle_component_validation',
-    'safe_component_operation',
     'validate_ui_components',
     'ErrorComponent',
-    'create_error_component'
+    'create_error_component',
+    
+    # Centralized decorators
+    'handle_errors',
+    'handle_ui_errors',
+    'safe_ui_operation',
+    'log_errors',
+    'suppress_errors',
+    'retry_on_failure',
+    'safe_component_operation',
+    'suppress_ui_init_logs',
+    'suppress_all_init_logs',
+    'suppress_initial_logs',
+    'safe_widget_operation',
+    'safe_progress_operation',
+    'safe_component_access',
+    'safe_button_operation',
+    'safe_form_operation'
 ]

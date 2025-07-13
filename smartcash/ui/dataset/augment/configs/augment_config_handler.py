@@ -8,7 +8,7 @@ augment-specific configuration management while preserving business logic.
 
 from typing import Dict, Any, Optional, Tuple, List
 from smartcash.ui.core.handlers.config_handler import ConfigHandler
-from smartcash.ui.core.errors.handlers import handle_ui_errors
+from smartcash.ui.core.decorators import handle_ui_errors
 from .augment_defaults import get_default_augment_config, get_augment_config_schema
 from ..constants import (
     AugmentationTypes, CleanupTarget, TARGET_SPLIT_OPTIONS,

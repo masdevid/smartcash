@@ -21,11 +21,10 @@ from smartcash.ui.components.action_container import create_action_container
 from smartcash.ui.components.operation_container import create_operation_container
 from smartcash.ui.components.footer_container import create_footer_container
 from smartcash.ui.components.main_container import create_main_container
-from smartcash.ui.core.errors.handlers import handle_ui_errors
+from smartcash.ui.core.decorators import handle_ui_errors
 
 # Global UI handler for Save/Reset and status updates
 from smartcash.ui.core.handlers.global_ui_handler import create_global_ui_handler
-from smartcash.ui.core.utils.log_suppression import suppress_ui_init_logs
 
 # Import downloader specific components
 from .input_options import create_downloader_input_options
@@ -41,7 +40,6 @@ BUTTON_CONFIG = BUTTON_CONFIG
 VALIDATION_RULES = VALIDATION_RULES
 
 
-@suppress_ui_init_logs(duration=3.0)
 @handle_ui_errors(error_component_title="Dataset Downloader UI Creation Error")
 def create_downloader_ui(config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     """Create and initialize the Dataset Downloader UI components.
@@ -223,6 +221,13 @@ def create_downloader_ui(config: Optional[Dict[str, Any]] = None) -> Dict[str, A
         'config': config,
         'main_container': main_container,
         
+        # Add container references
+        'header_container': header_container,
+        'form_container': form_container,
+        'action_container': action_container,
+        'operation_container': operation_container,
+        'footer_container': footer_container,
+        
         # Add all button references
         'download_button': action_buttons.get('download_button'),
         'check_button': action_buttons.get('check_button'),
@@ -278,15 +283,14 @@ def create_downloader_ui(config: Optional[Dict[str, Any]] = None) -> Dict[str, A
             default_values=form_defaults
         )
         
-        # Get Save/Reset buttons from action container
-        save_button = action_buttons.get('save_button')
-        reset_button = action_buttons.get('reset_button')
+        # Get Save/Reset buttons from action container object
+        action_container_obj = action_container.get('action_container')
+        save_button = None
+        reset_button = None
         
-        # If not found in action_buttons, try to get from action_container
-        if not save_button or not reset_button:
-            action_btns = action_container.get('buttons', {})
-            save_button = action_btns.get('save_button')
-            reset_button = action_btns.get('reset_button')
+        if action_container_obj:
+            save_button = getattr(action_container_obj, 'save_button', None)
+            reset_button = getattr(action_container_obj, 'reset_button', None)
         
         # Bind Save/Reset buttons to the global handler if available
         if save_button and reset_button:

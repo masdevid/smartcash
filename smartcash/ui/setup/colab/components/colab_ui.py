@@ -40,7 +40,7 @@ from .colab_ui_helpers import (
 )
 
 # Error handling import
-from smartcash.ui.core.errors.handlers import handle_ui_errors
+from smartcash.ui.core.decorators import handle_ui_errors
 
 # UI Configuration
 UI_CONFIG = {

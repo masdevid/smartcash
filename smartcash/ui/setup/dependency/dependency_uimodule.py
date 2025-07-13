@@ -15,7 +15,7 @@ from datetime import datetime
 from smartcash.ui.core.ui_module import UIModule, SharedMethodRegistry, register_operation_method
 from smartcash.ui.core.ui_module_factory import create_template
 from smartcash.ui.logger import get_module_logger
-from smartcash.ui.core.errors.handlers import handle_ui_errors
+from smartcash.ui.core.decorators import handle_ui_errors
 
 # Import existing dependency components and handlers
 from smartcash.ui.setup.dependency.configs.dependency_config_handler import DependencyConfigHandler

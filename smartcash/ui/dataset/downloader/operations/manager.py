@@ -31,7 +31,7 @@ class DownloaderOperationManager(OperationHandler):
             super().initialize()
             
             # Initialize operation handlers
-            ui_components = {'operation_container': self.operation_container}
+            ui_components = {'operation_container': self._operation_container}
             self.download_handler = DownloadOperationHandler(ui_components=ui_components)
             self.check_handler = CheckOperationHandler(ui_components=ui_components)
             self.cleanup_handler = CleanupOperationHandler(ui_components=ui_components)

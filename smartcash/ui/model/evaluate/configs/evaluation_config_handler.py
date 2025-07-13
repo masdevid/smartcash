@@ -6,7 +6,7 @@ Description: Config handler for evaluation module with centralized error handlin
 from typing import Dict, Any, Optional, TypeVar, cast, Union, List
 import logging
 from smartcash.ui.core.handlers.config_handler import ConfigHandler
-from smartcash.ui.core.errors.handlers import handle_ui_errors
+from smartcash.ui.core.decorators import handle_ui_errors
 from smartcash.ui.model.evaluate.configs.evaluation_defaults import EVALUATION_DEFAULTS
 
 class EvaluationConfigHandler(ConfigHandler):

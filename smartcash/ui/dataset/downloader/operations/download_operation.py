@@ -5,7 +5,7 @@ Deskripsi: Handler untuk operasi download dataset dengan centralized error handl
 
 from typing import Dict, Any, Optional
 from smartcash.ui.dataset.downloader.operations.base_operation import BaseDownloaderHandler
-from smartcash.ui.core.errors.handlers import handle_ui_errors
+from smartcash.ui.core.decorators import handle_ui_errors
 
 class DownloadOperationHandler(BaseDownloaderHandler):
     """Handler untuk operasi download dataset dengan centralized error handling."""

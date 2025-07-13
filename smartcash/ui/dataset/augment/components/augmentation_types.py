@@ -8,7 +8,7 @@ business logic preserved while following the new UI structure.
 
 import ipywidgets as widgets
 from typing import Dict, Any, List
-from smartcash.ui.core.errors.handlers import handle_ui_errors
+from smartcash.ui.core.decorators import handle_ui_errors
 from ..constants import (
     AUGMENTATION_TYPES_OPTIONS, DEFAULT_AUGMENTATION_PARAMS,
     HELP_TEXT, AUGMENT_COLORS, SECTION_STYLES, AUGMENTATION_TIPS

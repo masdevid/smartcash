@@ -9,7 +9,7 @@ business logic and visualization features preserved.
 from typing import Dict, Any, Optional
 import logging
 import time
-from smartcash.ui.core.errors.handlers import handle_ui_errors
+from smartcash.ui.core.decorators import handle_ui_errors
 from ..constants import AugmentationTypes, DEFAULT_POSITION_PARAMS, DEFAULT_LIGHTING_PARAMS
 
 

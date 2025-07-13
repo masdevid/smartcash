@@ -5,7 +5,7 @@ Description: Base operation handler for downloader module with centralized error
 
 from typing import Dict, Any, Optional
 from smartcash.ui.core.handlers import BaseHandler
-from smartcash.ui.core.errors.handlers import handle_ui_errors
+from smartcash.ui.core.decorators import handle_ui_errors
 
 
 class BaseDownloaderHandler(BaseHandler):

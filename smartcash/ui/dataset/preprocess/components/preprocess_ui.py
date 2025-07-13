@@ -7,7 +7,7 @@ import ipywidgets as widgets
 from typing import Dict, Any, Optional
 
 # Error handling
-from smartcash.ui.core.errors.handlers import handle_ui_errors
+from smartcash.ui.core.decorators import handle_ui_errors
 from smartcash.ui.core.errors.enums import ErrorLevel
 
 # Import standard container components

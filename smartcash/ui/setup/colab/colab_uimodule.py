@@ -37,8 +37,8 @@ from smartcash.ui.core.ui_module import UIModule, SharedMethodRegistry, register
 from smartcash.ui.core.ui_module_factory import create_template
 from smartcash.ui.logger import get_module_logger
 from smartcash.ui.core.handlers.operation_handler import OperationHandler, OperationStatus
-from smartcash.ui.core.errors.handlers import handle_ui_errors
-from smartcash.ui.core.utils.log_suppression import suppress_ui_init_logs
+from smartcash.ui.core.decorators import handle_ui_errors
+from smartcash.ui.core.decorators import suppress_ui_init_logs
 
 # Colab module imports
 from smartcash.ui.setup.colab.components.colab_ui import create_colab_ui

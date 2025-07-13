@@ -10,7 +10,7 @@ import ipywidgets as widgets
 from ipywidgets import HTML, Layout, VBox, HBox, Output, Button, IntProgress, FloatProgress
 from IPython.display import display
 from typing import Dict, Any, Optional
-from smartcash.ui.core.errors.handlers import handle_ui_errors
+from smartcash.ui.core.decorators import handle_ui_errors
 from ..constants import (
     AUGMENT_COLORS, SECTION_STYLES, SUCCESS_MESSAGES, ERROR_MESSAGES,
     WARNING_MESSAGES, PROGRESS_PHASES

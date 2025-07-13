@@ -6,7 +6,7 @@ Main UIModule implementation for train module following new UIModule pattern.
 from typing import Dict, Any, Optional
 from smartcash.ui.core.ui_module import UIModule
 from smartcash.ui.logger import get_module_logger
-from smartcash.ui.core.utils.log_suppression import suppress_ui_init_logs
+from smartcash.ui.core.decorators import suppress_ui_init_logs
 from .configs.train_config_handler import TrainConfigHandler
 from .configs.train_defaults import get_default_train_config
 from .operations.train_operation_manager import TrainOperationManager

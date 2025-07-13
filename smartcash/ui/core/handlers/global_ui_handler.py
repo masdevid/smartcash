@@ -8,7 +8,7 @@ and header status updates that applies to all UI modules in SmartCash.
 from typing import Dict, Any, Optional, Callable, Union
 from smartcash.common.logger import get_logger
 from smartcash.ui.components.header_container import HeaderContainer
-from smartcash.ui.core.errors.handlers import handle_ui_errors
+from smartcash.ui.core.decorators import handle_ui_errors
 
 
 class GlobalUIHandler:

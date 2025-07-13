@@ -7,7 +7,7 @@ import asyncio
 import os
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-from smartcash.ui.core.errors.handlers import get_error_handler
+from smartcash.ui.core.decorators import get_error_handler
 from smartcash.ui.core.handlers.operation_handler import (
     OperationHandler, 
     OperationStatus,

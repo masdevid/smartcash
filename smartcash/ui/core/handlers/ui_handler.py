@@ -315,7 +315,7 @@ class UIHandler(BaseHandler):
             self.clear_all_components()
             
             # Use the centralized error handler to create and display the error UI
-            from smartcash.ui.core.errors.handlers import get_error_handler
+            from smartcash.ui.core.decorators import get_error_handler
             error_handler = get_error_handler()
             error_handler.create_error_ui(error_result)
             

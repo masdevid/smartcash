@@ -6,7 +6,7 @@ from typing import Dict, Any, Optional, List
 from datetime import datetime
 
 from smartcash.ui.core.ui_module import UIModule
-from smartcash.ui.core.utils.log_suppression import suppress_ui_init_logs
+from smartcash.ui.core.decorators import suppress_all_init_logs
 from smartcash.ui.dataset.downloader.components.downloader_ui import create_downloader_ui
 from smartcash.ui.dataset.downloader.configs.downloader_defaults import get_default_downloader_config
 from smartcash.ui.dataset.downloader.operations.manager import DownloaderOperationManager
@@ -27,7 +27,7 @@ class DownloaderUIModule(UIModule):
         self._operation_manager: Optional[DownloaderOperationManager] = None
         self._downloader_service: Optional[DownloaderService] = None
     
-    @suppress_ui_init_logs(duration=3.0)
+    @suppress_all_init_logs(duration=5.0)
     def initialize(self, config: Dict[str, Any] = None) -> 'DownloaderUIModule':
         """Initialize downloader module."""
         try:

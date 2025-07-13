@@ -31,7 +31,7 @@ from smartcash.ui.components import (
     create_main_container,
     SummaryContainer
 )
-from smartcash.ui.core.errors.handlers import handle_ui_errors
+from smartcash.ui.core.decorators import handle_ui_errors
 from IPython.display import display
 from ipywidgets import HTML, Layout, VBox
 from smartcash.ui.components.footer_container import PanelConfig, PanelType

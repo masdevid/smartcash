@@ -30,7 +30,7 @@ class DownloadOperationHandler(BaseDownloaderHandler):
         Returns:
             Dictionary dengan status operasi
         """
-        self.log_info("🚀 Memulai download dataset")
+        self.logger.info("🚀 Memulai download dataset")
         
         # Setup progress tracker
         self._setup_progress_tracker("Dataset Download")
@@ -38,7 +38,7 @@ class DownloadOperationHandler(BaseDownloaderHandler):
         # Create downloader
         downloader = self._create_backend_downloader(ui_config)
         if not downloader:
-            self.log_error("Gagal membuat download service")
+            self.logger.error("Gagal membuat download service")
             return {'status': False, 'message': "Gagal membuat download service"}
         
         # Setup progress callback
@@ -51,23 +51,52 @@ class DownloadOperationHandler(BaseDownloaderHandler):
         # Execute download
         result = downloader.download_dataset()
         
-        if result and result.get('status') == 'success':
-            self._show_download_success(result)
-            self._update_summary_container(result)
-            self.log_info("✅ Download berhasil")
-            return {'status': True, 'message': "Download berhasil", 'result': result}
-        else:
-            error_msg = result.get('message', 'Download gagal') if result else 'No response from service'
-            self.log_error(f"❌ {error_msg}")
+        # Get progress tracker
+        progress_tracker = self.ui_components.get('progress_tracker')
+        
+        try:
+            if result and result.get('status') == 'success':
+                # Complete the current stage
+                if progress_tracker:
+                    progress_tracker.complete_stage()
+                    progress_tracker.update_overall(100, "✅ Download selesai")
+                
+                self._show_download_success(result)
+                self._update_summary_container(result)
+                download_path = result.get('dataset_path', '')
+                self.logger.info(f"✅ Download berhasil ke {download_path}")
+                return {'status': True, 'message': "Download berhasil", 'result': result}
+            else:
+                error_msg = result.get('message', 'Download gagal') if result else 'Tidak ada respons dari layanan'
+                if progress_tracker:
+                    progress_tracker.update_overall(0, f"❌ {error_msg}")
+                self.logger.error(f"❌ {error_msg}")
+                return {'status': False, 'message': error_msg, 'result': result}
+                
+        except Exception as e:
+            error_msg = f"Error saat proses download: {str(e)}"
+            if progress_tracker:
+                progress_tracker.update_overall(0, f"❌ {error_msg}")
+            self.logger.error(f"❌ {error_msg}", exc_info=True)
             return {'status': False, 'message': error_msg, 'result': result}
     
     @handle_ui_errors(error_component_title="Progress Tracker Error", log_error=True)
     def _setup_progress_tracker(self, operation_name: str):
-        """Setup progress tracker untuk operation."""
+        """Setup progress tracker untuk operation.
+        
+        Args:
+            operation_name: Nama operasi yang akan ditampilkan di progress tracker
+        """
         progress_tracker = self.ui_components.get('progress_tracker')
         if progress_tracker:
-            progress_tracker.show(operation_name)
+            # Start a new stage for this operation
+            progress_tracker.start_stage(operation_name)
             progress_tracker.update_overall(0, f"🚀 Memulai {operation_name.lower()}...")
+            
+            # If there's a progress bar in UI components, update it
+            if 'progress_bar' in self.ui_components and self.ui_components['progress_bar']:
+                self.ui_components['progress_bar'].value = 0
+                self.ui_components['progress_bar'].description = f"Memulai {operation_name.lower()}..."
     
     @handle_ui_errors(error_component_title="Backend Service Error", log_error=True)
     def _create_backend_downloader(self, ui_config: Dict[str, Any]):
@@ -79,23 +108,23 @@ class DownloadOperationHandler(BaseDownloaderHandler):
     def _log_download_config(self, ui_config: Dict[str, Any]):
         """Log download config ke UI menggunakan parent class logging methods."""
         # Log config details using parent class logging methods
-        self.log_info("📋 Konfigurasi Download:")
+        self.logger.info("📋 Konfigurasi Download:")
         
         # Log source type
         source_type = ui_config.get('source_type', 'unknown')
-        self.log_info(f"🔹 Tipe sumber: {source_type}")
+        self.logger.info(f"🔹 Tipe sumber: {source_type}")
         
         # Log dataset path
         dataset_path = ui_config.get('dataset_path', '')
-        self.log_info(f"🔹 Path dataset: {dataset_path}")
+        self.logger.info(f"🔹 Path dataset: {dataset_path}")
         
         # Log additional options
         options = ui_config.get('options', {})
         if options:
-            self.log_info("🔹 Opsi tambahan:")
+            self.logger.info("🔹 Opsi tambahan:")
             for key, value in options.items():
                 if isinstance(value, bool) and value:
-                    self.log_info(f"  - {key}: {value}")
+                    self.logger.info(f"  - {key}: {value}")
     
     @handle_ui_errors(error_component_title="UI Operation Error", log_error=True)
     def _show_download_success(self, result: Dict[str, Any]):
@@ -104,30 +133,31 @@ class DownloadOperationHandler(BaseDownloaderHandler):
         summary = result.get('summary', {})
         dataset_path = result.get('dataset_path', '')
         
-        # Show success message using parent class methods
+        # Log success message
         success_message = f"✅ Download berhasil ke {dataset_path}"
+        self.logger.info(success_message)
         
-        # Update status panel with success message
-        self.update_status_panel(
-            self.ui_components,
-            message=success_message,
-            status_type="success",
-            title="Download Berhasil"
-        )
+        # Update status panel if available in UI components
+        if 'status_panel' in self.ui_components and self.ui_components['status_panel']:
+            self.ui_components['status_panel'].update(
+                message=success_message,
+                status_type="success",
+                title="Download Berhasil"
+            )
         
-        # Show success info dialog
+        # Log detailed summary
         total_images = summary.get('total_images', 0)
         total_labels = summary.get('total_labels', 0)
-        info_message = f"Dataset berhasil didownload ke {dataset_path}\n\n" \
-                      f"Total gambar: {total_images}\n" \
-                      f"Total label: {total_labels}"
         
-        self.show_info_dialog(
-            self.ui_components,
-            message=info_message,
-            title="Download Berhasil",
-            ok_text="OK"
-        )
+        # Log detailed information
+        self.logger.info(f"📊 Download Summary:")
+        self.logger.info(f"  - Dataset Path: {dataset_path}")
+        self.logger.info(f"  - Total Images: {total_images}")
+        self.logger.info(f"  - Total Labels: {total_labels}")
+        
+        # If we have a summary container, update it
+        if 'summary_container' in self.ui_components and self.ui_components['summary_container']:
+            self._update_summary_container(result)
         
     @handle_ui_errors(error_component_title="Summary Update Error", log_error=True)
     def _update_summary_container(self, result: Dict[str, Any]):
@@ -138,7 +168,7 @@ class DownloadOperationHandler(BaseDownloaderHandler):
         """
         summary_container = self.ui_components.get('summary_container')
         if not summary_container:
-            self.log_debug("Summary container tidak tersedia")
+            self.logger.debug("Summary container tidak tersedia")
             return
             
         # Extract summary data

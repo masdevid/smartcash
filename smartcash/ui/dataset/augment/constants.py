@@ -71,13 +71,13 @@ BUTTON_CONFIG = {
     },
     'cleanup': {
         'text': '🗑️ Cleanup Files',
-        'style': 'warning',
+        'style': 'danger',
         'tooltip': 'Clean up augmented or sample files',
         'order': 3
     },
     'preview': {
         'text': '👁️ Live Preview',
-        'style': 'primary',
+        'style': 'warning',
         'tooltip': 'Preview augmentation results in real-time',
         'order': 4
     }

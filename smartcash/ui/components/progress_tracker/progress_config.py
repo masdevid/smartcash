@@ -31,21 +31,24 @@ class ProgressBarConfig:
 
 def get_level_configs(level: ProgressLevel) -> List[ProgressBarConfig]:
     """Get bar configurations dengan warna hijau seragam"""
+    # Get the integer value from enum if needed
+    level_int = level.value if hasattr(level, 'value') else level
+    
     level_configs = {
-        ProgressLevel.SINGLE: [
+        1: [
             ProgressBarConfig("primary", "Progress", "📊", "#28a745", 0)
         ],
-        ProgressLevel.DUAL: [
+        2: [
             ProgressBarConfig("overall", "Overall Progress", "📊", "#28a745", 0),
             ProgressBarConfig("current", "Current Operation", "⚡", "#28a745", 1)
         ],
-        ProgressLevel.TRIPLE: [
+        3: [
             ProgressBarConfig("overall", "Overall Progress", "📊", "#28a745", 0),
             ProgressBarConfig("step", "Step Progress", "🔄", "#28a745", 1),
             ProgressBarConfig("current", "Current Operation", "⚡", "#28a745", 2)
         ]
     }
-    return level_configs[level]
+    return level_configs[level_int]
 
 def get_default_weights(steps: List[str]) -> Dict[str, int]:
     """Generate equal weights untuk semua steps"""

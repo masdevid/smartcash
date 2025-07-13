@@ -125,7 +125,8 @@ def create_downloader_ui(config: Optional[Dict[str, Any]] = None) -> Dict[str, A
         show_progress=True,
         show_logs=True,
         log_module_name=UI_CONFIG['title'],
-        log_height="200px"
+        log_height="200px",
+        log_entry_style='compact'  # Ensure consistent hover behavior
     )
     
     # 5. Create Footer Container

@@ -337,11 +337,22 @@ class CoreErrorHandler:
             if not isinstance(level, ErrorLevel):
                 level = ErrorLevel.ERROR
                 
+            # Get error type from kwargs or use level name
+            error_type = kwargs.pop('error_type', level.name.lower())
+            
+            # Ensure we have a valid error type
+            valid_types = ['error', 'warning', 'info', 'success']
+            if error_type not in valid_types:
+                error_type = 'error'
+                
+            # Extract traceback if available
+            traceback = kwargs.pop('traceback', None)
+            
             # Create and return an error display component
             return create_error_component(
                 error_message=error_msg,
-                error_type=level.name.lower(),
-                ui_components=ui_components,
+                error_type=error_type,
+                traceback=traceback,
                 **kwargs
             )
         except ImportError:

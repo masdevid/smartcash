@@ -356,7 +356,11 @@ class VisualizationInitializer(ModuleInitializer):
         except Exception as e:
             error_msg = f"Failed to display visualization UI: {str(e)}"
             self.logger.error(error_msg, exc_info=True)
-            raise SmartCashUIError(error_msg) from e
+            # Include error_type when raising SmartCashUIError
+            raise SmartCashUIError(
+                message=error_msg,
+                error_code="UI_INIT_ERROR"
+            ) from e
 
 
 # Global instances

@@ -81,10 +81,19 @@ def create_backbone_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> Dic
     # === 2. Create Form Container ===
     form_widgets = _create_backbone_form_widgets(current_config)
     form_container = create_form_container(
+        title=f"⚙️ {UI_CONFIG['title']} Configuration",
         layout_type=LayoutType.COLUMN,
         container_margin="0",
         container_padding="16px",
-        gap="12px"
+        gap="12px",
+        layout_kwargs={
+            'width': '100%',
+            'max_width': '100%',
+            'margin': '0',
+            'padding': '0',
+            'justify_content': 'flex-start',
+            'align_items': 'flex-start'
+        }
     )
     
     # Add form widgets to the container
@@ -127,10 +136,13 @@ def create_backbone_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> Dic
     
     # === 5. Create Operation Container ===
     operation_container = create_operation_container(
-        title="Backbone Operations",
         show_progress=True,
         show_logs=True,
-        collapsible=True
+        log_module_name=UI_CONFIG['module_name'],
+        log_height="200px",
+        log_entry_style='compact',  # Ensure consistent hover behavior
+        collapsible=True,
+        collapsed=False
     )
     ui_components['operation_container'] = operation_container  # Store full container object
     ui_components['containers']['operation'] = operation_container
@@ -183,7 +195,7 @@ def create_backbone_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> Dic
 
 
 def _create_backbone_form_widgets(config: Dict[str, Any]) -> Dict[str, Any]:
-    """Create actual form widgets for backbone configuration."""
+    """Create form widgets for backbone configuration with two-column layout."""
     backbone_config = config.get('backbone', {})
     
     # Get current values
@@ -194,9 +206,20 @@ def _create_backbone_form_widgets(config: Dict[str, Any]) -> Dict[str, Any]:
     current_input_size = backbone_config.get('input_size', 640)
     current_num_classes = backbone_config.get('num_classes', 7)
     
-    # Create section headers
-    header_architecture = widgets.HTML("<h4>🧬 Backbone Architecture</h4>")
+    # Common layout settings
+    input_layout = widgets.Layout(
+        width='90%',
+        margin='5px 0',
+        padding='5px 0'
+    )
     
+    checkbox_layout = widgets.Layout(
+        width='100%',
+        margin='8px 0',
+        padding='5px 0'
+    )
+    
+    # ===== Left Column: Architecture =====
     # Backbone Selection Dropdown
     backbone_dropdown = widgets.Dropdown(
         options=[
@@ -205,34 +228,44 @@ def _create_backbone_form_widgets(config: Dict[str, Any]) -> Dict[str, Any]:
         ],
         value=current_backbone,
         description='Backbone:',
-        style={'description_width': '120px'},
-        layout=widgets.Layout(width='100%', margin='5px 0')
+        style={'description_width': '140px'},
+        layout=input_layout
     )
     
-    # Pretrained checkbox
+    # Checkbox options
     pretrained_checkbox = widgets.Checkbox(
         value=current_pretrained,
         description='Use Pretrained Weights',
-        layout=widgets.Layout(width='100%', margin='5px 0')
+        layout=checkbox_layout,
+        style={'description_width': 'initial'}
     )
     
-    # Feature optimization checkbox
     feature_opt_checkbox = widgets.Checkbox(
         value=current_feature_opt,
         description='Enable Feature Optimization',
-        layout=widgets.Layout(width='100%', margin='5px 0')
+        layout=checkbox_layout,
+        style={'description_width': 'initial'}
     )
     
-    # Mixed precision checkbox
     mixed_precision_checkbox = widgets.Checkbox(
         value=current_mixed_precision,
         description='Mixed Precision Training',
-        layout=widgets.Layout(width='100%', margin='5px 0')
+        layout=checkbox_layout,
+        style={'description_width': 'initial'}
     )
     
-    # Model parameters header
-    header_params = widgets.HTML("<h4>⚙️ Model Parameters</h4>")
+    # Left column container
+    left_column = widgets.VBox([
+        widgets.HTML("<h4 style='margin: 10px 0 5px 0;'>🧬 Architecture</h4>"),
+        backbone_dropdown,
+        widgets.HTML("<div style='margin: 15px 0 5px 0; border-top: 1px solid #eee;'></div>"),
+        widgets.HTML("<h4 style='margin: 5px 0;'>⚙️ Training Options</h4>"),
+        pretrained_checkbox,
+        feature_opt_checkbox,
+        mixed_precision_checkbox
+    ], layout=widgets.Layout(width='48%', margin='0 1% 0 0'))
     
+    # ===== Right Column: Parameters =====
     # Input size slider
     input_size_slider = widgets.IntSlider(
         value=current_input_size,
@@ -240,43 +273,63 @@ def _create_backbone_form_widgets(config: Dict[str, Any]) -> Dict[str, Any]:
         max=1280,
         step=32,
         description='Input Size:',
-        style={'description_width': '120px'},
-        layout=widgets.Layout(width='100%', margin='5px 0')
+        style={'description_width': '140px'},
+        layout=input_layout
     )
     
     # Number of classes input
     num_classes_input = widgets.IntText(
         value=current_num_classes,
         description='Num Classes:',
-        style={'description_width': '120px'},
-        layout=widgets.Layout(width='100%', margin='5px 0')
+        style={'description_width': '140px'},
+        layout=input_layout
     )
     
     # Detection info
     detection_info = widgets.HTML("""
-        <div style='margin-top: 10px; padding: 10px; background: #f5f5f5; border-radius: 4px; font-size: 0.9em;'>
-            <strong>🎯 Detection Configuration:</strong><br>
-            • <strong>Detection Layers:</strong> Banknote Detection<br>
-            • <strong>Layer Mode:</strong> Single Layer<br>
-            • <strong>Primary Classes:</strong> Currency banknotes
+        <div style='margin-top: 10px; padding: 12px; background: #f8f9fa; border-radius: 4px; font-size: 0.9em;'>
+            <h4 style='margin: 0 0 8px 0; font-size: 1em;'>🎯 Detection Configuration</h4>
+            <div style='line-height: 1.5;'>
+                <div><strong>• Layers:</strong> Banknote Detection</div>
+                <div><strong>• Mode:</strong> Single Layer</div>
+                <div><strong>• Classes:</strong> Currency banknotes</div>
+            </div>
         </div>
     """)
     
-    # Create widget list in order
-    form_widgets = [
-        header_architecture,
-        backbone_dropdown,
-        pretrained_checkbox,
-        feature_opt_checkbox,
-        mixed_precision_checkbox,
-        header_params,
+    # Right column container
+    right_column = widgets.VBox([
+        widgets.HTML("<h4 style='margin: 10px 0 5px 0;'>📏 Model Parameters</h4>"),
         input_size_slider,
         num_classes_input,
         detection_info
-    ]
+    ], layout=widgets.Layout(width='48%', margin='0 0 0 1%'))
+    
+    # Create main form container with two columns
+    form_ui = widgets.HBox(
+        [left_column, right_column],
+        layout=widgets.Layout(
+            width='100%',
+            justify_content='space-between',
+            margin='0',
+            padding='0'
+        )
+    )
+    
+    # Wrap in a styled container
+    form_container = widgets.VBox(
+        [form_ui],
+        layout=widgets.Layout(
+            width='100%',
+            padding='15px',
+            border='1px solid #e0e0e0',
+            border_radius='4px',
+            margin='5px 0 15px 0'
+        )
+    )
     
     return {
-        'widgets': form_widgets,
+        'widgets': [form_container],  # Single widget containing the two-column layout
         'widget_refs': {
             'backbone_dropdown': backbone_dropdown,
             'pretrained_checkbox': pretrained_checkbox,

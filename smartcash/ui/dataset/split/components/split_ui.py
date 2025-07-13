@@ -174,9 +174,13 @@ def create_split_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> Dict[s
             **kwargs
         )
         
-        # Create operation container (empty by default)
+        # Create operation container with consistent logging and progress
         operation_container = create_operation_container(
-            children=[],
+            show_progress=True,
+            show_logs=True,
+            log_module_name=UI_CONFIG['module_name'],
+            log_height="200px",
+            log_entry_style='compact',  # Ensure consistent hover behavior
             **kwargs
         )
         

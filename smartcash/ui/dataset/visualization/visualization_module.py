@@ -84,8 +84,12 @@ class VisualizationUIModule(UIModule):
             self.logger.info("✅ Visualization UI components set up successfully")
             
         except Exception as e:
-            self.logger.error(f"❌ Failed to set up visualization UI: {e}", exc_info=True)
-            raise SmartCashUIError(f"Failed to set up visualization UI: {str(e)}") from e
+            error_msg = f"Failed to set up visualization UI: {str(e)}"
+            self.logger.error(f"❌ {error_msg}", exc_info=True)
+            raise SmartCashUIError(
+                message=error_msg,
+                error_code="UI_SETUP_ERROR"
+            ) from e
     
     def _analyze_dataset(self, **kwargs) -> Dict[str, Any]:
         """Analyze dataset and update visualizations.

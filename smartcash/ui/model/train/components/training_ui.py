@@ -118,7 +118,9 @@ def create_training_ui(config: Dict[str, Any]) -> Dict[str, Any]:
             show_progress=True,
             show_logs=True,
             log_module_name="Training",
-            log_namespace_filter="smartcash.ui.model.train"
+            log_namespace_filter="smartcash.ui.model.train",
+            log_height="200px",
+            log_entry_style='compact'  # Ensure consistent hover behavior
         )
         operation_container = operation_container_result.get('container', operation_container_result)
         

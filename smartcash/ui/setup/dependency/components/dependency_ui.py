@@ -91,11 +91,14 @@ def create_dependency_ui_components(module_config: Dict[str, Any]) -> Dict[str, 
             title="🔧 Package Operations"
         )
         
-        # 4. Operation Container with prominent progress tracking
+        # 4. Operation Container with consistent logging and progress
         operation_container = create_operation_container(
             show_progress=True,
             show_dialog=False,  # Disable dialog to reduce clutter
             show_logs=True,
+            log_module_name="Dependency Management",
+            log_height="200px",
+            log_entry_style='compact',  # Ensure consistent hover behavior
             progress_style="prominent"  # Make progress more visible
         )
         

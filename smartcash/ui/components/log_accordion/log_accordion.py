@@ -35,7 +35,8 @@ class LogAccordion(BaseUIComponent):
         enable_deduplication: bool = True,
         duplicate_window_ms: Optional[int] = None,
         max_duplicate_count: Optional[int] = None,
-        namespace_filter: Optional[Union[str, List[str]]] = None
+        namespace_filter: Optional[Union[str, List[str]]] = None,
+        log_entry_style: str = 'compact'
     ) -> None:
         """Initialize the LogAccordion.
         
@@ -51,6 +52,7 @@ class LogAccordion(BaseUIComponent):
             enable_deduplication: Whether to enable message deduplication
             duplicate_window_ms: Time window in ms to consider messages as duplicates
             max_duplicate_count: Maximum number of duplicates to show
+            log_entry_style: Style of log entries ('compact' or 'default')
         """
         super().__init__(component_name)
         self.module_name = module_name
@@ -63,6 +65,7 @@ class LogAccordion(BaseUIComponent):
         self.enable_deduplication = enable_deduplication
         self.duplicate_window_ms = duplicate_window_ms or self.DEFAULT_DUPLICATE_WINDOW_MS
         self.max_duplicate_count = max_duplicate_count or self.DEFAULT_MAX_DUPLICATE_COUNT
+        self.log_entry_style = log_entry_style.lower() if log_entry_style else 'compact'
         
         # Namespace filtering
         self.namespace_filter = namespace_filter
@@ -180,6 +183,7 @@ class LogAccordion(BaseUIComponent):
                 border-radius: 3px !important;
                 border-left: 3px solid transparent !important;
                 transition: all 0.15s ease !important;
+                cursor: default !important;
             }}
             
             /* Compact log entry styling - new format */
@@ -188,6 +192,8 @@ class LogAccordion(BaseUIComponent):
                 max-width: 100% !important;
                 overflow: visible !important;
                 word-wrap: break-word !important;
+                white-space: pre-wrap !important;
+                padding: 2px 8px !important;
                 margin: 1px 0 !important;
                 border-radius: 3px !important;
                 transition: all 0.15s ease !important;
@@ -508,10 +514,13 @@ class LogAccordion(BaseUIComponent):
             else:
                 expandable_html = ""
             
-            # Create single row format HTML
+            # Determine which CSS class to use based on log_entry_style
+            entry_class = 'log-entry-compact' if self.log_entry_style == 'compact' else 'log-entry'
+            
+            # Create single row format HTML with dynamic class and styles
             html = f"""
-            <div class='log-entry-compact' style='
-                padding: 4px 8px; 
+            <div class='{entry_class}' style='
+                padding: {'2px 8px' if self.log_entry_style == 'compact' else '4px 8px'}; 
                 margin: 2px 0; 
                 border-left: 3px solid {style['color']}; 
                 background: {style['bg']}; 
@@ -523,16 +532,18 @@ class LogAccordion(BaseUIComponent):
                 line-height: 1.3;
                 font-size: 13px;
                 font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+                white-space: pre-wrap;
             '>
                 <!-- Namespace -->
                 <span style='
                     color: #6c757d;
                     font-size: 11px;
-                    max-width: 200px;
+                    max-width: {'200px' if self.log_entry_style == 'compact' else 'none'};
                     overflow: hidden;
                     text-overflow: ellipsis;
                     white-space: nowrap;
                     flex-shrink: 0;
+                    display: {'block' if self.log_entry_style == 'default' else 'inline'};
                 '>[{full_namespace}]</span>
                 
                 <!-- Icon -->
@@ -550,7 +561,8 @@ class LogAccordion(BaseUIComponent):
                     word-break: break-word;
                     overflow: hidden;
                     text-overflow: ellipsis;
-                    white-space: nowrap;
+                    white-space: {'pre-wrap' if self.log_entry_style == 'default' else 'nowrap'};
+                    line-height: 1.4;
                 '>{main_message}{duplicate_counter}</span>
                 
                 <!-- Timestamp -->

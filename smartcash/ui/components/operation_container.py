@@ -84,6 +84,7 @@ class OperationContainer(BaseUIComponent):
                  log_module_name: str = "Operation",
                  log_height: str = "150px",
                  log_namespace_filter: Optional[str] = None,
+                 log_entry_style: str = 'compact',
                  **kwargs):
         """Initialize the OperationContainer.
         
@@ -97,6 +98,7 @@ class OperationContainer(BaseUIComponent):
             log_module_name: Name of the module for logging
             log_height: Height of the log accordion
             log_namespace_filter: Optional namespace prefix to filter logs (e.g. 'preprocess')
+            log_entry_style: Style of log entries ('compact' or 'default')
             **kwargs: Additional arguments for BaseUIComponent (logger, error_handler)
         """
         # Filter out unexpected kwargs for BaseUIComponent
@@ -113,6 +115,7 @@ class OperationContainer(BaseUIComponent):
         self.log_module_name = log_module_name
         self.log_height = log_height
         self.log_namespace_filter = log_namespace_filter
+        self.log_entry_style = log_entry_style
         
         # Initialize components
         self.progress_tracker = None
@@ -167,7 +170,8 @@ class OperationContainer(BaseUIComponent):
                 component_name=f"{self.component_name}_log_accordion",
                 module_name=self.log_module_name,
                 height=self.log_height,
-                namespace_filter=self.log_namespace_filter
+                namespace_filter=self.log_namespace_filter,
+                log_entry_style=self.log_entry_style
             )
             self.log_accordion.initialize()
         

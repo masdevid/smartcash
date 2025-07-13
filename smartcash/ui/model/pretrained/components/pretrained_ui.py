@@ -142,11 +142,11 @@ def create_pretrained_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> D
     
     # === 5. Create Operation Container ===
     operation_container = create_operation_container(
-        title="📥 Download Progress",
         show_progress=True,
         show_logs=True,
-        collapsible=True,
-        collapsed=False
+        log_module_name=UI_CONFIG['title'],
+        log_height="200px",
+        log_entry_style='compact'  # Ensure consistent hover behavior with downloader
     )
     ui_components['containers']['operation'] = operation_container
     

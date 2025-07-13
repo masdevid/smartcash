@@ -9,7 +9,7 @@ import ipywidgets as widgets
 from IPython.display import display
 
 def create_ratio_section(config: Dict[str, Any]) -> Dict[str, Any]:
-    """Create the ratio configuration section.
+    """Create the ratio configuration section using form container.
     
     Args:
         config: Configuration dictionary
@@ -25,6 +25,11 @@ def create_ratio_section(config: Dict[str, Any]) -> Dict[str, Any]:
         'test': 0.15
     })
     
+    # Create form container for the section
+    section = widgets.VBox([
+        widgets.HTML("<h3>Split Ratios</h3>")
+    ], layout=widgets.Layout(width='100%'))
+    
     # Create form widgets
     train_ratio = widgets.FloatSlider(
         value=ratios.get('train', 0.7),
@@ -33,7 +38,7 @@ def create_ratio_section(config: Dict[str, Any]) -> Dict[str, Any]:
         step=0.05,
         description='Train:',
         continuous_update=False,
-        layout=widgets.Layout(width='400px')
+        layout=widgets.Layout(width='100%')
     )
     
     val_ratio = widgets.FloatSlider(
@@ -43,7 +48,7 @@ def create_ratio_section(config: Dict[str, Any]) -> Dict[str, Any]:
         step=0.05,
         description='Validation:',
         continuous_update=False,
-        layout=widgets.Layout(width='400px')
+        layout=widgets.Layout(width='100%')
     )
     
     test_ratio = widgets.FloatSlider(
@@ -53,7 +58,7 @@ def create_ratio_section(config: Dict[str, Any]) -> Dict[str, Any]:
         step=0.05,
         description='Test:',
         continuous_update=False,
-        layout=widgets.Layout(width='400px')
+        layout=widgets.Layout(width='100%')
     )
     
     # Create info text
@@ -61,15 +66,28 @@ def create_ratio_section(config: Dict[str, Any]) -> Dict[str, Any]:
         value="<i>Note: Ratios will be automatically normalized to sum to 1.0</i>"
     )
     
-    # Create section
-    section = widgets.VBox([
-        widgets.HTML("<h3>Split Ratios</h3>"),
+    # Add widgets to section
+    section.children += (
         train_ratio,
         val_ratio,
         test_ratio,
         info_text,
         widgets.HTML("<hr>")
-    ])
+    )
+    
+    # Add ratio change handler
+    def _on_ratio_change(change):
+        total = train_ratio.value + val_ratio.value + test_ratio.value
+        if abs(total - 1.0) > 0.001:  # Allow for floating point errors
+            factor = 1.0 / total if total > 0 else 1.0
+            with train_ratio.hold_trait_notifications():
+                train_ratio.value = round(train_ratio.value * factor, 2)
+                val_ratio.value = round(val_ratio.value * factor, 2)
+                test_ratio.value = round(test_ratio.value * factor, 2)
+    
+    train_ratio.observe(_on_ratio_change, 'value')
+    val_ratio.observe(_on_ratio_change, 'value')
+    test_ratio.observe(_on_ratio_change, 'value')
     
     return {
         'ratio_section': section,

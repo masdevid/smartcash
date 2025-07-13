@@ -17,10 +17,26 @@ from .split_uimodule import (
     get_split_components
 )
 
+"""SmartCash Dataset Split UI Module.
+
+This module provides UI components for dataset splitting functionality.
+"""
+
 # ==================== CORE COMPONENTS ====================
 
 from .components.split_ui import create_split_ui
+from .components.ratio_section import create_ratio_section
+from .components.path_section import create_path_section
+from .components.advanced_section import create_advanced_section
 from .configs.split_config_handler import SplitConfigHandler
+
+__all__ = [
+    'create_split_ui',
+    'create_ratio_section',
+    'create_path_section',
+    'create_advanced_section',
+    'SplitConfigHandler'
+]
 
 # ==================== CONVENIENCE FUNCTIONS ====================
 

@@ -43,12 +43,16 @@ class TrainConfigHandler(SharedConfigHandler):
             enable_sharing=True
         )
         
+        # Now that parent is initialized, we can use its methods
         self.logger = get_module_logger("smartcash.ui.model.train.configs")
         self.layer_configs = get_layer_mode_configs()
         self.optimization_types = get_optimization_types()
         
         # Config sections that require UI synchronization
         self.ui_sync_sections = required_sections
+        
+        # Ensure config is properly initialized
+        self._config = self._config or default_config
         
         # Ensure shared manager is initialized
         if not hasattr(self, '_shared_manager'):

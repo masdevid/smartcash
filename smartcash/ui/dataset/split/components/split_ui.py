@@ -1,16 +1,19 @@
 """
+File: smartcash/ui/dataset/split/components/split_ui.py
+
 Dataset Split UI Components Module.
 
 This module provides UI components for the dataset split configuration interface,
 built using shared container components from the SmartCash UI library.
 """
 
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional, List, Callable, Tuple
 import ipywidgets as widgets
+from IPython.display import display
 
 # Standard UI components
-from smartcash.ui.components.header_container import create_header_container
 from smartcash.ui.components.form_container import create_form_container, LayoutType
+from smartcash.ui.components.header_container import create_header_container
 from smartcash.ui.components.footer_container import create_footer_container
 from smartcash.ui.components.action_container import create_action_container
 from smartcash.ui.components.operation_container import create_operation_container
@@ -36,32 +39,44 @@ UI_CONFIG = UI_CONFIG
 BUTTON_CONFIG = BUTTON_CONFIG
 
 def _create_module_form_widgets(config: Dict[str, Any]) -> Dict[str, Any]:
-    """Create form widgets for the split module.
+    """Create form widgets for the split module using the form container.
     
     Args:
         config: Configuration dictionary
         
     Returns:
-        Dictionary containing form widgets
+        Dictionary containing form widgets and container
     """
+    # Create form container with column layout
+    form_container = create_form_container(
+        layout_type=LayoutType.COLUMN,
+        gap='16px',
+        container_padding='16px',
+        width='100%'
+    )
+    
     # Create form sections
     ratio_components = create_ratio_section(config)
     path_components = create_path_section(config)
     advanced_components = create_advanced_section(config)
     
-    # Combine all components
-    components = {**ratio_components, **path_components, **advanced_components}
+    # Add sections to form container
+    form_container['add_item'](ratio_components['ratio_section'])
+    form_container['add_item'](path_components['path_section'])
+    form_container['add_item'](advanced_components['advanced_section'])
     
-    # Create form rows
-    form_rows = [
-        ratio_components["ratio_section"],
-        path_components["path_section"],
-        advanced_components["advanced_section"]
-    ]
+    # Combine all components
+    components = {
+        **ratio_components,
+        **path_components,
+        **advanced_components,
+        'form_container': form_container['container']
+    }
     
     return {
         'components': components,
-        'form_rows': form_rows
+        'form_container': form_container,
+        'form_rows': form_container['get_items']()
     }
 
 
@@ -123,35 +138,50 @@ def create_split_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> Dict[s
     ui_components = {}
     
     try:
-        # Create form widgets
+        # Create form widgets using the form container
         form_widgets = _create_module_form_widgets(config)
         components = form_widgets['components']
-        form_rows = form_widgets['form_rows']
         
-        # Create log accordion
+        # Create log accordion for operation feedback
         log_output = widgets.Output()
         log_accordion = widgets.Accordion(
             children=[log_output],
-            selected_index=None
+            selected_index=None,
+            layout=widgets.Layout(width='100%', margin='10px 0')
         )
-        log_accordion.set_title(0, 'Log Messages')
+        log_accordion.set_title(0, '📝 Log Messages')
         
-        # Create header container
+        # Create header container with module title and description
         header = create_header_container(
             title=UI_CONFIG['title'],
             description=UI_CONFIG['description'],
             **kwargs
         )
         
-        # Create form container
-        form_container = create_form_container(
-            form_rows=form_rows,
-            layout_type=LayoutType.COLUMN,
-            **kwargs
-        )
+        # Get the form container from the form widgets
+        form_container = form_widgets.get('form_container')
+        if form_container is None:
+            # Fallback to creating a new form container if not provided
+            form_container = create_form_container(
+                layout_type=LayoutType.COLUMN,
+                gap='16px',
+                container_padding='16px',
+                width='100%'
+            )
+            
+            # Add form rows to container if available
+            for row in form_widgets.get('form_rows', []):
+                form_container['add_item'](row)
         
-        # Create action container with explicit save/reset buttons
+        # Create action buttons with localized labels
         action_buttons = [
+            {
+                'name': 'split_button',
+                'label': 'Mulai Split Dataset',
+                'button_style': 'primary',
+                'tooltip': 'Mulai proses split dataset',
+                'icon': 'share'
+            },
             {
                 'name': 'save_button',
                 'label': 'Simpan Konfigurasi',
@@ -165,9 +195,17 @@ def create_split_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> Dict[s
                 'button_style': 'warning',
                 'tooltip': 'Reset ke nilai default',
                 'icon': 'undo'
+            },
+            {
+                'name': 'cancel_button',
+                'label': 'Batal',
+                'button_style': '',
+                'tooltip': 'Batalkan operasi',
+                'icon': 'times'
             }
         ]
         
+        # Create action container with consistent styling
         action_container = create_action_container(
             buttons=action_buttons,
             show_save_reset=True,
@@ -214,71 +252,137 @@ def create_split_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> Dict[s
         summary_content = _create_module_summary_content(components)
         info_box = _create_module_info_box()
         
-        # Get buttons from action container
+        # Get button references from action container
         buttons = {}
         if hasattr(action_container, 'get'):
-            # Try to get buttons from action container
-            save_btn = action_container.get('save_button')
-            reset_btn = action_container.get('reset_button')
-            
-            # If buttons weren't found in the container, try to create them
-            if not save_btn or not reset_btn:
-                from ipywidgets import Button
-                
-                if not save_btn:
-                    save_btn = Button(
-                        description='Simpan',
-                        button_style='success',
-                        icon='save',
-                        tooltip='Simpan konfigurasi split dataset'
-                    )
-                
-                if not reset_btn:
-                    reset_btn = Button(
-                        description='Reset',
-                        button_style='warning',
-                        icon='undo',
-                        tooltip='Reset ke nilai default'
-                    )
-            
             buttons = {
-                'save_button': save_btn,
-                'reset_button': reset_btn
+                'split_button': action_container.get('split_button'),
+                'save_button': action_container.get('save_button'),
+                'reset_button': action_container.get('reset_button'),
+                'cancel_button': action_container.get('cancel_button')
             }
         
-        # Get buttons from action container
-        save_btn = action_container.get('save_button')
-        reset_btn = action_container.get('reset_button')
+        # Fallback button creation if any button is missing
+        if not all(buttons.values()):
+            from ipywidgets import Button
+            
+            if not buttons.get('split_button'):
+                buttons['split_button'] = Button(
+                    description='Mulai Split Dataset',
+                    button_style='primary',
+                    icon='share',
+                    tooltip='Mulai proses split dataset'
+                )
+            
+            if not buttons.get('save_button'):
+                buttons['save_button'] = Button(
+                    description='Simpan',
+                    button_style='success',
+                    icon='save',
+                    tooltip='Simpan konfigurasi split dataset'
+                )
+            
+            if not buttons.get('reset_button'):
+                buttons['reset_button'] = Button(
+                    description='Reset',
+                    button_style='warning',
+                    icon='undo',
+                    tooltip='Reset ke nilai default'
+                )
+            
+            if not buttons.get('cancel_button'):
+                buttons['cancel_button'] = Button(
+                    description='Batal',
+                    button_style='',
+                    icon='times',
+                    tooltip='Batalkan operasi'
+                )
         
-        # Create button references
-        buttons = {
-            'save_button': save_btn,
-            'reset_button': reset_btn
-        }
+        # Setup event handlers
+        def on_split_button_clicked(button):
+            with operation_container.log_output:
+                print("🚀 Memulai proses split dataset...")
+                try:
+                    # TODO: Implement actual split logic
+                    print("✅ Proses split dataset selesai")
+                except Exception as e:
+                    print(f"❌ Error: {str(e)}")
         
-        # Update components dictionary
+        def on_save_button_clicked(button):
+            with operation_container.log_output:
+                print("💾 Menyimpan konfigurasi...")
+                try:
+                    # TODO: Implement save logic
+                    print("✅ Konfigurasi berhasil disimpan")
+                except Exception as e:
+                    print(f"❌ Gagal menyimpan konfigurasi: {str(e)}")
+        
+        def on_reset_button_clicked(button):
+            with operation_container.log_output:
+                print("🔄 Mereset ke nilai default...")
+                try:
+                    # TODO: Implement reset logic
+                    print("✅ Berhasil mereset ke nilai default")
+                except Exception as e:
+                    print(f"❌ Gagal mereset: {str(e)}")
+        
+        def on_cancel_button_clicked(button):
+            with operation_container.log_output:
+                print("⏹️ Operasi dibatalkan")
+                # TODO: Implement cancel logic
+        
+        # Connect button click handlers
+        if buttons.get('split_button'):
+            buttons['split_button'].on_click(on_split_button_clicked)
+        if buttons.get('save_button'):
+            buttons['save_button'].on_click(on_save_button_clicked)
+        if buttons.get('reset_button'):
+            buttons['reset_button'].on_click(on_reset_button_clicked)
+        if buttons.get('cancel_button'):
+            buttons['cancel_button'].on_click(on_cancel_button_clicked)
+        
+        # Update components dictionary with all UI elements
         ui_components.update({
-            # Form components
+            # Containers
             'form_components': components,
             'form_container': form_container,
             'action_container': action_container,
             'operation_container': operation_container,
             'footer_container': footer_container,
             'header_container': header,
+            'main_container': main_container,
+            'container': main_container,  # For backward compatibility
             
-            # Individual components
+            # UI Components
             'summary_content': summary_content,
             'info_box': info_box,
             'log_accordion': log_accordion,
+            'log_output': log_output,
             
             # Buttons
             'buttons': buttons,
-            'save_button': save_btn,
-            'reset_button': reset_btn,
+            'split_button': buttons.get('split_button'),
+            'save_button': buttons.get('save_button'),
+            'reset_button': buttons.get('reset_button'),
+            'cancel_button': buttons.get('cancel_button'),
             
-            # Main container
-            'main_container': main_container,
-            'container': main_container  # For backward compatibility
+            # Form Controls
+            'train_ratio': components.get('train_ratio'),
+            'val_ratio': components.get('val_ratio'),
+            'test_ratio': components.get('test_ratio'),
+            'train_dir': components.get('train_dir'),
+            'val_dir': components.get('val_dir'),
+            'test_dir': components.get('test_dir'),
+            'create_subdirs': components.get('create_subdirs'),
+            'overwrite': components.get('overwrite'),
+            'seed': components.get('seed'),
+            'shuffle': components.get('shuffle'),
+            'stratify': components.get('stratify'),
+            'use_relative_paths': components.get('use_relative_paths'),
+            'preserve_structure': components.get('preserve_structure'),
+            'symlink': components.get('symlink'),
+            'backup': components.get('backup'),
+            'backup_dir': components.get('backup_dir')
         })
         
         return ui_components

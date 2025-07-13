@@ -9,7 +9,7 @@ import ipywidgets as widgets
 from IPython.display import display
 
 def create_path_section(config: Dict[str, Any]) -> Dict[str, Any]:
-    """Create the path configuration section.
+    """Create the path configuration section using form container.
     
     Args:
         config: Configuration dictionary
@@ -20,46 +20,61 @@ def create_path_section(config: Dict[str, Any]) -> Dict[str, Any]:
     # Extract config with defaults
     output_config = config.get('output', {})
     
+    # Create form container for the section
+    section = widgets.VBox([
+        widgets.HTML("<h3>Output Paths</h3>")
+    ], layout=widgets.Layout(width='100%'))
+    
     # Create form widgets
     train_dir = widgets.Text(
         value=output_config.get('train_dir', 'data/train'),
         description='Train Dir:',
-        layout=widgets.Layout(width='400px')
+        layout=widgets.Layout(width='100%')
     )
     
     val_dir = widgets.Text(
         value=output_config.get('val_dir', 'data/val'),
-        description='Validation Dir:',
-        layout=widgets.Layout(width='400px')
+        description='Val Dir:',
+        layout=widgets.Layout(width='100%')
     )
     
     test_dir = widgets.Text(
         value=output_config.get('test_dir', 'data/test'),
         description='Test Dir:',
-        layout=widgets.Layout(width='400px')
+        layout=widgets.Layout(width='100%')
     )
     
-    create_subdirs = widgets.Checkbox(
-        value=output_config.get('create_subdirs', True),
-        description='Create subdirectories',
-        indent=False
-    )
+    # Create options group
+    options_group = widgets.VBox([
+        widgets.HTML("<h4>Options</h4>"),
+        widgets.HBox([
+            widgets.Checkbox(
+                value=output_config.get('create_subdirs', True),
+                description='Create subdirectories',
+                indent=False,
+                layout=widgets.Layout(width='50%')
+            ),
+            widgets.Checkbox(
+                value=output_config.get('overwrite', False),
+                description='Overwrite existing',
+                indent=False,
+                layout=widgets.Layout(width='50%')
+            )
+        ])
+    ])
     
-    overwrite = widgets.Checkbox(
-        value=output_config.get('overwrite', False),
-        description='Overwrite existing files',
-        indent=False
-    )
-    
-    # Create section
-    section = widgets.VBox([
-        widgets.HTML("<h3>Output Paths</h3>"),
+    # Add widgets to section
+    section.children += (
         train_dir,
         val_dir,
         test_dir,
-        widgets.HBox([create_subdirs, overwrite]),
+        options_group,
         widgets.HTML("<hr>")
-    ])
+    )
+    
+    # Create references to form controls
+    create_subdirs = options_group.children[1].children[0]
+    overwrite = options_group.children[1].children[1]
     
     return {
         'path_section': section,

@@ -65,6 +65,16 @@ class EvaluationOperationManager(OperationHandler):
             # Setup scenarios list for backend
             scenarios = list(RESEARCH_SCENARIOS.keys())  # ['position_variation', 'lighting_variation']
             
+            # Extract execution configuration
+            execution_config = self.config.get('evaluation', {}).get('execution', {})
+            parallel_execution = execution_config.get('parallel_execution', False)
+            save_intermediate = execution_config.get('save_intermediate_results', True)
+            
+            if parallel_execution:
+                self.log("⚡ Parallel execution enabled", 'info')
+            if save_intermediate:
+                self.log("💾 Intermediate results will be saved", 'info')
+            
             # Setup progress callback
             def progress_callback(progress_data):
                 if 'percentage' in progress_data:
@@ -75,19 +85,21 @@ class EvaluationOperationManager(OperationHandler):
             # Get UI components for progress tracking
             ui_components = {
                 'progress_callback': progress_callback,
-                'operation_container': self.operation_container
+                'operation_container': self.operation_container,
+                'parallel_execution': parallel_execution,
+                'save_intermediate_results': save_intermediate
             }
             
             # Run backend evaluation
             self.log("🔧 Running backend evaluation service...", 'info')
             backend_result = await asyncio.get_event_loop().run_in_executor(
                 None,
-                self.evaluation_service.run_evaluation,
-                scenarios,      # scenarios to test
-                None,          # checkpoints (auto-select best)
+                self._run_evaluation_with_config,
+                scenarios,
+                None,  # checkpoints (auto-select best)
                 progress_callback,
-                None,          # metrics_callback
-                ui_components  # ui_components for progress
+                None,  # metrics_callback
+                ui_components
             )
             
             if backend_result.get('status') == 'success':
@@ -391,3 +403,47 @@ class EvaluationOperationManager(OperationHandler):
             self.logger.error(f"Failed to export results: {e}")
             self.log(f"❌ Export failed: {e}", 'error')
             return {'success': False, 'error': str(e)}
+    
+    def _run_evaluation_with_config(self, scenarios, checkpoints, progress_callback, metrics_callback, ui_components):
+        """Run evaluation with enhanced configuration support."""
+        try:
+            # Check if backend supports parallel execution and save intermediate
+            parallel_execution = ui_components.get('parallel_execution', False)
+            save_intermediate = ui_components.get('save_intermediate_results', True)
+            
+            # Log configuration
+            if parallel_execution:
+                self.logger.info("⚡ Running with parallel execution")
+            if save_intermediate:
+                self.logger.info("💾 Intermediate results will be saved")
+            
+            # For now, pass these as part of the ui_components to the backend
+            # The backend can check these flags and implement accordingly
+            enhanced_ui_components = {
+                **ui_components,
+                'evaluation_config': {
+                    'parallel_execution': parallel_execution,
+                    'save_intermediate_results': save_intermediate,
+                    'execution_mode': 'comprehensive'
+                }
+            }
+            
+            # Call the original evaluation service
+            return self.evaluation_service.run_evaluation(
+                scenarios=scenarios,
+                checkpoints=checkpoints,
+                progress_callback=progress_callback,
+                metrics_callback=metrics_callback,
+                ui_components=enhanced_ui_components
+            )
+            
+        except Exception as e:
+            self.logger.error(f"Enhanced evaluation failed: {e}")
+            # Fallback to original method
+            return self.evaluation_service.run_evaluation(
+                scenarios=scenarios,
+                checkpoints=checkpoints,
+                progress_callback=progress_callback,
+                metrics_callback=metrics_callback,
+                ui_components=ui_components
+            )

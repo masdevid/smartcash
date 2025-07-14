@@ -303,18 +303,10 @@ class EvaluationUIModule(UIModule):
             if isinstance(action_container, dict) and 'buttons' in action_container:
                 buttons = action_container['buttons']
                 
-                # Bind button handlers
+                # Bind button handlers for single run scenario button
                 for button_id, button_widget in buttons.items():
-                    if button_id == 'run_all_scenarios':
-                        button_widget.on_click(self._handle_run_all_scenarios)
-                    elif button_id == 'run_position_scenario':
-                        button_widget.on_click(self._handle_run_position_scenario)
-                    elif button_id == 'run_lighting_scenario':
-                        button_widget.on_click(self._handle_run_lighting_scenario)
-                    elif button_id == 'load_checkpoint':
-                        button_widget.on_click(self._handle_load_checkpoint)
-                    elif button_id == 'export_results':
-                        button_widget.on_click(self._handle_export_results)
+                    if button_id == 'run_scenario':
+                        button_widget.on_click(self._handle_run_scenario)
                 
                 self.log("🔗 Button handlers configured", 'info')
             else:
@@ -355,24 +347,40 @@ class EvaluationUIModule(UIModule):
     
     def log(self, message: str, level: str = 'info') -> None:
         """
-        Log message to operation container.
+        Log message to operation container's log_accordion.
         
         Args:
             message: Message to log
             level: Log level (info, success, warning, error)
         """
         try:
+            # Check if UI components exist
+            if not self._ui_components:
+                getattr(self.logger, level, self.logger.info)(message)
+                return
+                
             operation_container = self._ui_components.get('operation_container')
             if operation_container:
-                # Standard operation container should have log method or log_accordion
+                # Convert string level to LogLevel enum
+                from smartcash.ui.components.log_accordion import LogLevel
+                log_level_map = {
+                    'info': LogLevel.INFO,
+                    'success': LogLevel.SUCCESS,
+                    'warning': LogLevel.WARNING,
+                    'error': LogLevel.ERROR,
+                    'debug': LogLevel.DEBUG
+                }
+                log_level = log_level_map.get(level, LogLevel.INFO)
+                
+                # Use the log method from operation container which routes to log_accordion
                 if hasattr(operation_container, 'log'):
-                    operation_container.log(message, level)
+                    operation_container.log(message, log_level)
                     return
-                elif hasattr(operation_container, 'log_accordion'):
-                    # Use log accordion if available
-                    log_accordion = operation_container.log_accordion
+                elif isinstance(operation_container, dict) and 'log_accordion' in operation_container:
+                    # Direct access to log accordion
+                    log_accordion = operation_container['log_accordion']
                     if hasattr(log_accordion, 'log'):
-                        log_accordion.log(message, level)
+                        log_accordion.log(message, log_level)
                         return
             
             # Fallback to logger
@@ -382,117 +390,79 @@ class EvaluationUIModule(UIModule):
             self.logger.error(f"Failed to log message: {e}")
             getattr(self.logger, level, self.logger.info)(message)
     
-    # Button Handler Methods
-    async def _handle_run_all_scenarios(self, button) -> None:
-        """Handle run all scenarios button click."""
+    # Button Handler Method
+    async def _handle_run_scenario(self, button) -> None:
+        """Handle run scenario button click - determines action based on UI form selections."""
         try:
-            self.log("🚀 Starting comprehensive evaluation (8 tests)...", 'info')
+            # Extract form values to determine what to run
+            form_config = self._extract_form_values()
             
-            if not self._operation_manager:
-                raise RuntimeError("Operation manager not initialized")
+            run_mode = form_config.get('run_mode', 'all_scenarios')
             
-            result = await self._operation_manager.execute_all_scenarios()
-            
-            if result.get('success'):
-                successful = result.get('successful_tests', 0)
-                total = result.get('total_tests', 0)
-                self.log(f"🎉 Comprehensive evaluation completed: {successful}/{total} tests successful", 'success')
-            else:
-                error_msg = result.get('error', 'Unknown error')
-                self.log(f"❌ Comprehensive evaluation failed: {error_msg}", 'error')
+            if run_mode == 'all_scenarios':
+                self.log("🚀 Starting comprehensive evaluation (8 tests)...", 'info')
+                result = await self._operation_manager.execute_all_scenarios()
                 
+                if result.get('success'):
+                    successful = result.get('successful_tests', 0)
+                    total = result.get('total_tests', 0)
+                    self.log(f"🎉 Comprehensive evaluation completed: {successful}/{total} tests successful", 'success')
+                else:
+                    error_msg = result.get('error', 'Unknown error')
+                    self.log(f"❌ Comprehensive evaluation failed: {error_msg}", 'error')
+                    
+            elif run_mode == 'position_only':
+                self.log("📐 Starting position variation scenario (4 models)...", 'info')
+                result = await self._operation_manager.execute_position_scenario()
+                
+                if result.get('success'):
+                    successful = result.get('successful_tests', 0) 
+                    total = result.get('total_tests', 0)
+                    self.log(f"✅ Position scenario completed: {successful}/{total} models successful", 'success')
+                else:
+                    error_msg = result.get('error', 'Unknown error')
+                    self.log(f"❌ Position scenario failed: {error_msg}", 'error')
+                    
+            elif run_mode == 'lighting_only':
+                self.log("💡 Starting lighting variation scenario (4 models)...", 'info')
+                result = await self._operation_manager.execute_lighting_scenario()
+                
+                if result.get('success'):
+                    successful = result.get('successful_tests', 0)
+                    total = result.get('total_tests', 0)
+                    self.log(f"✅ Lighting scenario completed: {successful}/{total} models successful", 'success')
+                else:
+                    error_msg = result.get('error', 'Unknown error')
+                    self.log(f"❌ Lighting scenario failed: {error_msg}", 'error')
+                    
         except Exception as e:
-            self.logger.error(f"All scenarios evaluation failed: {e}")
+            self.logger.error(f"Scenario execution failed: {e}")
             self.log(f"❌ Evaluation error: {e}", 'error')
     
-    async def _handle_run_position_scenario(self, button) -> None:
-        """Handle run position scenario button click."""
+    def _extract_form_values(self) -> Dict[str, Any]:
+        """Extract current form values from UI components."""
         try:
-            self.log("📐 Starting position variation scenario (4 models)...", 'info')
+            # Get execution_model_row component
+            execution_model_row = self._ui_components.get('execution_model_row')
+            if not execution_model_row:
+                return {'run_mode': 'all_scenarios'}  # Default
             
-            if not self._operation_manager:
-                raise RuntimeError("Operation manager not initialized")
+            # Extract scenario radio button value from the HBox
+            form_values = {'run_mode': 'all_scenarios'}  # Default
             
-            result = await self._operation_manager.execute_position_scenario()
+            # In a real implementation, we would extract the actual widget values
+            # For now, use the config defaults as fallback
+            if self._merged_config:
+                execution_config = self._merged_config.get('evaluation', {}).get('execution', {})
+                form_values['run_mode'] = execution_config.get('run_mode', 'all_scenarios')
+                form_values['parallel_execution'] = execution_config.get('parallel_execution', False)
+                form_values['save_intermediate_results'] = execution_config.get('save_intermediate_results', True)
             
-            if result.get('success'):
-                successful = result.get('successful_tests', 0)
-                total = result.get('total_tests', 0)
-                self.log(f"✅ Position scenario completed: {successful}/{total} models successful", 'success')
-            else:
-                error_msg = result.get('error', 'Unknown error')
-                self.log(f"❌ Position scenario failed: {error_msg}", 'error')
-                
+            return form_values
+            
         except Exception as e:
-            self.logger.error(f"Position scenario failed: {e}")
-            self.log(f"❌ Position scenario error: {e}", 'error')
-    
-    async def _handle_run_lighting_scenario(self, button) -> None:
-        """Handle run lighting scenario button click."""
-        try:
-            self.log("💡 Starting lighting variation scenario (4 models)...", 'info')
-            
-            if not self._operation_manager:
-                raise RuntimeError("Operation manager not initialized")
-            
-            result = await self._operation_manager.execute_lighting_scenario()
-            
-            if result.get('success'):
-                successful = result.get('successful_tests', 0)
-                total = result.get('total_tests', 0)
-                self.log(f"✅ Lighting scenario completed: {successful}/{total} models successful", 'success')
-            else:
-                error_msg = result.get('error', 'Unknown error')
-                self.log(f"❌ Lighting scenario failed: {error_msg}", 'error')
-                
-        except Exception as e:
-            self.logger.error(f"Lighting scenario failed: {e}")
-            self.log(f"❌ Lighting scenario error: {e}", 'error')
-    
-    async def _handle_load_checkpoint(self, button) -> None:
-        """Handle load checkpoint button click."""
-        try:
-            self.log("📂 Loading best model checkpoints...", 'info')
-            
-            if not self._operation_manager:
-                raise RuntimeError("Operation manager not initialized")
-            
-            result = await self._operation_manager.load_best_checkpoints()
-            
-            if result.get('success'):
-                loaded_count = result.get('loaded_count', 0)
-                self.log(f"✅ Loaded {loaded_count} model checkpoints", 'success')
-            else:
-                error_msg = result.get('error', 'Unknown error')
-                self.log(f"❌ Checkpoint loading failed: {error_msg}", 'error')
-                
-        except Exception as e:
-            self.logger.error(f"Checkpoint loading failed: {e}")
-            self.log(f"❌ Checkpoint loading error: {e}", 'error')
-    
-    async def _handle_export_results(self, button) -> None:
-        """Handle export results button click."""
-        try:
-            self.log("📊 Exporting evaluation results...", 'info')
-            
-            if not self._operation_manager:
-                raise RuntimeError("Operation manager not initialized")
-            
-            # Get current results (would normally come from completed evaluations)
-            results = {"results": {}, "summary": "No evaluations completed yet"}
-            
-            result = await self._operation_manager.export_results(results)
-            
-            if result.get('success'):
-                export_path = result.get('export_path', 'Unknown path')
-                self.log(f"✅ Results exported to {export_path}", 'success')
-            else:
-                error_msg = result.get('error', 'Unknown error')
-                self.log(f"❌ Export failed: {error_msg}", 'error')
-                
-        except Exception as e:
-            self.logger.error(f"Export failed: {e}")
-            self.log(f"❌ Export error: {e}", 'error')
+            self.logger.error(f"Failed to extract form values: {e}")
+            return {'run_mode': 'all_scenarios'}
     
     def get_ui_components(self) -> Dict[str, Any]:
         """

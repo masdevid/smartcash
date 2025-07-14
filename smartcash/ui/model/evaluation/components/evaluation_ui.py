@@ -34,7 +34,7 @@ def create_evaluation_ui(config: Dict[str, Any]) -> Dict[str, Any]:
     try:
         logger = get_module_logger("smartcash.ui.model.evaluation.components")
         
-        # Create header container
+        # Create header container with integrated status panel
         header_container = create_header_container(
             title=UI_CONFIG['title'],
             description=UI_CONFIG['description'],
@@ -44,55 +44,34 @@ def create_evaluation_ui(config: Dict[str, Any]) -> Dict[str, Any]:
                 {'label': 'Model Types', 'value': str(len(MODEL_COMBINATIONS)), 'icon': '🤖'},
                 {'label': 'Total Tests', 'value': str(len(EVALUATION_MATRIX)), 'icon': '🎯'},
                 {'label': 'Metrics', 'value': str(len(EVALUATION_METRICS)), 'icon': '📈'}
-            ]
+            ],
+            show_status_panel=True,
+            status_title="Evaluation Status",
+            status_items={
+                'Current Mode': 'Ready to Start',
+                'Progress': '0%',
+                'Last Run': 'None',
+                'Backend': 'Connected'
+            }
         )
         
-        # Create form sections for configuration
-        scenario_section = _create_scenario_form_section(config)
-        model_section = _create_model_form_section(config)
-        metrics_section = _create_metrics_form_section(config)
-        execution_section = _create_execution_form_section(config)
+        # Create compact form sections - Row 1: 2 columns (Execution + Model options)
+        execution_model_row = _create_execution_model_row(config)
         
-        # Create action container with evaluation buttons
+        # Row 2: Metrics selection
+        metrics_section = _create_metrics_form_section(config)
+        
+        # Create action container with single run scenario button (no double icons)
         action_container = create_action_container(
             buttons=[
                 {
-                    'id': 'run_all_scenarios',
-                    'text': BUTTON_CONFIG['run_all_scenarios']['text'],
-                    'tooltip': BUTTON_CONFIG['run_all_scenarios']['tooltip'],
-                    'style': 'success',
-                    'icon': '🚀'
-                },
-                {
-                    'id': 'run_position_scenario',
-                    'text': BUTTON_CONFIG['run_position_scenario']['text'],
-                    'tooltip': BUTTON_CONFIG['run_position_scenario']['tooltip'],
-                    'style': 'info',
-                    'icon': '📐'
-                },
-                {
-                    'id': 'run_lighting_scenario', 
-                    'text': BUTTON_CONFIG['run_lighting_scenario']['text'],
-                    'tooltip': BUTTON_CONFIG['run_lighting_scenario']['tooltip'],
-                    'style': 'info',
-                    'icon': '💡'
-                },
-                {
-                    'id': 'load_checkpoint',
-                    'text': BUTTON_CONFIG['load_checkpoint']['text'],
-                    'tooltip': BUTTON_CONFIG['load_checkpoint']['tooltip'],
-                    'style': 'warning',
-                    'icon': '📂'
-                },
-                {
-                    'id': 'export_results',
-                    'text': BUTTON_CONFIG['export_results']['text'],
-                    'tooltip': BUTTON_CONFIG['export_results']['tooltip'],
-                    'style': 'success',
-                    'icon': '📊'
+                    'id': 'run_scenario',
+                    'text': 'Run Scenario',
+                    'tooltip': 'Execute evaluation based on selected configuration',
+                    'style': 'success'
                 }
             ],
-            title="🎯 Evaluation Actions",
+            title="Evaluation Actions",
             show_save_reset=False
         )
         
@@ -118,17 +97,15 @@ def create_evaluation_ui(config: Dict[str, Any]) -> Dict[str, Any]:
         operation_widget = operation_container.get('container') if isinstance(operation_container, dict) else operation_container
         summary_widget = summary_container.container if hasattr(summary_container, 'container') else summary_container
         
-        # Create main container with all components
+        # Create main container with compact layout
         main_container = create_main_container(
             components=[
                 {'type': 'header', 'component': header_widget, 'order': 0},
-                {'type': 'form', 'component': scenario_section, 'order': 1},
-                {'type': 'form', 'component': model_section, 'order': 2}, 
-                {'type': 'form', 'component': metrics_section, 'order': 3},
-                {'type': 'form', 'component': execution_section, 'order': 4},
-                {'type': 'action', 'component': action_widget, 'order': 5},
-                {'type': 'operation', 'component': operation_widget, 'order': 6},
-                {'type': 'custom', 'component': summary_widget, 'order': 7}
+                {'type': 'form', 'component': execution_model_row, 'order': 1},
+                {'type': 'form', 'component': metrics_section, 'order': 2},
+                {'type': 'action', 'component': action_widget, 'order': 3},
+                {'type': 'operation', 'component': operation_widget, 'order': 4},
+                {'type': 'custom', 'component': summary_widget, 'order': 5}
             ],
             title=UI_CONFIG['title'],
             description=UI_CONFIG['description']
@@ -142,14 +119,12 @@ def create_evaluation_ui(config: Dict[str, Any]) -> Dict[str, Any]:
         return {
             'main_container': main_widget,
             'header_container': header_container,
-            'scenario_section': scenario_section,
-            'model_section': model_section,
+            'execution_model_row': execution_model_row,
             'metrics_section': metrics_section,
-            'execution_section': execution_section,
             'action_container': action_container,
             'operation_container': operation_container,
             'summary_container': summary_container,
-            'components_count': 8
+            'components_count': 6
         }
         
     except Exception as e:
@@ -168,141 +143,131 @@ def create_evaluation_ui(config: Dict[str, Any]) -> Dict[str, Any]:
             'components_count': 0
         }
 
-def _create_scenario_form_section(config: Dict[str, Any]) -> widgets.Widget:
-    """Create scenario selection form section."""
-    scenario_items = []
+def _create_execution_model_row(config: Dict[str, Any]) -> widgets.Widget:
+    """Create compact 2-column row with execution options and model configurations."""
     
-    # Title
-    scenario_items.append(widgets.HTML("<h3>📊 Research Scenarios</h3>"))
-    
-    # Scenario checkboxes
-    for scenario_key, scenario_info in RESEARCH_SCENARIOS.items():
-        checkbox = widgets.Checkbox(
-            value=scenario_info.get('enabled', True),
-            description=f"{scenario_info['icon']} {scenario_info['name']}",
-            style={'description_width': 'initial'},
-            layout=widgets.Layout(margin='5px 0')
-        )
-        scenario_items.append(checkbox)
-        
-        # Add description
-        desc_html = widgets.HTML(
-            f"<p style='margin: 0 0 10px 25px; color: #666; font-size: 0.9em;'>"
-            f"{scenario_info['description']}</p>"
-        )
-        scenario_items.append(desc_html)
-    
-    # Summary info
-    summary_html = widgets.HTML(
-        f"<div style='background: #f8f9fa; padding: 10px; border-radius: 5px; margin-top: 10px;'>"
-        f"<strong>🎯 Evaluation Matrix:</strong> {len(RESEARCH_SCENARIOS)} scenarios × "
-        f"{len(MODEL_COMBINATIONS)} models = {len(EVALUATION_MATRIX)} total tests"
-        f"</div>"
-    )
-    scenario_items.append(summary_html)
-    
-    return widgets.VBox(scenario_items, layout=widgets.Layout(margin='10px 0'))
-
-def _create_model_form_section(config: Dict[str, Any]) -> widgets.Widget:
-    """Create model selection form section."""
-    model_items = []
-    
-    # Title
-    model_items.append(widgets.HTML("<h3>🤖 Model Configurations</h3>"))
-    
-    # Model checkboxes
-    for model in MODEL_COMBINATIONS:
-        checkbox = widgets.Checkbox(
-            value=True,  # Default enabled
-            description=f"🔸 {model['name']}",
-            style={'description_width': 'initial'},
-            layout=widgets.Layout(margin='5px 0')
-        )
-        model_items.append(checkbox)
-        
-        # Add model details
-        details_html = widgets.HTML(
-            f"<p style='margin: 0 0 10px 25px; color: #666; font-size: 0.9em;'>"
-            f"Backbone: {model['backbone']} | Layer Mode: {model['layer_mode']}</p>"
-        )
-        model_items.append(details_html)
-    
-    # Auto-select best option
-    auto_select = widgets.Checkbox(
-        value=config.get('evaluation', {}).get('models', {}).get('auto_select_best', True),
-        description="🎯 Auto-select best performing models",
-        style={'description_width': 'initial'},
-        layout=widgets.Layout(margin='10px 0')
-    )
-    model_items.append(auto_select)
-    
-    return widgets.VBox(model_items, layout=widgets.Layout(margin='10px 0'))
-
-def _create_metrics_form_section(config: Dict[str, Any]) -> widgets.Widget:
-    """Create metrics configuration form section."""
-    metrics_items = []
-    
-    # Title
-    metrics_items.append(widgets.HTML("<h3>📈 Evaluation Metrics</h3>"))
-    
-    # Metrics checkboxes (including accuracy)
-    for metric_key, metric_info in EVALUATION_METRICS.items():
-        checkbox = widgets.Checkbox(
-            value=True,  # Default enabled
-            description=f"{metric_info['icon']} {metric_info['name']}",
-            style={'description_width': 'initial'},
-            layout=widgets.Layout(margin='5px 0')
-        )
-        metrics_items.append(checkbox)
-        
-        # Add metric description
-        desc_html = widgets.HTML(
-            f"<p style='margin: 0 0 10px 25px; color: #666; font-size: 0.9em;'>"
-            f"{metric_info['description']}</p>"
-        )
-        metrics_items.append(desc_html)
-    
-    return widgets.VBox(metrics_items, layout=widgets.Layout(margin='10px 0'))
-
-def _create_execution_form_section(config: Dict[str, Any]) -> widgets.Widget:
-    """Create execution options form section."""
+    # Left column: Execution Options
     execution_items = []
-    
-    # Title
     execution_items.append(widgets.HTML("<h3>⚙️ Execution Options</h3>"))
     
-    # Execution mode selection
-    run_mode = widgets.RadioButtons(
+    # Scenario selection (radio buttons)
+    scenario_radio = widgets.RadioButtons(
         options=[
             ('All Scenarios (8 tests)', 'all_scenarios'),
-            ('Position Variation Only (4 tests)', 'position_only'),
-            ('Lighting Variation Only (4 tests)', 'lighting_only')
+            ('Position Variation (4 tests)', 'position_only'), 
+            ('Lighting Variation (4 tests)', 'lighting_only')
         ],
         value=config.get('evaluation', {}).get('execution', {}).get('run_mode', 'all_scenarios'),
-        description='Run Mode:',
-        style={'description_width': 'initial'},
-        layout=widgets.Layout(margin='10px 0')
+        description='Scenarios:',
+        style={'description_width': '80px'},
+        layout=widgets.Layout(margin='5px 0')
     )
-    execution_items.append(run_mode)
+    execution_items.append(scenario_radio)
     
-    # Additional options
+    # Parallel execution
     parallel_execution = widgets.Checkbox(
         value=config.get('evaluation', {}).get('execution', {}).get('parallel_execution', False),
-        description="⚡ Enable parallel execution",
+        description="⚡ Parallel execution",
         style={'description_width': 'initial'},
         layout=widgets.Layout(margin='5px 0')
     )
     execution_items.append(parallel_execution)
     
+    # Save intermediate results
     save_intermediate = widgets.Checkbox(
         value=config.get('evaluation', {}).get('execution', {}).get('save_intermediate_results', True),
-        description="💾 Save intermediate results",
+        description="💾 Save intermediate results", 
         style={'description_width': 'initial'},
         layout=widgets.Layout(margin='5px 0')
     )
     execution_items.append(save_intermediate)
     
-    return widgets.VBox(execution_items, layout=widgets.Layout(margin='10px 0'))
+    # Right column: Backbone & Layer Options
+    model_items = []
+    model_items.append(widgets.HTML("<h3>🤖 Backbone & Layer Options</h3>"))
+    
+    # Backbone selection (radio buttons)
+    backbone_options = list(set([model['backbone'] for model in MODEL_COMBINATIONS]))
+    backbone_radio = widgets.RadioButtons(
+        options=backbone_options,
+        value=backbone_options[0],
+        description='Backbone:',
+        style={'description_width': '80px'},
+        layout=widgets.Layout(margin='5px 0')
+    )
+    model_items.append(backbone_radio)
+    
+    # Layer mode selection (radio buttons)
+    layer_options = list(set([model['layer_mode'] for model in MODEL_COMBINATIONS]))
+    layer_radio = widgets.RadioButtons(
+        options=layer_options,
+        value=layer_options[0],
+        description='Layer Mode:',
+        style={'description_width': '80px'},
+        layout=widgets.Layout(margin='5px 0')
+    )
+    model_items.append(layer_radio)
+    
+    # Auto-select best checkbox
+    auto_select = widgets.Checkbox(
+        value=config.get('evaluation', {}).get('models', {}).get('auto_select_best', True),
+        description="🎯 Auto-select best models",
+        style={'description_width': 'initial'},
+        layout=widgets.Layout(margin='5px 0')
+    )
+    model_items.append(auto_select)
+    
+    # Create 2-column layout
+    left_column = widgets.VBox(execution_items, layout=widgets.Layout(width='48%', margin='0 1% 0 0'))
+    right_column = widgets.VBox(model_items, layout=widgets.Layout(width='48%', margin='0 0 0 1%'))
+    
+    return widgets.HBox([left_column, right_column], layout=widgets.Layout(margin='10px 0'))
+
+
+def _create_metrics_form_section(config: Dict[str, Any]) -> widgets.Widget:
+    """Create compact metrics configuration section."""
+    metrics_items = []
+    
+    # Title
+    metrics_items.append(widgets.HTML("<h3>📈 Evaluation Metrics</h3>"))
+    
+    # Create metrics checkboxes in a more compact horizontal layout
+    metrics_row1 = []
+    metrics_row2 = []
+    
+    metric_keys = list(EVALUATION_METRICS.keys())
+    half_point = len(metric_keys) // 2
+    
+    # First row of metrics
+    for i, metric_key in enumerate(metric_keys[:half_point]):
+        metric_info = EVALUATION_METRICS[metric_key]
+        checkbox = widgets.Checkbox(
+            value=True,
+            description=f"{metric_info['icon']} {metric_info['name']}",
+            style={'description_width': 'initial'},
+            layout=widgets.Layout(width='200px', margin='2px 10px 2px 0')
+        )
+        metrics_row1.append(checkbox)
+    
+    # Second row of metrics  
+    for metric_key in metric_keys[half_point:]:
+        metric_info = EVALUATION_METRICS[metric_key]
+        checkbox = widgets.Checkbox(
+            value=True,
+            description=f"{metric_info['icon']} {metric_info['name']}",
+            style={'description_width': 'initial'},
+            layout=widgets.Layout(width='200px', margin='2px 10px 2px 0')
+        )
+        metrics_row2.append(checkbox)
+    
+    # Add the metric rows
+    if metrics_row1:
+        metrics_items.append(widgets.HBox(metrics_row1))
+    if metrics_row2:
+        metrics_items.append(widgets.HBox(metrics_row2))
+    
+    return widgets.VBox(metrics_items, layout=widgets.Layout(margin='10px 0'))
+
 
 def display_evaluation_ui(ui_components: Dict[str, Any]) -> None:
     """

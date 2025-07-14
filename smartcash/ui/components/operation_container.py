@@ -286,22 +286,25 @@ class OperationContainer(BaseUIComponent):
             for k, v in layout_kwargs.items()
         })
 
-        # Create the main container with all valid components
-        self.container = widgets.VBox(children=[], layout=layout)
-
+        # Initialize empty tuple for children
+        children = ()
+        
         # 1. Add progress tracker if enabled (top)
         if self.progress_tracker and hasattr(self.progress_tracker, 'container') and self.progress_tracker.container is not None:
-            self.container.children += [self.progress_tracker.container]
+            children += (self.progress_tracker.container,)
 
         # 2. Add dialog area (middle) - will be populated when needed
         if hasattr(self, 'dialog_area') and self.dialog_area is not None:
-            self.container.children += [self.dialog_area]
+            children += (self.dialog_area,)
 
         # 3. Add log accordion if enabled (bottom) - use helper for DRY approach
         if self.log_accordion:
             log_widget = self._get_log_accordion_widget()
             if log_widget is not None:
-                self.container.children += [log_widget]
+                children += (log_widget,)
+
+        # Create the main container with all valid components
+        self.container = widgets.VBox(children=children, layout=layout)
     
     def _init_dialog_area(self) -> None:
         """Initialize the dialog area."""

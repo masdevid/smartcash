@@ -356,8 +356,14 @@ class VisualizationInitializer(ModuleInitializer):
             # Get the main container from UI components
             main_container = ui_components.get('main_container')
             if main_container:
-                from IPython.display import display
-                display(main_container, **kwargs)
+                from smartcash.ui.utils.display_utils import safe_display
+                # Filter out conflicting kwargs that might interfere with display
+                display_kwargs = {k: v for k, v in kwargs.items() 
+                                 if k not in ['display', 'publish', 'metadata', 'transient']}
+                try:
+                    safe_display(main_container)
+                except Exception as display_error:
+                    self.logger.debug(f"Safe display fallback used: {display_error}")
             else:
                 self.logger.warning("Main container not found in UI components")
             

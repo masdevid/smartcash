@@ -90,7 +90,7 @@ class OperationHandler(BaseHandler):
         self._operation_status = OperationStatus.PENDING
         self._last_result: Optional[OperationResult] = None
         self._cancel_requested = False
-        self._operation_container = operation_container
+        self._operation_container = operation_container.widget if operation_container else None
         
         # Executor setup
         self._max_workers = max_workers

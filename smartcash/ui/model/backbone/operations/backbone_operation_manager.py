@@ -120,7 +120,7 @@ class BackboneOperationManager(OperationHandler):
             button_states = self.disable_all_buttons("⏳ Validating...")
             
             # Update progress
-            self.update_progress(0, "Initializing validation...")
+            self.update_progress(0, "Initializing validation...", level="primary")
             
             # Use provided config or current config
             operation_config = config or self.config
@@ -133,10 +133,10 @@ class BackboneOperationManager(OperationHandler):
             
             # Update progress based on result
             if result.get('success'):
-                self.update_progress(100, "Validation completed successfully")
+                self.update_progress(100, "Validation completed successfully", level="primary")
                 self.log("✅ Backbone configuration validated successfully", 'success')
             else:
-                self.update_progress(0, "Validation failed")
+                self.update_progress(0, "Validation failed", level="primary")
                 self.log(f"❌ Validation failed: {result.get('message', 'Unknown error')}", 'error')
             
             return result
@@ -144,7 +144,7 @@ class BackboneOperationManager(OperationHandler):
         except Exception as e:
             self.logger.error(f"Validate operation error: {e}")
             self.log(f"❌ Validation operation error: {e}", 'error')
-            self.update_progress(0, "Validation failed")
+            self.update_progress(0, "Validation failed", level="primary")
             return {'success': False, 'message': str(e)}
         
         finally:
@@ -170,7 +170,7 @@ class BackboneOperationManager(OperationHandler):
             button_states = self.disable_all_buttons("⏳ Building...")
             
             # Update progress
-            self.update_progress(0, "Initializing model build...")
+            self.update_progress(0, "Initializing model build...", level="primary")
             
             # Use provided config or current config
             operation_config = config or self.config
@@ -183,10 +183,10 @@ class BackboneOperationManager(OperationHandler):
             
             # Update progress based on result
             if result.get('success'):
-                self.update_progress(100, "Model build completed successfully")
+                self.update_progress(100, "Model build completed successfully", level="primary")
                 self.log("✅ Backbone model built successfully", 'success')
             else:
-                self.update_progress(0, "Model build failed")
+                self.update_progress(0, "Model build failed", level="primary")
                 self.log(f"❌ Build failed: {result.get('message', 'Unknown error')}", 'error')
             
             return result
@@ -213,7 +213,7 @@ class BackboneOperationManager(OperationHandler):
             
             # Create async wrapper for progress and log callbacks
             def sync_progress_callback(progress, message):
-                self.update_progress(progress, message)
+                self.update_progress(progress, message, level="primary")
             
             def sync_log_callback(level, message):
                 self.log(message, level.lower())
@@ -303,7 +303,7 @@ class BackboneOperationManager(OperationHandler):
             
             # Create async wrapper for progress and log callbacks
             def sync_progress_callback(progress, message):
-                self.update_progress(progress, message)
+                self.update_progress(progress, message, level="primary")
             
             def sync_log_callback(level, message):
                 self.log(message, level.lower())

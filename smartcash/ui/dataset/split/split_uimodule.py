@@ -151,36 +151,67 @@ class SplitUIModule(UIModule):
     def _handle_save_config(self, button=None):
         """Handle save config button click."""
         try:
+            self._update_status("Saving configuration...", "info")
             self.log("💾 Save config button clicked", 'info')
+            
             result = self.save_config()
             if result.get('success'):
-                self.log(f"✅ Configuration saved: {result.get('message', '')}", 'success')
+                success_msg = f"Configuration saved: {result.get('message', '')}"
+                self._update_status(success_msg, "success")
+                self.log(f"✅ {success_msg}", 'info')
             else:
-                self.log(f"❌ Save failed: {result.get('message', '')}", 'error')
+                error_msg = f"Save failed: {result.get('message', '')}"
+                self._update_status(error_msg, "error")
+                self.log(f"❌ {error_msg}", 'error')
         except Exception as e:
-            self.log(f"❌ Save config error: {e}", 'error')
+            error_msg = f"Save config error: {e}"
+            self._update_status(error_msg, "error")
+            self.log(f"❌ {error_msg}", 'error')
     
     def _handle_reset_config(self, button=None):
         """Handle reset config button click."""
         try:
+            self._update_status("Resetting configuration...", "info")
             self.log("🔄 Reset config button clicked", 'info')
+            
             result = self.reset_config()
             if result.get('success'):
-                self.log(f"✅ Configuration reset: {result.get('message', '')}", 'success')
+                success_msg = f"Configuration reset: {result.get('message', '')}"
+                self._update_status(success_msg, "success")
+                self.log(f"✅ {success_msg}", 'info')
             else:
-                self.log(f"❌ Reset failed: {result.get('message', '')}", 'error')
+                error_msg = f"Reset failed: {result.get('message', '')}"
+                self._update_status(error_msg, "error")
+                self.log(f"❌ {error_msg}", 'error')
         except Exception as e:
-            self.log(f"❌ Reset config error: {e}", 'error')
+            error_msg = f"Reset config error: {e}"
+            self._update_status(error_msg, "error")
+            self.log(f"❌ {error_msg}", 'error')
     
     def log(self, message: str, level: str = 'info') -> None:
         """Log message to operation container."""
         try:
             # Look for operation container with log capability
             operation_container = self._ui_components.get('operation_container')
-            if operation_container and isinstance(operation_container, dict):
-                log_message_func = operation_container.get('log_message')
-                if log_message_func and callable(log_message_func):
-                    log_message_func(message, level)
+            if operation_container:
+                # Check if it's a dict with log_message function
+                if isinstance(operation_container, dict):
+                    log_message_func = operation_container.get('log_message')
+                    if log_message_func and callable(log_message_func):
+                        log_message_func(message, level)
+                        return
+                # Check if it has log method directly
+                elif hasattr(operation_container, 'log'):
+                    from smartcash.ui.components.log_accordion import LogLevel
+                    level_map = {
+                        'info': LogLevel.INFO,
+                        'success': LogLevel.INFO,
+                        'warning': LogLevel.WARNING,
+                        'error': LogLevel.ERROR,
+                        'debug': LogLevel.DEBUG
+                    }
+                    log_level = level_map.get(level, LogLevel.INFO)
+                    operation_container.log(message, log_level)
                     return
             
             # Fallback to logger
@@ -205,6 +236,12 @@ class SplitUIModule(UIModule):
             
             # Create UI components
             self._ui_components = self._create_ui_components(self._merged_config)
+            
+            # Setup UI logging bridge and status panel integration
+            operation_container = self._ui_components.get('operation_container')
+            if operation_container:
+                self._setup_ui_logging_bridge(operation_container)
+                self._initialize_status_panel()
             
             # Setup button event handlers
             self._setup_button_handlers()
@@ -435,15 +472,127 @@ class SplitUIModule(UIModule):
         except Exception as e:
             return {'error': f'Status check failed: {str(e)}'}
     
+    def _setup_ui_logging_bridge(self, operation_container: Any) -> None:
+        """Setup UI logging bridge to capture backend service logs."""
+        try:
+            import logging
+            
+            # Create custom handler for backend services
+            class BackendUILogHandler(logging.Handler):
+                def __init__(self, log_func):
+                    super().__init__()
+                    self.log_func = log_func
+                    self.setFormatter(logging.Formatter('%(name)s: %(message)s'))
+                
+                def emit(self, record):
+                    try:
+                        msg = self.format(record)
+                        level = 'info' if record.levelno == logging.INFO else 'error'
+                        self.log_func(msg, level)
+                    except Exception:
+                        pass  # Silently fail to avoid recursive errors
+            
+            # Get log function from operation container
+            if hasattr(operation_container, 'log_message'):
+                log_func = operation_container.log_message
+            elif hasattr(operation_container, 'log'):
+                log_func = operation_container.log
+            else:
+                # Fallback to internal logging
+                log_func = self.log
+            
+            # Create handler
+            ui_handler = BackendUILogHandler(log_func)
+            ui_handler.setLevel(logging.INFO)
+            
+            # Target specific backend service loggers
+            target_loggers = [
+                'smartcash.dataset',
+                'smartcash.ui.dataset.split',
+                'smartcash.core'
+            ]
+            
+            # Remove existing console handlers and add UI handlers
+            for logger_name in target_loggers:
+                logger = logging.getLogger(logger_name)
+                
+                # Remove existing console handlers
+                for handler in logger.handlers[:]:
+                    if isinstance(handler, logging.StreamHandler):
+                        logger.removeHandler(handler)
+                
+                # Add UI handler
+                logger.addHandler(ui_handler)
+            
+            # Store handler for cleanup
+            if not hasattr(self, '_ui_handlers'):
+                self._ui_handlers = []
+            self._ui_handlers.append(ui_handler)
+            
+            self.logger.debug("🌉 UI logging bridge setup completed")
+            
+        except Exception as e:
+            self.logger.error(f"❌ Failed to setup UI logging bridge: {e}")
+    
+    def _initialize_status_panel(self) -> None:
+        """Initialize status panel display."""
+        try:
+            # Update header status
+            header_container = self._ui_components.get('header_container')
+            if header_container and hasattr(header_container, 'update_status'):
+                header_container.update_status(
+                    "Ready for dataset split configuration",
+                    "info"
+                )
+                    
+            self.logger.debug("📊 Status panel initialized")
+            
+        except Exception as e:
+            self.logger.debug(f"Status panel initialization failed: {e}")
+    
+    def _update_status(self, message: str, level: str = "info") -> None:
+        """Update status panel message."""
+        try:
+            header_container = self._ui_components.get('header_container')
+            if header_container and hasattr(header_container, 'update_status'):
+                header_container.update_status(message, level)
+            else:
+                # Fallback to logging
+                self.log(f"Status: {message}", level)
+        except Exception as e:
+            self.logger.debug(f"Status update failed: {e}")
+    
+    def _cleanup_ui_logging_bridge(self) -> None:
+        """Cleanup UI logging bridge handlers."""
+        try:
+            if hasattr(self, '_ui_handlers'):
+                import logging
+                for handler in self._ui_handlers:
+                    # Remove handler from all loggers
+                    for logger_name in logging.Logger.manager.loggerDict:
+                        logger = logging.getLogger(logger_name)
+                        if handler in logger.handlers:
+                            logger.removeHandler(handler)
+                self._ui_handlers.clear()
+                
+            self.logger.debug("🧹 UI logging bridge cleanup completed")
+            
+        except Exception as e:
+            self.logger.debug(f"UI logging bridge cleanup failed: {e}")
+
     def cleanup(self) -> None:
         """Cleanup module resources."""
         try:
             self.logger.info("Cleaning up split module")
             
+            # Cleanup UI logging bridge
+            self._cleanup_ui_logging_bridge()
+            
             # Reset state
             self._is_initialized = False
             self._initialization_error = None
-            self._ui_components.clear()
+            if self._ui_components:
+                self._ui_components.clear()
             
             # Clear references
             self._config_handler = None
@@ -542,7 +691,8 @@ def register_split_shared_methods() -> None:
 
 def initialize_split_ui(
     config: Optional[Dict[str, Any]] = None,
-    display: bool = True
+    display: bool = True,
+    **kwargs
 ) -> Optional[Dict[str, Any]]:
     """
     Initialize and optionally display split UI using new UIModule pattern.
@@ -550,48 +700,66 @@ def initialize_split_ui(
     Args:
         config: Optional configuration dictionary
         display: Whether to display the UI (requires IPython)
+        **kwargs: Additional keyword arguments for module creation
         
     Returns:
         If display=True: Returns None (displays UI directly)
         If display=False: Returns a dictionary with UI components and status
     """
     try:
-        # Create module instance
-        module = create_split_uimodule(config=config, auto_initialize=True)
+        from IPython.display import display as ipython_display
+        
+        # Create module instance with enhanced features
+        module = create_split_uimodule(config=config, auto_initialize=True, **kwargs)
         ui_components = module.get_ui_components()
         
-        # Prepare the result dictionary
+        # Setup UI logging bridge to capture backend service logs
+        operation_container = ui_components.get('operation_container')
+        if operation_container and hasattr(module, '_setup_ui_logging_bridge'):
+            module._setup_ui_logging_bridge(operation_container)
+        
+        # Initialize status panel
+        if hasattr(module, '_initialize_status_panel'):
+            module._initialize_status_panel()
+        
+        main_ui = ui_components.get('main_container')
+        
+        if display and main_ui:
+            # Display the main UI container
+            if hasattr(main_ui, 'container'):
+                ipython_display(main_ui.container)
+            else:
+                ipython_display(main_ui)
+            return None  # Return None when displaying
+        
+        # Return components without displaying
         result = {
             'success': True,
             'module': module,
             'ui_components': ui_components,
+            'main_ui': main_ui,
             'status': module.get_split_status()
         }
-        
-        # Display the UI if requested
-        if display and ui_components:
-            from IPython.display import display as ipython_display
-            
-            # Get the main UI container and display it
-            main_ui = ui_components.get('main_container')
-            if main_ui is not None:
-                ipython_display(main_ui)
-                return None  # Don't return data when display=True
         
         return result
         
     except Exception as e:
         error_msg = f"Failed to initialize split UI: {str(e)}"
-        import logging
-        logging.getLogger(__name__).error(error_msg, exc_info=True)
-        
-        return {
+        error_result = {
             'success': False,
             'error': error_msg,
             'module': None,
             'ui_components': {},
+            'main_ui': None,
             'status': {}
         }
+        
+        if display:
+            import logging
+            logging.getLogger(__name__).error(error_msg, exc_info=True)
+            return None
+        
+        return error_result
 
 
 def get_split_components() -> Dict[str, Any]:

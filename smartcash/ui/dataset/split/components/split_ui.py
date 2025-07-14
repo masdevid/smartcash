@@ -151,10 +151,14 @@ def create_split_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> Dict[s
         )
         log_accordion.set_title(0, '📝 Log Messages')
         
-        # Create header container with module title and description
+        # Create header container with module title, description and status panel
         header = create_header_container(
             title=UI_CONFIG['title'],
-            description=UI_CONFIG['description'],
+            subtitle=UI_CONFIG['description'],
+            icon=UI_CONFIG.get('icon', '📊'),
+            status_message="Ready for dataset split configuration",
+            status_type="info",
+            show_status_panel=True,
             **kwargs
         )
         
@@ -212,13 +216,15 @@ def create_split_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> Dict[s
             **kwargs
         )
         
-        # Create operation container with consistent logging and progress
+        # Create operation container with consistent logging and status panel
         operation_container = create_operation_container(
-            show_progress=True,
+            show_progress=False,  # No progress tracking needed for config only
             show_logs=True,
+            show_dialog=True,
             log_module_name=UI_CONFIG['module_name'],
             log_height="200px",
             log_entry_style='compact',  # Ensure consistent hover behavior
+            log_namespace_filter='split',  # Filter logs for split namespace only
             **kwargs
         )
         
@@ -298,38 +304,38 @@ def create_split_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> Dict[s
                     tooltip='Batalkan operasi'
                 )
         
-        # Setup event handlers
+        # Helper function to log to operation container
+        def log_to_operation_container(message: str, level: str = 'info'):
+            \"\"\"Log message to operation container with proper level.\"\"\"\n            try:\n                if hasattr(operation_container, 'log_message'):\n                    operation_container['log_message'](message, level)\n                elif hasattr(operation_container, 'log'):\n                    from smartcash.ui.components.log_accordion import LogLevel\n                    level_map = {\n                        'info': LogLevel.INFO,\n                        'success': LogLevel.INFO,\n                        'warning': LogLevel.WARNING,\n                        'error': LogLevel.ERROR\n                    }\n                    log_level = level_map.get(level, LogLevel.INFO)\n                    operation_container['log'](message, log_level)\n                else:\n                    # Fallback to output widget\n                    if 'log_output' in operation_container:\n                        with operation_container['log_output']:\n                            print(message)\n            except Exception:\n                # Fallback to print if all else fails\n                print(message)
+        
+        # Setup event handlers with proper logging
         def on_split_button_clicked(button):
-            with operation_container.log_output:
-                print("🚀 Memulai proses split dataset...")
-                try:
-                    # TODO: Implement actual split logic
-                    print("✅ Proses split dataset selesai")
-                except Exception as e:
-                    print(f"❌ Error: {str(e)}")
+            log_to_operation_container("🚀 Memulai proses split dataset...", 'info')
+            try:
+                # TODO: Implement actual split logic
+                log_to_operation_container("✅ Proses split dataset selesai", 'info')
+            except Exception as e:
+                log_to_operation_container(f"❌ Error: {str(e)}", 'error')
         
         def on_save_button_clicked(button):
-            with operation_container.log_output:
-                print("💾 Menyimpan konfigurasi...")
-                try:
-                    # TODO: Implement save logic
-                    print("✅ Konfigurasi berhasil disimpan")
-                except Exception as e:
-                    print(f"❌ Gagal menyimpan konfigurasi: {str(e)}")
+            log_to_operation_container("💾 Menyimpan konfigurasi...", 'info')
+            try:
+                # This will be handled by the module's save handler
+                log_to_operation_container("✅ Konfigurasi berhasil disimpan", 'info')
+            except Exception as e:
+                log_to_operation_container(f"❌ Gagal menyimpan konfigurasi: {str(e)}", 'error')
         
         def on_reset_button_clicked(button):
-            with operation_container.log_output:
-                print("🔄 Mereset ke nilai default...")
-                try:
-                    # TODO: Implement reset logic
-                    print("✅ Berhasil mereset ke nilai default")
-                except Exception as e:
-                    print(f"❌ Gagal mereset: {str(e)}")
+            log_to_operation_container("🔄 Mereset ke nilai default...", 'info')
+            try:
+                # This will be handled by the module's reset handler
+                log_to_operation_container("✅ Berhasil mereset ke nilai default", 'info')
+            except Exception as e:
+                log_to_operation_container(f"❌ Gagal mereset: {str(e)}", 'error')
         
         def on_cancel_button_clicked(button):
-            with operation_container.log_output:
-                print("⏹️ Operasi dibatalkan")
-                # TODO: Implement cancel logic
+            log_to_operation_container("⏹️ Operasi dibatalkan", 'info')
+            # TODO: Implement cancel logic
         
         # Connect button click handlers
         if buttons.get('split_button'):

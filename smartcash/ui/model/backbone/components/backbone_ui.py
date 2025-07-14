@@ -122,10 +122,10 @@ def create_backbone_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> Dic
     ui_components['action_container'] = action_container
     ui_components['containers']['action'] = action_container
     
-    # === 4. Create Summary Container (Config Summary Panel) ===
-    summary_content = _generate_config_summary_content(current_config)
+    # === 4. Create Summary Container (Model Summary Panel) ===
+    summary_content = _generate_model_summary_content(current_config)
     summary_container = create_summary_container(
-        title="Configuration Summary",
+        title="Model Summary",
         theme="info"
     )
     # Set the content after creation
@@ -152,7 +152,7 @@ def create_backbone_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> Dic
         "💡 EfficientNet-B4 is recommended for higher accuracy",
         "⚡ CSPDarknet provides faster inference with lower memory usage", 
         "🔧 Feature optimization improves model performance for currency detection",
-        "📊 Use Model Summary to analyze memory usage and parameters"
+        "📥 Pretrained weights are automatically loaded during build process"
     ]
     
     footer_container = create_footer_container(
@@ -341,66 +341,105 @@ def _create_backbone_form_widgets(config: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
-def _generate_config_summary_content(config: Dict[str, Any]) -> Dict[str, Any]:
-    """Generate configuration summary content for the summary container."""
+def _generate_model_summary_content(config: Dict[str, Any]) -> Dict[str, Any]:
+    """Generate model summary content for the summary container."""
     backbone_config = config.get('backbone', {})
-    model_config = config.get('model', {})
     available_backbones = get_available_backbones()
     
     # Get backbone information
     backbone_type = backbone_config.get('model_type', 'efficientnet_b4')
     backbone_info = available_backbones.get(backbone_type, {})
     
-    # Generate summary sections
+    # Generate summary sections for model status
     summary_sections = {
-        'Model Architecture': {
+        'Model Status': {
+            'Status': '⚠️ Not Built',
+            'Message': 'Build model to see detailed summary',
             'Backbone': backbone_info.get('display_name', backbone_type),
-            'Description': backbone_info.get('description', 'N/A'),
-            'Recommended': '✅ Yes' if backbone_info.get('recommended') else '⚠️ No',
-            'Pretrained': '✅ Enabled' if backbone_config.get('pretrained') else '❌ Disabled'
+            'Pretrained': '✅ Auto-loaded from drive' if backbone_config.get('pretrained') else '❌ Disabled'
         },
-        'Configuration Settings': {
+        'Current Configuration': {
             'Input Size': f"{backbone_config.get('input_size', 640)}px",
             'Number of Classes': backbone_config.get('num_classes', 7),
             'Feature Optimization': '✅ Enabled' if backbone_config.get('feature_optimization') else '❌ Disabled',
             'Mixed Precision': '✅ Enabled' if backbone_config.get('mixed_precision') else '❌ Disabled'
-        },
-        'Performance Characteristics': {
-            'Memory Usage': backbone_info.get('memory_usage', 'N/A'),
-            'Inference Speed': backbone_info.get('inference_speed', 'N/A'),
-            'Expected Accuracy': backbone_info.get('accuracy', 'N/A'),
-            'Output Channels': str(backbone_info.get('output_channels', []))
-        },
-        'Training Pipeline': {
-            'Early Training': '✅ Enabled' if backbone_config.get('early_training', {}).get('enabled') else '❌ Disabled',
-            'Pretrained Validation': '✅ Enabled' if backbone_config.get('early_training', {}).get('validation_from_pretrained') else '❌ Disabled',
-            'Detection Layers': ', '.join(backbone_config.get('detection_layers', ['banknote'])),
-            'Layer Mode': backbone_config.get('layer_mode', 'single').title()
         }
     }
     
     return {
-        'title': 'Backbone Configuration Summary',
+        'title': 'Model Summary',
         'sections': summary_sections,
-        'style': 'info'  # Use info style for the summary
+        'style': 'info'
     }
 
 
-def update_config_summary(summary_container: Any, config: Dict[str, Any]) -> None:
+def update_model_summary(summary_container: Any, model_info: Dict[str, Any]) -> None:
     """
-    Update the configuration summary in the summary container.
+    Update the model summary in the summary container.
     
     Args:
         summary_container: The summary container widget
-        config: Updated configuration dictionary
+        model_info: Model information dictionary from API
     """
     try:
         if summary_container and hasattr(summary_container, 'update_content'):
-            new_content = _generate_config_summary_content(config)
+            new_content = _generate_model_summary_from_info(model_info)
             summary_container.update_content(new_content)
     except Exception as e:
         # Silently handle update errors to avoid UI disruption
         pass
+
+def _generate_model_summary_from_info(model_info: Dict[str, Any]) -> Dict[str, Any]:
+    """Generate model summary content from model API info."""
+    status = model_info.get('status', 'not_built')
+    
+    if status == 'built':
+        # Model is built - show detailed info
+        summary_sections = {
+            'Model Status': {
+                'Status': '✅ Built Successfully',
+                'Model Name': model_info.get('model_name', 'N/A'),
+                'Backbone': model_info.get('backbone', 'N/A'),
+                'Device': model_info.get('device', 'N/A')
+            },
+            'Model Parameters': {
+                'Total Parameters': f"{model_info.get('total_parameters', 0):,}",
+                'Trainable Parameters': f"{model_info.get('trainable_parameters', 0):,}",
+                'Memory Usage': model_info.get('memory_usage', 'N/A'),
+                'Input Size': f"{model_info.get('img_size', 640)}px"
+            },
+            'Configuration': {
+                'Detection Layers': ', '.join(model_info.get('detection_layers', ['banknote'])),
+                'Layer Mode': model_info.get('layer_mode', 'single').title(),
+                'Number of Classes': model_info.get('num_classes', 7),
+                'Feature Optimization': '✅ Enabled' if model_info.get('feature_optimization') else '❌ Disabled'
+            }
+        }
+    elif status == 'error':
+        # Error state
+        summary_sections = {
+            'Model Status': {
+                'Status': '❌ Error',
+                'Message': model_info.get('message', 'Unknown error occurred'),
+                'Backbone': model_info.get('backbone', 'N/A')
+            }
+        }
+    else:
+        # Not built yet
+        summary_sections = {
+            'Model Status': {
+                'Status': '⚠️ Not Built',
+                'Message': model_info.get('message', 'Build model to see detailed summary'),
+                'Backbone': model_info.get('backbone', 'N/A'),
+                'Pretrained': '✅ Auto-loaded from drive' if model_info.get('pretrained') else '❌ Disabled'
+            }
+        }
+    
+    return {
+        'title': 'Model Summary',
+        'sections': summary_sections,
+        'style': 'success' if status == 'built' else 'warning' if status == 'not_built' else 'error'
+    }
 
 
 # ==================== HELPER FUNCTIONS ====================

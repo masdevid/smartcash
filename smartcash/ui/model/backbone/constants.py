@@ -17,8 +17,6 @@ class BackboneOperation(Enum):
     """Operations available in backbone module."""
     VALIDATE = "validate"
     BUILD = "build"
-    LOAD = "load"
-    SUMMARY = "summary"
 
 # ==================== Default Configurations ====================
 
@@ -53,21 +51,10 @@ PROGRESS_STEPS = {
     ],
     BackboneOperation.BUILD.value: [
         "🏗️ Building backbone architecture",
+        "📥 Auto-loading pretrained weights",
         "🔧 Configuring model layers",
         "📊 Calculating parameters",
         "✅ Build complete"
-    ],
-    BackboneOperation.LOAD.value: [
-        "📥 Loading backbone model",
-        "⚙️ Applying configuration",
-        "🎯 Setting up features",
-        "✅ Model loaded"
-    ],
-    BackboneOperation.SUMMARY.value: [
-        "📊 Generating model summary",
-        "📈 Analyzing parameters",
-        "🔍 Calculating memory usage",
-        "✅ Summary complete"
     ]
 }
 
@@ -113,20 +100,8 @@ BUTTON_CONFIG = {
     'build': {
         'text': '🏗️ Build Model',
         'style': 'success',
-        'tooltip': 'Build backbone architecture with current configuration',
+        'tooltip': 'Build backbone architecture with current configuration (pretrained auto-loaded from drive)',
         'order': 2
-    },
-    'load': {
-        'text': '📥 Load Pretrained',
-        'style': 'success',
-        'tooltip': 'Load pretrained backbone model',
-        'order': 3
-    },
-    'summary': {
-        'text': '📊 Model Summary',
-        'style': 'warning',
-        'tooltip': 'Generate detailed model summary and statistics',
-        'order': 4
     }
 }
 

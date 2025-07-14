@@ -19,7 +19,7 @@ from .backbone_uimodule import (
 
 # ==================== CORE COMPONENTS ====================
 
-from .components.backbone_ui import create_backbone_ui, update_config_summary
+from .components.backbone_ui import create_backbone_ui, update_model_summary
 from .configs.backbone_config_handler import BackboneConfigHandler
 from .operations.backbone_operation_manager import BackboneOperationManager
 
@@ -56,7 +56,7 @@ __all__ = [
     
     # CORE COMPONENTS
     'create_backbone_ui',
-    'update_config_summary',
+    'update_model_summary',
     'BackboneConfigHandler',
     'BackboneOperationManager'
 ]

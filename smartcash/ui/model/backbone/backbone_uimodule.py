@@ -19,7 +19,7 @@ class BackboneUIModule(UIModule):
     Features:
     - 🧬 Backbone model selection and configuration
     - 🏗️ Early training pipeline integration
-    - 📊 Model summary and statistics generation  
+    - 📊 Current model summary display  
     - 🔧 Configuration validation and management
     - 🎯 Backend model builder integration
     - 📋 Config summary panel in summary_container
@@ -85,6 +85,176 @@ class BackboneUIModule(UIModule):
             self.logger.error(f"Failed to initialize operation manager: {e}")
             raise
     
+    def _setup_button_handlers(self) -> None:
+        """Setup button click handlers for UI operations."""
+        try:
+            if not self._ui_components or not self._operation_manager:
+                self.logger.warning("Cannot setup button handlers - components not initialized")
+                return
+            
+            action_container = self._ui_components.get('containers', {}).get('action')
+            if not action_container:
+                self.logger.warning("Action container not found for button handlers")
+                return
+            
+            # Setup button click handlers with synchronous wrappers
+            buttons = action_container.get('buttons', {})
+            
+            if 'validate' in buttons:
+                buttons['validate'].on_click(self._handle_validate_sync)
+                
+            if 'build' in buttons:
+                buttons['build'].on_click(self._handle_build_sync)
+            
+            self.logger.debug("✅ Button handlers setup completed")
+            
+        except Exception as e:
+            self.logger.error(f"Failed to setup button handlers: {e}")
+    
+    def _handle_validate_sync(self, button) -> None:
+        """Synchronous wrapper for validate button click."""
+        import asyncio
+        import threading
+        
+        def run_async():
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                self._clear_ui_state()
+                loop.run_until_complete(self._handle_validate(button))
+            except Exception as e:
+                self.logger.error(f"Error in async validate handler: {e}")
+                if self._operation_manager:
+                    self._operation_manager.log(f"❌ Error: {e}", 'error')
+            finally:
+                loop.close()
+        
+        thread = threading.Thread(target=run_async)
+        thread.daemon = True
+        thread.start()
+    
+    def _handle_build_sync(self, button) -> None:
+        """Synchronous wrapper for build button click."""
+        import asyncio
+        import threading
+        
+        def run_async():
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                self._clear_ui_state()
+                loop.run_until_complete(self._handle_build(button))
+            except Exception as e:
+                self.logger.error(f"Error in async build handler: {e}")
+                if self._operation_manager:
+                    self._operation_manager.log(f"❌ Error: {e}", 'error')
+            finally:
+                loop.close()
+        
+        thread = threading.Thread(target=run_async)
+        thread.daemon = True
+        thread.start()
+    
+    async def _handle_validate(self, button) -> None:
+        """Async handler for validate button."""
+        try:
+            if not self._operation_manager:
+                raise RuntimeError("Operation manager not available")
+            
+            # Get current configuration from UI
+            current_config = self._get_current_ui_config()
+            
+            # Execute validation
+            result = self._operation_manager.execute_validate(current_config)
+            
+            # Update summary with validation results if successful
+            if result.get('success'):
+                await self._update_summary_display()
+                
+        except Exception as e:
+            self.logger.error(f"Validate handler error: {e}")
+            if self._operation_manager:
+                self._operation_manager.log(f"❌ Validation error: {e}", 'error')
+    
+    async def _handle_build(self, button) -> None:
+        """Async handler for build button."""
+        try:
+            if not self._operation_manager:
+                raise RuntimeError("Operation manager not available")
+            
+            # Get current configuration from UI
+            current_config = self._get_current_ui_config()
+            
+            # Execute build
+            result = self._operation_manager.execute_build(current_config)
+            
+            # Update summary with build results if successful
+            if result.get('success'):
+                await self._update_summary_display()
+                
+        except Exception as e:
+            self.logger.error(f"Build handler error: {e}")
+            if self._operation_manager:
+                self._operation_manager.log(f"❌ Build error: {e}", 'error')
+    
+    def _clear_ui_state(self) -> None:
+        """Clear UI state before operations."""
+        try:
+            if self._operation_manager:
+                self._operation_manager.clear_logs()
+                self._operation_manager.update_progress(0, "Initializing...")
+                
+        except Exception as e:
+            self.logger.error(f"Error clearing UI state: {e}")
+    
+    def _get_current_ui_config(self) -> Dict[str, Any]:
+        """Get current configuration from UI widgets."""
+        try:
+            current_config = self.get_config().copy()
+            
+            # Get widget values if available
+            widgets = self._ui_components.get('widgets', {})
+            if widgets:
+                backbone_config = current_config.setdefault('backbone', {})
+                
+                # Update backbone config from widgets
+                if 'backbone_dropdown' in widgets:
+                    backbone_config['model_type'] = widgets['backbone_dropdown'].value
+                if 'pretrained_checkbox' in widgets:
+                    backbone_config['pretrained'] = widgets['pretrained_checkbox'].value
+                if 'feature_opt_checkbox' in widgets:
+                    backbone_config['feature_optimization'] = widgets['feature_opt_checkbox'].value
+                if 'mixed_precision_checkbox' in widgets:
+                    backbone_config['mixed_precision'] = widgets['mixed_precision_checkbox'].value
+                if 'input_size_slider' in widgets:
+                    backbone_config['input_size'] = widgets['input_size_slider'].value
+                if 'num_classes_input' in widgets:
+                    backbone_config['num_classes'] = widgets['num_classes_input'].value
+            
+            return current_config
+            
+        except Exception as e:
+            self.logger.error(f"Error getting UI config: {e}")
+            return self.get_config().copy()
+    
+    async def _update_summary_display(self) -> None:
+        """Update summary container with current model info."""
+        try:
+            if not self._operation_manager:
+                return
+                
+            # Get current model summary
+            model_info = self._operation_manager.get_current_model_summary()
+            
+            # Update summary container
+            summary_container = self._ui_components.get('summary_container')
+            if summary_container and model_info:
+                from .components.backbone_ui import update_model_summary
+                update_model_summary(summary_container, model_info)
+                
+        except Exception as e:
+            self.logger.error(f"Error updating summary display: {e}")
+    
     def _create_ui_components(self, config: Dict[str, Any]) -> Dict[str, Any]:
         """Create UI components."""
         try:
@@ -123,6 +293,9 @@ class BackboneUIModule(UIModule):
             # Initialize operation manager
             self._initialize_operation_manager()
             
+            # Setup button click handlers
+            self._setup_button_handlers()
+            
             # Register shared methods for cross-module integration
             self._register_shared_methods()
             
@@ -154,15 +327,9 @@ class BackboneUIModule(UIModule):
             )
             
             SharedMethodRegistry.register_method(
-                'backbone.execute_load',
-                self.execute_load,
-                description='Load pretrained backbone'
-            )
-            
-            SharedMethodRegistry.register_method(
-                'backbone.execute_summary',
-                self.execute_summary,
-                description='Generate model summary'
+                'backbone.get_model_summary',
+                self.get_model_summary,
+                description='Get current model summary'
             )
             
             SharedMethodRegistry.register_method(
@@ -232,15 +399,12 @@ class BackboneUIModule(UIModule):
             self.logger.error(error_msg)
             return {'success': False, 'message': error_msg}
     
-    def execute_load(self, config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    def get_model_summary(self) -> Dict[str, Any]:
         """
-        Execute backbone load operation.
+        Get current model summary.
         
-        Args:
-            config: Optional configuration override
-            
         Returns:
-            Load result dictionary
+            Current model summary dictionary
         """
         try:
             if not self.is_initialized():
@@ -249,36 +413,12 @@ class BackboneUIModule(UIModule):
             if not self._operation_manager:
                 raise RuntimeError("Operation manager not available")
             
-            return self._operation_manager.execute_load(config)
+            return self._operation_manager.get_current_model_summary()
             
         except Exception as e:
-            error_msg = f"Load execution failed: {e}"
+            error_msg = f"Get summary failed: {e}"
             self.logger.error(error_msg)
-            return {'success': False, 'message': error_msg}
-    
-    def execute_summary(self, config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-        """
-        Execute model summary generation operation.
-        
-        Args:
-            config: Optional configuration override
-            
-        Returns:
-            Summary result dictionary
-        """
-        try:
-            if not self.is_initialized():
-                self.initialize()
-            
-            if not self._operation_manager:
-                raise RuntimeError("Operation manager not available")
-            
-            return self._operation_manager.execute_summary(config)
-            
-        except Exception as e:
-            error_msg = f"Summary execution failed: {e}"
-            self.logger.error(error_msg)
-            return {'success': False, 'message': error_msg}
+            return {'status': 'error', 'message': error_msg}
     
     # ==================== STATUS AND INFO METHODS ====================
     

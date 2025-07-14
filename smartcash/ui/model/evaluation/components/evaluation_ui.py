@@ -34,11 +34,10 @@ def create_evaluation_ui(config: Dict[str, Any]) -> Dict[str, Any]:
     try:
         logger = get_module_logger("smartcash.ui.model.evaluation.components")
         
-        # Create header container with integrated status panel
+        # Create header container with integrated status panel (no duplicate icons)
         header_container = create_header_container(
             title=UI_CONFIG['title'],
             description=UI_CONFIG['description'],
-            icon=UI_CONFIG['icon'],
             stats=[
                 {'label': 'Scenarios', 'value': str(len(RESEARCH_SCENARIOS)), 'icon': '📊'},
                 {'label': 'Model Types', 'value': str(len(MODEL_COMBINATIONS)), 'icon': '🤖'},
@@ -75,12 +74,13 @@ def create_evaluation_ui(config: Dict[str, Any]) -> Dict[str, Any]:
             show_save_reset=False
         )
         
-        # Create operation container for progress and logging
+        # Create operation container for progress and logging (following backbone pattern)
         operation_container = create_operation_container(
             show_progress=True,
-            show_dialog=True,
             show_logs=True,
-            log_module_name="Evaluation",
+            log_module_name=UI_CONFIG['title'],
+            log_height="200px",
+            log_entry_style='compact',
             log_namespace_filter="evaluation"
         )
         
@@ -91,10 +91,10 @@ def create_evaluation_ui(config: Dict[str, Any]) -> Dict[str, Any]:
             icon="📊"
         )
         
-        # Extract widget components from container objects
+        # Extract widget components from container objects (following backbone pattern)
         header_widget = header_container.container if hasattr(header_container, 'container') else header_container
         action_widget = action_container.get('container') if isinstance(action_container, dict) else action_container
-        operation_widget = operation_container.get('container') if isinstance(operation_container, dict) else operation_container
+        operation_widget = operation_container['container'] if isinstance(operation_container, dict) else operation_container
         summary_widget = summary_container.container if hasattr(summary_container, 'container') else summary_container
         
         # Create main container with compact layout
@@ -122,7 +122,7 @@ def create_evaluation_ui(config: Dict[str, Any]) -> Dict[str, Any]:
             'execution_model_row': execution_model_row,
             'metrics_section': metrics_section,
             'action_container': action_container,
-            'operation_container': operation_container,
+            'operation_container': operation_container,  # Store full container object like backbone
             'summary_container': summary_container,
             'components_count': 6
         }
@@ -150,12 +150,12 @@ def _create_execution_model_row(config: Dict[str, Any]) -> widgets.Widget:
     execution_items = []
     execution_items.append(widgets.HTML("<h3>⚙️ Execution Options</h3>"))
     
-    # Scenario selection (radio buttons)
+    # Scenario selection (radio buttons) with correct test counts
     scenario_radio = widgets.RadioButtons(
         options=[
             ('All Scenarios (8 tests)', 'all_scenarios'),
-            ('Position Variation (4 tests)', 'position_only'), 
-            ('Lighting Variation (4 tests)', 'lighting_only')
+            ('Position Only (4 tests)', 'position_only'), 
+            ('Lighting Only (4 tests)', 'lighting_only')
         ],
         value=config.get('evaluation', {}).get('execution', {}).get('run_mode', 'all_scenarios'),
         description='Scenarios:',

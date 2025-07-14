@@ -96,9 +96,7 @@ class BackboneOperationManager(OperationHandler):
         """
         return {
             'validate': 'Validate backbone configuration and compatibility',
-            'build': 'Build backbone architecture with current configuration',
-            'load': 'Load pretrained backbone model from existing checkpoint',
-            'summary': 'Generate detailed model summary and statistics'
+            'build': 'Build backbone architecture with current configuration (pretrained auto-loaded)'
         }
     
     # ==================== BACKBONE OPERATIONS ====================
@@ -203,105 +201,7 @@ class BackboneOperationManager(OperationHandler):
             if button_states:
                 self.enable_all_buttons(button_states)
     
-    def execute_load(self, config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-        """
-        Execute pretrained backbone loading operation.
-        
-        Args:
-            config: Optional configuration override
-            
-        Returns:
-            Load result dictionary
-        """
-        button_states = None
-        try:
-            # Clear logs from previous operations
-            self.clear_logs()
-            
-            self.log("📥 Starting backbone load operation...", 'info')
-            button_states = self.disable_all_buttons("⏳ Loading...")
-            
-            # Update progress
-            self.update_progress(0, "Initializing model loading...")
-            
-            # Use provided config or current config
-            operation_config = config or self.config
-            
-            # Execute load operation - fail fast if service not available
-            if not self._service:
-                raise RuntimeError("Service not available - cannot proceed with load")
-            
-            result = self._execute_load_with_service(operation_config)
-            
-            # Update progress based on result
-            if result.get('success'):
-                self.update_progress(100, "Model loaded successfully")
-                self.log("✅ Pretrained backbone loaded successfully", 'success')
-            else:
-                self.update_progress(0, "Model loading failed")
-                self.log(f"❌ Load failed: {result.get('message', 'Unknown error')}", 'error')
-            
-            return result
-            
-        except Exception as e:
-            self.logger.error(f"Load operation error: {e}")
-            self.log(f"❌ Load operation error: {e}", 'error')
-            self.update_progress(0, "Load failed")
-            return {'success': False, 'message': str(e)}
-        
-        finally:
-            if button_states:
-                self.enable_all_buttons(button_states)
     
-    def execute_summary(self, config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-        """
-        Execute model summary generation operation.
-        
-        Args:
-            config: Optional configuration override
-            
-        Returns:
-            Summary result dictionary
-        """
-        button_states = None
-        try:
-            # Clear logs from previous operations
-            self.clear_logs()
-            
-            self.log("📊 Starting model summary generation...", 'info')
-            button_states = self.disable_all_buttons("⏳ Generating...")
-            
-            # Update progress
-            self.update_progress(0, "Generating model summary...")
-            
-            # Use provided config or current config
-            operation_config = config or self.config
-            
-            # Execute summary operation - fail fast if service not available
-            if not self._service:
-                raise RuntimeError("Service not available - cannot proceed with summary")
-            
-            result = self._execute_summary_with_service(operation_config)
-            
-            # Update progress based on result
-            if result.get('success'):
-                self.update_progress(100, "Summary generated successfully")
-                self.log("✅ Model summary generated successfully", 'success')
-            else:
-                self.update_progress(0, "Summary generation failed")
-                self.log(f"❌ Summary failed: {result.get('message', 'Unknown error')}", 'error')
-            
-            return result
-            
-        except Exception as e:
-            self.logger.error(f"Summary operation error: {e}")
-            self.log(f"❌ Summary operation error: {e}", 'error')
-            self.update_progress(0, "Summary failed")
-            return {'success': False, 'message': str(e)}
-        
-        finally:
-            if button_states:
-                self.enable_all_buttons(button_states)
     
     # ==================== SERVICE INTEGRATION ====================
     
@@ -385,79 +285,32 @@ class BackboneOperationManager(OperationHandler):
         except Exception as e:
             return {'success': False, 'message': f'Service build failed: {e}'}
     
-    def _execute_load_with_service(self, config: Dict[str, Any]) -> Dict[str, Any]:
-        """Execute load operation with service integration."""
+    def get_current_model_summary(self) -> Dict[str, Any]:
+        """
+        Get current model summary if available.
+        
+        Returns:
+            Current model summary dictionary
+        """
         try:
-            backbone_config = config.get('backbone', {})
+            # Try to get model info from API if available
+            if self._model_builder and hasattr(self._model_builder, 'get_model_info'):
+                return self._model_builder.get_model_info()
             
-            # Create async wrapper for progress and log callbacks
-            def sync_progress_callback(progress, message):
-                self.update_progress(progress, message)
-            
-            def sync_log_callback(level, message):
-                self.log(message, level.lower())
-            
-            # Run async load in sync context
-            import asyncio
-            
-            async def async_load():
-                return await self._service.load_backbone_model(
-                    backbone_config,
-                    progress_callback=lambda step, total, msg: sync_progress_callback(
-                        int((step + 1) / total * 100), msg
-                    ),
-                    log_callback=lambda level, msg: sync_log_callback(level, msg)
-                )
-            
-            # Execute async operation
-            try:
-                loop = asyncio.get_event_loop()
-                load_result = loop.run_until_complete(async_load())
-            except RuntimeError:
-                # No event loop running, create new one
-                load_result = asyncio.run(async_load())
-            
-            return load_result
+            # Return basic config info if no model built yet
+            return {
+                'status': 'not_built',
+                'backbone': self.config.get('backbone', {}).get('model_type', 'efficientnet_b4'),
+                'pretrained': self.config.get('backbone', {}).get('pretrained', True),
+                'message': 'Model not built yet - build to see full summary'
+            }
             
         except Exception as e:
-            return {'success': False, 'message': f'Service load failed: {e}'}
-    
-    def _execute_summary_with_service(self, config: Dict[str, Any]) -> Dict[str, Any]:
-        """Execute summary operation with service integration."""
-        try:
-            backbone_config = config.get('backbone', {})
-            
-            # Create async wrapper for progress and log callbacks
-            def sync_progress_callback(progress, message):
-                self.update_progress(progress, message)
-            
-            def sync_log_callback(level, message):
-                self.log(message, level.lower())
-            
-            # Run async summary in sync context
-            import asyncio
-            
-            async def async_summary():
-                return await self._service.generate_model_summary(
-                    backbone_config,
-                    progress_callback=lambda step, total, msg: sync_progress_callback(
-                        int((step + 1) / total * 100), msg
-                    ),
-                    log_callback=lambda level, msg: sync_log_callback(level, msg)
-                )
-            
-            # Execute async operation
-            try:
-                loop = asyncio.get_event_loop()
-                summary_result = loop.run_until_complete(async_summary())
-            except RuntimeError:
-                # No event loop running, create new one
-                summary_result = asyncio.run(async_summary())
-            
-            return summary_result
-            
-        except Exception as e:
-            return {'success': False, 'message': f'Service summary failed: {e}'}
+            self.logger.error(f"Error getting model summary: {e}")
+            return {
+                'status': 'error',
+                'message': f'Error retrieving summary: {e}'
+            }
     
     # ==================== FAIL-FAST APPROACH ====================
     # No fallback simulations - service must be available for operations

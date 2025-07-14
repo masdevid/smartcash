@@ -12,7 +12,6 @@ from smartcash.ui.model.evaluation.configs.evaluation_config_handler import Eval
 from smartcash.ui.model.evaluation.configs.evaluation_defaults import get_default_evaluation_config
 from smartcash.ui.model.evaluation.constants import UI_CONFIG
 from typing import Optional, Dict, Any
-from IPython.display import display
 
 def initialize_evaluation_ui(config: Optional[Dict[str, Any]] = None, display: bool = True):
     """
@@ -40,9 +39,6 @@ def initialize_evaluation_ui(config: Optional[Dict[str, Any]] = None, display: b
     try:
         from IPython.display import display as ipython_display, HTML, clear_output
         from ipywidgets import Output
-        
-        # Create an output widget to capture the UI
-        output = Output()
         
         # Initialize the evaluation module with error handling for read-only file systems
         evaluation_module = None
@@ -384,25 +380,24 @@ class EvaluationUIModule(UIModule):
                 }
                 log_level = log_level_map.get(level, LogLevel.INFO)
                 
-                # Try different ways to access the log functionality
+                # Following backbone pattern - operation_container is dict with methods
                 if isinstance(operation_container, dict):
-                    # Try log_message method first (from operation container dict)
+                    # Try log_message method first (preferred method)
                     if 'log_message' in operation_container and callable(operation_container['log_message']):
                         operation_container['log_message'](message, log_level)
                         return
-                    # Try direct log_accordion access
+                    # Try direct log_accordion access as fallback
                     elif 'log_accordion' in operation_container:
                         log_accordion = operation_container['log_accordion']
                         if hasattr(log_accordion, 'log'):
                             log_accordion.log(message, log_level)
                             return
-                elif hasattr(operation_container, 'log'):
-                    # Direct log method on container object
-                    operation_container.log(message, log_level)
-                    return
+                # Fallback for other container types
                 elif hasattr(operation_container, 'log_message'):
-                    # log_message method on container object
                     operation_container.log_message(message, log_level)
+                    return
+                elif hasattr(operation_container, 'log'):
+                    operation_container.log(message, log_level)
                     return
             
             # Fallback to logger
@@ -439,7 +434,7 @@ class EvaluationUIModule(UIModule):
         thread.daemon = True
         thread.start()
     
-    async def _handle_run_scenario(self, button) -> None:
+    async def _handle_run_scenario(self, _button) -> None:
         """Handle run scenario button click - determines action based on UI form selections."""
         try:
             # Extract form values to determine what to run
@@ -534,24 +529,24 @@ class EvaluationUIModule(UIModule):
         """Clear logs, progress, and status panel before starting new evaluation."""
         try:
             operation_container = self._ui_components.get('operation_container')
-            if operation_container:
-                # Clear log accordion
-                if isinstance(operation_container, dict) and 'log_accordion' in operation_container:
+            if operation_container and isinstance(operation_container, dict):
+                # Clear log accordion using backbone pattern
+                if 'log_accordion' in operation_container:
                     log_accordion = operation_container['log_accordion']
-                    if hasattr(log_accordion, 'clear'):
+                    if hasattr(log_accordion, 'clear_logs'):
+                        log_accordion.clear_logs()
+                    elif hasattr(log_accordion, 'clear'):
                         log_accordion.clear()
-                elif hasattr(operation_container, 'log_accordion'):
-                    if hasattr(operation_container.log_accordion, 'clear'):
-                        operation_container.log_accordion.clear()
                 
-                # Reset progress tracker
-                if isinstance(operation_container, dict) and 'progress_tracker' in operation_container:
+                # Reset progress tracker using backbone pattern
+                if 'progress_tracker' in operation_container:
                     progress_tracker = operation_container['progress_tracker']
                     if hasattr(progress_tracker, 'reset'):
                         progress_tracker.reset()
-                elif hasattr(operation_container, 'progress_tracker'):
-                    if hasattr(operation_container.progress_tracker, 'reset'):
-                        operation_container.progress_tracker.reset()
+                
+                # Also use update_progress method if available
+                if 'update_progress' in operation_container:
+                    operation_container['update_progress'](0, "Ready to start...")
             
             # Update status panel
             self._update_status_panel("Ready to Start", "0%", "None")

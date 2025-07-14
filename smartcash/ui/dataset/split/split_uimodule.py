@@ -127,23 +127,34 @@ class SplitUIModule(UIModule):
                 self.logger.warning("Cannot setup button handlers - missing UI components")
                 return
                 
-            # Get buttons
-            save_button = self._ui_components.get('save_button')
-            reset_button = self._ui_components.get('reset_button')
+            # Get action container and its buttons (like backbone pattern)
+            action_container = self._ui_components.get('action_container')
+            if not action_container:
+                self.logger.warning("Action container not found")
+                return
+                
+            # Get buttons from action container structure
+            buttons = action_container.get('buttons', {})
+            if not buttons:
+                # Fallback to direct button access (only save/reset)
+                buttons = {
+                    'save': self._ui_components.get('save_button'),
+                    'reset': self._ui_components.get('reset_button')
+                }
             
             # Setup save button handler
-            if save_button and hasattr(save_button, 'on_click'):
-                save_button.on_click(self._handle_save_config)
+            if 'save' in buttons and buttons['save']:
+                buttons['save'].on_click(self._handle_save_config)
                 self.logger.debug("✅ Bound Save button to _handle_save_config")
             else:
-                self.logger.warning("Save button not found or doesn't support on_click")
+                self.logger.warning("Save button not found in action container")
                 
             # Setup reset button handler  
-            if reset_button and hasattr(reset_button, 'on_click'):
-                reset_button.on_click(self._handle_reset_config)
+            if 'reset' in buttons and buttons['reset']:
+                buttons['reset'].on_click(self._handle_reset_config)
                 self.logger.debug("✅ Bound Reset button to _handle_reset_config")
             else:
-                self.logger.warning("Reset button not found or doesn't support on_click")
+                self.logger.warning("Reset button not found in action container")
                 
         except Exception as e:
             self.logger.error(f"Failed to setup button handlers: {e}")
@@ -185,6 +196,29 @@ class SplitUIModule(UIModule):
                 self.log(f"❌ {error_msg}", 'error')
         except Exception as e:
             error_msg = f"Reset config error: {e}"
+            self._update_status(error_msg, "error")
+            self.log(f"❌ {error_msg}", 'error')
+    
+    def _handle_split_dataset(self, button=None):
+        """Handle split dataset button click."""
+        try:
+            self._update_status("Starting dataset split...", "info")
+            self.log("🚀 Split dataset button clicked", 'info')
+            
+            # First save current config
+            save_result = self.save_config()
+            if not save_result.get('success'):
+                error_msg = f"Cannot split: {save_result.get('message', 'Config save failed')}"
+                self._update_status(error_msg, "error")
+                self.log(f"❌ {error_msg}", 'error')
+                return
+            
+            # TODO: Implement actual dataset splitting logic
+            self.log("📊 Dataset split functionality not yet implemented", 'warning')
+            self._update_status("Dataset split functionality coming soon", "warning")
+            
+        except Exception as e:
+            error_msg = f"Split dataset error: {e}"
             self._update_status(error_msg, "error")
             self.log(f"❌ {error_msg}", 'error')
     
@@ -250,9 +284,8 @@ class SplitUIModule(UIModule):
             # Setup button event handlers
             self._setup_button_handlers()
             
-            # Log successful initialization to operation container
-            self.log("✅ Split module initialized successfully", 'info')
-            self.log("📊 Ready for dataset split configuration", 'info')
+            # Initialize progress display and show initial logs like backbone
+            self._initialize_progress_display()
             
             # Call base class initialization to set status to READY
             super().initialize()
@@ -543,6 +576,33 @@ class SplitUIModule(UIModule):
             
         except Exception as e:
             self.logger.debug(f"Status panel initialization failed: {e}")
+    
+    def _initialize_progress_display(self) -> None:
+        """Initialize operation container and show initial logs like backbone."""
+        try:
+            # Show rich initialization logs like backbone module
+            self.log("🔧 Split module operation manager initialized", 'info')
+            self.log("📊 Split UI module ready", 'info')
+            
+            # Log current configuration status
+            config = self.get_config()
+            split_config = config.get('split', {})
+            ratios = split_config.get('ratios', {})
+            
+            self.log(f"🎯 Default split ratios loaded: Train={ratios.get('train', 0.7):.1%}, Val={ratios.get('val', 0.15):.1%}, Test={ratios.get('test', 0.15):.1%}", 'info')
+            self.log(f"📁 Input directory: {split_config.get('input_dir', 'data/raw')}", 'info')
+            self.log(f"📂 Output directory: {split_config.get('output_dir', 'data/split')}", 'info')
+            self.log(f"🎲 Random seed: {split_config.get('seed', 42)}", 'debug')
+            
+            # Show operation container is ready (no progress tracker as requested)
+            operation_container = self._ui_components.get('operation_container')
+            if operation_container:
+                self.log("📈 Operation container ready for split configuration", 'info')
+            
+            self.log("✅ Split module fully initialized and ready", 'info')
+            
+        except Exception as e:
+            self.logger.debug(f"Operation container initialization failed: {e}")
     
     def _update_status(self, message: str, level: str = "info") -> None:
         """Update status panel message."""

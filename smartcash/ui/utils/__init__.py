@@ -14,6 +14,7 @@ from typing import Optional, Any, Dict, List, Union, Callable, Tuple
 
 # Import core utilities
 from .widget_utils import display_widget, safe_display
+from .display_utils import safe_display as safe_display_zmq
 
 # Error handling utilities have been moved to smartcash.ui.core.errors
 # Importing them here would cause circular imports
@@ -61,6 +62,7 @@ __all__ = [
     # Core utilities
     'display_widget',
     'safe_display',
+    'safe_display_zmq',
     
     # Logging
     'UILogger',

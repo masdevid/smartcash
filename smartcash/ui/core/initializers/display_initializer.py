@@ -11,13 +11,13 @@ This initializer provides:
 
 import logging
 from typing import Dict, Any, Optional, Union
-from IPython.display import display
 from contextlib import contextmanager
 
 from .base_initializer import BaseInitializer
 from smartcash.ui.core.errors import (
     create_error_component
 )
+from smartcash.ui.utils.display_utils import safe_display
 
 
 class DisplayInitializer(BaseInitializer):
@@ -107,22 +107,30 @@ class DisplayInitializer(BaseInitializer):
             
         # Direct ipywidgets
         if hasattr(component, 'children') or hasattr(component, 'layout'):
-            display(component)
+            self._safe_display(component)
             return True
         
         # Custom container classes with .container attribute (like MainContainer)
         if hasattr(component, 'container'):
             container = component.container
             if container is not None and (hasattr(container, 'children') or hasattr(container, 'layout')):
-                display(container)
+                self._safe_display(container)
                 return True
         
         # Classes with show() method
         if hasattr(component, 'show') and callable(component.show):
-            display(component.show())
+            self._safe_display(component.show())
             return True
         
         return False
+    
+    def _safe_display(self, widget):
+        """Safely display a widget with fallback for ZMQDisplayPublisher issues."""
+        try:
+            safe_display(widget)
+        except Exception as e:
+            self.logger.error(f"Failed to display widget: {e}")
+            print(widget)
     
     def _display_error_component(self, error: Exception, error_msg: str = None) -> None:
         """
@@ -146,7 +154,7 @@ class DisplayInitializer(BaseInitializer):
         
         # Display the error component
         if error_component and 'widget' in error_component:
-            display(error_component['widget'])
+            self._safe_display(error_component['widget'])
         else:
             # Fallback to simple HTML display
             from IPython.display import HTML
@@ -159,7 +167,7 @@ class DisplayInitializer(BaseInitializer):
                 </div>
             </div>
             """
-            display(HTML(error_html))
+            self._safe_display(HTML(error_html))
     
     def initialize_and_display(self, *args, **kwargs) -> None:
         """
@@ -319,22 +327,30 @@ class DisplayInitializer(BaseInitializer):
             
         # Direct ipywidgets
         if hasattr(component, 'children') or hasattr(component, 'layout'):
-            display(component)
+            DisplayInitializer._safe_display_static(component)
             return True
         
         # Custom container classes with .container attribute (like MainContainer)
         if hasattr(component, 'container'):
             container = component.container
             if container is not None and (hasattr(container, 'children') or hasattr(container, 'layout')):
-                display(container)
+                DisplayInitializer._safe_display_static(container)
                 return True
         
         # Classes with show() method
         if hasattr(component, 'show') and callable(component.show):
-            display(component.show())
+            DisplayInitializer._safe_display_static(component.show())
             return True
         
         return False
+    
+    @staticmethod
+    def _safe_display_static(widget):
+        """Static version of _safe_display."""
+        try:
+            safe_display(widget)
+        except Exception:
+            print(widget)
     
     @staticmethod
     def _display_error_component_static(error: Exception, module_name: str) -> None:
@@ -351,7 +367,7 @@ class DisplayInitializer(BaseInitializer):
             )
             
             if error_component and 'widget' in error_component:
-                display(error_component['widget'])
+                DisplayInitializer._safe_display_static(error_component['widget'])
                 return
         except:
             pass
@@ -367,7 +383,7 @@ class DisplayInitializer(BaseInitializer):
             </div>
         </div>
         """
-        display(HTML(error_html))
+        DisplayInitializer._safe_display_static(HTML(error_html))
 
 
 # Convenience function for backward compatibility and easy import

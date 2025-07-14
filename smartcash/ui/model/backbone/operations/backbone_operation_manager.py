@@ -230,13 +230,23 @@ class BackboneOperationManager(OperationHandler):
                     log_callback=lambda level, msg: sync_log_callback(level, msg)
                 )
             
-            # Execute async operation
+            # Execute async operation with proper event loop handling
             try:
-                loop = asyncio.get_event_loop()
-                validation_result = loop.run_until_complete(async_validate())
-            except RuntimeError:
-                # No event loop running, create new one
-                validation_result = asyncio.run(async_validate())
+                # Try to get existing event loop
+                try:
+                    loop = asyncio.get_running_loop()
+                    # We're in a running loop, create a task
+                    import concurrent.futures
+                    with concurrent.futures.ThreadPoolExecutor() as executor:
+                        future = executor.submit(asyncio.run, async_validate())
+                        validation_result = future.result()
+                except RuntimeError:
+                    # No running loop, safe to use asyncio.run
+                    validation_result = asyncio.run(async_validate())
+            except Exception as async_error:
+                # Fallback to basic validation without service
+                self.log(f"⚠️ Service validation unavailable, using basic validation", 'warning')
+                validation_result = self._basic_validation_fallback(backbone_config)
             
             return {
                 'success': validation_result.get('valid', False),
@@ -247,6 +257,44 @@ class BackboneOperationManager(OperationHandler):
             
         except Exception as e:
             return {'success': False, 'message': f'Service validation failed: {e}'}
+    
+    def _basic_validation_fallback(self, backbone_config: Dict[str, Any]) -> Dict[str, Any]:
+        """Basic validation fallback when service is unavailable."""
+        try:
+            model_type = backbone_config.get('model_type', 'efficientnet_b4')
+            
+            # Basic validation checks
+            valid = True
+            issues = []
+            
+            if model_type not in ['efficientnet_b4', 'cspdarknet']:
+                valid = False
+                issues.append(f"Unsupported model type: {model_type}")
+            
+            input_size = backbone_config.get('input_size', 640)
+            if input_size < 320 or input_size > 1280:
+                valid = False
+                issues.append(f"Invalid input size: {input_size}")
+            
+            num_classes = backbone_config.get('num_classes', 7)
+            if num_classes < 1 or num_classes > 100:
+                valid = False
+                issues.append(f"Invalid number of classes: {num_classes}")
+            
+            return {
+                'valid': valid,
+                'model_type': model_type,
+                'issues': issues,
+                'fallback': True
+            }
+            
+        except Exception as e:
+            return {
+                'valid': False,
+                'model_type': 'unknown',
+                'issues': [f"Validation error: {e}"],
+                'fallback': True
+            }
     
     def _execute_build_with_service(self, config: Dict[str, Any]) -> Dict[str, Any]:
         """Execute build operation with service integration."""

@@ -79,6 +79,10 @@ class BackboneUIModule(UIModule):
             )
             
             self._operation_manager.initialize()
+            
+            # Initialize progress tracker display
+            self._initialize_progress_display()
+            
             self.logger.debug("✅ Operation manager initialized")
             
         except Exception as e:
@@ -566,6 +570,27 @@ class BackboneUIModule(UIModule):
                 
         except Exception as e:
             self.logger.error(f"Error updating UI widgets: {e}")
+            # Also log to operation container if available
+            if self._operation_manager:
+                self._operation_manager.log(f"⚠️ Warning: Could not update UI widgets - {e}", 'warning')
+    
+    def _initialize_progress_display(self) -> None:
+        """Initialize progress tracker display to show by default."""
+        try:
+            if not self._operation_manager:
+                return
+            
+            # Initialize progress tracker with default state
+            self._operation_manager.update_progress(0, "Ready - No operation running")
+            
+            # Log initial status to show the operation container is working
+            self._operation_manager.log("🧬 Backbone module ready", 'info')
+            self._operation_manager.log("📋 Progress tracker initialized", 'debug')
+            
+            self.logger.debug("✅ Progress display initialized")
+            
+        except Exception as e:
+            self.logger.error(f"Error initializing progress display: {e}")
     
     def _create_ui_components(self, config: Dict[str, Any]) -> Dict[str, Any]:
         """Create UI components."""

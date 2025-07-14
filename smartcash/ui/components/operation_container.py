@@ -124,6 +124,10 @@ class OperationContainer(BaseUIComponent):
         self.dialogs = {}
         self.dialog_area = None
         
+        # Initialize dialog area if enabled (must be before creating container)
+        if self._show_dialog_enabled:
+            self._init_dialog_area()
+            
         # Create main container widget
         self.container = widgets.VBox(
             layout=widgets.Layout(
@@ -137,10 +141,6 @@ class OperationContainer(BaseUIComponent):
         
         # Create UI components
         self._create_ui_components(progress_config)
-        
-        # Initialize dialog area if enabled (must be before creating container)
-        if self._show_dialog_enabled:
-            self._init_dialog_area()
     
     def _create_ui_components(self, progress_config: Optional[ProgressConfig] = None) -> None:
         """Create and initialize UI components.

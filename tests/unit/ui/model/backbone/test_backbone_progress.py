@@ -22,13 +22,15 @@ class TestBackboneProgress(unittest.TestCase):
         }
     
         # Create mock operation container
-        self.mock_operation_container = create_operation_container(
+        # Create mock operation container
+        container_dict = create_operation_container(
             show_progress=True,
             show_logs=True,
             log_module_name='test_backbone',
             log_height="200px",
             log_entry_style='compact'
         )
+        self.mock_operation_container = container_dict['container']
         
         # Mock update_progress
         self.mock_operation_container.update_progress = MagicMock()

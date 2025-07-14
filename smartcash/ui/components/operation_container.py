@@ -51,17 +51,7 @@ def create_operation_container(
         **kwargs
     )
     
-    return {
-        'container': container.container,
-        'progress_tracker': container.progress_tracker if show_progress else None,
-        'dialog_area': container.dialog_area if container._show_dialog_enabled else None,
-        'log_accordion': container.log_accordion if show_logs else None,
-        'show_dialog': container.show_dialog,
-        'show_info_dialog': container.show_info_dialog,
-        'clear_dialog': container.clear_dialog,
-        'update_progress': container.update_progress,
-        'log_message': container.log_message
-    }
+    return container
 
 
 class OperationContainer(BaseUIComponent):

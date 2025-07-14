@@ -22,7 +22,7 @@ class TestBackboneProgress(unittest.TestCase):
         }
     
         # Create mock operation container
-        self.mock_operation_container = OperationContainer(
+        self.mock_operation_container = create_operation_container(
             show_progress=True,
             show_logs=True,
             log_module_name='test_backbone',

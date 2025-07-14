@@ -190,6 +190,12 @@ class DependencyUIModule(UIModule):
                 ui_components={'operation_container': operation_container}
             )
             
+            # Setup UI logging bridge to capture backend service logs
+            self._setup_ui_logging_bridge(operation_container)
+            
+            # Initialize progress tracker display
+            self._initialize_progress_display()
+            
             get_module_logger("smartcash.ui.setup.dependency.uimodule").debug("⚙️ Setup operation manager")
             
         except Exception as e:
@@ -493,7 +499,7 @@ class DependencyUIModule(UIModule):
             get_module_logger("smartcash.ui.setup.dependency.uimodule").debug(f"Progress update failed: {e}")
     
     def execute_install_operation(self, packages: List[str]) -> Dict[str, Any]:
-        """Execute package installation."""
+        """Execute package installation synchronously."""
         if not self._operation_manager:
             return {"success": False, "message": "Operation manager not initialized"}
         
@@ -501,25 +507,12 @@ class DependencyUIModule(UIModule):
             # Show progress start
             self._update_progress(0, "Starting installation...")
             
-            # Execute install operation - this should be async but we'll handle sync
-            import asyncio
-            try:
-                # Try to run in existing event loop
-                loop = asyncio.get_event_loop()
-                if loop.is_running():
-                    # Create a task to run later
-                    import concurrent.futures
-                    with concurrent.futures.ThreadPoolExecutor() as executor:
-                        future = executor.submit(
-                            asyncio.run, 
-                            self._operation_manager.execute_install(packages)
-                        )
-                        result = future.result(timeout=300)  # 5 minute timeout
-                else:
-                    result = asyncio.run(self._operation_manager.execute_install(packages))
-            except RuntimeError:
-                # No event loop running, create new one
-                result = asyncio.run(self._operation_manager.execute_install(packages))
+            # Execute install operation synchronously using the operation manager's sync method
+            if hasattr(self._operation_manager, 'execute_install_sync'):
+                result = self._operation_manager.execute_install_sync(packages)
+            else:
+                # Fallback to direct pip installation if sync method not available
+                result = self._execute_pip_install_sync(packages)
             
             # Update progress based on result
             if result.get("success", False):
@@ -543,7 +536,7 @@ class DependencyUIModule(UIModule):
             return {"success": False, "message": str(e)}
     
     def execute_uninstall_operation(self, packages: List[str]) -> Dict[str, Any]:
-        """Execute package uninstallation."""
+        """Execute package uninstallation synchronously."""
         if not self._operation_manager:
             return {"success": False, "message": "Operation manager not initialized"}
         
@@ -551,22 +544,12 @@ class DependencyUIModule(UIModule):
             # Show progress start
             self._update_progress(0, "Starting uninstallation...")
             
-            # Execute uninstall operation
-            import asyncio
-            try:
-                loop = asyncio.get_event_loop()
-                if loop.is_running():
-                    import concurrent.futures
-                    with concurrent.futures.ThreadPoolExecutor() as executor:
-                        future = executor.submit(
-                            asyncio.run, 
-                            self._operation_manager.execute_uninstall(packages)
-                        )
-                        result = future.result(timeout=300)
-                else:
-                    result = asyncio.run(self._operation_manager.execute_uninstall(packages))
-            except RuntimeError:
-                result = asyncio.run(self._operation_manager.execute_uninstall(packages))
+            # Execute uninstall operation synchronously
+            if hasattr(self._operation_manager, 'execute_uninstall_sync'):
+                result = self._operation_manager.execute_uninstall_sync(packages)
+            else:
+                # Fallback to direct pip uninstallation if sync method not available
+                result = self._execute_pip_uninstall_sync(packages)
             
             # Update progress based on result
             if result.get("success", False):
@@ -590,7 +573,7 @@ class DependencyUIModule(UIModule):
             return {"success": False, "message": str(e)}
     
     def execute_update_operation(self) -> Dict[str, Any]:
-        """Execute package update."""
+        """Execute package update synchronously."""
         if not self._operation_manager:
             return {"success": False, "message": "Operation manager not initialized"}
         
@@ -601,22 +584,12 @@ class DependencyUIModule(UIModule):
             # Get all installed packages for update
             selected_packages = self._get_selected_packages()
             
-            # Execute update operation
-            import asyncio
-            try:
-                loop = asyncio.get_event_loop()
-                if loop.is_running():
-                    import concurrent.futures
-                    with concurrent.futures.ThreadPoolExecutor() as executor:
-                        future = executor.submit(
-                            asyncio.run, 
-                            self._operation_manager.execute_update(selected_packages)
-                        )
-                        result = future.result(timeout=300)
-                else:
-                    result = asyncio.run(self._operation_manager.execute_update(selected_packages))
-            except RuntimeError:
-                result = asyncio.run(self._operation_manager.execute_update(selected_packages))
+            # Execute update operation synchronously
+            if hasattr(self._operation_manager, 'execute_update_sync'):
+                result = self._operation_manager.execute_update_sync(selected_packages)
+            else:
+                # Fallback to direct pip update if sync method not available
+                result = self._execute_pip_update_sync(selected_packages)
             
             # Update progress based on result
             if result.get("success", False):
@@ -697,6 +670,269 @@ class DependencyUIModule(UIModule):
     def get_config_handler(self) -> Optional[DependencyConfigHandler]:
         """Get the config handler instance."""
         return self._config_handler
+    
+    def _setup_ui_logging_bridge(self, operation_container: Any) -> None:
+        """Setup UI logging bridge to capture backend service logs."""
+        try:
+            import logging
+            
+            # Create custom handler for backend services
+            class BackendUILogHandler(logging.Handler):
+                def __init__(self, log_func):
+                    super().__init__()
+                    self.log_func = log_func
+                    self.setFormatter(logging.Formatter('%(name)s: %(message)s'))
+                
+                def emit(self, record):
+                    try:
+                        msg = self.format(record)
+                        level = 'info' if record.levelno == logging.INFO else 'error'
+                        self.log_func(msg, level)
+                    except Exception:
+                        pass  # Silently fail to avoid recursive errors
+            
+            # Get log function from operation container
+            if hasattr(operation_container, 'log_message'):
+                log_func = operation_container.log_message
+            elif hasattr(operation_container, 'log'):
+                log_func = operation_container.log
+            else:
+                # Fallback to internal logging
+                log_func = self._log_to_ui
+            
+            # Create handler
+            ui_handler = BackendUILogHandler(log_func)
+            ui_handler.setLevel(logging.INFO)
+            
+            # Target specific backend service loggers that might log during dependency operations
+            target_loggers = [
+                'smartcash.dataset',
+                'smartcash.model', 
+                'smartcash.setup.dependency',
+                'smartcash.core',
+                'pip',
+                'subprocess'
+            ]
+            
+            # Remove existing console handlers and add UI handlers
+            for logger_name in target_loggers:
+                logger = logging.getLogger(logger_name)
+                
+                # Remove existing console handlers
+                for handler in logger.handlers[:]:
+                    if isinstance(handler, logging.StreamHandler):
+                        logger.removeHandler(handler)
+                
+                # Add UI handler
+                logger.addHandler(ui_handler)
+            
+            # Store handler for cleanup
+            if not hasattr(self, '_ui_handlers'):
+                self._ui_handlers = []
+            self._ui_handlers.append(ui_handler)
+            
+            get_module_logger("smartcash.ui.setup.dependency.uimodule").debug("🌉 UI logging bridge setup completed")
+            
+        except Exception as e:
+            get_module_logger("smartcash.ui.setup.dependency.uimodule").error(f"❌ Failed to setup UI logging bridge: {e}")
+    
+    def _initialize_progress_display(self) -> None:
+        """Initialize progress tracker display."""
+        try:
+            operation_container = self.get_component("operation_container")
+            if operation_container and hasattr(operation_container, 'progress_tracker'):
+                progress_tracker = operation_container.progress_tracker
+                if hasattr(progress_tracker, 'initialize') and not getattr(progress_tracker, '_initialized', False):
+                    progress_tracker.initialize()
+                if hasattr(progress_tracker, 'show'):
+                    progress_tracker.show()
+                    
+            get_module_logger("smartcash.ui.setup.dependency.uimodule").debug("📊 Progress display initialized")
+            
+        except Exception as e:
+            get_module_logger("smartcash.ui.setup.dependency.uimodule").debug(f"Progress display initialization failed: {e}")
+    
+    def _cleanup_ui_logging_bridge(self) -> None:
+        """Cleanup UI logging bridge handlers."""
+        try:
+            if hasattr(self, '_ui_handlers'):
+                import logging
+                for handler in self._ui_handlers:
+                    # Remove handler from all loggers
+                    for logger_name in logging.Logger.manager.loggerDict:
+                        logger = logging.getLogger(logger_name)
+                        if handler in logger.handlers:
+                            logger.removeHandler(handler)
+                self._ui_handlers.clear()
+                
+            get_module_logger("smartcash.ui.setup.dependency.uimodule").debug("🧹 UI logging bridge cleanup completed")
+            
+        except Exception as e:
+            get_module_logger("smartcash.ui.setup.dependency.uimodule").debug(f"UI logging bridge cleanup failed: {e}")
+    
+    def _execute_pip_install_sync(self, packages: List[str]) -> Dict[str, Any]:
+        """Fallback synchronous pip install method."""
+        try:
+            import subprocess
+            import sys
+            
+            # Update progress
+            self._update_progress(25, f"Installing {len(packages)} packages...")
+            self._log_to_ui(f"📦 Installing packages: {', '.join(packages)}", "info")
+            
+            success_count = 0
+            failed_packages = []
+            
+            for i, package in enumerate(packages):
+                try:
+                    # Update progress for each package
+                    progress = 25 + (50 * i // len(packages))
+                    self._update_progress(progress, f"Installing {package}...")
+                    
+                    # Execute pip install
+                    result = subprocess.run(
+                        [sys.executable, "-m", "pip", "install", package],
+                        capture_output=True,
+                        text=True,
+                        timeout=120  # 2 minute timeout per package
+                    )
+                    
+                    if result.returncode == 0:
+                        success_count += 1
+                        self._log_to_ui(f"✅ Successfully installed {package}", "info")
+                    else:
+                        failed_packages.append(package)
+                        self._log_to_ui(f"❌ Failed to install {package}: {result.stderr.strip()}", "error")
+                        
+                except subprocess.TimeoutExpired:
+                    failed_packages.append(package)
+                    self._log_to_ui(f"⏰ Timeout installing {package}", "error")
+                except Exception as e:
+                    failed_packages.append(package)
+                    self._log_to_ui(f"❌ Error installing {package}: {str(e)}", "error")
+            
+            # Final result
+            if failed_packages:
+                message = f"Installed {success_count}/{len(packages)} packages. Failed: {', '.join(failed_packages)}"
+                return {"success": False, "message": message, "failed_packages": failed_packages}
+            else:
+                message = f"Successfully installed all {success_count} packages"
+                return {"success": True, "message": message}
+                
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+    
+    def _execute_pip_uninstall_sync(self, packages: List[str]) -> Dict[str, Any]:
+        """Fallback synchronous pip uninstall method."""
+        try:
+            import subprocess
+            import sys
+            
+            # Update progress
+            self._update_progress(25, f"Uninstalling {len(packages)} packages...")
+            self._log_to_ui(f"🗑️ Uninstalling packages: {', '.join(packages)}", "info")
+            
+            success_count = 0
+            failed_packages = []
+            
+            for i, package in enumerate(packages):
+                try:
+                    # Update progress for each package
+                    progress = 25 + (50 * i // len(packages))
+                    self._update_progress(progress, f"Uninstalling {package}...")
+                    
+                    # Execute pip uninstall
+                    result = subprocess.run(
+                        [sys.executable, "-m", "pip", "uninstall", package, "-y"],
+                        capture_output=True,
+                        text=True,
+                        timeout=60  # 1 minute timeout per package
+                    )
+                    
+                    if result.returncode == 0:
+                        success_count += 1
+                        self._log_to_ui(f"✅ Successfully uninstalled {package}", "info")
+                    else:
+                        failed_packages.append(package)
+                        self._log_to_ui(f"❌ Failed to uninstall {package}: {result.stderr.strip()}", "error")
+                        
+                except subprocess.TimeoutExpired:
+                    failed_packages.append(package)
+                    self._log_to_ui(f"⏰ Timeout uninstalling {package}", "error")
+                except Exception as e:
+                    failed_packages.append(package)
+                    self._log_to_ui(f"❌ Error uninstalling {package}: {str(e)}", "error")
+            
+            # Final result
+            if failed_packages:
+                message = f"Uninstalled {success_count}/{len(packages)} packages. Failed: {', '.join(failed_packages)}"
+                return {"success": False, "message": message, "failed_packages": failed_packages}
+            else:
+                message = f"Successfully uninstalled all {success_count} packages"
+                return {"success": True, "message": message}
+                
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+    
+    def _execute_pip_update_sync(self, packages: List[str]) -> Dict[str, Any]:
+        """Fallback synchronous pip update method."""
+        try:
+            import subprocess
+            import sys
+            
+            # Update progress
+            self._update_progress(25, f"Updating {len(packages)} packages...")
+            self._log_to_ui(f"⬆️ Updating packages: {', '.join(packages)}", "info")
+            
+            success_count = 0
+            failed_packages = []
+            
+            for i, package in enumerate(packages):
+                try:
+                    # Update progress for each package
+                    progress = 25 + (50 * i // len(packages))
+                    self._update_progress(progress, f"Updating {package}...")
+                    
+                    # Execute pip install --upgrade
+                    result = subprocess.run(
+                        [sys.executable, "-m", "pip", "install", "--upgrade", package],
+                        capture_output=True,
+                        text=True,
+                        timeout=120  # 2 minute timeout per package
+                    )
+                    
+                    if result.returncode == 0:
+                        success_count += 1
+                        self._log_to_ui(f"✅ Successfully updated {package}", "info")
+                    else:
+                        failed_packages.append(package)
+                        self._log_to_ui(f"❌ Failed to update {package}: {result.stderr.strip()}", "error")
+                        
+                except subprocess.TimeoutExpired:
+                    failed_packages.append(package)
+                    self._log_to_ui(f"⏰ Timeout updating {package}", "error")
+                except Exception as e:
+                    failed_packages.append(package)
+                    self._log_to_ui(f"❌ Error updating {package}: {str(e)}", "error")
+            
+            # Final result
+            if failed_packages:
+                message = f"Updated {success_count}/{len(packages)} packages. Failed: {', '.join(failed_packages)}"
+                return {"success": False, "message": message, "failed_packages": failed_packages}
+            else:
+                message = f"Successfully updated all {success_count} packages"
+                return {"success": True, "message": message}
+                
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    def cleanup(self) -> None:
+        """Cleanup resources."""
+        try:
+            self._cleanup_ui_logging_bridge()
+            super().cleanup()
+        except Exception as e:
+            get_module_logger("smartcash.ui.setup.dependency.uimodule").error(f"Cleanup error: {e}")
 
 def create_dependency_uimodule(config: Dict[str, Any] = None, 
                               auto_initialize: bool = True,
@@ -777,14 +1013,70 @@ def reset_dependency_uimodule() -> None:
 # === Backward Compatibility Layer ===
 
 @handle_ui_errors(return_type=None)
-def initialize_dependency_ui(config: Dict[str, Any] = None) -> None:
-    """Initialize Dependency UI using new UIModule pattern."""
-    from IPython.display import display
+def initialize_dependency_ui(
+    config: Optional[Dict[str, Any]] = None,
+    display: bool = True,
+    **kwargs
+) -> Optional[Dict[str, Any]]:
+    """Initialize Dependency UI using new UIModule pattern.
     
-    module = create_dependency_uimodule(config, auto_initialize=True)
-    main_container = module.get_component('main_container')
-    if main_container:
-        display(main_container)
+    Args:
+        config: Optional configuration dictionary
+        display: Whether to display the UI immediately (True) or return components (False)
+        **kwargs: Additional keyword arguments for module creation
+        
+    Returns:
+        None if display=True, dict of components if display=False
+    """
+    try:
+        from IPython.display import display as ipython_display
+        
+        # Get the module and UI components
+        module = create_dependency_uimodule(config, auto_initialize=True, **kwargs)
+        ui_components = {
+            component_type: module.get_component(component_type)
+            for component_type in module.list_components()
+        }
+        
+        main_ui = ui_components.get('main_container') or ui_components.get('ui')
+        
+        # Setup UI logging bridge to capture backend service logs
+        operation_container = ui_components.get('operation_container')
+        if operation_container and hasattr(module, '_setup_ui_logging_bridge'):
+            module._setup_ui_logging_bridge(operation_container)
+        
+        # Initialize progress display
+        if hasattr(module, '_initialize_progress_display'):
+            module._initialize_progress_display()
+        
+        if display and main_ui:
+            ipython_display(main_ui)
+            return None
+        
+        # Return components without displaying
+        result = {
+            'success': True,
+            'module': module,
+            'ui_components': ui_components,
+            'main_ui': main_ui
+        }
+        
+        return result
+        
+    except Exception as e:
+        error_result = {
+            'success': False,
+            'error': str(e),
+            'module': None,
+            'ui_components': {},
+            'main_ui': None
+        }
+        
+        if display:
+            get_module_logger("smartcash.ui.setup.dependency.uimodule").error(f"Failed to initialize dependency UI: {e}")
+            return None
+        
+        return error_result
 
 @handle_ui_errors(return_type=dict)
 def get_dependency_components(config: Dict[str, Any] = None) -> Dict[str, Any]:

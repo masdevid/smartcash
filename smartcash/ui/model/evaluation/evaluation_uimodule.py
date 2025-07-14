@@ -219,6 +219,9 @@ class EvaluationUIModule(UIModule):
             # Initialize operation manager
             self._initialize_operation_manager()
             
+            # Initialize summary panel with empty state
+            self._update_summary_panel({})
+            
             self.log("✅ Evaluation module initialized successfully", 'info')
             self.log(f"📊 Ready to test 8 model combinations (2 scenarios × 4 models)", 'info')
             
@@ -306,7 +309,12 @@ class EvaluationUIModule(UIModule):
                 # Bind button handlers for single run scenario button
                 for button_id, button_widget in buttons.items():
                     if button_id == 'run_scenario':
-                        button_widget.on_click(self._handle_run_scenario)
+                        # Ensure the button has the click handler
+                        button_widget.on_click(self._handle_run_scenario_sync)
+                        
+                        # Store the handler reference for verification
+                        if not hasattr(button_widget, '_smartcash_handler_set'):
+                            button_widget._smartcash_handler_set = True
                 
                 self.log("🔗 Button handlers configured", 'info')
             else:
@@ -337,6 +345,10 @@ class EvaluationUIModule(UIModule):
                 config=config,
                 operation_container=operation_container
             )
+            
+            # Set reference to this UI module for status updates
+            self._operation_manager._parent_ui_module = self
+            
             self._operation_manager.initialize()
             
             self.log("🎯 Operation manager initialized", 'info')
@@ -372,16 +384,26 @@ class EvaluationUIModule(UIModule):
                 }
                 log_level = log_level_map.get(level, LogLevel.INFO)
                 
-                # Use the log method from operation container which routes to log_accordion
-                if hasattr(operation_container, 'log'):
+                # Try different ways to access the log functionality
+                if isinstance(operation_container, dict):
+                    # Try log_message method first (from operation container dict)
+                    if 'log_message' in operation_container and callable(operation_container['log_message']):
+                        operation_container['log_message'](message, log_level)
+                        return
+                    # Try direct log_accordion access
+                    elif 'log_accordion' in operation_container:
+                        log_accordion = operation_container['log_accordion']
+                        if hasattr(log_accordion, 'log'):
+                            log_accordion.log(message, log_level)
+                            return
+                elif hasattr(operation_container, 'log'):
+                    # Direct log method on container object
                     operation_container.log(message, log_level)
                     return
-                elif isinstance(operation_container, dict) and 'log_accordion' in operation_container:
-                    # Direct access to log accordion
-                    log_accordion = operation_container['log_accordion']
-                    if hasattr(log_accordion, 'log'):
-                        log_accordion.log(message, log_level)
-                        return
+                elif hasattr(operation_container, 'log_message'):
+                    # log_message method on container object
+                    operation_container.log_message(message, log_level)
+                    return
             
             # Fallback to logger
             getattr(self.logger, level, self.logger.info)(message)
@@ -390,7 +412,33 @@ class EvaluationUIModule(UIModule):
             self.logger.error(f"Failed to log message: {e}")
             getattr(self.logger, level, self.logger.info)(message)
     
-    # Button Handler Method
+    # Button Handler Methods
+    def _handle_run_scenario_sync(self, button) -> None:
+        """Synchronous wrapper for run scenario button click."""
+        import asyncio
+        import threading
+        
+        def run_async():
+            # Create new event loop for this thread
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                # Clear previous results and logs
+                self._clear_ui_state()
+                
+                # Run the async handler
+                loop.run_until_complete(self._handle_run_scenario(button))
+            except Exception as e:
+                self.logger.error(f"Error in async scenario handler: {e}")
+                self.log(f"❌ Error: {e}", 'error')
+            finally:
+                loop.close()
+        
+        # Run in thread to avoid blocking
+        thread = threading.Thread(target=run_async)
+        thread.daemon = True
+        thread.start()
+    
     async def _handle_run_scenario(self, button) -> None:
         """Handle run scenario button click - determines action based on UI form selections."""
         try:
@@ -401,39 +449,57 @@ class EvaluationUIModule(UIModule):
             
             if run_mode == 'all_scenarios':
                 self.log("🚀 Starting comprehensive evaluation (8 tests)...", 'info')
+                self._update_status_panel("Running All Scenarios", "0%", "In Progress")
+                
                 result = await self._operation_manager.execute_all_scenarios()
                 
                 if result.get('success'):
                     successful = result.get('successful_tests', 0)
                     total = result.get('total_tests', 0)
                     self.log(f"🎉 Comprehensive evaluation completed: {successful}/{total} tests successful", 'success')
+                    self._update_status_panel("Completed", "100%", f"{successful}/{total} tests successful")
+                    self._update_summary_panel(result)
                 else:
                     error_msg = result.get('error', 'Unknown error')
                     self.log(f"❌ Comprehensive evaluation failed: {error_msg}", 'error')
+                    self._update_status_panel("Failed", "0%", f"Error: {error_msg}")
+                    self._update_summary_panel({})
                     
             elif run_mode == 'position_only':
                 self.log("📐 Starting position variation scenario (4 models)...", 'info')
+                self._update_status_panel("Running Position Scenario", "0%", "In Progress")
+                
                 result = await self._operation_manager.execute_position_scenario()
                 
                 if result.get('success'):
                     successful = result.get('successful_tests', 0) 
                     total = result.get('total_tests', 0)
                     self.log(f"✅ Position scenario completed: {successful}/{total} models successful", 'success')
+                    self._update_status_panel("Completed", "100%", f"{successful}/{total} models successful")
+                    self._update_summary_panel(result)
                 else:
                     error_msg = result.get('error', 'Unknown error')
                     self.log(f"❌ Position scenario failed: {error_msg}", 'error')
+                    self._update_status_panel("Failed", "0%", f"Error: {error_msg}")
+                    self._update_summary_panel({})
                     
             elif run_mode == 'lighting_only':
                 self.log("💡 Starting lighting variation scenario (4 models)...", 'info')
+                self._update_status_panel("Running Lighting Scenario", "0%", "In Progress")
+                
                 result = await self._operation_manager.execute_lighting_scenario()
                 
                 if result.get('success'):
                     successful = result.get('successful_tests', 0)
                     total = result.get('total_tests', 0)
                     self.log(f"✅ Lighting scenario completed: {successful}/{total} models successful", 'success')
+                    self._update_status_panel("Completed", "100%", f"{successful}/{total} models successful")
+                    self._update_summary_panel(result)
                 else:
                     error_msg = result.get('error', 'Unknown error')
                     self.log(f"❌ Lighting scenario failed: {error_msg}", 'error')
+                    self._update_status_panel("Failed", "0%", f"Error: {error_msg}")
+                    self._update_summary_panel({})
                     
         except Exception as e:
             self.logger.error(f"Scenario execution failed: {e}")
@@ -463,6 +529,112 @@ class EvaluationUIModule(UIModule):
         except Exception as e:
             self.logger.error(f"Failed to extract form values: {e}")
             return {'run_mode': 'all_scenarios'}
+    
+    def _clear_ui_state(self) -> None:
+        """Clear logs, progress, and status panel before starting new evaluation."""
+        try:
+            operation_container = self._ui_components.get('operation_container')
+            if operation_container:
+                # Clear log accordion
+                if isinstance(operation_container, dict) and 'log_accordion' in operation_container:
+                    log_accordion = operation_container['log_accordion']
+                    if hasattr(log_accordion, 'clear'):
+                        log_accordion.clear()
+                elif hasattr(operation_container, 'log_accordion'):
+                    if hasattr(operation_container.log_accordion, 'clear'):
+                        operation_container.log_accordion.clear()
+                
+                # Reset progress tracker
+                if isinstance(operation_container, dict) and 'progress_tracker' in operation_container:
+                    progress_tracker = operation_container['progress_tracker']
+                    if hasattr(progress_tracker, 'reset'):
+                        progress_tracker.reset()
+                elif hasattr(operation_container, 'progress_tracker'):
+                    if hasattr(operation_container.progress_tracker, 'reset'):
+                        operation_container.progress_tracker.reset()
+            
+            # Update status panel
+            self._update_status_panel("Ready to Start", "0%", "None")
+            
+            # Clear summary panel
+            self._update_summary_panel({})
+            
+            self.log("🧹 UI state cleared", 'info')
+            
+        except Exception as e:
+            self.logger.error(f"Failed to clear UI state: {e}")
+    
+    def _update_status_panel(self, mode: str, progress: str, last_run: str) -> None:
+        """Update status panel in header container."""
+        try:
+            header_container = self._ui_components.get('header_container')
+            if header_container and hasattr(header_container, 'update_status'):
+                status_items = {
+                    'Current Mode': mode,
+                    'Progress': progress,
+                    'Last Run': last_run,
+                    'Backend': 'Connected'
+                }
+                header_container.update_status(status_items)
+        except Exception as e:
+            self.logger.error(f"Failed to update status panel: {e}")
+    
+    def _update_summary_panel(self, results: dict) -> None:
+        """Update summary panel with evaluation results."""
+        try:
+            summary_container = self._ui_components.get('summary_container')
+            if summary_container:
+                if results:
+                    # Display actual results
+                    successful = results.get('successful_tests', 0)
+                    total = results.get('total_tests', 0)
+                    
+                    summary_html = f"""
+                    <div style='padding: 15px;'>
+                        <h4 style='margin-top: 0; color: #28a745;'>🎉 Evaluation Results</h4>
+                        <div style='display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin: 10px 0;'>
+                            <div><strong>Tests Completed:</strong> {successful}/{total}</div>
+                            <div><strong>Success Rate:</strong> {(successful/total*100):.1f}%</div>
+                        </div>
+                        <div style='margin-top: 15px;'>
+                            <strong>📊 Model Performance:</strong>
+                            <div style='margin: 10px 0; font-size: 0.9em; color: #666;'>
+                                Detailed results available in logs
+                            </div>
+                        </div>
+                    </div>
+                    """
+                    
+                    if hasattr(summary_container, 'set_content'):
+                        summary_container.set_content(summary_html)
+                    elif hasattr(summary_container, 'set_html'):
+                        summary_container.set_html(summary_html, 'success')
+                else:
+                    # Display empty state
+                    empty_html = f"""
+                    <div style='padding: 15px; text-align: center; color: #6c757d;'>
+                        <h4 style='margin-top: 0;'>📊 Evaluation Results</h4>
+                        <div style='margin: 20px 0;'>
+                            <div style='font-size: 3em; opacity: 0.3;'>📈</div>
+                            <p>No evaluation results yet</p>
+                            <p style='font-size: 0.9em;'>Click "Run Scenario" to start evaluation</p>
+                        </div>
+                        <div style='display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin: 15px 0;'>
+                            <div><strong>Tests Completed:</strong> 0/8</div>
+                            <div><strong>Success Rate:</strong> 0%</div>
+                            <div><strong>Best Model:</strong> None</div>
+                            <div><strong>Avg mAP:</strong> N/A</div>
+                        </div>
+                    </div>
+                    """
+                    
+                    if hasattr(summary_container, 'set_content'):
+                        summary_container.set_content(empty_html)
+                    elif hasattr(summary_container, 'set_html'):
+                        summary_container.set_html(empty_html, 'info')
+                        
+        except Exception as e:
+            self.logger.error(f"Failed to update summary panel: {e}")
     
     def get_ui_components(self) -> Dict[str, Any]:
         """

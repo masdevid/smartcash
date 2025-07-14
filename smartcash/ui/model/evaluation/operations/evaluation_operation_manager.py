@@ -28,6 +28,9 @@ class EvaluationOperationManager(OperationHandler):
         self._current_model = None
         self._results = {}
         
+        # Store operation container properly
+        self.operation_container = operation_container
+        
         # Initialize backend evaluation service
         self.evaluation_service = create_evaluation_service(
             model_api=None,  # Will be set when model is loaded
@@ -77,10 +80,22 @@ class EvaluationOperationManager(OperationHandler):
             
             # Setup progress callback
             def progress_callback(progress_data):
-                if 'percentage' in progress_data:
-                    self.update_progress(progress_data['percentage'], progress_data.get('message', 'Processing...'))
-                if 'log_message' in progress_data:
-                    self.log(progress_data['log_message'], progress_data.get('log_level', 'info'))
+                try:
+                    if 'percentage' in progress_data:
+                        percentage = min(100, max(0, progress_data['percentage']))
+                        message = progress_data.get('message', 'Processing...')
+                        self.update_progress(percentage, message)
+                        
+                        # Also update parent UI status
+                        if hasattr(self, '_parent_ui_module'):
+                            self._parent_ui_module._update_status_panel(
+                                "In Progress", f"{percentage}%", message
+                            )
+                    
+                    if 'log_message' in progress_data:
+                        self.log(progress_data['log_message'], progress_data.get('log_level', 'info'))
+                except Exception as e:
+                    self.logger.error(f"Progress callback error: {e}")
             
             # Get UI components for progress tracking
             ui_components = {

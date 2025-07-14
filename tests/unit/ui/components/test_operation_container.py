@@ -69,6 +69,14 @@ class TestWidget(widgets.Widget):
         if not name.startswith('_'):
             return MagicMock()
         raise AttributeError(name)
+        
+    def __enter__(self):
+        """Support context manager protocol."""
+        return self
+        
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """Support context manager protocol."""
+        pass
 
 # Create a test config for progress tracker
 class TestProgressConfig(ProgressConfig):

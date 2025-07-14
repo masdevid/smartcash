@@ -526,7 +526,7 @@ class OperationContainer(BaseUIComponent):
                    on_cancel: Optional[Callable] = None,
                    confirm_text: str = "Confirm",
                    cancel_text: str = "Cancel",
-                   danger_mode: bool = False) -> None:
+                   danger_mode: bool = False) -> bool:
         """Show a confirmation dialog.
         
         Args:
@@ -605,13 +605,19 @@ class OperationContainer(BaseUIComponent):
     # Alias for backward compatibility
     show_info_dialog = show_info
     
-    def clear_dialog(self) -> None:
+    def clear_dialog(self) -> bool:
         """Clear any currently displayed dialog."""
         if self.dialog_area:
             clear_dialog_area({'dialog_area': self.dialog_area})
             self.dialog_area.layout.display = 'none'
     
     def is_dialog_visible(self) -> bool:
+        """Check if a dialog is currently visible.
+        
+        Returns:
+            True if any dialog is visible, False otherwise
+        """
+        return any(dialog.visible for dialog in self.dialogs.values())
         """Check if a dialog is currently visible."""
         if not self.dialog_area:
             return False

@@ -326,11 +326,15 @@ class ColabUIModule(UIModule):
             config = self.get_config()
             self.logger.debug(f"Initializing operation manager with config: {config}")
             
-            # Initialize operation manager with the widget container
+            # Initialize operation manager with the operation container
+            # The operation container from colab_ui.py is a VBox widget, so pass it directly
             self._operation_manager = ColabOperationManager(
                 config=config,
-                operation_container=operation_container.widget
+                operation_container=operation_container
             )
+            
+            # Setup UI logging bridge to capture backend service logs
+            self._setup_ui_logging_bridge(operation_container)
             
             # Initialize the operation manager
             self._operation_manager.initialize()
@@ -360,6 +364,135 @@ class ColabUIModule(UIModule):
         except Exception as e:
             self.logger.exception("Failed to setup config handler")
             raise
+    
+    def _setup_ui_logging_bridge(self, operation_container: Any) -> None:
+        """Setup UI logging bridge to capture backend service logs.
+        
+        This method creates a custom logging handler that captures logs from
+        backend services (smartcash.dataset.*, smartcash.model.*, etc.) and
+        forwards them to the operation container for display in the UI.
+        
+        Args:
+            operation_container: The operation container instance to log to
+        """
+        try:
+            import logging
+            from typing import Callable
+            
+            # Create custom handler for backend services
+            class BackendUILogHandler(logging.Handler):
+                def __init__(self, log_func: Callable[[str, str], None]):
+                    super().__init__()
+                    self.log_func = log_func
+                    self.setLevel(logging.INFO)  # Capture INFO and above
+                    
+                def emit(self, record):
+                    try:
+                        msg = self.format(record)
+                        # Map log levels
+                        level = 'info'
+                        if record.levelno >= logging.ERROR:
+                            level = 'error'
+                        elif record.levelno >= logging.WARNING:
+                            level = 'warning'
+                        elif record.levelno >= logging.INFO:
+                            level = 'info'
+                        else:
+                            level = 'debug'
+                        
+                        # Forward to operation container
+                        self.log_func(msg, level)
+                    except Exception:
+                        # Don't let logging errors break the application
+                        pass
+            
+            # Get the log function from operation container
+            log_func = None
+            if hasattr(operation_container, 'log_message'):
+                log_func = operation_container.log_message
+            elif hasattr(self._operation_manager, 'log'):
+                log_func = self._operation_manager.log
+            
+            if log_func:
+                # Create and configure the handler
+                ui_handler = BackendUILogHandler(log_func)
+                ui_handler.setFormatter(logging.Formatter(
+                    '%(name)s: %(message)s'
+                ))
+                
+                # Add handler to relevant backend service loggers
+                backend_loggers = [
+                    'smartcash.dataset',     # Dataset processing services
+                    'smartcash.model',       # Model services
+                    'smartcash.common',      # Common services
+                    'smartcash.setup.colab'  # Colab-specific backend services
+                ]
+                
+                for logger_name in backend_loggers:
+                    backend_logger = logging.getLogger(logger_name)
+                    backend_logger.addHandler(ui_handler)
+                    # Ensure the logger level allows INFO messages
+                    if backend_logger.level > logging.INFO:
+                        backend_logger.setLevel(logging.INFO)
+                
+                self.logger.debug(f"✅ UI logging bridge setup for {len(backend_loggers)} backend loggers")
+                
+                # Store handler for cleanup
+                self._ui_log_handler = ui_handler
+                self._ui_backend_loggers = backend_loggers
+            else:
+                self.logger.warning("⚠️ Could not setup UI logging bridge - no log function available")
+                
+        except Exception as e:
+            self.logger.warning(f"⚠️ Failed to setup UI logging bridge: {e}")
+    
+    def _cleanup_ui_logging_bridge(self) -> None:
+        """Clean up UI logging bridge handlers."""
+        try:
+            if hasattr(self, '_ui_log_handler') and hasattr(self, '_ui_backend_loggers'):
+                import logging
+                
+                # Remove handler from all backend loggers
+                for logger_name in self._ui_backend_loggers:
+                    backend_logger = logging.getLogger(logger_name)
+                    backend_logger.removeHandler(self._ui_log_handler)
+                
+                self.logger.debug("✅ UI logging bridge cleaned up")
+                
+                # Clean up references
+                delattr(self, '_ui_log_handler')
+                delattr(self, '_ui_backend_loggers')
+                
+        except Exception as e:
+            self.logger.warning(f"⚠️ Error cleaning up UI logging bridge: {e}")
+    
+    def cleanup(self) -> None:
+        """Clean up module resources and operation manager."""
+        try:
+            self.logger.info("🧹 Starting Colab module cleanup...")
+            
+            # Clean up UI logging bridge
+            self._cleanup_ui_logging_bridge()
+            
+            # Clean up operation manager
+            if self._operation_manager:
+                self._operation_manager.cleanup()
+                self._operation_manager = None
+                self.logger.debug("✅ Operation manager cleaned up")
+            
+            # Clean up config handler
+            if self._config_handler:
+                # No specific cleanup needed for config handler
+                self._config_handler = None
+                self.logger.debug("✅ Config handler cleaned up")
+            
+            # Clean up parent resources
+            super().cleanup()
+            
+            self.logger.info("✅ Colab module cleanup completed")
+            
+        except Exception as e:
+            self.logger.exception(f"❌ Error during cleanup: {e}")
     
     def _register_operations(self) -> None:
         """Register all Colab operations with the operation registry.

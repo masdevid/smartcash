@@ -2,17 +2,17 @@
 Operation Container Component
 
 This module provides a unified interface for operation-related UI components,
-including action buttons, dialogs, progress tracking, and logging.
+including dialogs, progress tracking, and logging.
 """
 
-from typing import Dict, Any, Optional, List, Callable, Union, Literal
-import ipywidgets as widgets
-from IPython.display import display
-
-# Import components
-from smartcash.ui.components.progress_tracker.progress_tracker import ProgressTracker, ProgressConfig
+from typing import Dict, Any, Optional, Literal, Callable, Union
+from ipywidgets import widgets
+from smartcash.ui.core.errors.enums import ErrorLevel
 from smartcash.ui.components.progress_tracker.types import ProgressLevel, ProgressConfig
-from smartcash.ui.components.log_accordion import LogAccordion, LogLevel
+from smartcash.ui.components.log_accordion import LogLevel, LogAccordion
+from smartcash.ui.components.progress_tracker.progress_tracker import ProgressTracker
+from smartcash.ui.core.errors.handlers import CoreErrorHandler
+from smartcash.ui.components.dialog import SimpleDialog
 from smartcash.ui.components.base_component import BaseUIComponent
 from smartcash.ui.components.dialog import (
     show_confirmation_dialog,
@@ -52,7 +52,7 @@ def create_operation_container(
     )
     
     return {
-        'container': container,
+        'container': container.widget,
         'progress_tracker': container.progress_tracker if show_progress else None,
         'dialog_area': container.dialog_area if container._show_dialog_enabled else None,
         'log_accordion': container.log_accordion if show_logs else None,
@@ -203,6 +203,9 @@ class OperationContainer(BaseUIComponent):
             )
             # Initialize the progress tracker
             self.progress_tracker.initialize()
+            
+            # Show progress tracker by default for operation containers
+            self.progress_tracker.show()
             
             # Initialize progress bars based on the number of levels
             levels = {
@@ -426,6 +429,15 @@ class OperationContainer(BaseUIComponent):
         """
         if not self.progress_tracker or level not in self.progress_bars:
             return
+        
+        # Ensure progress tracker is visible when updating progress
+        if not self.progress_tracker._initialized:
+            self.progress_tracker.initialize()
+        
+        # Show progress tracker if it's hidden
+        if hasattr(self.progress_tracker, 'container') and self.progress_tracker.container:
+            if self.progress_tracker.container.layout.display == 'none':
+                self.progress_tracker.show()
             
         # Update progress value and message
         self.progress_bars[level].update({
@@ -502,20 +514,58 @@ class OperationContainer(BaseUIComponent):
         """Update the progress tracker with current progress values."""
         if not self.progress_tracker:
             return
+        
+        try:
+            # Ensure progress tracker is properly initialized and visible
+            if not hasattr(self.progress_tracker, '_initialized') or not self.progress_tracker._initialized:
+                self.progress_tracker.initialize()
             
-        for level, data in self.progress_bars.items():
-            if data['visible']:
-                if data.get('error', False):
-                    self.progress_tracker.error(data['message'])
-                else:
-                    self.progress_tracker.set_progress(
-                        data['value'], 
-                        level,
-                        data['message']
-                    )
+            # Show progress tracker if any bars are visible
+            has_visible_bars = any(data.get('visible', False) for data in self.progress_bars.values())
+            
+            if has_visible_bars:
+                # Ensure tracker is visible
+                if hasattr(self.progress_tracker, 'container') and self.progress_tracker.container:
+                    if self.progress_tracker.container.layout.display == 'none':
+                        self.progress_tracker.show()
+                
+                # Update each visible progress bar
+                for level, data in self.progress_bars.items():
+                    if data.get('visible', False):
+                        try:
+                            if data.get('error', False):
+                                # Show error state
+                                if hasattr(self.progress_tracker, 'error'):
+                                    self.progress_tracker.error(data.get('message', 'An error occurred'))
+                                else:
+                                    # Fallback to set_progress with error styling
+                                    self.progress_tracker.set_progress(
+                                        data.get('value', 0), 
+                                        level,
+                                        f"❌ {data.get('message', 'Error')}"
+                                    )
+                            else:
+                                # Normal progress update
+                                self.progress_tracker.set_progress(
+                                    data.get('value', 0), 
+                                    level,
+                                    data.get('message', '')
+                                )
+                        except Exception as e:
+                            # Log error but don't break the UI
+                            import logging
+                            logger = logging.getLogger(__name__)
+                            logger.error(f"Error updating progress bar {level}: {e}")
             else:
-                # Hide the progress bar
-                self.progress_tracker.hide()
+                # No visible bars - consider hiding tracker
+                # But keep it visible if it was explicitly shown
+                pass
+                
+        except Exception as e:
+            # Comprehensive error handling for progress tracker updates
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Error in _update_progress_bars: {e}")
     
     # ===== Dialog Methods =====
     
@@ -527,7 +577,7 @@ class OperationContainer(BaseUIComponent):
                    confirm_text: str = "Confirm",
                    cancel_text: str = "Cancel",
                    danger_mode: bool = False) -> bool:
-        """Show a confirmation dialog.
+        """Show a confirmation dialog with enhanced integration.
         
         Args:
             title: Dialog title
@@ -537,79 +587,150 @@ class OperationContainer(BaseUIComponent):
             confirm_text: Text for confirm button
             cancel_text: Text for cancel button
             danger_mode: If True, shows the confirm button in danger color
+            
+        Returns:
+            True if dialog was shown successfully, False otherwise
         """
-        if not hasattr(self, 'dialog_area') or not self.dialog_area:
-            # If dialogs are disabled, just call confirm callback if provided
+        if not self.dialog_area:
+            # Log fallback if dialog area is not available
+            self.log(f"Dialog requested: {title} - {message}", LogLevel.INFO)
             if on_confirm:
                 on_confirm()
-            return
+            return False
+        
+        try:
+            # Clear any existing dialog
+            self.clear_dialog()
             
-        with self.dialog_area:
-            clear_dialog_area({'dialog_area': self.dialog_area})
-            self.dialog_area.layout.display = 'flex'
+            # Enhanced callback wrappers with logging
+            def enhanced_confirm():
+                try:
+                    self.log(f"Dialog confirmed: {title}", LogLevel.INFO)
+                    if on_confirm:
+                        on_confirm()
+                except Exception as e:
+                    self.log(f"Error in dialog confirm callback: {e}", LogLevel.ERROR)
+                finally:
+                    self.clear_dialog()
+                    
+            def enhanced_cancel():
+                try:
+                    self.log(f"Dialog cancelled: {title}", LogLevel.INFO)
+                    if on_cancel:
+                        on_cancel()
+                except Exception as e:
+                    self.log(f"Error in dialog cancel callback: {e}", LogLevel.ERROR)
+                finally:
+                    self.clear_dialog()
             
-            def wrapped_confirm():
-                if on_confirm:
-                    on_confirm()
-                self.clear_dialog()
-                
-            def wrapped_cancel():
-                if on_cancel:
-                    on_cancel()
-                self.clear_dialog()
-            
-            show_confirmation_dialog(
-                {'dialog_area': self.dialog_area},
+            # Create dialog with enhanced callbacks
+            dialog = SimpleDialog(
+                component_name=f"dialog_{title}",
                 title=title,
                 message=message,
-                on_confirm=wrapped_confirm,
-                on_cancel=wrapped_cancel,
+                on_confirm=enhanced_confirm,
+                on_cancel=enhanced_cancel,
                 confirm_text=confirm_text,
                 cancel_text=cancel_text,
                 danger_mode=danger_mode
             )
+            
+            # Store dialog reference and display
+            self.dialogs[title] = dialog
+            self.dialog_area.children = (dialog,)
+            self.dialog_area.layout.display = 'flex'
+            
+            # Log dialog display
+            self.log(f"Showing dialog: {title}", LogLevel.DEBUG)
+            return True
+            
+        except Exception as e:
+            self.log(f"Error showing dialog '{title}': {e}", LogLevel.ERROR)
+            return False
     
     def show_info(self, 
                  title: str, 
                  message: str, 
                  on_ok: Optional[Callable] = None,
-                 ok_text: str = "OK") -> None:
-        """Show an info dialog.
+                 ok_text: str = "OK") -> bool:
+        """Show an info dialog with enhanced integration.
         
         Args:
             title: Dialog title
             message: Dialog message
             on_ok: Callback when user clicks OK
             ok_text: Text for OK button
+            
+        Returns:
+            True if dialog was shown successfully, False otherwise
         """
         if not self.dialog_area:
-            return
+            # Log fallback if dialog area is not available
+            self.log(f"Info dialog requested: {title} - {message}", LogLevel.INFO)
+            if on_ok:
+                on_ok()
+            return False
+        
+        try:
+            # Clear any existing dialog
+            self.clear_dialog()
             
-        with self.dialog_area:
-            clear_dialog_area({'dialog_area': self.dialog_area})
-            self.dialog_area.layout.display = 'flex'
+            # Enhanced callback wrapper with logging
+            def enhanced_ok():
+                try:
+                    self.log(f"Info dialog acknowledged: {title}", LogLevel.INFO)
+                    if on_ok:
+                        on_ok()
+                except Exception as e:
+                    self.log(f"Error in info dialog callback: {e}", LogLevel.ERROR)
+                finally:
+                    self.clear_dialog()
             
-            def wrapped_ok():
-                if on_ok:
-                    on_ok()
-                self.clear_dialog()
+            # Use dialog area with enhanced callbacks
+            with self.dialog_area:
+                clear_dialog_area({'dialog_area': self.dialog_area})
+                self.dialog_area.layout.display = 'flex'
+                
+                show_info_dialog(
+                    {'dialog_area': self.dialog_area},
+                    title=title,
+                    message=message,
+                    on_ok=enhanced_ok,
+                    ok_text=ok_text
+                )
             
-            show_info_dialog(
-                {'dialog_area': self.dialog_area},
-                title=title,
-                message=message,
-                on_ok=wrapped_ok,
-                ok_text=ok_text
-            )
+            # Log dialog display
+            self.log(f"Showing info dialog: {title}", LogLevel.DEBUG)
+            return True
+            
+        except Exception as e:
+            self.log(f"Error showing info dialog '{title}': {e}", LogLevel.ERROR)
+            return False
     
     # Alias for backward compatibility
     show_info_dialog = show_info
     
     def clear_dialog(self) -> bool:
-        """Clear any currently displayed dialog."""
-        if self.dialog_area:
-            clear_dialog_area({'dialog_area': self.dialog_area})
-            self.dialog_area.layout.display = 'none'
+        """Clear any currently displayed dialog.
+        
+        Returns:
+            True if dialog was cleared successfully, False otherwise
+        """
+        if not self.dialog_area:
+            return False
+            
+        # Hide any visible dialog
+        for dialog in self.dialogs.values():
+            if hasattr(dialog, 'hide'):
+                dialog.hide()
+        
+        # Clear dialog area
+        self.dialog_area.children = ()
+        self.dialog_area.layout.display = 'none'
+        
+        # Log dialog clearing
+        self.log("Dialog cleared", LogLevel.DEBUG)
+        return True
     
     def is_dialog_visible(self) -> bool:
         """Check if a dialog is currently visible.
@@ -617,23 +738,50 @@ class OperationContainer(BaseUIComponent):
         Returns:
             True if any dialog is visible, False otherwise
         """
-        return any(dialog.visible for dialog in self.dialogs.values())
-        """Check if a dialog is currently visible."""
         if not self.dialog_area:
             return False
-        return is_dialog_visible({'dialog_area': self.dialog_area})
+            
+        # Check if dialog area has any children and is visible
+        return bool(self.dialog_area.children) and self.dialog_area.layout.display != 'none'
     
     # ===== Logging Methods =====
     
-    def log(self, message: str, level: LogLevel = LogLevel.INFO) -> None:
+    def log(self, message: str, level: LogLevel = LogLevel.INFO, namespace: str = None) -> None:
         """Log a message with the specified level.
         
         Args:
             message: The message to log
             level: The log level (default: INFO)
+            namespace: Optional namespace for categorizing logs
         """
-        if self.log_accordion:
-            self.log_accordion.log(message, level)
+        if not self.log_accordion:
+            return
+            
+        try:
+            # Ensure log accordion is properly initialized
+            if not hasattr(self.log_accordion, '_initialized') or not self.log_accordion._initialized:
+                self.log_accordion.initialize()
+            
+            # Add timestamp and namespace formatting if provided
+            if namespace:
+                formatted_message = f"[{namespace}] {message}"
+            else:
+                formatted_message = message
+            
+            # Log the message
+            self.log_accordion.log(formatted_message, level)
+            
+            # Auto-expand log accordion for important messages
+            if level in [LogLevel.WARNING, LogLevel.ERROR]:
+                if hasattr(self.log_accordion, 'expand'):
+                    self.log_accordion.expand()
+                    
+        except Exception as e:
+            # Fallback logging to console if log accordion fails
+            import logging
+            fallback_logger = logging.getLogger(__name__)
+            fallback_logger.log(getattr(logging, level.value.upper(), logging.INFO), f"[FALLBACK] {message}")
+            fallback_logger.error(f"Log accordion error: {e}")
     
     # Alias for backward compatibility
     log_message = log
@@ -654,9 +802,240 @@ class OperationContainer(BaseUIComponent):
         """Log an error message."""
         self.log(message, LogLevel.ERROR)
     
+    def clear_logs(self) -> None:
+        """Clear all log messages from the log accordion."""
+        if self.log_accordion and hasattr(self.log_accordion, 'clear'):
+            try:
+                self.log_accordion.clear()
+            except Exception as e:
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.error(f"Error clearing logs: {e}")
+    
+    def get_log_count(self) -> int:
+        """Get the total number of log entries.
+        
+        Returns:
+            Number of log entries, or 0 if log accordion is not available
+        """
+        if self.log_accordion and hasattr(self.log_accordion, 'get_log_count'):
+            try:
+                return self.log_accordion.get_log_count()
+            except Exception:
+                pass
+        return 0
+    
+    def export_logs(self) -> str:
+        """Export all logs as a formatted string.
+        
+        Returns:
+            Formatted string containing all log entries
+        """
+        if self.log_accordion and hasattr(self.log_accordion, 'export_logs'):
+            try:
+                return self.log_accordion.export_logs()
+            except Exception as e:
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.error(f"Error exporting logs: {e}")
+        return ""
+    
     def critical(self, message: str) -> None:
         """Log a critical message."""
         self.log(message, LogLevel.CRITICAL)
+    
+    # ===== Integration and Health Check Methods =====
+    
+    def validate_integration(self) -> Dict[str, Any]:
+        """Validate integration of all operation container components.
+        
+        Returns:
+            Dictionary with validation results for each component
+        """
+        results = {
+            'overall_status': 'healthy',
+            'components': {},
+            'issues': [],
+            'recommendations': []
+        }
+        
+        # Check progress tracker
+        if self.show_progress:
+            progress_status = self._validate_progress_tracker()
+            results['components']['progress_tracker'] = progress_status
+            if not progress_status['healthy']:
+                results['issues'].extend(progress_status['issues'])
+                results['overall_status'] = 'issues'
+        
+        # Check log accordion
+        if self.show_logs:
+            log_status = self._validate_log_accordion()
+            results['components']['log_accordion'] = log_status
+            if not log_status['healthy']:
+                results['issues'].extend(log_status['issues'])
+                results['overall_status'] = 'issues'
+        
+        # Check dialog system
+        if self._show_dialog_enabled:
+            dialog_status = self._validate_dialog_system()
+            results['components']['dialog_system'] = dialog_status
+            if not dialog_status['healthy']:
+                results['issues'].extend(dialog_status['issues'])
+                results['overall_status'] = 'issues'
+        
+        # Check container layout
+        container_status = self._validate_container_layout()
+        results['components']['container_layout'] = container_status
+        if not container_status['healthy']:
+            results['issues'].extend(container_status['issues'])
+            results['overall_status'] = 'issues'
+        
+        return results
+    
+    def _validate_progress_tracker(self) -> Dict[str, Any]:
+        """Validate progress tracker component."""
+        status = {'healthy': True, 'issues': [], 'details': {}}
+        
+        try:
+            if not self.progress_tracker:
+                status['healthy'] = False
+                status['issues'].append("Progress tracker not initialized")
+                return status
+            
+            # Check initialization
+            if not hasattr(self.progress_tracker, '_initialized') or not self.progress_tracker._initialized:
+                status['issues'].append("Progress tracker not properly initialized")
+                status['healthy'] = False
+            
+            # Check container availability
+            if not hasattr(self.progress_tracker, 'container') or not self.progress_tracker.container:
+                status['issues'].append("Progress tracker container not available")
+                status['healthy'] = False
+            
+            # Check progress bars configuration
+            expected_levels = {
+                'single': ['primary'],
+                'dual': ['primary', 'secondary'],
+                'triple': ['primary', 'secondary', 'tertiary']
+            }.get(self.progress_levels, ['primary'])
+            
+            for level in expected_levels:
+                if level not in self.progress_bars:
+                    status['issues'].append(f"Progress bar level '{level}' not configured")
+                    status['healthy'] = False
+            
+            status['details'] = {
+                'initialized': getattr(self.progress_tracker, '_initialized', False),
+                'levels_configured': list(self.progress_bars.keys()),
+                'expected_levels': expected_levels,
+                'visible': hasattr(self.progress_tracker, 'container') and 
+                          self.progress_tracker.container and 
+                          self.progress_tracker.container.layout.display != 'none'
+            }
+            
+        except Exception as e:
+            status['healthy'] = False
+            status['issues'].append(f"Progress tracker validation error: {e}")
+        
+        return status
+    
+    def _validate_log_accordion(self) -> Dict[str, Any]:
+        """Validate log accordion component."""
+        status = {'healthy': True, 'issues': [], 'details': {}}
+        
+        try:
+            if not self.log_accordion:
+                status['healthy'] = False
+                status['issues'].append("Log accordion not initialized")
+                return status
+            
+            # Check initialization
+            if not hasattr(self.log_accordion, '_initialized') or not self.log_accordion._initialized:
+                status['issues'].append("Log accordion not properly initialized")
+                status['healthy'] = False
+            
+            # Check logging capability
+            if not hasattr(self.log_accordion, 'log') or not callable(self.log_accordion.log):
+                status['issues'].append("Log accordion missing log method")
+                status['healthy'] = False
+            
+            status['details'] = {
+                'initialized': getattr(self.log_accordion, '_initialized', False),
+                'module_name': self.log_module_name,
+                'height': self.log_height,
+                'log_count': self.get_log_count()
+            }
+            
+        except Exception as e:
+            status['healthy'] = False
+            status['issues'].append(f"Log accordion validation error: {e}")
+        
+        return status
+    
+    def _validate_dialog_system(self) -> Dict[str, Any]:
+        """Validate dialog system component."""
+        status = {'healthy': True, 'issues': [], 'details': {}}
+        
+        try:
+            if not self.dialog_area:
+                status['healthy'] = False
+                status['issues'].append("Dialog area not initialized")
+                return status
+            
+            # Check dialog area layout
+            if not hasattr(self.dialog_area, 'layout'):
+                status['issues'].append("Dialog area missing layout")
+                status['healthy'] = False
+            
+            status['details'] = {
+                'dialog_area_available': self.dialog_area is not None,
+                'active_dialogs': len(self.dialogs),
+                'dialog_visible': self.is_dialog_visible()
+            }
+            
+        except Exception as e:
+            status['healthy'] = False
+            status['issues'].append(f"Dialog system validation error: {e}")
+        
+        return status
+    
+    def _validate_container_layout(self) -> Dict[str, Any]:
+        """Validate container layout and structure."""
+        status = {'healthy': True, 'issues': [], 'details': {}}
+        
+        try:
+            if not self.container:
+                status['healthy'] = False
+                status['issues'].append("Main container not initialized")
+                return status
+            
+            # Check container children
+            expected_children = 0
+            if self.show_progress and self.progress_tracker:
+                expected_children += 1
+            if self._show_dialog_enabled and self.dialog_area:
+                expected_children += 1
+            if self.show_logs and self.log_accordion:
+                expected_children += 1
+            
+            actual_children = len(self.container.children)
+            if actual_children != expected_children:
+                status['issues'].append(f"Container children mismatch: expected {expected_children}, got {actual_children}")
+                status['healthy'] = False
+            
+            status['details'] = {
+                'expected_children': expected_children,
+                'actual_children': actual_children,
+                'show_progress': self.show_progress,
+                'show_logs': self.show_logs,
+                'show_dialog': self._show_dialog_enabled
+            }
+            
+        except Exception as e:
+            status['healthy'] = False
+            status['issues'].append(f"Container layout validation error: {e}")
+        
+        return status
         
     def clear_logs(self) -> None:
         """Clear all log messages."""

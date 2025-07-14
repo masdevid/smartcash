@@ -90,7 +90,19 @@ class OperationHandler(BaseHandler):
         self._operation_status = OperationStatus.PENDING
         self._last_result: Optional[OperationResult] = None
         self._cancel_requested = False
-        self._operation_container = operation_container.widget if operation_container else None
+        # Handle both dictionary and object operation containers
+        if operation_container:
+            if hasattr(operation_container, 'widget'):
+                # Object with widget attribute
+                self._operation_container = operation_container.widget
+            elif isinstance(operation_container, dict):
+                # Dictionary from create_operation_container
+                self._operation_container = operation_container
+            else:
+                # Direct widget or other object
+                self._operation_container = operation_container
+        else:
+            self._operation_container = None
         
         # Executor setup
         self._max_workers = max_workers

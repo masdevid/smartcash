@@ -22,7 +22,22 @@ class SimpleDialog(BaseUIComponent):
             component_name: Unique name for this component
             **kwargs: Additional arguments to pass to BaseUIComponent
         """
+        # Extract dialog-specific kwargs
+        dialog_kwargs = {
+            'title': kwargs.pop('title', ''),
+            'message': kwargs.pop('message', ''),
+            'on_confirm': kwargs.pop('on_confirm', None),
+            'on_cancel': kwargs.pop('on_cancel', None),
+            'confirm_text': kwargs.pop('confirm_text', 'Confirm'),
+            'cancel_text': kwargs.pop('cancel_text', 'Cancel'),
+            'danger_mode': kwargs.pop('danger_mode', False)
+        }
+        
+        # Pass remaining kwargs to BaseUIComponent
         super().__init__(component_name, **kwargs)
+        
+        # Store dialog-specific kwargs
+        self._dialog_kwargs = dialog_kwargs
         
         self._is_visible = False
         self._callbacks: Dict[str, Callable] = {}

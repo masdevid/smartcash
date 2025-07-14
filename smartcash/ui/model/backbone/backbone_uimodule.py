@@ -80,6 +80,9 @@ class BackboneUIModule(UIModule):
             
             self._operation_manager.initialize()
             
+            # Setup UI logging bridge to capture backend service logs
+            self._setup_ui_logging_bridge(operation_container)
+            
             # Initialize progress tracker display
             self._initialize_progress_display()
             
@@ -574,6 +577,83 @@ class BackboneUIModule(UIModule):
             if self._operation_manager:
                 self._operation_manager.log(f"⚠️ Warning: Could not update UI widgets - {e}", 'warning')
     
+    def _setup_ui_logging_bridge(self, operation_container: Any) -> None:
+        """Setup UI logging bridge to capture backend service logs."""
+        try:
+            import logging
+            from smartcash.ui.core.logging.ui_logging_manager import setup_ui_logging
+            
+            # Get log message function from operation container
+            log_message_func = None
+            if isinstance(operation_container, dict) and 'log_message' in operation_container:
+                log_message_func = operation_container['log_message']
+            elif hasattr(operation_container, 'log_message'):
+                log_message_func = operation_container.log_message
+            
+            if not log_message_func:
+                self.logger.warning("⚠️ Could not setup UI logging bridge - log_message function not found")
+                return
+            
+            # Setup basic UI logging for the module
+            setup_ui_logging(
+                module_name='model.backbone',
+                log_message_func=log_message_func
+            )
+            
+            # Create custom handler for backend services
+            class BackendUILogHandler(logging.Handler):
+                """Custom handler to route backend service logs to UI."""
+                
+                def __init__(self, log_func: callable):
+                    super().__init__()
+                    self.log_func = log_func
+                    self.setLevel(logging.INFO)
+                    formatter = logging.Formatter('%(name)s: %(message)s')
+                    self.setFormatter(formatter)
+                
+                def emit(self, record):
+                    try:
+                        msg = self.format(record)
+                        level = 'debug' if record.levelno == logging.DEBUG else \
+                               'info' if record.levelno == logging.INFO else \
+                               'warning' if record.levelno == logging.WARNING else \
+                               'error'
+                        self.log_func(msg, level)
+                    except Exception:
+                        pass  # Silently handle logging errors
+            
+            # Create handler for backend services
+            backend_handler = BackendUILogHandler(log_message_func)
+            
+            # Configure backend service loggers
+            backend_namespaces = [
+                'smartcash.model',
+                'smartcash.dataset.preprocessor', 
+                'smartcash.dataset.augmentor',
+                'smartcash.common'
+            ]
+            
+            for namespace in backend_namespaces:
+                logger = logging.getLogger(namespace)
+                
+                # Remove existing console handlers to prevent duplicate output
+                for handler in logger.handlers[:]:
+                    if isinstance(handler, logging.StreamHandler):
+                        import sys
+                        if hasattr(handler, 'stream') and handler.stream in (sys.stdout, sys.stderr):
+                            logger.removeHandler(handler)
+                
+                # Add UI handler
+                logger.addHandler(backend_handler)
+                logger.setLevel(logging.INFO)
+            
+            self.logger.debug("✅ UI logging bridge setup completed for backend services")
+                
+        except ImportError as e:
+            self.logger.warning(f"⚠️ UI logging manager not available: {e}")
+        except Exception as e:
+            self.logger.error(f"Failed to setup UI logging bridge: {e}")
+    
     def _initialize_progress_display(self) -> None:
         """Initialize progress tracker display to show by default."""
         try:
@@ -872,6 +952,9 @@ class BackboneUIModule(UIModule):
             if self._operation_manager:
                 self._operation_manager.cleanup()
             
+            # Cleanup UI logging bridge
+            self._cleanup_ui_logging_bridge()
+            
             # Clear references
             self._config_handler = None
             self._operation_manager = None
@@ -881,6 +964,35 @@ class BackboneUIModule(UIModule):
             
         except Exception as e:
             self.logger.error(f"Error during cleanup: {e}")
+    
+    def _cleanup_ui_logging_bridge(self) -> None:
+        """Cleanup UI logging bridge handlers."""
+        try:
+            import logging
+            from smartcash.ui.core.logging.ui_logging_manager import cleanup_ui_logging
+            
+            # Cleanup UI logging for this module
+            cleanup_ui_logging('model.backbone')
+            
+            # Remove custom handlers from backend services
+            backend_namespaces = [
+                'smartcash.model',
+                'smartcash.dataset.preprocessor', 
+                'smartcash.dataset.augmentor',
+                'smartcash.common'
+            ]
+            
+            for namespace in backend_namespaces:
+                logger = logging.getLogger(namespace)
+                # Remove all handlers that were added by this module
+                for handler in logger.handlers[:]:
+                    if hasattr(handler, 'log_func'):  # Our custom handler
+                        logger.removeHandler(handler)
+            
+            self.logger.debug("✅ UI logging bridge cleanup completed")
+                
+        except Exception as e:
+            self.logger.debug(f"Error during logging cleanup: {e}")
 
 
 # ==================== FACTORY FUNCTIONS ====================

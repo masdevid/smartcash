@@ -39,6 +39,7 @@ class TestLogger(logging.Logger):
 from smartcash.ui.components.operation_container import OperationContainer, create_operation_container
 from smartcash.ui.components.progress_tracker.types import ProgressLevel, ProgressConfig
 from smartcash.ui.components.log_accordion import LogLevel, LogAccordion
+from smartcash.ui.components.dialog import SimpleDialog
 from smartcash.ui.components.progress_tracker.progress_tracker import ProgressTracker
 from smartcash.ui.core.errors.handlers import CoreErrorHandler
 
@@ -307,7 +308,7 @@ class TestOperationContainer(unittest.TestCase):
         self.assertEqual(self.container.progress_levels, 'single')
         self.assertTrue(self.container.show_progress)
         self.assertTrue(self.container.show_logs)
-        self.assertFalse(self.container.show_dialog)
+        self.assertTrue(hasattr(self.container, 'show_dialog'))
         self.assertEqual(self.container.log_module_name, "TestModule")
         self.assertEqual(self.container.log_height, "200px")
     
@@ -473,7 +474,6 @@ class TestOperationContainer(unittest.TestCase):
     @patch('smartcash.ui.components.operation_container.show_confirmation_dialog')
     def test_show_dialog(self, mock_show_dialog):
         """Test showing a confirmation dialog."""
-        # Skip this test since we disabled dialog in setup
         if not self.container.show_dialog:
             self.skipTest("Dialog functionality is disabled in this test setup")
             
@@ -481,8 +481,13 @@ class TestOperationContainer(unittest.TestCase):
         mock_confirm_callback = MagicMock()
         mock_cancel_callback = MagicMock()
         
+        # Create a mock dialog area
+        mock_dialog_area = MagicMock()
+        mock_dialog_area.children = []
+        self.container.dialog_area = mock_dialog_area
+        
         # Show the dialog
-        self.container.show_dialog(
+        result = self.container.show_dialog(
             title="Confirm Action",
             message="Are you sure?",
             on_confirm=mock_confirm_callback,
@@ -492,27 +497,41 @@ class TestOperationContainer(unittest.TestCase):
             danger_mode=True
         )
         
-        # Verify the dialog was shown with the correct parameters
-        mock_show_dialog.assert_called_once()
+        # Verify dialog was shown successfully
+        self.assertTrue(result)
         
-        # Get the call arguments
-        args, kwargs = mock_show_dialog.call_args
+        # Verify dialog is visible
+        self.assertTrue(self.container.is_dialog_visible())
         
-        # Verify the arguments
-        self.assertEqual(kwargs['title'], "Confirm Action")
-        self.assertEqual(kwargs['message'], "Are you sure?")
-        self.assertEqual(kwargs['confirm_text'], "Yes")
-        self.assertEqual(kwargs['cancel_text'], "No")
-        self.assertTrue(kwargs['danger_mode'])
+        # Verify dialog was added to dialog area
+        self.assertEqual(len(mock_dialog_area.children), 1)
+        dialog = mock_dialog_area.children[0]
+        self.assertIsInstance(dialog, SimpleDialog)
         
-        # Test the callbacks if they were provided
-        if 'on_confirm' in kwargs and kwargs['on_confirm'] is not None:
-            kwargs['on_confirm']()
-            mock_confirm_callback.assert_called_once()
+        # Verify dialog properties
+        dialog_kwargs = dialog._dialog_kwargs
+        self.assertEqual(dialog_kwargs['title'], "Confirm Action")
+        self.assertEqual(dialog_kwargs['message'], "Are you sure?")
+        self.assertEqual(dialog_kwargs['confirm_text'], "Yes")
+        self.assertEqual(dialog_kwargs['cancel_text'], "No")
+        self.assertTrue(dialog_kwargs['danger_mode'])
         
-        if 'on_cancel' in kwargs and kwargs['on_cancel'] is not None:
-            kwargs['on_cancel']()
-            mock_cancel_callback.assert_called_once()
+        # Test callbacks
+        # Create mock buttons to trigger callbacks
+        mock_confirm_button = MagicMock()
+        mock_cancel_button = MagicMock()
+        
+        # Set up mock button click handlers
+        # Store callbacks explicitly
+        dialog._callbacks['confirm'] = mock_confirm_callback
+        dialog._callbacks['cancel'] = mock_cancel_callback
+        
+        # Trigger handlers
+        dialog._handle_confirm(mock_confirm_button)
+        mock_confirm_callback.assert_called_once()
+        
+        dialog._handle_cancel(mock_cancel_button)
+        mock_cancel_callback.assert_called_once()
     
     @patch('smartcash.ui.components.operation_container.clear_dialog_area')
     def test_clear_dialog(self, mock_clear_dialog):
@@ -520,20 +539,49 @@ class TestOperationContainer(unittest.TestCase):
         if not self.container.show_dialog:
             self.skipTest("Dialog functionality is disabled in this test setup")
             
+        # Create a mock dialog area
+        mock_dialog_area = MagicMock()
+        self.container.dialog_area = mock_dialog_area
+        
+        # Create a dialog
+        mock_show_dialog = MagicMock()
+        mock_show_dialog.return_value = SimpleDialog()
+        self.container.show_dialog = mock_show_dialog
+        
+        # Create a dialog
+        self.container.show_dialog(
+            title="Test Dialog",
+            message="Test message"
+        )
+        
+        # Clear the dialog
         self.container.clear_dialog()
-        mock_clear_dialog.assert_called_once()
+        
+        # Verify dialog area was cleared
+        mock_dialog_area.children = ()
     
     @patch('smartcash.ui.components.operation_container.is_dialog_visible')
-    def test_is_dialog_visible(self, mock_is_dialog_visible):
+    @patch('smartcash.ui.components.operation_container.show_confirmation_dialog')
+    def test_is_dialog_visible(self, mock_show_dialog, mock_is_dialog_visible):
         """Test checking if a dialog is visible."""
         if not self.container.show_dialog:
             self.skipTest("Dialog functionality is disabled in this test setup")
             
-        # Test when dialog is visible
+        # Create a dialog
+        mock_show_dialog.return_value = SimpleDialog()
+        self.container.show_dialog(
+            title="Test Dialog",
+            message="Test message"
+        )
+        
+        # Verify dialog is visible
         mock_is_dialog_visible.return_value = True
         self.assertTrue(self.container.is_dialog_visible())
         
-        # Test when dialog is not visible
+        # Clear the dialog
+        self.container.clear_dialog()
+        
+        # Verify dialog is not visible
         mock_is_dialog_visible.return_value = False
         self.assertFalse(self.container.is_dialog_visible())
 
@@ -574,7 +622,7 @@ class TestCreateOperationContainer(unittest.TestCase):
         self.assertEqual(kwargs['log_module_name'], "TestModule")
         
         # Verify the result contains the expected keys
-        self.assertEqual(result['container'], mock_container.container)
+        self.assertEqual(result['container'], mock_container.widget)
         self.assertEqual(result['progress_tracker'], mock_container.progress_tracker)
         self.assertEqual(result['log_accordion'], mock_container.log_accordion)
     

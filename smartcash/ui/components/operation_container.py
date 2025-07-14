@@ -72,6 +72,9 @@ class OperationContainer(BaseUIComponent):
     - Dialogs
     - Progress tracking
     - Logging
+    
+    Attributes:
+        container: The main VBox widget that holds all UI components
     """
     
     def __init__(self,
@@ -139,8 +142,13 @@ class OperationContainer(BaseUIComponent):
             )
         )
         
-        # Create UI components
+        # Create UI components and add them to container
         self._create_ui_components(progress_config)
+        
+    @property
+    def widget(self) -> widgets.VBox:
+        """Get the main widget container."""
+        return self.container
     
     def _create_ui_components(self, progress_config: Optional[ProgressConfig] = None) -> None:
         """Create and initialize UI components.

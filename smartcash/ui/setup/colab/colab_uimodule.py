@@ -326,10 +326,10 @@ class ColabUIModule(UIModule):
             config = self.get_config()
             self.logger.debug(f"Initializing operation manager with config: {config}")
             
-            # Initialize operation manager
+            # Initialize operation manager with the widget container
             self._operation_manager = ColabOperationManager(
                 config=config,
-                operation_container=operation_container
+                operation_container=operation_container.widget
             )
             
             # Initialize the operation manager

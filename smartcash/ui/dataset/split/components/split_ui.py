@@ -306,7 +306,28 @@ def create_split_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> Dict[s
         
         # Helper function to log to operation container
         def log_to_operation_container(message: str, level: str = 'info'):
-            \"\"\"Log message to operation container with proper level.\"\"\"\n            try:\n                if hasattr(operation_container, 'log_message'):\n                    operation_container['log_message'](message, level)\n                elif hasattr(operation_container, 'log'):\n                    from smartcash.ui.components.log_accordion import LogLevel\n                    level_map = {\n                        'info': LogLevel.INFO,\n                        'success': LogLevel.INFO,\n                        'warning': LogLevel.WARNING,\n                        'error': LogLevel.ERROR\n                    }\n                    log_level = level_map.get(level, LogLevel.INFO)\n                    operation_container['log'](message, log_level)\n                else:\n                    # Fallback to output widget\n                    if 'log_output' in operation_container:\n                        with operation_container['log_output']:\n                            print(message)\n            except Exception:\n                # Fallback to print if all else fails\n                print(message)
+            """Log message to operation container with proper level."""
+            try:
+                if hasattr(operation_container, 'log_message'):
+                    operation_container['log_message'](message, level)
+                elif hasattr(operation_container, 'log'):
+                    from smartcash.ui.components.log_accordion import LogLevel
+                    level_map = {
+                        'info': LogLevel.INFO,
+                        'success': LogLevel.INFO,
+                        'warning': LogLevel.WARNING,
+                        'error': LogLevel.ERROR
+                    }
+                    log_level = level_map.get(level, LogLevel.INFO)
+                    operation_container['log'](message, log_level)
+                else:
+                    # Fallback to output widget
+                    if 'log_output' in operation_container:
+                        with operation_container['log_output']:
+                            print(message)
+            except Exception:
+                # Fallback to print if all else fails
+                print(message)
         
         # Setup event handlers with proper logging
         def on_split_button_clicked(button):

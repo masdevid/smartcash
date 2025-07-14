@@ -4,12 +4,12 @@ Description: Configuration handler for split module following UIModule pattern
 """
 
 from typing import Dict, Any, Optional
-from smartcash.ui.core.handlers.config_handler import ConfigHandler
+from smartcash.ui.core.handlers.config_handler import ConfigurableHandler
 from smartcash.ui.logger import get_module_logger
 from .split_defaults import get_default_split_config, VALIDATION_RULES
 
 
-class SplitConfigHandler(ConfigHandler):
+class SplitConfigHandler(ConfigurableHandler):
     """
     Configuration handler for split module.
     
@@ -35,10 +35,15 @@ class SplitConfigHandler(ConfigHandler):
         
         self.logger = get_module_logger("smartcash.ui.dataset.split.config")
         self._validation_rules = VALIDATION_RULES
+        self._ui_components = None  # Will be set by the module
         
         # Load initial configuration
         if config:
             self.update_config(config)
+    
+    def set_ui_components(self, ui_components: Dict[str, Any]) -> None:
+        """Set UI components for config extraction and updates."""
+        self._ui_components = ui_components
     
     def validate_config(self, config: Dict[str, Any]) -> bool:
         """
@@ -114,18 +119,19 @@ class SplitConfigHandler(ConfigHandler):
             self.logger.error(f"Validation error: {e}")
             return False
     
-    def extract_config_from_ui(self, ui_components: Dict[str, Any]) -> Dict[str, Any]:
+    def extract_config_from_ui(self) -> Dict[str, Any]:
         """
         Extract configuration from UI components.
-        
-        Args:
-            ui_components: Dictionary of UI components
             
         Returns:
             Extracted configuration dictionary
         """
         try:
-            form_components = ui_components.get('form_components', {})
+            if not self._ui_components:
+                self.logger.warning("No UI components available for config extraction")
+                return self.config
+                
+            form_components = self._ui_components.get('form_components', {})
             
             # Extract configuration from form components
             config = {
@@ -177,19 +183,22 @@ class SplitConfigHandler(ConfigHandler):
             
         except Exception as e:
             self.logger.error(f"Error extracting config from UI: {e}")
-            return self.get_config()
+            return self.config
     
-    def update_ui_from_config(self, ui_components: Dict[str, Any], config: Optional[Dict[str, Any]] = None) -> None:
+    def update_ui_from_config(self, config: Optional[Dict[str, Any]] = None) -> None:
         """
         Update UI components from configuration.
         
         Args:
-            ui_components: Dictionary of UI components to update
             config: Configuration to apply (uses current config if None)
         """
         try:
-            config = config or self.get_config()
-            form_components = ui_components.get('form_components', {})
+            if not self._ui_components:
+                self.logger.warning("No UI components available for UI update")
+                return
+                
+            config = config or self.config
+            form_components = self._ui_components.get('form_components', {})
             
             # Update split configuration
             split_config = config.get('split', {})

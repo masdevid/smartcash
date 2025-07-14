@@ -237,6 +237,10 @@ class SplitUIModule(UIModule):
             # Create UI components
             self._ui_components = self._create_ui_components(self._merged_config)
             
+            # Set UI components in config handler for extraction/updates
+            if self._config_handler:
+                self._config_handler.set_ui_components(self._ui_components)
+            
             # Setup UI logging bridge and status panel integration
             operation_container = self._ui_components.get('operation_container')
             if operation_container:
@@ -260,7 +264,7 @@ class SplitUIModule(UIModule):
     def get_config(self) -> Dict[str, Any]:
         """Get current configuration."""
         if self._config_handler:
-            return self._config_handler.get_config()
+            return self._config_handler.config
         return self._merged_config.copy()
     
     def get_ui_components(self) -> Dict[str, Any]:
@@ -340,16 +344,6 @@ class SplitUIModule(UIModule):
             except:
                 return None
     
-    def get_config(self) -> Dict[str, Any]:
-        """
-        Get current configuration.
-        
-        Returns:
-            Current configuration dictionary
-        """
-        if self._config_handler:
-            return self._config_handler.get_config()
-        return self._merged_config.copy()
     
     
     # ==================== CONFIGURATION OPERATIONS ====================
@@ -369,7 +363,7 @@ class SplitUIModule(UIModule):
                 return {'success': False, 'message': 'Configuration handler not available'}
             
             # Extract current config from UI
-            current_config = self._config_handler.extract_config_from_ui(self._ui_components)
+            current_config = self._config_handler.extract_config_from_ui()
             
             # Validate configuration
             if not self._config_handler.validate_config(current_config):
@@ -418,7 +412,7 @@ class SplitUIModule(UIModule):
                 
                 # Update UI from default config
                 if self._ui_components:
-                    self._config_handler.update_ui_from_config(self._ui_components, default_config)
+                    self._config_handler.update_ui_from_config(default_config)
             
             # Update internal config
             self._merged_config = default_config

@@ -36,7 +36,7 @@ MODULE_METADATA = {
 BUTTON_CONFIG = {
     'save': {'button_style': 'success', 'icon': 'save'},
     'reset': {'button_style': 'warning', 'icon': 'undo'},
-    'split': {'button_style': 'primary', 'icon': 'scissors'},
+    'split': {'button_style': 'success', 'icon': 'scissors'},
     'check': {'button_style': 'info', 'icon': 'check'},
     'cleanup': {'button_style': 'warning', 'icon': 'trash'}
 }

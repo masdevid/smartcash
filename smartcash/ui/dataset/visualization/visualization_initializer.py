@@ -6,7 +6,7 @@ This module provides visualization capabilities for dataset analysis,
 including comparison between raw, preprocessed, and augmented data.
 """
 
-import asyncio
+# import asyncio  # Removed async operations
 from typing import Dict, Any, Optional, List, Tuple
 import ipywidgets as widgets
 from IPython.display import display, HTML
@@ -298,23 +298,20 @@ class VisualizationInitializer(ModuleInitializer):
             log_output.append_stdout(f"❌ {message}\n")
             
     def _schedule_post_init_check(self, ui_components: Dict[str, Any], config: Dict[str, Any]) -> None:
-        """Schedule post-initialization checks.
+        """Schedule post-initialization checks synchronously.
         
         Args:
             ui_components: UI components dictionary
             config: Configuration dictionary
         """
         try:
-            loop = asyncio.get_event_loop()
-            if loop.is_running():
-                loop.create_task(self._post_init_check(ui_components, config))
-            else:
-                loop.run_until_complete(self._post_init_check(ui_components, config))
+            # Run post-init check synchronously
+            self._post_init_check(ui_components, config)
         except Exception as e:
-            self.logger.warning(f"Could not schedule post-init check: {str(e)}")
+            self.logger.warning(f"Could not run post-init check: {str(e)}")
     
-    async def _post_init_check(self, ui_components: Dict[str, Any], config: Dict[str, Any]) -> None:
-        """Perform post-initialization checks.
+    def _post_init_check(self, ui_components: Dict[str, Any], config: Dict[str, Any]) -> None:
+        """Perform post-initialization checks synchronously.
         
         Args:
             ui_components: UI components dictionary
@@ -545,7 +542,7 @@ def init_visualization_ui(config: Optional[Dict[str, Any]] = None, display: bool
         **kwargs: Additional keyword arguments for UI customization
         
     Returns:
-        If display=True: Returns the displayed widget
+        If display=True: Returns None after displaying UI
         If display=False: Returns a dictionary with UI components and initializer
         
     Raises:
@@ -653,7 +650,7 @@ def init_visualization_ui(config: Optional[Dict[str, Any]] = None, display: bool
         
         # Return the appropriate result based on display flag
         if display:
-            return main_container
+            return None  # Return None when displaying, consistent with other modules
         
         # Return a result dictionary when not displaying
         result = {

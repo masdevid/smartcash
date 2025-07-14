@@ -81,6 +81,12 @@ class VisualizationUIModule(UIModule):
             self.register_operation("export", self._export_visualization)
             self.register_operation("compare", self._compare_datasets)
             
+            # Setup UI logging bridge and progress display
+            operation_container = ui_components.get('operation_container')
+            if operation_container:
+                self._setup_ui_logging_bridge(operation_container)
+                self._initialize_progress_display()
+            
             self.logger.info("✅ Visualization UI components set up successfully")
             
         except Exception as e:
@@ -186,6 +192,149 @@ class VisualizationUIModule(UIModule):
             self.update_status(f"Comparison failed: {str(e)}", "error")
             raise
     
+    def _setup_ui_logging_bridge(self, operation_container: Any) -> None:
+        """Setup UI logging bridge to capture backend service logs."""
+        try:
+            import logging
+            
+            # Create custom handler for backend services
+            class BackendUILogHandler(logging.Handler):
+                def __init__(self, log_func):
+                    super().__init__()
+                    self.log_func = log_func
+                    self.setFormatter(logging.Formatter('%(name)s: %(message)s'))
+                
+                def emit(self, record):
+                    try:
+                        msg = self.format(record)
+                        level = 'info' if record.levelno == logging.INFO else 'error'
+                        self.log_func(msg, level)
+                    except Exception:
+                        pass  # Silently fail to avoid recursive errors
+            
+            # Get log function from operation container
+            if hasattr(operation_container, 'log_message'):
+                log_func = operation_container.log_message
+            elif hasattr(operation_container, 'log'):
+                log_func = operation_container.log
+            else:
+                # Fallback to internal logging
+                log_func = self._log_to_ui
+            
+            # Create handler
+            ui_handler = BackendUILogHandler(log_func)
+            ui_handler.setLevel(logging.INFO)
+            
+            # Target specific backend service loggers that might log during visualization operations
+            target_loggers = [
+                'smartcash.dataset',
+                'smartcash.model', 
+                'smartcash.ui.dataset.visualization',
+                'smartcash.core',
+                'matplotlib',
+                'plotly'
+            ]
+            
+            # Remove existing console handlers and add UI handlers
+            for logger_name in target_loggers:
+                logger = logging.getLogger(logger_name)
+                
+                # Remove existing console handlers
+                for handler in logger.handlers[:]:
+                    if isinstance(handler, logging.StreamHandler):
+                        logger.removeHandler(handler)
+                
+                # Add UI handler
+                logger.addHandler(ui_handler)
+            
+            # Store handler for cleanup
+            if not hasattr(self, '_ui_handlers'):
+                self._ui_handlers = []
+            self._ui_handlers.append(ui_handler)
+            
+            self.logger.debug("🌉 UI logging bridge setup completed")
+            
+        except Exception as e:
+            self.logger.error(f"❌ Failed to setup UI logging bridge: {e}")
+    
+    def _initialize_progress_display(self) -> None:
+        """Initialize progress tracker display."""
+        try:
+            operation_container = self.get_component("operation_container")
+            if operation_container and hasattr(operation_container, 'progress_tracker'):
+                progress_tracker = operation_container.progress_tracker
+                if hasattr(progress_tracker, 'initialize') and not getattr(progress_tracker, '_initialized', False):
+                    progress_tracker.initialize()
+                if hasattr(progress_tracker, 'show'):
+                    progress_tracker.show()
+                    
+            self.logger.debug("📊 Progress display initialized")
+            
+        except Exception as e:
+            self.logger.debug(f"Progress display initialization failed: {e}")
+    
+    def _log_to_ui(self, message: str, level: str = "info") -> None:
+        """Log message to UI components using operation container's log_accordion."""
+        try:
+            # Get operation container and use its log_accordion
+            operation_container = self.get_component("operation_container")
+            if operation_container and hasattr(operation_container, 'log'):
+                # Map log levels to LogLevel enum if needed
+                from smartcash.ui.components.log_accordion import LogLevel
+                level_map = {
+                    'info': LogLevel.INFO,
+                    'success': LogLevel.INFO,
+                    'warning': LogLevel.WARNING,
+                    'error': LogLevel.ERROR,
+                    'debug': LogLevel.DEBUG
+                }
+                log_level = level_map.get(level, LogLevel.INFO)
+                operation_container.log(message, log_level)
+            else:
+                # Fallback to logger if operation container not available
+                getattr(self.logger, level, self.logger.info)(message)
+        except Exception as e:
+            self.logger.debug(f"UI logging failed: {e}")
+    
+    def _update_progress(self, progress: int, message: str = "", level: str = "primary") -> None:
+        """Update progress tracker using operation container."""
+        try:
+            operation_container = self.get_component("operation_container")
+            if operation_container and hasattr(operation_container, 'update_progress'):
+                operation_container.update_progress(progress, message, level)
+            else:
+                # Fallback to logging
+                self._log_to_ui(f"Progress {progress}%: {message}", "info")
+        except Exception as e:
+            self.logger.debug(f"Progress update failed: {e}")
+    
+    def _cleanup_ui_logging_bridge(self) -> None:
+        """Cleanup UI logging bridge handlers."""
+        try:
+            if hasattr(self, '_ui_handlers'):
+                import logging
+                for handler in self._ui_handlers:
+                    # Remove handler from all loggers
+                    for logger_name in logging.Logger.manager.loggerDict:
+                        logger = logging.getLogger(logger_name)
+                        if handler in logger.handlers:
+                            logger.removeHandler(handler)
+                self._ui_handlers.clear()
+                
+            self.logger.debug("🧹 UI logging bridge cleanup completed")
+            
+        except Exception as e:
+            self.logger.debug(f"UI logging bridge cleanup failed: {e}")
+
+    def cleanup(self) -> None:
+        """Cleanup resources."""
+        try:
+            self._cleanup_ui_logging_bridge()
+            if hasattr(super(), 'cleanup'):
+                super().cleanup()
+        except Exception as e:
+            self.logger.error(f"Cleanup error: {e}")
+
     def display(self):
         """Display the visualization UI.
         
@@ -255,13 +404,7 @@ def create_visualization_module(config: Optional[Dict[str, Any]] = None, **kwarg
     Returns:
         VisualizationUIModule: New visualization module instance
     """
-    return UIModuleFactory.create_module(
-        module_name="visualization",
-        parent_module="dataset",
-        config=config,
-        module_class=VisualizationUIModule,
-        **kwargs
-    )
+    return VisualizationUIModule(config=config, **kwargs)
 
 
 def get_visualization_module() -> Optional[VisualizationUIModule]:
@@ -273,6 +416,77 @@ def get_visualization_module() -> Optional[VisualizationUIModule]:
     return UIModuleFactory.get_module("visualization", "dataset")
 
 
+def initialize_visualization_ui(
+    config: Optional[Dict[str, Any]] = None,
+    display: bool = True,
+    **kwargs
+) -> Optional[Dict[str, Any]]:
+    """Initialize Visualization UI using new UIModule pattern.
+    
+    Args:
+        config: Optional configuration dictionary
+        display: Whether to display the UI immediately (True) or return components (False)
+        **kwargs: Additional keyword arguments for module creation
+        
+    Returns:
+        None if display=True, dict of components if display=False
+    """
+    try:
+        from IPython.display import display as ipython_display
+        
+        # Get the module and UI components
+        module = create_visualization_module(config, **kwargs)
+        
+        # Setup components and initialize module
+        if not hasattr(module, '_components') or not module._components:
+            module._setup_components()
+        
+        ui_components = {
+            component_type: module.get_component(component_type)
+            for component_type in module.list_components()
+        }
+        
+        main_ui = ui_components.get('main_container')
+        
+        # Setup UI logging bridge to capture backend service logs
+        operation_container = ui_components.get('operation_container')
+        if operation_container and hasattr(module, '_setup_ui_logging_bridge'):
+            module._setup_ui_logging_bridge(operation_container)
+        
+        # Initialize progress display
+        if hasattr(module, '_initialize_progress_display'):
+            module._initialize_progress_display()
+        
+        if display and main_ui:
+            ipython_display(main_ui)
+            return None
+        
+        # Return components without displaying
+        result = {
+            'success': True,
+            'module': module,
+            'ui_components': ui_components,
+            'main_ui': main_ui
+        }
+        
+        return result
+        
+    except Exception as e:
+        error_result = {
+            'success': False,
+            'error': str(e),
+            'module': None,
+            'ui_components': {},
+            'main_ui': None
+        }
+        
+        if display:
+            get_module_logger("smartcash.ui.dataset.visualization").error(f"Failed to initialize visualization UI: {e}")
+            return None
+        
+        return error_result
+
+
 def display_visualization_ui(config: Optional[Dict[str, Any]] = None, **kwargs):
     """Display the visualization UI.
     
@@ -280,9 +494,4 @@ def display_visualization_ui(config: Optional[Dict[str, Any]] = None, **kwargs):
         config: Optional configuration dictionary
         **kwargs: Additional keyword arguments
     """
-    module = create_visualization_module(config, **kwargs)
-    module.display()
-
-
-# For backward compatibility
-initialize_visualization_ui = display_visualization_ui
+    initialize_visualization_ui(config, display=True, **kwargs)

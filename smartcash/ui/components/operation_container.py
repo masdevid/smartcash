@@ -257,7 +257,15 @@ class OperationContainer(BaseUIComponent):
             if log_widget is not None:
                 self.container.children += [log_widget]
         
-        # Create and validate the layout
+    def _create_container(self) -> None:
+        """Create the main container widget.
+        
+        Components are ordered as:
+        1. Progress Tracker (top)
+        2. Dialog Area (middle)
+        3. Log Accordion (bottom)
+        """
+        # Create layout with validated properties
         layout_kwargs = {
             'width': '100%',
             'margin': '10px 0',
@@ -268,35 +276,32 @@ class OperationContainer(BaseUIComponent):
             'display': 'flex',
             'flex_flow': 'column',
             'position': 'relative',
-            'min_height': '0',  # Ensure flex container can shrink below content size
-            'align_items': 'stretch'  # Default value that will be validated
+            'min_height': '0',
+            'align_items': 'stretch'
         }
 
-        
-        Args:
-            visible: Whether to show or hide the progress tracker
-        """
-        if self.progress_tracker and hasattr(self.progress_tracker, 'container'):
-            self.progress_tracker.container.layout.display = 'block' if visible else 'none'
-
-    def is_progress_tracker_visible(self) -> bool:
-        """Check if the progress tracker is currently visible.
-        
-        Returns:
-            True if progress tracker is visible, False otherwise
-        """
-        if self.progress_tracker and hasattr(self.progress_tracker, 'container'):
-            return self.progress_tracker.container.layout.display == 'block'
-        return False
-        
         # Create and validate the layout
         layout = widgets.Layout(**{
             k: self._validate_layout_value(v, k, 'stretch' if k == 'align_items' else v)
             for k, v in layout_kwargs.items()
         })
-        
+
         # Create the main container with all valid components
-        self.container = widgets.VBox(children=valid_children, layout=layout)
+        self.container = widgets.VBox(children=[], layout=layout)
+
+        # 1. Add progress tracker if enabled (top)
+        if self.progress_tracker and hasattr(self.progress_tracker, 'container') and self.progress_tracker.container is not None:
+            self.container.children += [self.progress_tracker.container]
+
+        # 2. Add dialog area (middle) - will be populated when needed
+        if hasattr(self, 'dialog_area') and self.dialog_area is not None:
+            self.container.children += [self.dialog_area]
+
+        # 3. Add log accordion if enabled (bottom) - use helper for DRY approach
+        if self.log_accordion:
+            log_widget = self._get_log_accordion_widget()
+            if log_widget is not None:
+                self.container.children += [log_widget]
     
     def _init_dialog_area(self) -> None:
         """Initialize the dialog area."""

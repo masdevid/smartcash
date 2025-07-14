@@ -264,6 +264,25 @@ class OperationContainer(BaseUIComponent):
             'min_height': '0',  # Ensure flex container can shrink below content size
             'align_items': 'stretch'  # Default value that will be validated
         }
+
+    def set_progress_tracker_visibility(self, visible: bool) -> None:
+        """Set the visibility of the progress tracker.
+        
+        Args:
+            visible: Whether to show or hide the progress tracker
+        """
+        if self.progress_tracker and hasattr(self.progress_tracker, 'container'):
+            self.progress_tracker.container.layout.display = 'block' if visible else 'none'
+
+    def is_progress_tracker_visible(self) -> bool:
+        """Check if the progress tracker is currently visible.
+        
+        Returns:
+            True if progress tracker is visible, False otherwise
+        """
+        if self.progress_tracker and hasattr(self.progress_tracker, 'container'):
+            return self.progress_tracker.container.layout.display == 'block'
+        return False
         
         # Create and validate the layout
         layout = widgets.Layout(**{

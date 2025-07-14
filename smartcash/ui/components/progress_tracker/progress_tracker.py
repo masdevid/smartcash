@@ -45,7 +45,7 @@ class ProgressTracker(BaseUIComponent):
         self._ui_components['container'] = widgets.VBox(
             [],
             layout=widgets.Layout(
-                display='none',
+                display='block',  # Progress tracker akan selalu terlihat setelah diinisialisasi
                 width='100%',
                 margin='10px 0',
                 padding='15px',

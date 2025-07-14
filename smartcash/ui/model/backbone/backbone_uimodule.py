@@ -10,6 +10,8 @@ from .configs.backbone_config_handler import BackboneConfigHandler
 from .configs.backbone_defaults import get_default_backbone_config
 from .operations.backbone_operation_manager import BackboneOperationManager
 from datetime import datetime
+import asyncio
+import threading
 
 
 class BackboneUIModule(UIModule):
@@ -106,6 +108,13 @@ class BackboneUIModule(UIModule):
             if 'build' in buttons:
                 buttons['build'].on_click(self._handle_build_sync)
             
+            # Setup save/reset button handlers
+            if 'save' in buttons:
+                buttons['save'].on_click(self._handle_save_config)
+                
+            if 'reset' in buttons:
+                buttons['reset'].on_click(self._handle_reset_config)
+            
             self.logger.debug("✅ Button handlers setup completed")
             
         except Exception as e:
@@ -161,6 +170,15 @@ class BackboneUIModule(UIModule):
             if not self._operation_manager:
                 raise RuntimeError("Operation manager not available")
             
+            # Disable buttons during operation
+            self._disable_operation_buttons()
+            
+            # Check prerequisites before validation
+            prereq_check = await self._check_data_prerequisites()
+            if not prereq_check['success']:
+                self._operation_manager.log(f"⚠️ Prerequisites check: {prereq_check['message']}", 'warning')
+                # Continue with validation even if data is missing - just warn user
+            
             # Get current configuration from UI
             current_config = self._get_current_ui_config()
             
@@ -175,12 +193,24 @@ class BackboneUIModule(UIModule):
             self.logger.error(f"Validate handler error: {e}")
             if self._operation_manager:
                 self._operation_manager.log(f"❌ Validation error: {e}", 'error')
+        finally:
+            # Re-enable buttons
+            self._enable_operation_buttons()
     
     async def _handle_build(self, button) -> None:
         """Async handler for build button."""
         try:
             if not self._operation_manager:
                 raise RuntimeError("Operation manager not available")
+            
+            # Disable buttons during operation
+            self._disable_operation_buttons()
+            
+            # Check prerequisites before build
+            prereq_check = await self._check_data_prerequisites()
+            if not prereq_check['success']:
+                self._operation_manager.log(f"❌ Prerequisites missing: {prereq_check['message']}", 'error')
+                return
             
             # Get current configuration from UI
             current_config = self._get_current_ui_config()
@@ -196,6 +226,9 @@ class BackboneUIModule(UIModule):
             self.logger.error(f"Build handler error: {e}")
             if self._operation_manager:
                 self._operation_manager.log(f"❌ Build error: {e}", 'error')
+        finally:
+            # Re-enable buttons
+            self._enable_operation_buttons()
     
     def _clear_ui_state(self) -> None:
         """Clear UI state before operations."""
@@ -254,6 +287,304 @@ class BackboneUIModule(UIModule):
                 
         except Exception as e:
             self.logger.error(f"Error updating summary display: {e}")
+    
+    def _handle_save_config(self, button) -> None:
+        """Handle save config button click."""
+        try:
+            if not self._operation_manager:
+                self.logger.warning("Operation manager not available for logging")
+                return
+            
+            # Get current UI configuration
+            current_config = self._get_current_ui_config()
+            
+            # Update the module configuration using individual keys
+            for key, value in current_config.items():
+                self._config[key] = value
+            
+            # Log success message
+            if self._operation_manager:
+                self._operation_manager.log("💾 Configuration saved successfully", 'success')
+            
+            # Update status panel
+            self._update_header_status("Configuration saved", "success")
+            
+            self.logger.info("Configuration saved successfully")
+            
+        except Exception as e:
+            error_msg = f"Failed to save configuration: {e}"
+            self.logger.error(error_msg)
+            if self._operation_manager:
+                self._operation_manager.log(f"❌ {error_msg}", 'error')
+            self._update_header_status("Save failed", "error")
+    
+    def _handle_reset_config(self, button) -> None:
+        """Handle reset config button click."""
+        try:
+            if not self._operation_manager:
+                self.logger.warning("Operation manager not available for logging")
+                return
+            
+            # Reset to default configuration
+            from .configs.backbone_defaults import get_default_backbone_config
+            default_config = get_default_backbone_config()
+            
+            # Update module configuration using individual keys
+            for key, value in default_config.items():
+                self._config[key] = value
+            
+            # Update UI widgets with default values
+            self._update_ui_widgets_from_config(default_config)
+            
+            # Log success message
+            if self._operation_manager:
+                self._operation_manager.log("🔄 Configuration reset to defaults", 'info')
+            
+            # Update status panel
+            self._update_header_status("Configuration reset", "info")
+            
+            self.logger.info("Configuration reset to defaults")
+            
+        except Exception as e:
+            error_msg = f"Failed to reset configuration: {e}"
+            self.logger.error(error_msg)
+            if self._operation_manager:
+                self._operation_manager.log(f"❌ {error_msg}", 'error')
+            self._update_header_status("Reset failed", "error")
+    
+    async def _check_data_prerequisites(self) -> Dict[str, Any]:
+        """Check if all required data is available."""
+        try:
+            missing = []
+            warnings = []
+            
+            # Check pretrained models
+            pretrained_check = self._check_pretrained_models()
+            if not pretrained_check['available']:
+                warnings.append("Pretrained models not found")
+            
+            # Check raw data using preprocessor API
+            raw_data_check = await self._check_raw_data()
+            if not raw_data_check['available']:
+                missing.append("Raw data not found")
+            
+            # Check preprocessed data
+            preprocessed_check = await self._check_preprocessed_data()
+            if not preprocessed_check['available']:
+                warnings.append("Preprocessed data not found")
+            
+            # Check augmented data
+            augmented_check = await self._check_augmented_data()
+            if not augmented_check['available']:
+                warnings.append("Augmented data not found")
+            
+            if missing:
+                return {
+                    'success': False,
+                    'message': f"Missing required data: {', '.join(missing)}",
+                    'missing': missing,
+                    'warnings': warnings
+                }
+            elif warnings:
+                return {
+                    'success': True,
+                    'message': f"Some optional data missing: {', '.join(warnings)}",
+                    'missing': [],
+                    'warnings': warnings
+                }
+            else:
+                return {
+                    'success': True,
+                    'message': "All data prerequisites available",
+                    'missing': [],
+                    'warnings': []
+                }
+                
+        except Exception as e:
+            return {
+                'success': False,
+                'message': f"Error checking prerequisites: {e}",
+                'missing': [],
+                'warnings': []
+            }
+    
+    def _check_pretrained_models(self) -> Dict[str, Any]:
+        """Check if pretrained models are available."""
+        try:
+            from pathlib import Path
+            
+            pretrained_dir = Path('/data/pretrained')
+            backbone_config = self.get_config().get('backbone', {})
+            backbone_type = backbone_config.get('model_type', 'efficientnet_b4')
+            
+            # Check for backbone-specific pretrained models
+            if backbone_type == 'efficientnet_b4':
+                efficientnet_dir = pretrained_dir / 'efficientnet'
+                if efficientnet_dir.exists():
+                    model_files = list(efficientnet_dir.glob('*.pth')) + list(efficientnet_dir.glob('*.pt'))
+                    if model_files:
+                        return {'available': True, 'path': str(efficientnet_dir), 'files': len(model_files)}
+            elif backbone_type == 'cspdarknet':
+                yolov5_dir = pretrained_dir / 'yolov5'
+                if yolov5_dir.exists():
+                    model_files = list(yolov5_dir.glob('*.pt'))
+                    if model_files:
+                        return {'available': True, 'path': str(yolov5_dir), 'files': len(model_files)}
+            
+            return {'available': False, 'path': str(pretrained_dir), 'files': 0}
+            
+        except Exception as e:
+            self.logger.error(f"Error checking pretrained models: {e}")
+            return {'available': False, 'path': '', 'files': 0}
+    
+    async def _check_raw_data(self) -> Dict[str, Any]:
+        """Check raw data using preprocessor API."""
+        try:
+            # Use preprocessor API to check raw data
+            from smartcash.dataset.preprocessor.api import get_preprocessing_status
+            
+            status = get_preprocessing_status()
+            if status.get('success') and status.get('service_ready'):
+                file_stats = status.get('file_statistics', {})
+                
+                # Check if any split has raw images
+                total_raw = sum(
+                    split_data.get('raw_images', 0) 
+                    for split_data in file_stats.values()
+                )
+                
+                return {
+                    'available': total_raw > 0,
+                    'total_files': total_raw,
+                    'details': file_stats
+                }
+            
+            return {'available': False, 'total_files': 0, 'details': {}}
+            
+        except Exception as e:
+            self.logger.error(f"Error checking raw data: {e}")
+            return {'available': False, 'total_files': 0, 'details': {}}
+    
+    async def _check_preprocessed_data(self) -> Dict[str, Any]:
+        """Check preprocessed data using preprocessor API."""
+        try:
+            # Use preprocessor API to check preprocessed data
+            from smartcash.dataset.preprocessor.api import get_preprocessing_status
+            
+            status = get_preprocessing_status()
+            if status.get('success') and status.get('service_ready'):
+                file_stats = status.get('file_statistics', {})
+                
+                # Check if any split has preprocessed files
+                total_preprocessed = sum(
+                    split_data.get('preprocessed_files', 0) 
+                    for split_data in file_stats.values()
+                )
+                
+                return {
+                    'available': total_preprocessed > 0,
+                    'total_files': total_preprocessed,
+                    'details': file_stats
+                }
+            
+            return {'available': False, 'total_files': 0, 'details': {}}
+            
+        except Exception as e:
+            self.logger.error(f"Error checking preprocessed data: {e}")
+            return {'available': False, 'total_files': 0, 'details': {}}
+    
+    async def _check_augmented_data(self) -> Dict[str, Any]:
+        """Check augmented data using augmentor API."""
+        try:
+            # Use augmentor API to check augmented data
+            from smartcash.dataset.augmentor import get_augmentation_status
+            
+            status = get_augmentation_status({})
+            if status.get('service_ready'):
+                # Check for augmented files across splits
+                total_augmented = 0
+                for split in ['train', 'valid', 'test']:
+                    total_augmented += status.get(f'{split}_augmented', 0)
+                
+                return {
+                    'available': total_augmented > 0,
+                    'total_files': total_augmented,
+                    'details': status
+                }
+            
+            return {'available': False, 'total_files': 0, 'details': {}}
+            
+        except Exception as e:
+            self.logger.error(f"Error checking augmented data: {e}")
+            return {'available': False, 'total_files': 0, 'details': {}}
+    
+    def _disable_operation_buttons(self) -> None:
+        """Disable validate and build buttons during operations."""
+        try:
+            action_container = self._ui_components.get('containers', {}).get('action')
+            if action_container:
+                buttons = action_container.get('buttons', {})
+                
+                if 'validate' in buttons:
+                    buttons['validate'].disabled = True
+                    buttons['validate'].description = '⏳ Validating...'
+                    
+                if 'build' in buttons:
+                    buttons['build'].disabled = True
+                    buttons['build'].description = '⏳ Building...'
+                    
+        except Exception as e:
+            self.logger.error(f"Error disabling buttons: {e}")
+    
+    def _enable_operation_buttons(self) -> None:
+        """Re-enable validate and build buttons after operations."""
+        try:
+            action_container = self._ui_components.get('containers', {}).get('action')
+            if action_container:
+                buttons = action_container.get('buttons', {})
+                
+                if 'validate' in buttons:
+                    buttons['validate'].disabled = False
+                    buttons['validate'].description = '🔍 Validate'
+                    
+                if 'build' in buttons:
+                    buttons['build'].disabled = False
+                    buttons['build'].description = '🏗️ Build Model'
+                    
+        except Exception as e:
+            self.logger.error(f"Error enabling buttons: {e}")
+    
+    def _update_header_status(self, message: str, status_type: str) -> None:
+        """Update header status panel."""
+        try:
+            header_container = self._ui_components.get('containers', {}).get('header')
+            if header_container and hasattr(header_container, 'update_status'):
+                header_container.update_status(message, status_type)
+                
+        except Exception as e:
+            self.logger.error(f"Error updating header status: {e}")
+    
+    def _update_ui_widgets_from_config(self, config: Dict[str, Any]) -> None:
+        """Update UI widgets with values from config."""
+        try:
+            widgets = self._ui_components.get('widgets', {})
+            backbone_config = config.get('backbone', {})
+            
+            if 'backbone_dropdown' in widgets:
+                widgets['backbone_dropdown'].value = backbone_config.get('model_type', 'efficientnet_b4')
+            if 'pretrained_checkbox' in widgets:
+                widgets['pretrained_checkbox'].value = backbone_config.get('pretrained', True)
+            if 'feature_opt_checkbox' in widgets:
+                widgets['feature_opt_checkbox'].value = backbone_config.get('feature_optimization', True)
+            if 'mixed_precision_checkbox' in widgets:
+                widgets['mixed_precision_checkbox'].value = backbone_config.get('mixed_precision', True)
+            if 'input_size_slider' in widgets:
+                widgets['input_size_slider'].value = backbone_config.get('input_size', 640)
+            if 'num_classes_input' in widgets:
+                widgets['num_classes_input'].value = backbone_config.get('num_classes', 7)
+                
+        except Exception as e:
+            self.logger.error(f"Error updating UI widgets: {e}")
     
     def _create_ui_components(self, config: Dict[str, Any]) -> Dict[str, Any]:
         """Create UI components."""

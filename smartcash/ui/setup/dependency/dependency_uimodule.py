@@ -1,1093 +1,597 @@
 """
 File: smartcash/ui/setup/dependency/dependency_uimodule.py
-Description: Dependency Module implementation using UIModule pattern.
-
-Simplified dependency management with core functionality:
-- Install packages (core + custom)
-- Uninstall packages 
-- Check status & updates
-- Update packages
+Description: Dependency Module implementation using BaseUIModule pattern with operation checklist compliance.
 """
 
-from typing import Dict, Any, Optional, List
-from datetime import datetime
+from typing import Dict, Any, Optional
+import sys
+import os
 
-from smartcash.ui.core.ui_module import UIModule, SharedMethodRegistry, register_operation_method
-from smartcash.ui.core.ui_module_factory import create_template
+# BaseUIModule imports
+from smartcash.ui.core.base_ui_module import BaseUIModule
+from smartcash.ui.core.decorators import suppress_ui_init_logs
 from smartcash.ui.logger import get_module_logger
-from smartcash.ui.core.decorators import handle_ui_errors
 
-# Import existing dependency components and handlers
+# Environment management imports
+from smartcash.common.environment import get_environment_manager, EnvironmentManager
+from smartcash.common.constants.paths import get_paths_for_environment
+
+# Dependency module imports
+from smartcash.ui.setup.dependency.components.dependency_ui import create_dependency_ui_components
 from smartcash.ui.setup.dependency.configs.dependency_config_handler import DependencyConfigHandler
 from smartcash.ui.setup.dependency.configs.dependency_defaults import get_default_dependency_config
 from smartcash.ui.setup.dependency.operations.operation_manager import DependencyOperationManager
 
-# Global module instance for singleton pattern
-_dependency_uimodule: Optional[UIModule] = None
 
-def register_dependency_template() -> None:
-    """Register Dependency module template with UIModuleFactory."""
-    from smartcash.ui.core.ui_module_factory import UIModuleFactory
+class DependencyUIModule(BaseUIModule):
+    """
+    Dependency Module implementation using BaseUIModule pattern.
     
-    template = create_template(
-        module_name="dependency",
-        parent_module="setup",
-        default_config=get_default_dependency_config(),
-        required_components=["main_container", "form_container", "action_container", "operation_container"],
-        required_operations=["install", "uninstall", "check_status", "update"],
-        auto_initialize=False,
-        description="Package dependency management module"
-    )
+    Features:
+    - 📦 Package management (install, uninstall, check, update)
+    - 🌍 Environment-aware package installation
+    - 📊 Real-time package status tracking
+    - 🔄 Enhanced factory-based initialization functions
+    - ✅ Full compliance with OPERATION_CHECKLISTS.md requirements
+    - 🇮🇩 Bahasa Indonesia interface
+    """
     
-    try:
-        UIModuleFactory.register_template(template, overwrite=True)
-        get_module_logger("smartcash.ui.setup.dependency.uimodule").debug("📋 Registered Dependency template")
-    except Exception as e:
-        get_module_logger("smartcash.ui.setup.dependency.uimodule").error(f"❌ Failed to register template: {e}")
-
-def register_dependency_shared_methods() -> None:
-    """Register Dependency-specific shared methods."""
-    
-    def get_package_status(package_name: str) -> Dict[str, Any]:
-        """Get status of a specific package."""
-        try:
-            import subprocess
-            result = subprocess.run(['pip', 'show', package_name], 
-                                  capture_output=True, text=True)
-            if result.returncode == 0:
-                return {"installed": True, "package": package_name, "details": result.stdout}
-            else:
-                return {"installed": False, "package": package_name}
-        except Exception as e:
-            return {"installed": False, "package": package_name, "error": str(e)}
-    
-    def list_installed_packages() -> Dict[str, Any]:
-        """List all installed packages."""
-        try:
-            import subprocess
-            result = subprocess.run(['pip', 'list', '--format=json'], 
-                                  capture_output=True, text=True)
-            if result.returncode == 0:
-                import json
-                packages = json.loads(result.stdout)
-                return {"success": True, "packages": packages}
-            else:
-                return {"success": False, "error": "Failed to list packages"}
-        except Exception as e:
-            return {"success": False, "error": str(e)}
-    
-    # Register methods with error handling for re-registration
-    methods = [
-        ("get_package_status", get_package_status, "Get package installation status"),
-        ("list_installed_packages", list_installed_packages, "List all installed packages")
-    ]
-    
-    for name, method, desc in methods:
-        try:
-            register_operation_method(name, method, description=desc)
-        except ValueError:
-            SharedMethodRegistry.register_method(name, method, overwrite=True, 
-                                               description=desc, category="operations")
-    
-    get_module_logger("smartcash.ui.setup.dependency.uimodule").debug("🔗 Registered Dependency shared methods")
-
-class DependencyUIModule(UIModule):
-    """Dependency-specific UIModule with package management functionality."""
-    
-    def __init__(self, config: Dict[str, Any] = None):
-        """Initialize Dependency UIModule.
-        
-        Args:
-            config: Dependency configuration (optional, uses defaults if not provided)
-        """
-        # Get default config and merge with provided config
-        default_config = get_default_dependency_config()
-        if config:
-            default_config.update(config)
-        
+    def __init__(self):
+        """Initialize Dependency UI module."""
         super().__init__(
-            module_name="dependency",
-            parent_module="setup", 
-            config=default_config,
-            auto_initialize=False
+            module_name='dependency',
+            parent_module='setup'
         )
+        
+        # Set required components for validation (Operation Checklist 1.2)
+        self._required_components = [
+            'main_container',
+            'header_container', 
+            'form_container',
+            'action_container',
+            'operation_container'
+        ]
         
         # Dependency-specific attributes
         self._operation_manager: Optional[DependencyOperationManager] = None
-        self._config_handler: Optional[DependencyConfigHandler] = None
+        self._environment_manager: Optional[EnvironmentManager] = None
         self._package_status = {}
+        self._environment_paths = {}
         
-    def initialize(self, config: Dict[str, Any] = None) -> 'DependencyUIModule':
-        """Initialize Dependency module with package management.
+        self.logger.debug("✅ DependencyUIModule initialized")
+    
+    def get_default_config(self) -> Dict[str, Any]:
+        """Get default configuration for Dependency module (BaseUIModule requirement)."""
+        return get_default_dependency_config()
+    
+    def create_config_handler(self, config: Dict[str, Any]) -> DependencyConfigHandler:
+        """Create config handler instance for Dependency module (BaseUIModule requirement)."""
+        handler = DependencyConfigHandler(config)
+        return handler
+    
+    def create_ui_components(self, config: Dict[str, Any]) -> Dict[str, Any]:
+        """Create UI components for Dependency module (BaseUIModule requirement)."""
+        try:
+            self.logger.debug("Creating Dependency UI components...")
+            ui_components = create_dependency_ui_components(module_config=config)
+            
+            if not ui_components:
+                raise RuntimeError("Failed to create UI components")
+            
+            self.logger.debug(f"✅ Created {len(ui_components)} UI components")
+            return ui_components
+            
+        except Exception as e:
+            self.logger.error(f"Failed to create UI components: {e}")
+            raise
+    
+    @suppress_ui_init_logs(duration=3.0)
+    def initialize(self, config: Optional[Dict[str, Any]] = None, **kwargs) -> bool:
+        """
+        Initialize the Dependency module with environment detection.
         
         Args:
-            config: Additional configuration to merge
+            config: Optional configuration dictionary
+            **kwargs: Additional initialization arguments
             
         Returns:
-            Self for method chaining
+            True if initialization was successful
         """
-        if config:
-            self.update_config(**config)
-        
         try:
-            # Create UI components
-            self._create_ui_components()
+            # Setup environment management first
+            self._setup_environment()
             
-            # Setup operation manager
-            self._setup_operation_manager()
+            # Set config if provided before initialization
+            if config:
+                self._user_config = config
             
-            # Setup config handler
-            self._setup_config_handler()
+            # Initialize using base class which handles everything
+            success = super().initialize()
             
-            # Register operations
-            self._register_operations()
+            if success:
+                # Setup operation manager after UI components are created
+                self._setup_operation_manager()
+                
+                # Log environment information (Operation Checklist 3.2)
+                env_type = "Google Colab" if self._environment_manager.is_colab else "Lokal/Jupyter"
+                self.log(f"🌍 Lingkungan terdeteksi: {env_type}", 'info')
+                self.log(f"📁 Direktori kerja: {self._environment_paths.get('data_root', 'Unknown')}", 'info')
+                
+                # Update status panel (Operation Checklist 7.1)
+                self.update_operation_status("Siap untuk manajemen paket", "info")
             
-            # Inject shared methods
-            SharedMethodRegistry.inject_methods(self, category="operations")
-            
-            # Setup event handlers for buttons
-            self._setup_event_handlers()
-            
-            # Call parent initialization
-            super().initialize()
-            
-            get_module_logger("smartcash.ui.setup.dependency.uimodule").debug(f"✅ Initialized Dependency UIModule")
+            return success
             
         except Exception as e:
-            get_module_logger("smartcash.ui.setup.dependency.uimodule").error(f"❌ Failed to initialize Dependency UIModule: {e}")
-            raise
-        
-        return self
+            self.logger.error(f"Failed to initialize Dependency module: {e}")
+            return False
     
-    def _create_ui_components(self) -> None:
-        """Create and register UI components."""
+    def _setup_environment(self) -> None:
+        """Setup environment management using EnvironmentManager."""
         try:
-            # Use the new component structure
-            from smartcash.ui.setup.dependency.components import create_dependency_ui_components
+            # Use standardized environment manager
+            self._environment_manager = get_environment_manager(logger=self.logger)
             
-            ui_components = create_dependency_ui_components(self.get_config())
-            
-            # Register each component
-            for component_type, component in ui_components.items():
-                self.register_component(component_type, component)
-            
-            get_module_logger("smartcash.ui.setup.dependency.uimodule").debug(f"📦 Created {len(ui_components)} UI components")
-            
-        except Exception as e:
-            get_module_logger("smartcash.ui.setup.dependency.uimodule").error(f"❌ Failed to create UI components: {e}")
-            raise
-    
-    
-    def _setup_operation_manager(self) -> None:
-        """Setup operation manager for Dependency operations."""
-        try:
-            # Get operation container instance directly
-            operation_container = self.get_component("operation_container")
-            
-            self._operation_manager = DependencyOperationManager(
-                config=self.get_config(),
-                operation_container=operation_container,
-                ui_components={'operation_container': operation_container}
+            # Get appropriate paths for current environment
+            self._environment_paths = get_paths_for_environment(
+                is_colab=self._environment_manager.is_colab,
+                is_drive_mounted=self._environment_manager.is_drive_mounted if self._environment_manager.is_colab else False
             )
             
-            # Setup UI logging bridge to capture backend service logs
-            self._setup_ui_logging_bridge(operation_container)
-            
-            # Initialize progress tracker display
-            self._initialize_progress_display()
-            
-            get_module_logger("smartcash.ui.setup.dependency.uimodule").debug("⚙️ Setup operation manager")
+            env_type = "Google Colab" if self._environment_manager.is_colab else "Lokal/Jupyter"
+            self.logger.debug(f"✅ Environment detected: {env_type}")
             
         except Exception as e:
-            get_module_logger("smartcash.ui.setup.dependency.uimodule").error(f"❌ Failed to setup operation manager: {e}")
-            raise
+            self.logger.error(f"Failed to setup environment: {e}")
+            # Create fallback environment info
+            self._environment_paths = {
+                'data_root': 'data',
+                'config': './smartcash/configs'
+            }
     
-    
-    def _setup_config_handler(self) -> None:
-        """Setup config handler."""
+    def _setup_operation_manager(self) -> None:
+        """Setup operation manager with UI integration."""
         try:
-            self._config_handler = DependencyConfigHandler()
-            get_module_logger("smartcash.ui.setup.dependency.uimodule").debug("🔧 Setup config handler")
+            if not self._ui_components:
+                raise RuntimeError("UI components must be created before operation manager")
+            
+            operation_container = self._ui_components.get('operation_container')
+            if not operation_container:
+                raise RuntimeError("Operation container not found in UI components")
+            
+            self._operation_manager = DependencyOperationManager(
+                config=self.get_current_config(),
+                operation_container=operation_container,
+                ui_components={'operation_container': operation_container},
+                environment_manager=self._environment_manager
+            )
+            
+            # Initialize operation manager (note: some operation managers don't have initialize method)
+            if hasattr(self._operation_manager, 'initialize'):
+                self._operation_manager.initialize()
+            else:
+                self.logger.debug("Operation manager doesn't have initialize method - using default setup")
+            
+            self.logger.debug("✅ Operation manager initialized")
+            
         except Exception as e:
-            get_module_logger("smartcash.ui.setup.dependency.uimodule").error(f"❌ Failed to setup config handler: {e}")
+            self.logger.error(f"Failed to initialize operation manager: {e}")
             raise
     
-    def _register_operations(self) -> None:
-        """Register Dependency operations."""
+    def _register_default_operations(self) -> None:
+        """Register default operations for Dependency module (Operation Checklist 9.1)."""
+        # Call parent method first
+        super()._register_default_operations()
+        
+        # Register Dependency-specific operations (Operation Checklist 8.3)
+        self.register_operation_handler('install_packages', self._handle_install_packages)
+        self.register_operation_handler('uninstall_packages', self._handle_uninstall_packages)
+        self.register_operation_handler('check_status', self._handle_check_status)
+        self.register_operation_handler('update_packages', self._handle_update_packages)
+        self.register_operation_handler('refresh_status', self._handle_refresh_status)
+        
+        # Register button handlers (Operation Checklist 2.2)
+        self.register_button_handler('install', self._handle_install_packages)
+        self.register_button_handler('uninstall', self._handle_uninstall_packages)
+        self.register_button_handler('check_status', self._handle_check_status)
+        self.register_button_handler('update', self._handle_update_packages)
+    
+    # ==================== OPERATION HANDLERS ====================
+    
+    def _handle_install_packages(self, button=None) -> Dict[str, Any]:
+        """Handle package installation operation (Operation Checklist 8.3)."""
         try:
+            self.log_operation_start("Instalasi Paket")
+            self.update_operation_status("Memulai instalasi paket...", "info")
+            
             if not self._operation_manager:
-                raise ValueError("Operation manager not initialized")
+                raise RuntimeError("Operation manager not available")
             
-            # Get operations from manager
-            operations = self._operation_manager.get_operations()
-            
-            # Register each operation
-            for op_name, op_func in operations.items():
-                self.register_operation(op_name, op_func)
-            
-            # Register convenience methods
-            self.register_operation("get_status", self.get_package_status_summary)
-            self.register_operation("refresh_status", self.refresh_package_status)
-            
-            get_module_logger("smartcash.ui.setup.dependency.uimodule").debug(f"⚙️ Registered {len(operations)} operations")
-            
-        except Exception as e:
-            get_module_logger("smartcash.ui.setup.dependency.uimodule").error(f"❌ Failed to register operations: {e}")
-            raise
-    
-    def _setup_event_handlers(self) -> None:
-        """Setup event handlers for UI components."""
-        try:
-            # Connect buttons to handlers (updated button names)
-            add_button = self.get_component("add_button")
-            if add_button:
-                add_button.on_click(self._handle_add_click)
-            
-            install_button = self.get_component("install_button")
-            if install_button:
-                install_button.on_click(self._handle_install_click)
-            
-            check_button = self.get_component("check_button")
-            if check_button:
-                check_button.on_click(self._handle_check_click)
-            
-            update_button = self.get_component("update_button")
-            if update_button:
-                update_button.on_click(self._handle_update_click)
-            
-            uninstall_button = self.get_component("uninstall_button")
-            if uninstall_button:
-                uninstall_button.on_click(self._handle_uninstall_click)
-            
-            get_module_logger("smartcash.ui.setup.dependency.uimodule").debug("✅ Connected dependency button handlers")
-            
-        except Exception as e:
-            get_module_logger("smartcash.ui.setup.dependency.uimodule").error(f"❌ Failed to setup event handlers: {e}")
-    
-    def _handle_add_click(self, _=None) -> None:
-        """Handle add packages button click."""
-        try:
-            self._log_to_ui("➕ Adding packages to configuration...", "info")
-            
-            # Get selected packages
+            # Get selected packages from UI
             selected_packages = self._get_selected_packages()
+            
+            if not selected_packages:
+                warning_msg = "Tidak ada paket yang dipilih untuk diinstal"
+                self.log(f"⚠️ {warning_msg}", 'warning')
+                self.update_operation_status(warning_msg, "warning")
+                return {'success': False, 'message': warning_msg}
+            
+            # Execute installation with progress tracking (Operation Checklist 3.1)
+            result = self._operation_manager.execute_install(selected_packages)
+            
+            if result.get('success'):
+                self.log_operation_complete("Instalasi Paket")
+                self.update_operation_status("Instalasi paket berhasil diselesaikan", "info")
+                installed_count = result.get('installed_count', 0)
+                self.log(f"✅ {installed_count} paket berhasil diinstal", 'success')
+            else:
+                error_msg = result.get('message', 'Instalasi gagal')
+                self.log_operation_error("Instalasi Paket", error_msg)
+                self.update_operation_status(f"Instalasi gagal: {error_msg}", "error")
+                
+            return result
+            
+        except Exception as e:
+            error_msg = f"Kesalahan instalasi paket: {e}"
+            self.log_operation_error("Instalasi Paket", str(e))
+            self.update_operation_status(error_msg, "error")
+            return {'success': False, 'message': error_msg}
+    
+    def _handle_uninstall_packages(self, button=None) -> Dict[str, Any]:
+        """Handle package uninstallation operation (Operation Checklist 8.3)."""
+        try:
+            self.log_operation_start("Uninstal Paket")
+            self.update_operation_status("Memulai uninstal paket...", "info")
+            
+            if not self._operation_manager:
+                raise RuntimeError("Operation manager not available")
+            
+            # Get selected packages from UI
+            selected_packages = self._get_selected_packages()
+            
+            if not selected_packages:
+                warning_msg = "Tidak ada paket yang dipilih untuk diuninstal"
+                self.log(f"⚠️ {warning_msg}", 'warning')
+                self.update_operation_status(warning_msg, "warning")
+                return {'success': False, 'message': warning_msg}
+            
+            result = self._operation_manager.execute_uninstall(selected_packages)
+            
+            if result.get('success'):
+                self.log_operation_complete("Uninstal Paket")
+                self.update_operation_status("Uninstal paket berhasil diselesaikan", "info")
+                uninstalled_count = result.get('uninstalled_count', 0)
+                self.log(f"✅ {uninstalled_count} paket berhasil diuninstal", 'success')
+            else:
+                error_msg = result.get('message', 'Uninstal gagal')
+                self.log_operation_error("Uninstal Paket", error_msg)
+                self.update_operation_status(f"Uninstal gagal: {error_msg}", "error")
+                
+            return result
+            
+        except Exception as e:
+            error_msg = f"Kesalahan uninstal paket: {e}"
+            self.log_operation_error("Uninstal Paket", str(e))
+            self.update_operation_status(error_msg, "error")
+            return {'success': False, 'message': error_msg}
+    
+    def _handle_check_status(self, button=None) -> Dict[str, Any]:
+        """Handle package status check operation (Operation Checklist 8.3)."""
+        try:
+            self.log_operation_start("Cek Status Paket")
+            self.update_operation_status("Memeriksa status paket...", "info")
+            
+            if not self._operation_manager:
+                raise RuntimeError("Operation manager not available")
+            
+            result = self._operation_manager.execute_check_status()
+            
+            if result.get('success'):
+                self.log_operation_complete("Cek Status Paket")
+                self.update_operation_status("Pemeriksaan status selesai", "info")
+                
+                # Log status summary
+                status_summary = result.get('summary', {})
+                installed = status_summary.get('installed', 0)
+                missing = status_summary.get('missing', 0)
+                total = status_summary.get('total', 0)
+                
+                self.log(f"📊 Status paket: {installed}/{total} terinstal, {missing} hilang", 'info')
+                
+                # Update internal package status
+                self._package_status = result.get('package_status', {})
+                
+            else:
+                error_msg = result.get('message', 'Pemeriksaan status gagal')
+                self.log_operation_error("Cek Status Paket", error_msg)
+                self.update_operation_status(f"Pemeriksaan gagal: {error_msg}", "error")
+                
+            return result
+            
+        except Exception as e:
+            error_msg = f"Kesalahan cek status: {e}"
+            self.log_operation_error("Cek Status Paket", str(e))
+            self.update_operation_status(error_msg, "error")
+            return {'success': False, 'message': error_msg}
+    
+    def _handle_update_packages(self, button=None) -> Dict[str, Any]:
+        """Handle package update operation (Operation Checklist 8.3)."""
+        try:
+            self.log_operation_start("Update Paket")
+            self.update_operation_status("Memulai update paket...", "info")
+            
+            if not self._operation_manager:
+                raise RuntimeError("Operation manager not available")
+            
+            result = self._operation_manager.execute_update()
+            
+            if result.get('success'):
+                self.log_operation_complete("Update Paket")
+                self.update_operation_status("Update paket berhasil diselesaikan", "info")
+                updated_count = result.get('updated_count', 0)
+                self.log(f"✅ {updated_count} paket berhasil diupdate", 'success')
+            else:
+                error_msg = result.get('message', 'Update gagal')
+                self.log_operation_error("Update Paket", error_msg)
+                self.update_operation_status(f"Update gagal: {error_msg}", "error")
+                
+            return result
+            
+        except Exception as e:
+            error_msg = f"Kesalahan update paket: {e}"
+            self.log_operation_error("Update Paket", str(e))
+            self.update_operation_status(error_msg, "error")
+            return {'success': False, 'message': error_msg}
+    
+    def _handle_refresh_status(self, button=None) -> Dict[str, Any]:
+        """Handle refresh package status operation."""
+        try:
+            self.log_operation_start("Refresh Status")
+            self.update_operation_status("Memperbarui status paket...", "info")
+            
+            # Clear cached status
+            self._package_status = {}
+            
+            # Re-run status check
+            result = self._handle_check_status()
+            
+            if result.get('success'):
+                self.log_operation_complete("Refresh Status")
+                self.update_operation_status("Status paket diperbarui", "info")
+                self.log("🔄 Status paket berhasil diperbarui", 'success')
+            
+            return result
+            
+        except Exception as e:
+            error_msg = f"Kesalahan refresh status: {e}"
+            self.log_operation_error("Refresh Status", str(e))
+            self.update_operation_status(error_msg, "error")
+            return {'success': False, 'message': error_msg}
+    
+    # ==================== DEPENDENCY-SPECIFIC METHODS ====================
+    
+    def _get_selected_packages(self) -> list:
+        """Get list of selected packages from UI."""
+        selected_packages = []
+        
+        try:
+            # Get package checkboxes from UI components
+            if self._ui_components and 'package_checkboxes' in self._ui_components:
+                checkboxes = self._ui_components['package_checkboxes']
+                for category, boxes in checkboxes.items():
+                    for package_name, checkbox in boxes.items():
+                        if checkbox.value:  # If checkbox is checked
+                            selected_packages.append(package_name)
             
             # Get custom packages
-            custom_packages = self.get_component("custom_packages")
-            custom_packages_text = custom_packages.value if custom_packages else ""
-            
-            # Save to config handler
-            if self._config_handler:
-                # Update selected packages
-                current_config = self._config_handler.config.copy()
-                current_config['selected_packages'] = selected_packages
-                current_config['custom_packages'] = custom_packages_text
-                
-                # Save configuration
-                self._config_handler.config = current_config
-                success = True
-                
-                if success:
-                    self._log_to_ui(f"✅ Packages added to configuration! {len(selected_packages)} packages selected", "success")
-                    
-                    # Update UI display
-                    self._update_ui_after_save()
-                else:
-                    self._log_to_ui("❌ Failed to add packages to configuration", "error")
-            else:
-                self._log_to_ui("❌ Config handler not available", "error")
-                
-        except Exception as e:
-            get_module_logger("smartcash.ui.setup.dependency.uimodule").error(f"❌ Add packages failed: {e}")
-            self._log_to_ui(f"❌ Add packages error: {str(e)}", "error")
-    
-    def _update_ui_after_save(self) -> None:
-        """Update UI components after saving configuration."""
-        try:
-            # Refresh package status to show current state
-            self.refresh_package_status()
-            
-            # Update header status
-            header_container = self.get_component("header_container")
-            if header_container and hasattr(header_container, 'update_status'):
-                selected_count = len(self._get_selected_packages())
-                header_container.update_status(
-                    f"Configuration saved - {selected_count} packages selected",
-                    "success"
-                )
-            
-            # Log configuration file location
-            config_path = getattr(self._config_handler, 'config_file', "dependency_config.yaml") if self._config_handler else "dependency_config.yaml"
-            self._log_to_ui(f"📁 Configuration saved to: {config_path}", "info")
+            if self._ui_components and 'custom_packages' in self._ui_components:
+                custom_widget = self._ui_components['custom_packages']
+                if hasattr(custom_widget, 'value') and custom_widget.value.strip():
+                    custom_packages = [pkg.strip() for pkg in custom_widget.value.split(',') if pkg.strip()]
+                    selected_packages.extend(custom_packages)
             
         except Exception as e:
-            get_module_logger("smartcash.ui.setup.dependency.uimodule").error(f"❌ Failed to update UI after save: {e}")
-    
-    def _handle_install_click(self, _=None) -> None:
-        """Handle install button click."""
-        try:
-            selected_packages = self._get_selected_packages()
-            if not selected_packages:
-                self._log_to_ui("⚠️ No packages selected for installation", "warning")
-                return
-            
-            self._log_to_ui(f"📥 Installing {len(selected_packages)} packages...", "info")
-            
-            # Execute install operation with progress tracking
-            result = self.execute_install_operation(selected_packages)
-            
-            if result.get("success", False):
-                self._log_to_ui("✅ Installation completed successfully!", "success")
-                self.refresh_package_status()
-            else:
-                error_msg = result.get("message", "Installation failed")
-                self._log_to_ui(f"❌ Installation failed: {error_msg}", "error")
-                
-        except Exception as e:
-            get_module_logger("smartcash.ui.setup.dependency.uimodule").error(f"❌ Install click failed: {e}")
-            self._log_to_ui(f"❌ Install error: {str(e)}", "error")
-    
-    def _handle_check_click(self, _=None) -> None:
-        """Handle check status button click - automatically check for missing packages."""
-        try:
-            self._log_to_ui("🔍 Checking package status and finding missing packages...", "info")
-            
-            # Refresh package status first
-            self.refresh_package_status()
-            
-            # Check for missing packages and suggest them
-            self._check_missing_packages()
-            
-        except Exception as e:
-            get_module_logger("smartcash.ui.setup.dependency.uimodule").error(f"❌ Check click failed: {e}")
-            self._log_to_ui(f"❌ Check error: {str(e)}", "error")
-    
-    def _check_missing_packages(self) -> None:
-        """Check for missing packages and automatically select them."""
-        try:
-            missing_packages = []
-            
-            # Get all packages that should be installed (selected ones)
-            selected_packages = self._get_selected_packages()
-            
-            # Check which ones are actually missing
-            for package in selected_packages:
-                # Extract package name (before version specifiers)
-                pkg_name = package.split('>=')[0].split('==')[0].split('>')[0].split('<')[0].strip()
-                
-                # Check if package is installed
-                status = self.get_package_status(pkg_name)
-                if not status.get("installed", False):
-                    missing_packages.append(package)
-            
-            # Report findings
-            if missing_packages:
-                self._log_to_ui(f"⚠️ Found {len(missing_packages)} missing packages:", "warning")
-                for pkg in missing_packages[:5]:  # Show first 5
-                    self._log_to_ui(f"   - {pkg}", "warning")
-                if len(missing_packages) > 5:
-                    self._log_to_ui(f"   ... and {len(missing_packages) - 5} more", "warning")
-                
-                self._log_to_ui("💡 Tip: Click 'Install Selected' to install missing packages", "info")
-            else:
-                self._log_to_ui("✅ All selected packages are installed!", "success")
-                
-        except Exception as e:
-            get_module_logger("smartcash.ui.setup.dependency.uimodule").error(f"❌ Failed to check missing packages: {e}")
-            self._log_to_ui(f"❌ Missing package check error: {str(e)}", "error")
-    
-    def _handle_update_click(self, _=None) -> None:
-        """Handle update button click."""
-        try:
-            self._log_to_ui("⬆️ Updating packages...", "info")
-            
-            # Execute update operation
-            result = self.execute_update_operation()
-            
-            if result.get("success", False):
-                self._log_to_ui("✅ Update completed successfully!", "success")
-                self.refresh_package_status()
-            else:
-                error_msg = result.get("message", "Update failed")
-                self._log_to_ui(f"❌ Update failed: {error_msg}", "error")
-                
-        except Exception as e:
-            get_module_logger("smartcash.ui.setup.dependency.uimodule").error(f"❌ Update click failed: {e}")
-            self._log_to_ui(f"❌ Update error: {str(e)}", "error")
-    
-    def _handle_uninstall_click(self, _=None) -> None:
-        """Handle uninstall button click."""
-        try:
-            selected_packages = self._get_selected_packages()
-            if not selected_packages:
-                self._log_to_ui("⚠️ No packages selected for uninstallation", "warning")
-                return
-            
-            self._log_to_ui(f"🗑️ Uninstalling {len(selected_packages)} packages...", "info")
-            
-            # Execute uninstall operation
-            result = self.execute_uninstall_operation(selected_packages)
-            
-            if result.get("success", False):
-                self._log_to_ui("✅ Uninstallation completed successfully!", "success")
-                self.refresh_package_status()
-            else:
-                error_msg = result.get("message", "Uninstallation failed")
-                self._log_to_ui(f"❌ Uninstallation failed: {error_msg}", "error")
-                
-        except Exception as e:
-            get_module_logger("smartcash.ui.setup.dependency.uimodule").error(f"❌ Uninstall click failed: {e}")
-            self._log_to_ui(f"❌ Uninstall error: {str(e)}", "error")
-    
-    def _get_selected_packages(self) -> List[str]:
-        """Get list of selected packages from UI."""
-        selected = []
+            self.logger.warning(f"Failed to get selected packages: {e}")
         
-        # Get packages from all category checkboxes
-        package_checkboxes = self.get_component("package_checkboxes") or {}
-        package_categories = self.get_config("package_categories", {})
-        
-        for category_key, checkboxes in package_checkboxes.items():
-            category = package_categories.get(category_key, {})
-            packages = category.get("packages", [])
-            
-            for i, checkbox in enumerate(checkboxes):
-                if checkbox.value and i < len(packages):
-                    selected.append(packages[i]['pip_name'])
-        
-        # Get custom packages from text area
-        custom_packages = self.get_component("custom_packages")
-        if custom_packages and custom_packages.value:
-            custom_lines = [line.strip() for line in custom_packages.value.split('\n') if line.strip()]
-            selected.extend(custom_lines)
-        
-        return selected
+        return selected_packages
     
-    def _log_to_ui(self, message: str, level: str = "info") -> None:
-        """Log message to UI components using operation container's log_accordion."""
+    def get_package_status(self) -> Dict[str, Any]:
+        """
+        Get current package status information.
+        
+        Returns:
+            Package status dictionary
+        """
         try:
-            # Get operation container and use its log_accordion
-            operation_container = self.get_component("operation_container")
-            if operation_container and hasattr(operation_container, 'log'):
-                # Map log levels to LogLevel enum if needed
-                from smartcash.ui.components.log_accordion import LogLevel
-                level_map = {
-                    'info': LogLevel.INFO,
-                    'success': LogLevel.INFO,
-                    'warning': LogLevel.WARNING,
-                    'error': LogLevel.ERROR,
-                    'debug': LogLevel.DEBUG
-                }
-                log_level = level_map.get(level, LogLevel.INFO)
-                operation_container.log(message, log_level)
-            else:
-                # Fallback to logger if operation container not available
-                getattr(logger, level, get_module_logger("smartcash.ui.setup.dependency.uimodule").info)(message)
+            status = {
+                'initialized': self._is_initialized,
+                'module_name': self.module_name,
+                'environment_type': 'colab' if self._environment_manager.is_colab else 'local',
+                'config_loaded': self._config_handler is not None,
+                'operation_manager_ready': self._operation_manager is not None,
+                'ui_created': bool(self._ui_components),
+                'package_status': self._package_status,
+                'environment_paths': self._environment_paths
+            }
+            
+            # Add environment-specific information
+            if self._environment_manager:
+                system_info = self._environment_manager.get_system_info()
+                status.update({
+                    'python_version': system_info.get('python_version'),
+                    'base_directory': system_info.get('base_directory'),
+                    'data_directory': system_info.get('data_directory')
+                })
+            
+            return status
+            
         except Exception as e:
-            get_module_logger("smartcash.ui.setup.dependency.uimodule").debug(f"UI logging failed: {e}")
+            return {'error': f'Pemeriksaan status gagal: {str(e)}'}
     
-    def _update_progress(self, progress: int, message: str = "", level: str = "primary") -> None:
-        """Update progress tracker using operation container."""
-        try:
-            operation_container = self.get_component("operation_container")
-            if operation_container and hasattr(operation_container, 'update_progress'):
-                operation_container.update_progress(progress, message, level)
-            else:
-                # Fallback to logging
-                self._log_to_ui(f"Progress {progress}%: {message}", "info")
-        except Exception as e:
-            get_module_logger("smartcash.ui.setup.dependency.uimodule").debug(f"Progress update failed: {e}")
-    
-    def execute_install_operation(self, packages: List[str]) -> Dict[str, Any]:
-        """Execute package installation synchronously."""
-        if not self._operation_manager:
-            return {"success": False, "message": "Operation manager not initialized"}
-        
-        try:
-            # Show progress start
-            self._update_progress(0, "Starting installation...")
-            
-            # Execute install operation synchronously using the operation manager's sync method
-            if hasattr(self._operation_manager, 'execute_install_sync'):
-                result = self._operation_manager.execute_install_sync(packages)
-            else:
-                # Fallback to direct pip installation if sync method not available
-                result = self._execute_pip_install_sync(packages)
-            
-            # Update progress based on result
-            if result.get("success", False):
-                self._update_progress(100, "Installation completed!")
-                return {
-                    "success": True,
-                    "message": result.get("message", "Installation completed"),
-                    "data": result
-                }
-            else:
-                self._update_progress(100, "Installation failed!")
-                return {
-                    "success": False,
-                    "message": result.get("error", "Installation failed"),
-                    "data": result
-                }
-                
-        except Exception as e:
-            get_module_logger("smartcash.ui.setup.dependency.uimodule").error(f"❌ Failed to execute install: {e}")
-            self._update_progress(100, f"Installation error: {str(e)}")
-            return {"success": False, "message": str(e)}
-    
-    def execute_uninstall_operation(self, packages: List[str]) -> Dict[str, Any]:
-        """Execute package uninstallation synchronously."""
-        if not self._operation_manager:
-            return {"success": False, "message": "Operation manager not initialized"}
-        
-        try:
-            # Show progress start
-            self._update_progress(0, "Starting uninstallation...")
-            
-            # Execute uninstall operation synchronously
-            if hasattr(self._operation_manager, 'execute_uninstall_sync'):
-                result = self._operation_manager.execute_uninstall_sync(packages)
-            else:
-                # Fallback to direct pip uninstallation if sync method not available
-                result = self._execute_pip_uninstall_sync(packages)
-            
-            # Update progress based on result
-            if result.get("success", False):
-                self._update_progress(100, "Uninstallation completed!")
-                return {
-                    "success": True,
-                    "message": result.get("message", "Uninstallation completed"),
-                    "data": result
-                }
-            else:
-                self._update_progress(100, "Uninstallation failed!")
-                return {
-                    "success": False,
-                    "message": result.get("error", "Uninstallation failed"),
-                    "data": result
-                }
-                
-        except Exception as e:
-            get_module_logger("smartcash.ui.setup.dependency.uimodule").error(f"❌ Failed to execute uninstall: {e}")
-            self._update_progress(100, f"Uninstallation error: {str(e)}")
-            return {"success": False, "message": str(e)}
-    
-    def execute_update_operation(self) -> Dict[str, Any]:
-        """Execute package update synchronously."""
-        if not self._operation_manager:
-            return {"success": False, "message": "Operation manager not initialized"}
-        
-        try:
-            # Show progress start
-            self._update_progress(0, "Starting update...")
-            
-            # Get all installed packages for update
-            selected_packages = self._get_selected_packages()
-            
-            # Execute update operation synchronously
-            if hasattr(self._operation_manager, 'execute_update_sync'):
-                result = self._operation_manager.execute_update_sync(selected_packages)
-            else:
-                # Fallback to direct pip update if sync method not available
-                result = self._execute_pip_update_sync(selected_packages)
-            
-            # Update progress based on result
-            if result.get("success", False):
-                self._update_progress(100, "Update completed!")
-                return {
-                    "success": True,
-                    "message": result.get("message", "Update completed"),
-                    "data": result
-                }
-            else:
-                self._update_progress(100, "Update failed!")
-                return {
-                    "success": False,
-                    "message": result.get("error", "Update failed"),
-                    "data": result
-                }
-                
-        except Exception as e:
-            get_module_logger("smartcash.ui.setup.dependency.uimodule").error(f"❌ Failed to execute update: {e}")
-            self._update_progress(100, f"Update error: {str(e)}")
-            return {"success": False, "message": str(e)}
-    
-    def get_package_status_summary(self) -> Dict[str, Any]:
-        """Get summary of package installation status."""
-        return {
-            "module": self.full_module_name,
-            "package_status": self._package_status,
-            "timestamp": datetime.now().isoformat()
+    def get_environment_info(self) -> Dict[str, Any]:
+        """Get detailed environment information for dependency management."""
+        base_info = {
+            'is_colab': self._environment_manager.is_colab if self._environment_manager else False,
+            'runtime_type': 'colab' if (self._environment_manager and self._environment_manager.is_colab) else 'local',
+            'python_version': f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}",
+            'platform': sys.platform,
+            'working_directory': os.getcwd(),
+            'paths': self._environment_paths
         }
-    
-    def refresh_package_status(self) -> None:
-        """Refresh package status and update UI."""
-        try:
-            # Get status of all packages
-            all_packages = self._get_all_packages()
-            status_info = []
-            
-            for package in all_packages:
-                status = self.get_package_status(package)
-                status_info.append(status)
-            
-            # Update internal status without logging to UI to avoid extra log_output
-            
-            self._package_status = {s["package"]: s for s in status_info}
-            get_module_logger("smartcash.ui.setup.dependency.uimodule").debug("✅ Package status refreshed")
-            
-        except Exception as e:
-            get_module_logger("smartcash.ui.setup.dependency.uimodule").error(f"❌ Failed to refresh package status: {e}")
-    
-    def _get_all_packages(self) -> List[str]:
-        """Get list of all packages from all categories + custom."""
-        all_packages = []
         
-        # Get packages from all categories
-        package_categories = self.get_config("package_categories", {})
-        for category_key, category in package_categories.items():
-            if category_key == 'custom_packages':  # Skip custom packages category
-                continue
-            packages = category.get("packages", [])
-            all_packages.extend([pkg['name'] for pkg in packages])
+        # Add EnvironmentManager system info if available
+        if self._environment_manager:
+            try:
+                system_info = self._environment_manager.get_system_info()
+                base_info.update({
+                    'base_directory': system_info.get('base_directory'),
+                    'data_directory': system_info.get('data_directory'),
+                    'python_executable': sys.executable
+                })
+            except Exception as e:
+                self.logger.warning(f"Failed to get system info from EnvironmentManager: {e}")
         
-        # Custom packages from UI
-        custom_packages = self.get_component("custom_packages")
-        if custom_packages and custom_packages.value:
-            custom_lines = [line.strip() for line in custom_packages.value.split('\n') if line.strip()]
-            # Extract package names (before any version specifiers)
-            for line in custom_lines:
-                pkg_name = line.split('>=')[0].split('==')[0].split('>')[0].split('<')[0].strip()
-                if pkg_name:
-                    all_packages.append(pkg_name)
-        
-        return all_packages
-    
-    def get_operation_manager(self) -> Optional[DependencyOperationManager]:
-        """Get the operation manager instance."""
-        return self._operation_manager
-    
-    def get_config_handler(self) -> Optional[DependencyConfigHandler]:
-        """Get the config handler instance."""
-        return self._config_handler
-    
-    def _setup_ui_logging_bridge(self, operation_container: Any) -> None:
-        """Setup UI logging bridge to capture backend service logs."""
-        try:
-            import logging
-            
-            # Create custom handler for backend services
-            class BackendUILogHandler(logging.Handler):
-                def __init__(self, log_func):
-                    super().__init__()
-                    self.log_func = log_func
-                    self.setFormatter(logging.Formatter('%(name)s: %(message)s'))
-                
-                def emit(self, record):
-                    try:
-                        msg = self.format(record)
-                        level = 'info' if record.levelno == logging.INFO else 'error'
-                        self.log_func(msg, level)
-                    except Exception:
-                        pass  # Silently fail to avoid recursive errors
-            
-            # Get log function from operation container
-            if hasattr(operation_container, 'log_message'):
-                log_func = operation_container.log_message
-            elif hasattr(operation_container, 'log'):
-                log_func = operation_container.log
-            else:
-                # Fallback to internal logging
-                log_func = self._log_to_ui
-            
-            # Create handler
-            ui_handler = BackendUILogHandler(log_func)
-            ui_handler.setLevel(logging.INFO)
-            
-            # Target specific backend service loggers that might log during dependency operations
-            target_loggers = [
-                'smartcash.dataset',
-                'smartcash.model', 
-                'smartcash.setup.dependency',
-                'smartcash.core',
-                'pip',
-                'subprocess'
-            ]
-            
-            # Remove existing console handlers and add UI handlers
-            for logger_name in target_loggers:
-                logger = logging.getLogger(logger_name)
-                
-                # Remove existing console handlers
-                for handler in logger.handlers[:]:
-                    if isinstance(handler, logging.StreamHandler):
-                        logger.removeHandler(handler)
-                
-                # Add UI handler
-                logger.addHandler(ui_handler)
-            
-            # Store handler for cleanup
-            if not hasattr(self, '_ui_handlers'):
-                self._ui_handlers = []
-            self._ui_handlers.append(ui_handler)
-            
-            get_module_logger("smartcash.ui.setup.dependency.uimodule").debug("🌉 UI logging bridge setup completed")
-            
-        except Exception as e:
-            get_module_logger("smartcash.ui.setup.dependency.uimodule").error(f"❌ Failed to setup UI logging bridge: {e}")
-    
-    def _initialize_progress_display(self) -> None:
-        """Initialize progress tracker display."""
-        try:
-            operation_container = self.get_component("operation_container")
-            if operation_container and hasattr(operation_container, 'progress_tracker'):
-                progress_tracker = operation_container.progress_tracker
-                if hasattr(progress_tracker, 'initialize') and not getattr(progress_tracker, '_initialized', False):
-                    progress_tracker.initialize()
-                if hasattr(progress_tracker, 'show'):
-                    progress_tracker.show()
-                    
-            get_module_logger("smartcash.ui.setup.dependency.uimodule").debug("📊 Progress display initialized")
-            
-        except Exception as e:
-            get_module_logger("smartcash.ui.setup.dependency.uimodule").debug(f"Progress display initialization failed: {e}")
-    
-    def _cleanup_ui_logging_bridge(self) -> None:
-        """Cleanup UI logging bridge handlers."""
-        try:
-            if hasattr(self, '_ui_handlers'):
-                import logging
-                for handler in self._ui_handlers:
-                    # Remove handler from all loggers
-                    for logger_name in logging.Logger.manager.loggerDict:
-                        logger = logging.getLogger(logger_name)
-                        if handler in logger.handlers:
-                            logger.removeHandler(handler)
-                self._ui_handlers.clear()
-                
-            get_module_logger("smartcash.ui.setup.dependency.uimodule").debug("🧹 UI logging bridge cleanup completed")
-            
-        except Exception as e:
-            get_module_logger("smartcash.ui.setup.dependency.uimodule").debug(f"UI logging bridge cleanup failed: {e}")
-    
-    def _execute_pip_install_sync(self, packages: List[str]) -> Dict[str, Any]:
-        """Fallback synchronous pip install method."""
-        try:
-            import subprocess
-            import sys
-            
-            # Update progress
-            self._update_progress(25, f"Installing {len(packages)} packages...")
-            self._log_to_ui(f"📦 Installing packages: {', '.join(packages)}", "info")
-            
-            success_count = 0
-            failed_packages = []
-            
-            for i, package in enumerate(packages):
-                try:
-                    # Update progress for each package
-                    progress = 25 + (50 * i // len(packages))
-                    self._update_progress(progress, f"Installing {package}...")
-                    
-                    # Execute pip install
-                    result = subprocess.run(
-                        [sys.executable, "-m", "pip", "install", package],
-                        capture_output=True,
-                        text=True,
-                        timeout=120  # 2 minute timeout per package
-                    )
-                    
-                    if result.returncode == 0:
-                        success_count += 1
-                        self._log_to_ui(f"✅ Successfully installed {package}", "info")
-                    else:
-                        failed_packages.append(package)
-                        self._log_to_ui(f"❌ Failed to install {package}: {result.stderr.strip()}", "error")
-                        
-                except subprocess.TimeoutExpired:
-                    failed_packages.append(package)
-                    self._log_to_ui(f"⏰ Timeout installing {package}", "error")
-                except Exception as e:
-                    failed_packages.append(package)
-                    self._log_to_ui(f"❌ Error installing {package}: {str(e)}", "error")
-            
-            # Final result
-            if failed_packages:
-                message = f"Installed {success_count}/{len(packages)} packages. Failed: {', '.join(failed_packages)}"
-                return {"success": False, "message": message, "failed_packages": failed_packages}
-            else:
-                message = f"Successfully installed all {success_count} packages"
-                return {"success": True, "message": message}
-                
-        except Exception as e:
-            return {"success": False, "error": str(e)}
-    
-    def _execute_pip_uninstall_sync(self, packages: List[str]) -> Dict[str, Any]:
-        """Fallback synchronous pip uninstall method."""
-        try:
-            import subprocess
-            import sys
-            
-            # Update progress
-            self._update_progress(25, f"Uninstalling {len(packages)} packages...")
-            self._log_to_ui(f"🗑️ Uninstalling packages: {', '.join(packages)}", "info")
-            
-            success_count = 0
-            failed_packages = []
-            
-            for i, package in enumerate(packages):
-                try:
-                    # Update progress for each package
-                    progress = 25 + (50 * i // len(packages))
-                    self._update_progress(progress, f"Uninstalling {package}...")
-                    
-                    # Execute pip uninstall
-                    result = subprocess.run(
-                        [sys.executable, "-m", "pip", "uninstall", package, "-y"],
-                        capture_output=True,
-                        text=True,
-                        timeout=60  # 1 minute timeout per package
-                    )
-                    
-                    if result.returncode == 0:
-                        success_count += 1
-                        self._log_to_ui(f"✅ Successfully uninstalled {package}", "info")
-                    else:
-                        failed_packages.append(package)
-                        self._log_to_ui(f"❌ Failed to uninstall {package}: {result.stderr.strip()}", "error")
-                        
-                except subprocess.TimeoutExpired:
-                    failed_packages.append(package)
-                    self._log_to_ui(f"⏰ Timeout uninstalling {package}", "error")
-                except Exception as e:
-                    failed_packages.append(package)
-                    self._log_to_ui(f"❌ Error uninstalling {package}: {str(e)}", "error")
-            
-            # Final result
-            if failed_packages:
-                message = f"Uninstalled {success_count}/{len(packages)} packages. Failed: {', '.join(failed_packages)}"
-                return {"success": False, "message": message, "failed_packages": failed_packages}
-            else:
-                message = f"Successfully uninstalled all {success_count} packages"
-                return {"success": True, "message": message}
-                
-        except Exception as e:
-            return {"success": False, "error": str(e)}
-    
-    def _execute_pip_update_sync(self, packages: List[str]) -> Dict[str, Any]:
-        """Fallback synchronous pip update method."""
-        try:
-            import subprocess
-            import sys
-            
-            # Update progress
-            self._update_progress(25, f"Updating {len(packages)} packages...")
-            self._log_to_ui(f"⬆️ Updating packages: {', '.join(packages)}", "info")
-            
-            success_count = 0
-            failed_packages = []
-            
-            for i, package in enumerate(packages):
-                try:
-                    # Update progress for each package
-                    progress = 25 + (50 * i // len(packages))
-                    self._update_progress(progress, f"Updating {package}...")
-                    
-                    # Execute pip install --upgrade
-                    result = subprocess.run(
-                        [sys.executable, "-m", "pip", "install", "--upgrade", package],
-                        capture_output=True,
-                        text=True,
-                        timeout=120  # 2 minute timeout per package
-                    )
-                    
-                    if result.returncode == 0:
-                        success_count += 1
-                        self._log_to_ui(f"✅ Successfully updated {package}", "info")
-                    else:
-                        failed_packages.append(package)
-                        self._log_to_ui(f"❌ Failed to update {package}: {result.stderr.strip()}", "error")
-                        
-                except subprocess.TimeoutExpired:
-                    failed_packages.append(package)
-                    self._log_to_ui(f"⏰ Timeout updating {package}", "error")
-                except Exception as e:
-                    failed_packages.append(package)
-                    self._log_to_ui(f"❌ Error updating {package}: {str(e)}", "error")
-            
-            # Final result
-            if failed_packages:
-                message = f"Updated {success_count}/{len(packages)} packages. Failed: {', '.join(failed_packages)}"
-                return {"success": False, "message": message, "failed_packages": failed_packages}
-            else:
-                message = f"Successfully updated all {success_count} packages"
-                return {"success": True, "message": message}
-                
-        except Exception as e:
-            return {"success": False, "error": str(e)}
+        return base_info
 
-    def cleanup(self) -> None:
-        """Cleanup resources."""
-        try:
-            self._cleanup_ui_logging_bridge()
-            super().cleanup()
-        except Exception as e:
-            get_module_logger("smartcash.ui.setup.dependency.uimodule").error(f"Cleanup error: {e}")
 
-def create_dependency_uimodule(config: Dict[str, Any] = None, 
-                              auto_initialize: bool = True,
-                              force_new: bool = False) -> DependencyUIModule:
-    """Create Dependency UIModule using factory pattern.
+# ==================== FACTORY FUNCTIONS ====================
+
+# Create standardized display function using enhanced factory
+from smartcash.ui.core.enhanced_ui_module_factory import EnhancedUIModuleFactory
+
+def initialize_dependency_ui(config: Optional[Dict[str, Any]] = None, 
+                            display: bool = True, 
+                            **kwargs) -> Optional[Dict[str, Any]]:
+    """Initialize and optionally display the Dependency UI module."""
+    return EnhancedUIModuleFactory.create_and_display(
+        module_class=DependencyUIModule,
+        config=config,
+        display=display,
+        **kwargs
+    )
+
+def get_dependency_components(config: Optional[Dict[str, Any]] = None, 
+                             **kwargs) -> Optional[Dict[str, Any]]:
+    """Get Dependency UI components without displaying."""
+    return initialize_dependency_ui(config=config, display=False, **kwargs)
+
+
+# ==================== CONVENIENCE FUNCTIONS ====================
+
+# Global module instance for singleton pattern
+_dependency_module_instance: Optional[DependencyUIModule] = None
+
+def create_dependency_uimodule(
+    config: Optional[Dict[str, Any]] = None,
+    auto_initialize: bool = True,
+    **kwargs
+) -> DependencyUIModule:
+    """
+    Create a new Dependency UIModule instance.
     
     Args:
-        config: Dependency configuration dictionary
+        config: Optional configuration dictionary
         auto_initialize: Whether to auto-initialize the module
-        force_new: Force creation of new instance
+        **kwargs: Additional arguments
         
     Returns:
         DependencyUIModule instance
     """
-    global _dependency_uimodule
+    module = DependencyUIModule()
     
-    # Return existing instance if available and not forcing new
-    if not force_new and _dependency_uimodule is not None:
-        if config:
-            _dependency_uimodule.update_config(**config)
-        return _dependency_uimodule
+    if auto_initialize:
+        module.initialize(config, **kwargs)
     
-    try:
-        # Ensure template is registered
-        register_dependency_template()
-        
-        # Ensure shared methods are registered
-        register_dependency_shared_methods()
-        
-        # Create new module instance
-        module = DependencyUIModule(config)
-        
-        # Initialize if requested
-        if auto_initialize:
-            module.initialize()
-        
-        # Store global reference
-        _dependency_uimodule = module
-        
-        get_module_logger("smartcash.ui.setup.dependency.uimodule").debug(f"🏭 Created Dependency UIModule")
-        return module
-        
-    except Exception as e:
-        get_module_logger("smartcash.ui.setup.dependency.uimodule").error(f"❌ Failed to create Dependency UIModule: {e}")
-        raise
+    return module
 
-def get_dependency_uimodule(create_if_missing: bool = True, **kwargs) -> Optional[DependencyUIModule]:
-    """Get existing Dependency UIModule instance.
-    
-    Args:
-        create_if_missing: Create new instance if none exists
-        **kwargs: Arguments for create_dependency_uimodule if creating
-        
-    Returns:
-        DependencyUIModule instance or None
-    """
-    global _dependency_uimodule
-    
-    if _dependency_uimodule is None and create_if_missing:
-        _dependency_uimodule = create_dependency_uimodule(**kwargs)
-    
-    return _dependency_uimodule
+def get_dependency_uimodule() -> Optional[DependencyUIModule]:
+    """Get the current Dependency UIModule instance."""
+    global _dependency_module_instance
+    return _dependency_module_instance
 
 def reset_dependency_uimodule() -> None:
-    """Reset global Dependency UIModule instance."""
-    global _dependency_uimodule
-    
-    if _dependency_uimodule is not None:
+    """Reset the global Dependency UIModule instance."""
+    global _dependency_module_instance
+    if _dependency_module_instance:
         try:
-            _dependency_uimodule.cleanup()
-        except Exception as e:
-            get_module_logger("smartcash.ui.setup.dependency.uimodule").error(f"Error during cleanup: {e}")
-        finally:
-            _dependency_uimodule = None
-    
-    get_module_logger("smartcash.ui.setup.dependency.uimodule").debug("🔄 Reset global Dependency UIModule instance")
+            _dependency_module_instance.cleanup()
+        except:
+            pass
+    _dependency_module_instance = None
 
-# === Backward Compatibility Layer ===
+def display_dependency_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> Dict[str, Any]:
+    """Display Dependency UI and return components."""
+    return initialize_dependency_ui(config=config, display=True, **kwargs)
 
-@handle_ui_errors(return_type=None)
-def initialize_dependency_ui(
-    config: Optional[Dict[str, Any]] = None,
-    display: bool = True,
-    **kwargs
-) -> Optional[Dict[str, Any]]:
-    """Initialize Dependency UI using new UIModule pattern.
-    
-    Args:
-        config: Optional configuration dictionary
-        display: Whether to display the UI immediately (True) or return components (False)
-        **kwargs: Additional keyword arguments for module creation
-        
-    Returns:
-        None if display=True, dict of components if display=False
-    """
+
+# ==================== SHARED METHODS REGISTRATION ====================
+
+def register_dependency_shared_methods() -> None:
+    """Register shared methods for Dependency module (Operation Checklist 9.1)."""
     try:
-        from IPython.display import display as ipython_display
+        from smartcash.ui.core.ui_module import SharedMethodRegistry
         
-        # Get the module and UI components
-        module = create_dependency_uimodule(config, auto_initialize=True, **kwargs)
-        ui_components = {
-            component_type: module.get_component(component_type)
-            for component_type in module.list_components()
-        }
+        # Register Dependency-specific shared methods
+        SharedMethodRegistry.register_method(
+            'dependency.get_package_status',
+            lambda pkg: get_package_status_for_package(pkg),
+            description='Get package installation status'
+        )
         
-        main_ui = ui_components.get('main_container') or ui_components.get('ui')
+        SharedMethodRegistry.register_method(
+            'dependency.list_packages',
+            lambda: list_installed_packages(),
+            description='List all installed packages'
+        )
         
-        # Setup UI logging bridge to capture backend service logs
-        operation_container = ui_components.get('operation_container')
-        if operation_container and hasattr(module, '_setup_ui_logging_bridge'):
-            module._setup_ui_logging_bridge(operation_container)
+        SharedMethodRegistry.register_method(
+            'dependency.get_status',
+            lambda: create_dependency_uimodule().get_package_status(),
+            description='Get dependency module status'
+        )
         
-        # Initialize progress display
-        if hasattr(module, '_initialize_progress_display'):
-            module._initialize_progress_display()
-        
-        if display and main_ui:
-            ipython_display(main_ui)
-            return None
-        
-        # Return components without displaying
-        result = {
-            'success': True,
-            'module': module,
-            'ui_components': ui_components,
-            'main_ui': main_ui
-        }
-        
-        return result
+        logger = get_module_logger("smartcash.ui.setup.dependency.shared")
+        logger.debug("📋 Registered Dependency shared methods")
         
     except Exception as e:
-        error_result = {
-            'success': False,
-            'error': str(e),
-            'module': None,
-            'ui_components': {},
-            'main_ui': None
-        }
-        
-        if display:
-            get_module_logger("smartcash.ui.setup.dependency.uimodule").error(f"Failed to initialize dependency UI: {e}")
-            return None
-        
-        return error_result
+        # Log error but don't raise to avoid breaking module loading
+        logger = get_module_logger("smartcash.ui.setup.dependency.shared")
+        logger.error(f"Failed to register shared methods: {e}")
 
-@handle_ui_errors(return_type=dict)
-def get_dependency_components(config: Dict[str, Any] = None) -> Dict[str, Any]:
-    """Get Dependency components using new UIModule pattern."""
-    module = create_dependency_uimodule(config, auto_initialize=True)
-    return {
-        component_type: module.get_component(component_type)
-        for component_type in module.list_components()
-    }
 
-@handle_ui_errors(return_type=None)
-def display_dependency_ui(config: Dict[str, Any] = None) -> None:
-    """Display Dependency UI using new UIModule pattern."""
-    initialize_dependency_ui(config)
+def get_package_status_for_package(package_name: str) -> Dict[str, Any]:
+    """Get status of a specific package."""
+    try:
+        import subprocess
+        result = subprocess.run(['pip', 'show', package_name], 
+                              capture_output=True, text=True)
+        if result.returncode == 0:
+            return {"installed": True, "package": package_name, "details": result.stdout}
+        else:
+            return {"installed": False, "package": package_name}
+    except Exception as e:
+        return {"installed": False, "package": package_name, "error": str(e)}
+
+def list_installed_packages() -> Dict[str, Any]:
+    """List all installed packages."""
+    try:
+        import subprocess
+        result = subprocess.run(['pip', 'list', '--format=json'], 
+                              capture_output=True, text=True)
+        if result.returncode == 0:
+            import json
+            packages = json.loads(result.stdout)
+            return {"success": True, "packages": packages}
+        else:
+            return {"success": False, "error": "Failed to list packages"}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+# Auto-register when module is imported
+try:
+    register_dependency_shared_methods()
+except Exception as e:
+    # Log but continue - registration is optional
+    import logging
+    logging.getLogger(__name__).warning(f"Module registration failed: {e}")

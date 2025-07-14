@@ -1,13 +1,13 @@
 """
 File: smartcash/ui/setup/colab/operations/drive_mount_operation.py
-Description: Mount Google Drive with verification
+Description: Mount Google Drive with verification using EnvironmentManager
 """
 
 import os
-import sys
 from typing import Dict, Any, Optional, Callable
 from smartcash.ui.core.handlers.operation_handler import OperationHandler
-from ..utils.env_detector import get_runtime_type, _is_google_colab
+from smartcash.common.environment import get_environment_manager
+from smartcash.common.constants.paths import get_paths_for_environment
 
 
 class DriveMountOperation(OperationHandler):
@@ -40,7 +40,7 @@ class DriveMountOperation(OperationHandler):
         }
     
     def execute_mount_drive(self, progress_callback: Optional[Callable] = None) -> Dict[str, Any]:
-        """Mount Google Drive with verification.
+        """Mount Google Drive with verification using EnvironmentManager.
         
         Args:
             progress_callback: Optional callback for progress updates
@@ -49,114 +49,79 @@ class DriveMountOperation(OperationHandler):
             Dictionary with operation results
         """
         try:
-            # Get detailed environment information
-            from ..utils.env_detector import detect_environment_info, _is_google_colab
+            if progress_callback:
+                progress_callback(10, "🔍 Mengecek status environment...")
             
-            # Check if running in Colab first
-            is_colab = _is_google_colab()
-            runtime_info = get_runtime_type()
+            # Use standardized environment manager
+            env_manager = get_environment_manager(logger=self.logger)
             
-            # If we're in Colab but config doesn't reflect that, update it
-            if is_colab and self.config.get('environment', {}).get('type') != 'colab':
-                if 'environment' not in self.config:
-                    self.config['environment'] = {}
-                self.config['environment']['type'] = 'colab'
-                self.logger.info("Updated environment type to 'colab' based on runtime detection")
-            
-            # If we're not in Colab, return error with debug info
-            if not is_colab:
-                error_msg = [
-                    "Google Drive mounting is only available in Colab environment. ",
-                    f"Runtime type: {runtime_info.get('type')}",
-                    f"GPU status: {runtime_info.get('gpu')}",
-                    "\nEnvironment details:",
-                    f"- Python executable: {sys.executable}",
-                    f"- Current working directory: {os.getcwd()}",
-                    f"- /content exists: {os.path.exists('/content')}",
-                    f"- /content/drive exists: {os.path.exists('/content/drive')}",
-                    "\nEnvironment variables:",
-                    *[f"- {k}: {v}" for k, v in os.environ.items() 
-                      if 'COLAB' in k or 'JUPYTER' in k or 'IPYTHON' in k]
-                ]
-                
-                # Add debug info if available
-                if 'debug' in runtime_info:
-                    error_msg.extend([
-                        "\nDebug information:",
-                        f"Python path: {runtime_info['debug'].get('python_executable')}",
-                        "Files checked:",
-                        *[f"- {k}: {v}" for k, v in runtime_info['debug'].get('files_checked', {}).items()]
-                    ])
-                
+            if not env_manager.is_colab:
+                system_info = env_manager.get_system_info()
+                error_msg = (
+                    f"Mount Google Drive hanya tersedia di lingkungan Colab. "
+                    f"Environment saat ini: {system_info.get('environment', 'Unknown')}"
+                )
                 return {
                     'success': False,
-                    'error': '\n'.join(error_msg),
-                    'environment_info': {
-                        'detected_type': runtime_info.get('type'),
-                        'is_colab': is_colab,
-                        'has_gpu': runtime_info.get('gpu') == 'available',
-                        'debug': runtime_info.get('debug', {})
-                    }
+                    'error': error_msg,
+                    'environment_info': system_info
                 }
             
             if progress_callback:
-                progress_callback(10, "🔍 Checking Drive mount status...")
+                progress_callback(30, "🔍 Mengecek status mount Drive...")
             
-            mount_path = '/content/drive'
-            
-            # Check if already mounted
-            if os.path.exists(mount_path) and os.path.exists(os.path.join(mount_path, 'MyDrive')):
-                self.log("Google Drive already mounted", 'info')
+            # Check if already mounted using EnvironmentManager
+            if env_manager.is_drive_mounted:
+                self.log("Google Drive sudah terpasang", 'info')
                 if progress_callback:
-                    progress_callback(100, "✅ Google Drive already mounted")
+                    progress_callback(100, "✅ Google Drive sudah terpasang")
+                
+                drive_path = env_manager.drive_path
+                # Get updated paths
+                paths = get_paths_for_environment(is_colab=True, is_drive_mounted=True)
+                
                 return {
                     'success': True,
                     'already_mounted': True,
-                    'mount_path': mount_path,
-                    'message': 'Google Drive was already mounted'
+                    'path': str(drive_path) if drive_path else '/content/drive',
+                    'paths': paths,
+                    'message': 'Google Drive sudah terpasang sebelumnya'
                 }
             
             if progress_callback:
-                progress_callback(30, "📁 Mounting Google Drive...")
+                progress_callback(50, "📁 Memasang Google Drive...")
             
-            # Import and mount drive
-            try:
-                from google.colab import drive
-                drive.mount(mount_path)
-                self.log("Google Drive mount initiated", 'info')
+            # Use EnvironmentManager to mount drive
+            success, message = env_manager.mount_drive()
+            
+            if progress_callback:
+                progress_callback(90, "🔍 Memverifikasi mount...")
+            
+            if success:
+                # Get updated paths after successful mount
+                paths = get_paths_for_environment(is_colab=True, is_drive_mounted=True)
+                
+                # Test write access if drive path is available
+                write_access = False
+                if env_manager.drive_path:
+                    write_access = self._test_write_access(str(env_manager.drive_path))
                 
                 if progress_callback:
-                    progress_callback(70, "🔍 Verifying mount...")
+                    progress_callback(100, "✅ Google Drive berhasil dipasang")
                 
-                # Verify mount
-                if os.path.exists(os.path.join(mount_path, 'MyDrive')):
-                    # Check write access
-                    write_access = self._test_write_access(mount_path)
-                    
-                    if progress_callback:
-                        progress_callback(100, "✅ Google Drive mounted successfully")
-                    
-                    return {
-                        'success': True,
-                        'mount_path': mount_path,
-                        'write_access': write_access,
-                        'message': 'Google Drive mounted successfully'
-                    }
-                else:
-                    return {
-                        'success': False,
-                        'error': 'Drive mount verification failed'
-                    }
-                    
-            except ImportError:
+                self.log("Google Drive berhasil dipasang dan diverifikasi", 'success')
+                
                 return {
-                    'success': False,
-                    'error': 'Google Colab drive module not available'
+                    'success': True,
+                    'path': str(env_manager.drive_path) if env_manager.drive_path else '/content/drive',
+                    'paths': paths,
+                    'write_access': write_access,
+                    'message': message
                 }
-            except Exception as e:
+            else:
                 return {
                     'success': False,
-                    'error': f'Drive mount failed: {str(e)}'
+                    'error': message
                 }
                 
         except Exception as e:
@@ -166,22 +131,22 @@ class DriveMountOperation(OperationHandler):
                 'error': f'Drive mount operation failed: {str(e)}'
             }
     
-    def _test_write_access(self, mount_path: str) -> bool:
+    def _test_write_access(self, drive_path: str) -> bool:
         """Test write access to mounted drive.
         
         Args:
-            mount_path: Path to mounted drive
+            drive_path: Path to mounted drive
             
         Returns:
             True if write access is available, False otherwise
         """
         try:
-            test_file = os.path.join(mount_path, 'MyDrive', '.smartcash_test')
+            test_file = os.path.join(drive_path, '.smartcash_test')
             with open(test_file, 'w') as f:
                 f.write('test')
             os.remove(test_file)
-            self.log("Drive write access verified", 'info')
+            self.log("Akses tulis Drive diverifikasi", 'info')
             return True
-        except Exception:
-            self.log("Drive write access limited", 'warning')
+        except Exception as e:
+            self.log(f"Akses tulis Drive terbatas: {e}", 'warning')
             return False

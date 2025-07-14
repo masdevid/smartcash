@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/setup/colab/utils/env_detector.py
-Deskripsi: Utility untuk deteksi informasi environment
+Deskripsi: Utility untuk deteksi informasi environment menggunakan EnvironmentManager
 
 Fungsi-fungsi ini digunakan untuk mendeteksi informasi lingkungan seperti:
 - Versi Python
@@ -15,6 +15,10 @@ import sys
 import platform
 import traceback
 from typing import Dict, Any, Tuple, Callable, Union
+
+# Import standardized environment management
+from smartcash.common.environment import get_environment_manager, EnvironmentManager
+from smartcash.common.constants.paths import get_paths_for_environment
 
 def safe_get(func: Callable, default: Any = None) -> Any:
     """Safely execute a function and return default if error occurs.
@@ -32,7 +36,7 @@ def safe_get(func: Callable, default: Any = None) -> Any:
         return default
 
 def detect_environment_info(check_drive: bool = False) -> Dict[str, Any]:
-    """Detect and return comprehensive environment information."""
+    """Detect and return comprehensive environment information using EnvironmentManager."""
     # Initialize with default values
     result = {
         'python_version': 'Unknown',
@@ -49,6 +53,41 @@ def detect_environment_info(check_drive: bool = False) -> Dict[str, Any]:
         'drive_mounted': None,
         'drive_status': 'not_checked'
     }
+    
+    # Use standardized environment manager
+    try:
+        env_manager = get_environment_manager()
+        system_info = env_manager.get_system_info()
+        
+        # Update result with EnvironmentManager data
+        result.update({
+            'is_colab': env_manager.is_colab,
+            'drive_mounted': env_manager.is_drive_mounted if env_manager.is_colab else False,
+            'drive_status': 'mounted' if (env_manager.is_colab and env_manager.is_drive_mounted) else 'not_mounted',
+            'base_directory': system_info.get('base_directory'),
+            'data_directory': system_info.get('data_directory'),
+            'drive_path': system_info.get('drive_path'),
+            'total_memory_gb': system_info.get('total_memory_gb', 0),
+            'available_memory_gb': system_info.get('available_memory_gb', 0),
+            'cuda_available': system_info.get('cuda_available', False)
+        })
+        
+        # Get appropriate paths
+        paths = get_paths_for_environment(
+            is_colab=env_manager.is_colab,
+            is_drive_mounted=env_manager.is_drive_mounted if env_manager.is_colab else False
+        )
+        result['paths'] = paths
+        
+        # Update runtime information
+        runtime_type = 'colab' if env_manager.is_colab else 'local'
+        result['runtime'].update({
+            'type': runtime_type,
+            'display': 'Google Colab' if env_manager.is_colab else 'Lokal/Jupyter'
+        })
+        
+    except Exception as e:
+        result['environment_manager_error'] = str(e)
     
     # Helper function to safely update result dictionary
     def safe_update(updates: Dict[str, Any]) -> None:
@@ -97,7 +136,7 @@ def detect_environment_info(check_drive: bool = False) -> Dict[str, Any]:
         if env_vars:
             safe_update({'environment_variables': env_vars})
         
-        # Check if running in Colab and get drive status if requested
+        # Additional legacy checks if EnvironmentManager failed
         if safe_get(_is_google_colab, False):
             result['is_colab'] = True
             

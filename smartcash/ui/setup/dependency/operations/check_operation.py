@@ -2,7 +2,6 @@
 Handler for package status check operations.
 """
 from typing import Dict, Any, List, Optional, Tuple, Set, Callable
-import asyncio
 import re
 import time
 from datetime import datetime
@@ -24,27 +23,27 @@ class CheckStatusOperationHandler(BaseOperationHandler):
         super().__init__('check_status', ui_components, config)
         self._status_cache: Dict[str, Dict[str, Any]] = {}
     
-    async def execute_operation(self) -> Dict[str, Any]:
-        """Execute package status check asynchronously.
+    def execute_operation(self) -> Dict[str, Any]:
+        """Execute package status check.
         
         Returns:
             Dictionary with status check results
         """
-        await self.log("🔍 Memeriksa status paket...", 'info')
+        self.log("🔍 Memeriksa status paket...", 'info')
         
         # Get packages to check
-        packages = await self._get_packages_to_check()
+        packages = self._get_packages_to_check()
         if not packages:
-            await self.log("ℹ️ Tidak ada paket yang perlu diperiksa", 'info')
+            self.log("ℹ️ Tidak ada paket yang perlu diperiksa", 'info')
             return {'success': True, 'checked': 0, 'total': 0}
         
         # Execute status check with progress tracking
         start_time = time.time()
-        results = await self._check_packages_status(packages)
+        results = self._check_packages_status(packages)
         duration = time.time() - start_time
         
         # Update UI with results
-        await self._update_package_statuses(results)
+        self._update_package_statuses(results)
         
         # Generate summary
         installed = sum(1 for r in results if r.get('status') == 'installed')
@@ -58,7 +57,7 @@ class CheckStatusOperationHandler(BaseOperationHandler):
             f" dalam {duration:.1f} detik"
         )
         
-        await self.log(status_msg, 'success')
+        self.log(status_msg, 'success')
         
         return {
             'success': True,
@@ -70,7 +69,7 @@ class CheckStatusOperationHandler(BaseOperationHandler):
             'results': results
         }
     
-    async def _get_packages_to_check(self) -> List[str]:
+    def _get_packages_to_check(self) -> List[str]:
         """Get list of packages to check status for.
         
         Returns:
@@ -78,12 +77,12 @@ class CheckStatusOperationHandler(BaseOperationHandler):
         """
         try:
             # Use parent's method to get packages from UI components
-            return await self._get_packages_to_process()
+            return self._get_packages_to_process()
         except Exception as e:
-            await self.log(f"Gagal mendapatkan daftar paket: {str(e)}", 'error')
+            self.log(f"Gagal mendapatkan daftar paket: {str(e)}", 'error')
             return []
     
-    async def _check_packages_status(self, packages: List[str]) -> List[Dict[str, Any]]:
+    def _check_packages_status(self, packages: List[str]) -> List[Dict[str, Any]]:
         """Check status of multiple packages in parallel with progress tracking.
         
         Args:
@@ -100,7 +99,7 @@ class CheckStatusOperationHandler(BaseOperationHandler):
         results = []
         
         # Process packages in parallel with progress tracking
-        processed_results = await self._process_packages(
+        processed_results = self._process_packages(
             packages,
             self._check_package_status,
             progress_message="Memeriksa status paket"
@@ -109,8 +108,8 @@ class CheckStatusOperationHandler(BaseOperationHandler):
         # Extract and return the results
         return [r for r in processed_results['details'] if r.get('status') != 'error']
     
-    async def _check_package_status(self, package: str) -> Dict[str, Any]:
-        """Check status of a single package asynchronously.
+    def _check_package_status(self, package: str) -> Dict[str, Any]:
+        """Check status of a single package.
         
         Args:
             package: Package name to check
@@ -120,7 +119,7 @@ class CheckStatusOperationHandler(BaseOperationHandler):
         """
         try:
             # Check if package is installed
-            result = await self._execute_command(
+            result = self._execute_command(
                 ['pip', 'show', package],
                 progress_callback=lambda p, msg: self._update_progress(
                     message=f"Memeriksa {package}...",
@@ -148,7 +147,7 @@ class CheckStatusOperationHandler(BaseOperationHandler):
             installed_version = info.get('version', '')
             
             # Check for updates (non-blocking)
-            update_result = await self._execute_command(
+            update_result = self._execute_command(
                 ['pip', 'index', 'versions', package],
                 progress_callback=lambda p, msg: self._update_progress(
                     message=f"Memeriksa pembaruan untuk {package}...",
@@ -183,7 +182,7 @@ class CheckStatusOperationHandler(BaseOperationHandler):
             
         except Exception as e:
             error_msg = f"Gagal memeriksa status {package}: {str(e)}"
-            await self.log(error_msg, 'error')
+            self.log(error_msg, 'error')
             return {
                 'success': False,
                 'package': package,
@@ -191,8 +190,8 @@ class CheckStatusOperationHandler(BaseOperationHandler):
                 'message': error_msg
             }
     
-    async def _update_package_statuses(self, results: List[Dict[str, Any]]) -> None:
-        """Update UI with package status information asynchronously.
+    def _update_package_statuses(self, results: List[Dict[str, Any]]) -> None:
+        """Update UI with package status information.
         
         Args:
             results: List of package status dictionaries
@@ -201,28 +200,20 @@ class CheckStatusOperationHandler(BaseOperationHandler):
             # Update status panel if available
             status_panel = self.ui_components.get('status_panel')
             if status_panel and hasattr(status_panel, 'update_package_statuses'):
-                # Run in executor since we don't know if this is an async method
-                loop = asyncio.get_event_loop()
-                await loop.run_in_executor(
-                    None,
-                    lambda: status_panel.update_package_statuses(results)
-                )
+                # Call the method directly since it's now synchronous
+                status_panel.update_package_statuses(results)
             
             # Also update the package list if available
             package_list = self.ui_components.get('package_list')
             if package_list and hasattr(package_list, 'update_package_statuses'):
-                # Run in executor since we don't know if this is an async method
-                loop = asyncio.get_event_loop()
-                await loop.run_in_executor(
-                    None,
-                    lambda: package_list.update_package_statuses(results)
-                )
+                # Call the method directly since it's now synchronous
+                package_list.update_package_statuses(results)
                 
         except Exception as e:
-            await self.log(f"Gagal memperbarui UI status paket: {str(e)}", 'error')
+            self.log(f"Gagal memperbarui UI status paket: {str(e)}", 'error')
     
-    async def _get_latest_version(self, package: str) -> Optional[str]:
-        """Get latest version of a package from PyPI asynchronously.
+    def _get_latest_version(self, package: str) -> Optional[str]:
+        """Get latest version of a package from PyPI.
         
         Args:
             package: Package name
@@ -249,38 +240,6 @@ class CheckStatusOperationHandler(BaseOperationHandler):
         except Exception:
             return None
     
-    def _update_package_statuses(self, results: List[Dict[str, Any]]) -> None:
-        """Update UI with package status information.
-        
-        Args:
-            results: List of package status results
-        """
-        # Get package list UI component
-        package_list = self.ui_components.get('package_list')
-        if not package_list or not hasattr(package_list, 'update_package_status'):
-            return
-        
-        # Update each package status
-        for result in results:
-            package = result.get('package')
-            status = result.get('status', 'unknown')
-            
-            # Map status to UI status
-            if status == 'installed':
-                ui_status = 'installed'
-                tooltip = f"Version: {result.get('version')}"
-            elif status == 'outdated':
-                ui_status = 'outdated'
-                tooltip = f"Installed: {result.get('installed_version')} | Latest: {result.get('latest_version')}"
-            elif status == 'not_installed':
-                ui_status = 'not_installed'
-                tooltip = "Not installed"
-            else:
-                ui_status = 'error'
-                tooltip = result.get('error', 'Unknown error')
-            
-            # Update UI
-            package_list.update_package_status(package, ui_status, tooltip)
     
     def get_operations(self) -> Dict[str, Callable]:
         """Get available operations for this handler.

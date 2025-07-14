@@ -4,7 +4,6 @@ Description: Colab operations module exports
 """
 
 from .operation_manager import ColabOperationManager
-from .factory import OperationHandlerFactory
 
 from .init_operation import InitOperation
 from .drive_mount_operation import DriveMountOperation
@@ -16,7 +15,6 @@ from .verify_operation import VerifyOperation
 
 __all__ = [
     'ColabOperationManager',
-    'OperationHandlerFactory',
     'InitOperation',
     'DriveMountOperation', 
     'SymlinkOperation',

@@ -2,11 +2,9 @@
 File: smartcash/ui/setup/dependency/operations/operation_manager.py
 Deskripsi: Manages package operations with proper state and error handling.
 """
-import asyncio
-from typing import Dict, Any, List, Optional, Callable, Type, Tuple
+from typing import Dict, Any, List, Optional, Callable, Type
 from dataclasses import dataclass, field
 from enum import Enum, auto
-import importlib
 
 from .base_operation import BaseOperationHandler
 from smartcash.ui.core.handlers.operation_handler import OperationHandler
@@ -46,7 +44,7 @@ class OperationManager:
         self.ui_components = ui_components or {}
         self._current_operation: Optional[OperationContext] = None
         self._operation_handlers: Dict[OperationType, Type[BaseOperationHandler]] = {}
-        self._operation_lock = asyncio.Lock()  # Lock for thread-safe operation execution
+        self._operation_in_progress = False  # Simple flag for operation tracking
         self._setup_handlers()
     
     def _setup_handlers(self) -> None:
@@ -85,7 +83,7 @@ class OperationManager:
             progress_callback=progress_callback
         )
     
-    async def execute_operation(self, context: OperationContext) -> Dict[str, Any]:
+    def execute_operation(self, context: OperationContext) -> Dict[str, Any]:
         """Execute an operation with the given context.
         
         Args:
@@ -97,19 +95,11 @@ class OperationManager:
         Raises:
             RuntimeError: If another operation is already in progress.
         """
-        # Check if an operation is already in progress
-        if not self._operation_lock.locked():
-            async with self._operation_lock:
-                self._current_operation = context
-                return await self._execute_operation(context)
-        else:
-            return {
-                'success': False,
-                'error': 'Another operation is already in progress',
-                'message': 'Cannot start a new operation while another is in progress'
-            }
+        # Set current operation
+        self._current_operation = context
+        return self._execute_operation(context)
         
-    async def _execute_operation(self, context: OperationContext) -> Dict[str, Any]:
+    def _execute_operation(self, context: OperationContext) -> Dict[str, Any]:
         """Internal method to execute an operation.
         
         Args:
@@ -144,8 +134,8 @@ class OperationManager:
             # Update status
             self._update_status(f"🚀 Starting {context.operation_type.name.lower()}...")
             
-            # Execute the operation asynchronously
-            result = await handler.execute_operation(context)
+            # Execute the operation synchronously
+            result = handler.execute_operation(context)
             
             # Update status based on result
             if result.get('success', False):
@@ -190,12 +180,13 @@ class OperationManager:
 class DependencyOperationManager(OperationHandler):
     """Operation manager for dependency management that extends OperationHandler."""
     
-    def __init__(self, config: Dict[str, Any], ui_components: Dict[str, Any] = None, **kwargs):
+    def __init__(self, config: Dict[str, Any], ui_components: Dict[str, Any] = None, environment_manager=None, **kwargs):
         """Initialize the dependency operation manager.
         
         Args:
             config: Configuration dictionary
             ui_components: Dictionary of UI components
+            environment_manager: Environment manager instance for environment detection
             **kwargs: Additional keyword arguments
         """
         # Extract operation container from ui_components if not provided
@@ -218,6 +209,7 @@ class DependencyOperationManager(OperationHandler):
         
         self.config = config
         self.ui_components = ui_components or {}
+        self.environment_manager = environment_manager
         self.operation_manager = OperationManager(ui_components=self.ui_components)
         
         # Ensure operation_container is accessible
@@ -236,8 +228,7 @@ class DependencyOperationManager(OperationHandler):
             elif hasattr(self.operation_container, 'clear_outputs'):
                 self.operation_container.clear_outputs()
             
-        # Initialize operation handlers
-        self.operation_manager.initialize()
+        # Operation handlers are initialized in constructor (no separate initialize method needed)
         
         # Set up UI event handlers if UI components are available
         self._setup_ui_handlers()
@@ -256,10 +247,16 @@ class DependencyOperationManager(OperationHandler):
             'install_smartcash_yolo_requirements': self.install_smartcash_and_yolo_requirements
         }
     
-    async def execute_install(self, packages: List[str], progress_callback=None) -> Dict[str, Any]:
+    def execute_install(self, packages: List[str] = None, progress_callback=None) -> Dict[str, Any]:
         """Execute package installation using real pip install."""
         try:
             from .install_operation import InstallOperationHandler
+            
+            # Log packages being processed
+            if packages:
+                self.log(f"Installing specific packages: {packages}", 'info')
+            else:
+                self.log("Installing selected packages from UI", 'info')
             
             # Create install handler with UI components including operation container
             ui_components = getattr(self, '_ui_components', {})
@@ -268,14 +265,18 @@ class DependencyOperationManager(OperationHandler):
             
             # Ensure operation container is available for progress tracking and logging
             ui_components['operation_container'] = self.operation_container
+            
+            # Pass progress callback to UI components if provided
+            if progress_callback:
+                ui_components['progress_callback'] = progress_callback
                 
             install_handler = InstallOperationHandler(ui_components, self.config)
             
             # Execute the actual installation
-            result = await install_handler.execute_operation()
+            result = install_handler.execute_operation()
             
             # Update operation summary with results
-            await self._update_operation_summary('install', result)
+            self._update_operation_summary('install', result)
             
             return result
             
@@ -283,10 +284,16 @@ class DependencyOperationManager(OperationHandler):
             self.log(f"Error in execute_install: {e}", 'error')
             return {'success': False, 'error': str(e)}
     
-    async def execute_uninstall(self, packages: List[str], progress_callback=None) -> Dict[str, Any]:
+    def execute_uninstall(self, packages: List[str] = None, progress_callback=None) -> Dict[str, Any]:
         """Execute package uninstallation using real pip uninstall."""
         try:
             from .uninstall_operation import UninstallOperationHandler
+            
+            # Log packages being processed
+            if packages:
+                self.log(f"Uninstalling specific packages: {packages}", 'info')
+            else:
+                self.log("Uninstalling selected packages from UI", 'info')
             
             # Create uninstall handler with UI components including operation container
             ui_components = getattr(self, '_ui_components', {})
@@ -295,14 +302,18 @@ class DependencyOperationManager(OperationHandler):
             
             # Ensure operation container is available for progress tracking and logging
             ui_components['operation_container'] = self.operation_container
+            
+            # Pass progress callback to UI components if provided
+            if progress_callback:
+                ui_components['progress_callback'] = progress_callback
                 
             uninstall_handler = UninstallOperationHandler(ui_components, self.config)
             
             # Execute the actual uninstallation
-            result = await uninstall_handler.execute_operation()
+            result = uninstall_handler.execute_operation()
             
             # Update operation summary with results
-            await self._update_operation_summary('uninstall', result)
+            self._update_operation_summary('uninstall', result)
             
             return result
             
@@ -310,10 +321,16 @@ class DependencyOperationManager(OperationHandler):
             self.log(f"Error in execute_uninstall: {e}", 'error')
             return {'success': False, 'error': str(e)}
     
-    async def execute_update(self, packages: List[str], progress_callback=None) -> Dict[str, Any]:
+    def execute_update(self, packages: List[str] = None, progress_callback=None) -> Dict[str, Any]:
         """Execute package update using real pip install --upgrade."""
         try:
             from .update_operation import UpdateOperationHandler
+            
+            # Log packages being processed
+            if packages:
+                self.log(f"Updating specific packages: {packages}", 'info')
+            else:
+                self.log("Updating all installed packages", 'info')
             
             # Create update handler with UI components including operation container
             ui_components = getattr(self, '_ui_components', {})
@@ -322,14 +339,18 @@ class DependencyOperationManager(OperationHandler):
             
             # Ensure operation container is available for progress tracking and logging
             ui_components['operation_container'] = self.operation_container
+            
+            # Pass progress callback to UI components if provided
+            if progress_callback:
+                ui_components['progress_callback'] = progress_callback
                 
             update_handler = UpdateOperationHandler(ui_components, self.config)
             
             # Execute the actual update
-            result = await update_handler.execute_operation()
+            result = update_handler.execute_operation()
             
             # Update operation summary with results
-            await self._update_operation_summary('update', result)
+            self._update_operation_summary('update', result)
             
             return result
             
@@ -337,10 +358,16 @@ class DependencyOperationManager(OperationHandler):
             self.log(f"Error in execute_update: {e}", 'error')
             return {'success': False, 'error': str(e)}
     
-    async def execute_check_status(self, packages: List[str] = None, progress_callback=None) -> Dict[str, Any]:
+    def execute_check_status(self, packages: List[str] = None, progress_callback=None) -> Dict[str, Any]:
         """Execute package status check using real pip show."""
         try:
-            from .check_status_operation import CheckStatusOperationHandler
+            from .check_operation import CheckStatusOperationHandler
+            
+            # Log packages being checked
+            if packages:
+                self.log(f"Checking status of specific packages: {packages}", 'info')
+            else:
+                self.log("Checking status of all configured packages", 'info')
             
             # Create check status handler with UI components including operation container
             ui_components = getattr(self, '_ui_components', {})
@@ -349,14 +376,18 @@ class DependencyOperationManager(OperationHandler):
             
             # Ensure operation container is available for progress tracking and logging
             ui_components['operation_container'] = self.operation_container
+            
+            # Pass progress callback to UI components if provided
+            if progress_callback:
+                ui_components['progress_callback'] = progress_callback
                 
             check_handler = CheckStatusOperationHandler(ui_components, self.config)
             
             # Execute the actual status check
-            result = await check_handler.execute_operation()
+            result = check_handler.execute_operation()
             
             # Update operation summary with results
-            await self._update_operation_summary('check_status', result)
+            self._update_operation_summary('check_status', result)
             
             return result
             
@@ -364,7 +395,7 @@ class DependencyOperationManager(OperationHandler):
             self.log(f"Error in execute_check_status: {e}", 'error')
             return {'success': False, 'error': str(e)}
     
-    async def install_requirements_txt(self, repo_path: str, progress_callback=None) -> Dict[str, Any]:
+    def install_requirements_txt(self, repo_path: str, progress_callback=None) -> Dict[str, Any]:
         """Install requirements.txt from a repository path.
         
         Args:
@@ -377,7 +408,6 @@ class DependencyOperationManager(OperationHandler):
         try:
             import os
             import subprocess
-            import asyncio
             
             # Check if requirements.txt exists
             requirements_path = os.path.join(repo_path, 'requirements.txt')
@@ -416,16 +446,16 @@ class DependencyOperationManager(OperationHandler):
             
             # Execute pip install command
             self.log(f"Executing: {' '.join(cmd)}", 'info')
-            process = await asyncio.create_subprocess_exec(
-                *cmd,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-                cwd=repo_path
+            process = subprocess.run(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                cwd=repo_path,
+                text=True
             )
             
-            stdout, stderr = await process.communicate()
-            stdout_str = stdout.decode('utf-8') if stdout else ''
-            stderr_str = stderr.decode('utf-8') if stderr else ''
+            stdout_str = process.stdout or ''
+            stderr_str = process.stderr or ''
             
             # Update progress - installation complete
             if progress_callback:
@@ -461,7 +491,7 @@ class DependencyOperationManager(OperationHandler):
                 'repo_path': repo_path
             }
     
-    async def install_smartcash_and_yolo_requirements(self, progress_callback=None) -> Dict[str, Any]:
+    def install_smartcash_and_yolo_requirements(self, progress_callback=None) -> Dict[str, Any]:
         """Install requirements.txt from both smartcash and yolov5 repositories.
         
         Args:
@@ -487,7 +517,7 @@ class DependencyOperationManager(OperationHandler):
             if progress_callback:
                 progress_callback(0, "Installing SmartCash requirements.txt")
             
-            smartcash_result = await self.install_requirements_txt(smartcash_path, progress_callback)
+            smartcash_result = self.install_requirements_txt(smartcash_path, progress_callback)
             results['smartcash'] = smartcash_result
             
             if smartcash_result['success']:
@@ -501,7 +531,7 @@ class DependencyOperationManager(OperationHandler):
             if progress_callback:
                 progress_callback(50, "Installing YOLOv5 requirements.txt")
             
-            yolov5_result = await self.install_requirements_txt(yolov5_path, progress_callback)
+            yolov5_result = self.install_requirements_txt(yolov5_path, progress_callback)
             results['yolov5'] = yolov5_result
             
             if yolov5_result['success']:
@@ -529,7 +559,7 @@ class DependencyOperationManager(OperationHandler):
             results['message'] = message
             
             # Update operation summary
-            await self._update_operation_summary('install_requirements', results)
+            self._update_operation_summary('install_requirements', results)
             
             return results
             
@@ -546,7 +576,7 @@ class DependencyOperationManager(OperationHandler):
                 'errors': [str(e)]
             }
 
-    async def _update_operation_summary(self, operation_type: str, result: Dict[str, Any]):
+    def _update_operation_summary(self, operation_type: str, result: Dict[str, Any]):
         """Update operation summary with operation results.
         
         Args:
@@ -609,6 +639,7 @@ class DependencyOperationManager(OperationHandler):
                 # Handle output widgets
                 with summary_container:
                     summary_container.clear_output()
+                    from IPython.display import display, Markdown
                     display(Markdown(summary_markdown))
             else:
                 # Fallback to logging
@@ -630,19 +661,19 @@ class DependencyOperationManager(OperationHandler):
             
             # Set up install button handler
             if 'install_button' in widgets:
-                def on_install_clicked(button):
+                def on_install_clicked(_):
                     self.execute_install(self._get_selected_packages())
                 widgets['install_button'].on_click(on_install_clicked)
             
             # Set up update button handler
             if 'update_button' in widgets:
-                def on_update_clicked(button):
+                def on_update_clicked(_):
                     self.execute_update(self._get_selected_packages())
                 widgets['update_button'].on_click(on_update_clicked)
             
             # Set up uninstall button handler
             if 'uninstall_button' in widgets:
-                def on_uninstall_clicked(button):
+                def on_uninstall_clicked(_):
                     self.execute_uninstall(self._get_selected_packages())
                 widgets['uninstall_button'].on_click(on_uninstall_clicked)
                 

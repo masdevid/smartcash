@@ -27,9 +27,9 @@ def create_dependency_ui_components(module_config: Dict[str, Any]) -> Dict[str, 
         
         # 1. Header Container
         header_container = create_header_container(
-            title="📦 Package Dependencies",
-            subtitle="Manage Python packages for SmartCash environment",
-            status_message="Ready for package management",
+            title="📦 Manajemen Paket",
+            subtitle="Kelola paket Python untuk lingkungan SmartCash",
+            status_message="Siap untuk manajemen paket",
             status_type="info"
         )
         
@@ -46,8 +46,8 @@ def create_dependency_ui_components(module_config: Dict[str, Any]) -> Dict[str, 
         custom_packages = _create_custom_packages_area()
         
         # Add items to form (removed duplicate status_output)
-        packages_label = widgets.HTML("<h3 style='margin: 10px 0;'>📦 Package Categories</h3>")
-        custom_label = widgets.HTML("<h4>➕ Additional Packages</h4>")
+        packages_label = widgets.HTML("<h3 style='margin: 10px 0;'>📦 Kategori Paket</h3>")
+        custom_label = widgets.HTML("<h4>➕ Paket Tambahan</h4>")
         
         form_items = [packages_label, package_grid, custom_label, custom_packages]
         
@@ -58,37 +58,31 @@ def create_dependency_ui_components(module_config: Dict[str, Any]) -> Dict[str, 
         action_container = create_action_container(
             buttons=[
                 {
-                    'id': 'add_packages',
-                    'text': '➕ Add Packages',
-                    'style': 'success',
-                    'tooltip': 'Add selected packages to configuration'
-                },
-                {
                     'id': 'install',
-                    'text': '📥 Install Selected',
-                    'style': 'info',
-                    'tooltip': 'Install selected packages'
+                    'text': '📥 Instal Terpilih',
+                    'style': 'success',
+                    'tooltip': 'Instal paket yang dipilih'
                 },
                 {
                     'id': 'check_status', 
-                    'text': '🔍 Check Status',
+                    'text': '🔍 Cek Status',
                     'style': 'info',
-                    'tooltip': 'Check installation status and find missing packages'
+                    'tooltip': 'Periksa status instalasi dan temukan paket yang hilang'
                 },
                 {
                     'id': 'update',
-                    'text': '⬆️ Update All',
+                    'text': '⬆️ Update Semua',
                     'style': 'warning',
-                    'tooltip': 'Update installed packages'
+                    'tooltip': 'Update paket yang terinstal'
                 },
                 {
                     'id': 'uninstall',
-                    'text': '🗑️ Uninstall',
+                    'text': '🗑️ Uninstal',
                     'style': 'danger', 
-                    'tooltip': 'Uninstall selected packages'
+                    'tooltip': 'Uninstal paket yang dipilih'
                 }
             ],
-            title="🔧 Package Operations"
+            title="🔧 Operasi Paket"
         )
         
         # 4. Operation Container with consistent logging and progress
@@ -96,7 +90,7 @@ def create_dependency_ui_components(module_config: Dict[str, Any]) -> Dict[str, 
             show_progress=True,
             show_dialog=False,  # Disable dialog to reduce clutter
             show_logs=True,
-            log_module_name="Dependency Management",
+            log_module_name="Manajemen Paket",
             log_height="200px",
             log_entry_style='compact',  # Ensure consistent hover behavior
             progress_style="prominent"  # Make progress more visible
@@ -107,15 +101,15 @@ def create_dependency_ui_components(module_config: Dict[str, Any]) -> Dict[str, 
             panels=[
                 PanelConfig(
                     panel_type=PanelType.INFO_ACCORDION,
-                    title="💡 Package Management Tips",
+                    title="💡 Tips Manajemen Paket",
                     content="""
                     <div style="padding: 10px;">
                         <ul>
-                            <li><strong>Add Packages:</strong> Add checked packages to your configuration</li>
-                            <li><strong>Install Selected:</strong> Install checked packages and custom packages</li>
-                            <li><strong>Check Status:</strong> Verify which packages are installed and find missing ones</li>
-                            <li><strong>Update All:</strong> Update all installed packages to latest versions</li>
-                            <li><strong>Uninstall:</strong> Remove selected packages from environment</li>
+                            <li><strong>Tambah Paket:</strong> Tambahkan paket yang dipilih ke konfigurasi</li>
+                            <li><strong>Instal Terpilih:</strong> Instal paket yang dipilih dan paket tambahan</li>
+                            <li><strong>Cek Status:</strong> Verifikasi paket mana yang terinstal dan temukan yang hilang</li>
+                            <li><strong>Update Semua:</strong> Update semua paket terinstal ke versi terbaru</li>
+                            <li><strong>Uninstal:</strong> Hapus paket yang dipilih dari lingkungan</li>
                         </ul>
                     </div>
                     """,
@@ -264,6 +258,6 @@ def _create_custom_packages_area() -> widgets.Textarea:
         Textarea widget for custom packages
     """
     return widgets.Textarea(
-        placeholder="Enter additional packages (one per line)\nExample:\nnumpy>=1.21.0\npandas>=1.3.0",
+        placeholder="Masukkan paket tambahan (satu per baris)\nContoh:\nnumpy>=1.21.0\npandas>=1.3.0",
         layout=widgets.Layout(height='100px', width='100%')
     )

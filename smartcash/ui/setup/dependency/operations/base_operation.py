@@ -1,18 +1,13 @@
 """
 Base operation handler for dependency management operations.
 """
-from typing import Dict, Any, Optional, List, Tuple, Union, Callable
+from typing import Dict, Any, Optional, List, Callable
 import subprocess
-import asyncio
 import os
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from smartcash.ui.core.errors.handlers import get_error_handler
-from smartcash.ui.core.handlers.operation_handler import (
-    OperationHandler, 
-    OperationStatus,
-    OperationResult
-)
+from smartcash.ui.core.handlers.operation_handler import OperationHandler
 
 
 class BaseOperationHandler(OperationHandler):
@@ -44,7 +39,7 @@ class BaseOperationHandler(OperationHandler):
         if 'operation_container' in ui_components:
             self.operation_container = ui_components['operation_container']
     
-    async def _get_packages_to_process(self) -> List[str]:
+    def _get_packages_to_process(self) -> List[str]:
         """Get list of packages to process based on current selection.
         
         Returns:
@@ -56,17 +51,11 @@ class BaseOperationHandler(OperationHandler):
         
         try:
             # Get selected packages from categories
-            selected_packages = await asyncio.get_event_loop().run_in_executor(
-                None, 
-                lambda: get_selected_packages(self.ui_components)
-            )
+            selected_packages = get_selected_packages(self.ui_components)
             packages.extend(selected_packages)
             
             # Get custom packages
-            custom_packages_text = await asyncio.get_event_loop().run_in_executor(
-                None,
-                lambda: get_custom_packages_text(self.ui_components)
-            )
+            custom_packages_text = get_custom_packages_text(self.ui_components)
             
             if custom_packages_text:
                 for line in custom_packages_text.split('\n'):
@@ -80,12 +69,11 @@ class BaseOperationHandler(OperationHandler):
             self.log(f"Error getting packages to process: {str(e)}", 'error')
             return []
     
-    async def _execute_command(
+    def _execute_command(
         self, 
         command: List[str], 
         cwd: Optional[str] = None,
         env: Optional[Dict[str, str]] = None,
-        timeout: int = 300,
         progress_callback: Optional[Callable[[float, str], None]] = None
     ) -> Dict[str, Any]:
         """Execute a shell command with error handling and progress tracking.
@@ -94,7 +82,6 @@ class BaseOperationHandler(OperationHandler):
             command: List of command arguments
             cwd: Working directory for the command
             env: Environment variables to use
-            timeout: Command timeout in seconds
             progress_callback: Optional callback for progress updates
             
         Returns:
@@ -166,11 +153,10 @@ class BaseOperationHandler(OperationHandler):
                     'returncode': -1
                 }
         
-        # Execute the command in a thread pool
-        loop = asyncio.get_event_loop()
-        return await loop.run_in_executor(None, run_command)
+        # Execute the command synchronously
+        return run_command()
     
-    async def _process_packages(
+    def _process_packages(
         self,
         packages: List[str],
         process_func: Callable[[str], Dict[str, Any]],

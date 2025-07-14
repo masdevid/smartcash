@@ -2,11 +2,10 @@
 Handler for package uninstallation operations.
 """
 from typing import Dict, Any, List, Optional, Callable
-import asyncio
 import re
 import time
 
-from smartcash.ui.core.handlers.operation_handler import ProgressLevel
+# Progress level import removed - not used in synchronous version
 from .base_operation import BaseOperationHandler
 
 
@@ -23,25 +22,25 @@ class UninstallOperationHandler(BaseOperationHandler):
         super().__init__('uninstall', ui_components, config)
         self._cancelled = False
     
-    async def execute_operation(self) -> Dict[str, Any]:
-        """Execute package uninstallation asynchronously.
+    def execute_operation(self) -> Dict[str, Any]:
+        """Execute package uninstallation synchronously.
         
         Returns:
             Dictionary with operation results
         """
-        await self.log("🗑️ Memulai penghapusan paket...", 'info')
+        self.log("🗑️ Memulai penghapusan paket...", 'info')
         self._cancelled = False
         
         try:
             # Get packages to uninstall
-            packages = await self._get_packages_to_process()
+            packages = self._get_packages_to_process()
             if not packages:
-                await self.log("ℹ️ Tidak ada paket yang dipilih untuk dihapus", 'info')
+                self.log("ℹ️ Tidak ada paket yang dipilih untuk dihapus", 'info')
                 return {'success': True, 'uninstalled': 0, 'total': 0}
             
             # Execute uninstallation
             start_time = time.time()
-            results = await self._uninstall_packages(packages)
+            results = self._uninstall_packages(packages)
             duration = time.time() - start_time
             
             # Process results
@@ -50,17 +49,17 @@ class UninstallOperationHandler(BaseOperationHandler):
             
             # Update config by removing successfully uninstalled packages
             if success_count > 0:
-                await self._update_config_after_uninstall(results)
+                self._update_config_after_uninstall(results)
             
             if self._cancelled:
                 status_msg = f"⏹️ Penghapusan dibatalkan: {success_count}/{total} paket berhasil dihapus"
-                await self.log(status_msg, 'warning')
+                self.log(status_msg, 'warning')
             elif success_count == total:
                 status_msg = f"✅ Berhasil menghapus {success_count}/{total} paket dalam {duration:.1f} detik"
-                await self.log(status_msg, 'success')
+                self.log(status_msg, 'success')
             else:
                 status_msg = f"⚠️ Berhasil menghapus {success_count}/{total} paket dalam {duration:.1f} detik"
-                await self.log(status_msg, 'warning')
+                self.log(status_msg, 'warning')
             
             return {
                 'success': success_count > 0,
@@ -71,17 +70,17 @@ class UninstallOperationHandler(BaseOperationHandler):
                 'results': results
             }
             
-        except asyncio.CancelledError:
-            await self.log("⏹️ Penghapusan dibatalkan oleh pengguna", 'warning')
+        except KeyboardInterrupt:
+            self.log("⏹️ Penghapusan dibatalkan oleh pengguna", 'warning')
             return {'success': False, 'cancelled': True, 'error': 'Dibatalkan oleh pengguna'}
             
         except Exception as e:
             error_msg = f"Gagal melakukan penghapusan: {str(e)}"
-            await self.log(error_msg, 'error')
+            self.log(error_msg, 'error')
             return {'success': False, 'error': error_msg}
     
-    async def _uninstall_packages(self, packages: List[str]) -> List[Dict[str, Any]]:
-        """Uninstall multiple packages in parallel with progress tracking.
+    def _uninstall_packages(self, packages: List[str]) -> List[Dict[str, Any]]:
+        """Uninstall multiple packages sequentially with progress tracking.
         
         Args:
             packages: List of package names to uninstall
@@ -92,8 +91,8 @@ class UninstallOperationHandler(BaseOperationHandler):
         if not packages:
             return []
             
-        # Process packages in parallel with progress tracking
-        processed_results = await self._process_packages(
+        # Process packages sequentially with progress tracking
+        processed_results = self._process_packages(
             packages,
             self._uninstall_single_package,
             progress_message="Menghapus paket",
@@ -103,8 +102,8 @@ class UninstallOperationHandler(BaseOperationHandler):
         # Extract and return the results
         return [r for r in processed_results['details'] if r.get('status') != 'error']
     
-    async def _uninstall_single_package(self, package: str) -> Dict[str, Any]:
-        """Uninstall a single package asynchronously.
+    def _uninstall_single_package(self, package: str) -> Dict[str, Any]:
+        """Uninstall a single package synchronously.
         
         Args:
             package: Package name to uninstall
@@ -130,7 +129,7 @@ class UninstallOperationHandler(BaseOperationHandler):
         
         try:
             # Execute uninstallation with progress tracking
-            result = await self._execute_command(
+            result = self._execute_command(
                 command,
                 timeout=300,  # 5 minute timeout
                 progress_callback=lambda p, msg: self._update_progress(
@@ -147,7 +146,7 @@ class UninstallOperationHandler(BaseOperationHandler):
             
             if is_success:
                 message = "Tidak terpasang" if 'not installed' in result.get('stderr', '') else f"Berhasil dihapus dalam {duration:.1f} detik"
-                await self.log(f"✅ {pkg_name} {message.lower()}", 'success')
+                self.log(f"✅ {pkg_name} {message.lower()}", 'success')
                 return {
                     'success': True,
                     'package': pkg_name,
@@ -157,7 +156,7 @@ class UninstallOperationHandler(BaseOperationHandler):
                 }
             else:
                 error_msg = result.get('stderr', result.get('stdout', 'Gagal menghapus'))
-                await self.log(f"❌ Gagal menghapus {pkg_name}: {error_msg}", 'error')
+                self.log(f"❌ Gagal menghapus {pkg_name}: {error_msg}", 'error')
                 return {
                     'success': False,
                     'package': pkg_name,
@@ -165,13 +164,13 @@ class UninstallOperationHandler(BaseOperationHandler):
                     'message': f"Gagal: {error_msg}"
                 }
                 
-        except asyncio.CancelledError:
+        except KeyboardInterrupt:
             self._cancelled = True
             raise
             
         except Exception as e:
             error_msg = f"Kesalahan saat menghapus {pkg_name}: {str(e)}"
-            await self.log(error_msg, 'error')
+            self.log(error_msg, 'error')
             return {
                 'success': False,
                 'package': pkg_name,
@@ -179,7 +178,7 @@ class UninstallOperationHandler(BaseOperationHandler):
                 'message': f"Kesalahan: {str(e)}"
             }
     
-    async def _update_config_after_uninstall(self, results: List[Dict[str, Any]]) -> None:
+    def _update_config_after_uninstall(self, results: List[Dict[str, Any]]) -> None:
         """Update config by removing successfully uninstalled packages."""
         try:
             import yaml
@@ -241,15 +240,15 @@ class UninstallOperationHandler(BaseOperationHandler):
             with open(config_path, 'w', encoding='utf-8') as f:
                 yaml.dump(existing_config, f, default_flow_style=False, allow_unicode=True)
             
-            await self.log(f"💾 Configuration updated after uninstalling {len(uninstalled_packages)} packages", 'info')
+            self.log(f"💾 Configuration updated after uninstalling {len(uninstalled_packages)} packages", 'info')
             
         except Exception as e:
-            await self.log(f"❌ Failed to update config after uninstall: {str(e)}", 'error')
+            self.log(f"❌ Failed to update config after uninstall: {str(e)}", 'error')
 
-    async def cancel_operation(self) -> None:
+    def cancel_operation(self) -> None:
         """Cancel the current uninstallation operation."""
         self._cancelled = True
-        await self.log("Permintaan pembatalan diterima, menunggu proses saat ini selesai...", 'warning')
+        self.log("Permintaan pembatalan diterima, menunggu proses saat ini selesai...", 'warning')
     
     def get_operations(self) -> Dict[str, Callable]:
         """Get available operations for this handler.

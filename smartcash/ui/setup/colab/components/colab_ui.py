@@ -44,8 +44,8 @@ from smartcash.ui.core.decorators import handle_ui_errors
 
 # UI Configuration
 UI_CONFIG = {
-    'title': 'Google Colab Setup',
-    'description': 'Configure your Google Colab environment for SmartCash',
+    'title': 'Pengaturan Google Colab',
+    'description': 'Konfigurasi lingkungan Google Colab untuk SmartCash',
     'module_name': 'colab',
     'parent_module': 'setup',
     'version': '1.0.0',
@@ -55,7 +55,7 @@ UI_CONFIG = {
 # Button configuration
 BUTTON_CONFIG = {
     'primary': {
-        'description': 'Initialize Environment',
+        'description': 'Inisialisasi Lingkungan',
         'button_style': 'success',
         'icon': 'check'
     },
@@ -65,7 +65,7 @@ BUTTON_CONFIG = {
         'icon': 'undo'
     },
     'cancel': {
-        'description': 'Cancel',
+        'description': 'Batal',
         'button_style': 'danger',
         'icon': 'times'
     }
@@ -122,7 +122,7 @@ def create_colab_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> Dict[s
         title=UI_CONFIG['title'],
         subtitle=UI_CONFIG['description'],
         icon=UI_CONFIG['icon'],
-        status_message="Ready for environment setup",
+        status_message="Siap untuk pengaturan lingkungan",
         status_type="info",
         show_status_panel=True
     )

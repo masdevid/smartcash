@@ -5,13 +5,15 @@ This document provides comprehensive operational checklists for all SmartCash UI
 
 ## Document Scope
 - **All UI Modules**: Dataset, Model, Training, Evaluation, etc.
-- **Standardized Patterns**: UIModule architecture compliance
+- **Standardized Patterns**: BaseUIModule architecture compliance
 - **Integration Points**: Backend services, APIs, and cross-module communication
 - **User Experience**: Consistent feedback, progress tracking, and error handling
 
 ---
 
 ## 1. GENERAL UI MODULE CHECKLIST
+
+- [ ] ✅ Use Bahasa Indonesia but keep common Data Science terms in English
 
 ### 1.1 Module Initialization ✅
 

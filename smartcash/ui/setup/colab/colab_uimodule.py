@@ -336,6 +336,9 @@ class ColabUIModule(UIModule):
             # Setup UI logging bridge to capture backend service logs
             self._setup_ui_logging_bridge(operation_container)
             
+            # Initialize progress display to show the operation container is working
+            self._initialize_progress_display()
+            
             # Initialize the operation manager
             self._operation_manager.initialize()
             
@@ -379,69 +382,84 @@ class ColabUIModule(UIModule):
             import logging
             from typing import Callable
             
+            # Get the log function from operation container
+            log_func = None
+            if isinstance(operation_container, dict) and 'log_message' in operation_container:
+                log_func = operation_container['log_message']
+            elif hasattr(operation_container, 'log_message'):
+                log_func = operation_container.log_message
+            elif hasattr(self._operation_manager, 'log'):
+                log_func = self._operation_manager.log
+            
+            if not log_func:
+                self.logger.warning("⚠️ Could not setup UI logging bridge - log_message function not found")
+                return
+            
+            # Setup basic UI logging for the module
+            try:
+                from smartcash.ui.core.logging.ui_logging_manager import setup_ui_logging
+                setup_ui_logging(
+                    module_name='setup.colab',
+                    log_message_func=log_func
+                )
+            except ImportError:
+                self.logger.warning("⚠️ UI logging manager not available")
+            
             # Create custom handler for backend services
             class BackendUILogHandler(logging.Handler):
+                """Custom handler to route backend service logs to UI."""
+                
                 def __init__(self, log_func: Callable[[str, str], None]):
                     super().__init__()
                     self.log_func = log_func
                     self.setLevel(logging.INFO)  # Capture INFO and above
+                    formatter = logging.Formatter('%(name)s: %(message)s')
+                    self.setFormatter(formatter)
                     
                 def emit(self, record):
                     try:
                         msg = self.format(record)
                         # Map log levels
-                        level = 'info'
-                        if record.levelno >= logging.ERROR:
-                            level = 'error'
-                        elif record.levelno >= logging.WARNING:
-                            level = 'warning'
-                        elif record.levelno >= logging.INFO:
-                            level = 'info'
-                        else:
-                            level = 'debug'
+                        level = 'debug' if record.levelno == logging.DEBUG else \
+                               'info' if record.levelno == logging.INFO else \
+                               'warning' if record.levelno == logging.WARNING else \
+                               'error'
                         
                         # Forward to operation container
                         self.log_func(msg, level)
                     except Exception:
-                        # Don't let logging errors break the application
-                        pass
+                        pass  # Silently handle logging errors
             
-            # Get the log function from operation container
-            log_func = None
-            if hasattr(operation_container, 'log_message'):
-                log_func = operation_container.log_message
-            elif hasattr(self._operation_manager, 'log'):
-                log_func = self._operation_manager.log
+            # Create handler for backend services
+            backend_handler = BackendUILogHandler(log_func)
             
-            if log_func:
-                # Create and configure the handler
-                ui_handler = BackendUILogHandler(log_func)
-                ui_handler.setFormatter(logging.Formatter(
-                    '%(name)s: %(message)s'
-                ))
+            # Configure backend service loggers
+            backend_namespaces = [
+                'smartcash.dataset',     # Dataset processing services
+                'smartcash.model',       # Model services
+                'smartcash.common',      # Common services
+                'smartcash.setup.colab'  # Colab-specific backend services
+            ]
+            
+            for namespace in backend_namespaces:
+                backend_logger = logging.getLogger(namespace)
                 
-                # Add handler to relevant backend service loggers
-                backend_loggers = [
-                    'smartcash.dataset',     # Dataset processing services
-                    'smartcash.model',       # Model services
-                    'smartcash.common',      # Common services
-                    'smartcash.setup.colab'  # Colab-specific backend services
-                ]
+                # Remove existing console handlers to prevent duplicate output
+                for handler in backend_logger.handlers[:]:
+                    if isinstance(handler, logging.StreamHandler):
+                        import sys
+                        if hasattr(handler, 'stream') and handler.stream in (sys.stdout, sys.stderr):
+                            backend_logger.removeHandler(handler)
                 
-                for logger_name in backend_loggers:
-                    backend_logger = logging.getLogger(logger_name)
-                    backend_logger.addHandler(ui_handler)
-                    # Ensure the logger level allows INFO messages
-                    if backend_logger.level > logging.INFO:
-                        backend_logger.setLevel(logging.INFO)
-                
-                self.logger.debug(f"✅ UI logging bridge setup for {len(backend_loggers)} backend loggers")
-                
-                # Store handler for cleanup
-                self._ui_log_handler = ui_handler
-                self._ui_backend_loggers = backend_loggers
-            else:
-                self.logger.warning("⚠️ Could not setup UI logging bridge - no log function available")
+                # Add UI handler
+                backend_logger.addHandler(backend_handler)
+                backend_logger.setLevel(logging.INFO)
+            
+            self.logger.debug("✅ UI logging bridge setup completed for backend services")
+            
+            # Store handler and namespaces for cleanup
+            self._ui_log_handler = backend_handler
+            self._ui_backend_loggers = backend_namespaces
                 
         except Exception as e:
             self.logger.warning(f"⚠️ Failed to setup UI logging bridge: {e}")
@@ -449,13 +467,23 @@ class ColabUIModule(UIModule):
     def _cleanup_ui_logging_bridge(self) -> None:
         """Clean up UI logging bridge handlers."""
         try:
+            import logging
+            
+            # Cleanup UI logging for this module
+            try:
+                from smartcash.ui.core.logging.ui_logging_manager import cleanup_ui_logging
+                cleanup_ui_logging('setup.colab')
+            except ImportError:
+                pass
+            
+            # Remove custom handlers from backend services
             if hasattr(self, '_ui_log_handler') and hasattr(self, '_ui_backend_loggers'):
-                import logging
-                
-                # Remove handler from all backend loggers
-                for logger_name in self._ui_backend_loggers:
-                    backend_logger = logging.getLogger(logger_name)
-                    backend_logger.removeHandler(self._ui_log_handler)
+                for namespace in self._ui_backend_loggers:
+                    backend_logger = logging.getLogger(namespace)
+                    # Remove all handlers that were added by this module
+                    for handler in backend_logger.handlers[:]:
+                        if hasattr(handler, 'log_func'):  # Our custom handler
+                            backend_logger.removeHandler(handler)
                 
                 self.logger.debug("✅ UI logging bridge cleaned up")
                 
@@ -464,7 +492,25 @@ class ColabUIModule(UIModule):
                 delattr(self, '_ui_backend_loggers')
                 
         except Exception as e:
-            self.logger.warning(f"⚠️ Error cleaning up UI logging bridge: {e}")
+            self.logger.debug(f"Error during logging cleanup: {e}")
+    
+    def _initialize_progress_display(self) -> None:
+        """Initialize progress tracker display to show by default."""
+        try:
+            if not self._operation_manager:
+                return
+            
+            # Initialize progress tracker with default state
+            self._operation_manager.update_progress(0, "Ready - No operation running")
+            
+            # Log initial status to show the operation container is working
+            self._operation_manager.log("🚀 Colab module ready", 'info')
+            self._operation_manager.log("📋 Progress tracker initialized", 'debug')
+            
+            self.logger.debug("✅ Progress display initialized")
+            
+        except Exception as e:
+            self.logger.error(f"Error initializing progress display: {e}")
     
     def cleanup(self) -> None:
         """Clean up module resources and operation manager."""
@@ -1290,46 +1336,69 @@ def reset_colab_uimodule() -> None:
 
 # === Backward Compatibility Layer ===
 
-@handle_ui_errors(return_type=object)
-def initialize_colab_ui(config: Dict[str, Any] = None) -> Any:
-    """Initialize Colab UI using new UIModule pattern.
+def initialize_colab_ui(
+    config: Optional[Dict[str, Any]] = None,
+    display: bool = True,
+    **kwargs
+) -> Optional[Dict[str, Any]]:
+    """
+    Initialize and display the Colab UI.
     
     Args:
-        config: Optional configuration dictionary for the Colab UI
+        config: Optional configuration dictionary
+        display: Whether to display the UI immediately
+        **kwargs: Additional arguments
         
     Returns:
-        The initialized ColabUIModule instance
+        If display=True: Returns None (displays UI directly)
+        If display=False: Returns a dictionary with UI components and status
     """
-    # Get logger for this function
-    logger = get_module_logger("smartcash.ui.setup.colab.initialize")
-    
     try:
-        logger.info("🔄 Initializing Colab UI...")
-        print("[DEBUG] Initializing Colab UI...")  # Fallback log
+        # Get the module and UI components
+        module = get_colab_uimodule(config=config, **kwargs)
+        ui_components = module.list_components()
         
-        # Create the module instance
-        module = create_colab_uimodule(config, auto_initialize=True)
-        if module is None:
-            raise ValueError("Failed to create Colab UI module")
-            
-        # Get and display the main container if available
-        main_container = module.get_component('main_container')
-        if main_container:
-            from IPython.display import display
-            display(main_container)
-            
-        logger.info("✅ Colab UI initialization completed")
-        print("[DEBUG] Colab UI initialization completed")  # Fallback log
+        # Prepare the result dictionary
+        result = {
+            'success': True,
+            'module': module,
+            'ui_components': {comp: module.get_component(comp) for comp in ui_components},
+            'status': module.get_environment_status()
+        }
         
-        return module
+        # Display the UI if requested
+        if display and ui_components:
+            from IPython import get_ipython
+            from IPython.display import display as ipython_display, clear_output
+            
+            # Clear any existing output
+            if get_ipython() is not None:
+                clear_output(wait=True)
+            
+            # Get the main UI container and display it
+            main_ui = module.get_component('main_container')
+            if main_ui is not None:
+                try:
+                    # Display the widget directly
+                    ipython_display(main_ui)
+                except Exception as e:
+                    # Fallback to simple display if anything goes wrong
+                    logger = get_module_logger("smartcash.ui.setup.colab")
+                    logger.error(f"Error displaying UI: {str(e)}")
+                    ipython_display(main_ui)
+                return None  # Don't return data when display=True
+        
+        return result
         
     except Exception as e:
-        error_msg = f"❌ Error initializing Colab UI: {str(e)}"
-        logger.error(error_msg, exc_info=True)
-        print(f"[ERROR] {error_msg}")
-        import traceback
-        traceback.print_exc()
-        raise
+        # Always return a dictionary, even on error
+        return {
+            'success': False,
+            'error': str(e),
+            'module': None,
+            'ui_components': {},
+            'status': {}
+        }
 
 @handle_ui_errors(return_type=dict)
 def get_colab_components(config: Dict[str, Any] = None) -> Dict[str, Any]:

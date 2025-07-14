@@ -10,8 +10,6 @@ from .configs.backbone_config_handler import BackboneConfigHandler
 from .configs.backbone_defaults import get_default_backbone_config
 from .operations.backbone_operation_manager import BackboneOperationManager
 from datetime import datetime
-import asyncio
-import threading
 
 
 class BackboneUIModule(UIModule):
@@ -103,10 +101,10 @@ class BackboneUIModule(UIModule):
             buttons = action_container.get('buttons', {})
             
             if 'validate' in buttons:
-                buttons['validate'].on_click(self._handle_validate_sync)
+                buttons['validate'].on_click(self._handle_validate)
                 
             if 'build' in buttons:
-                buttons['build'].on_click(self._handle_build_sync)
+                buttons['build'].on_click(self._handle_build)
             
             # Setup save/reset button handlers
             if 'save' in buttons:
@@ -120,61 +118,21 @@ class BackboneUIModule(UIModule):
         except Exception as e:
             self.logger.error(f"Failed to setup button handlers: {e}")
     
-    def _handle_validate_sync(self, button) -> None:
-        """Synchronous wrapper for validate button click."""
-        import asyncio
-        import threading
-        
-        def run_async():
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            try:
-                self._clear_ui_state()
-                loop.run_until_complete(self._handle_validate(button))
-            except Exception as e:
-                self.logger.error(f"Error in async validate handler: {e}")
-                if self._operation_manager:
-                    self._operation_manager.log(f"❌ Error: {e}", 'error')
-            finally:
-                loop.close()
-        
-        thread = threading.Thread(target=run_async)
-        thread.daemon = True
-        thread.start()
     
-    def _handle_build_sync(self, button) -> None:
-        """Synchronous wrapper for build button click."""
-        import asyncio
-        import threading
-        
-        def run_async():
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            try:
-                self._clear_ui_state()
-                loop.run_until_complete(self._handle_build(button))
-            except Exception as e:
-                self.logger.error(f"Error in async build handler: {e}")
-                if self._operation_manager:
-                    self._operation_manager.log(f"❌ Error: {e}", 'error')
-            finally:
-                loop.close()
-        
-        thread = threading.Thread(target=run_async)
-        thread.daemon = True
-        thread.start()
-    
-    async def _handle_validate(self, button) -> None:
-        """Async handler for validate button."""
+    def _handle_validate(self, button) -> None:
+        """Synchronous handler for validate button."""
         try:
             if not self._operation_manager:
                 raise RuntimeError("Operation manager not available")
             
-            # Disable buttons during operation
-            self._disable_operation_buttons()
+            # Disable only validate button during operation
+            self._disable_validate_button()
+            
+            # Clear UI state
+            self._clear_ui_state()
             
             # Check prerequisites before validation
-            prereq_check = await self._check_data_prerequisites()
+            prereq_check = self._check_data_prerequisites_sync()
             if not prereq_check['success']:
                 self._operation_manager.log(f"⚠️ Prerequisites check: {prereq_check['message']}", 'warning')
                 # Continue with validation even if data is missing - just warn user
@@ -187,27 +145,30 @@ class BackboneUIModule(UIModule):
             
             # Update summary with validation results if successful
             if result.get('success'):
-                await self._update_summary_display()
+                self._update_summary_display_sync()
                 
         except Exception as e:
             self.logger.error(f"Validate handler error: {e}")
             if self._operation_manager:
                 self._operation_manager.log(f"❌ Validation error: {e}", 'error')
         finally:
-            # Re-enable buttons
-            self._enable_operation_buttons()
+            # Re-enable validate button
+            self._enable_validate_button()
     
-    async def _handle_build(self, button) -> None:
-        """Async handler for build button."""
+    def _handle_build(self, button) -> None:
+        """Synchronous handler for build button."""
         try:
             if not self._operation_manager:
                 raise RuntimeError("Operation manager not available")
             
-            # Disable buttons during operation
-            self._disable_operation_buttons()
+            # Disable only build button during operation
+            self._disable_build_button()
+            
+            # Clear UI state
+            self._clear_ui_state()
             
             # Check prerequisites before build
-            prereq_check = await self._check_data_prerequisites()
+            prereq_check = self._check_data_prerequisites_sync()
             if not prereq_check['success']:
                 self._operation_manager.log(f"❌ Prerequisites missing: {prereq_check['message']}", 'error')
                 return
@@ -220,15 +181,15 @@ class BackboneUIModule(UIModule):
             
             # Update summary with build results if successful
             if result.get('success'):
-                await self._update_summary_display()
+                self._update_summary_display_sync()
                 
         except Exception as e:
             self.logger.error(f"Build handler error: {e}")
             if self._operation_manager:
                 self._operation_manager.log(f"❌ Build error: {e}", 'error')
         finally:
-            # Re-enable buttons
-            self._enable_operation_buttons()
+            # Re-enable build button
+            self._enable_build_button()
     
     def _clear_ui_state(self) -> None:
         """Clear UI state before operations."""
@@ -270,8 +231,8 @@ class BackboneUIModule(UIModule):
             self.logger.error(f"Error getting UI config: {e}")
             return self.get_config().copy()
     
-    async def _update_summary_display(self) -> None:
-        """Update summary container with current model info."""
+    def _update_summary_display_sync(self) -> None:
+        """Update summary container with current model info (synchronous)."""
         try:
             if not self._operation_manager:
                 return
@@ -352,8 +313,8 @@ class BackboneUIModule(UIModule):
                 self._operation_manager.log(f"❌ {error_msg}", 'error')
             self._update_header_status("Reset failed", "error")
     
-    async def _check_data_prerequisites(self) -> Dict[str, Any]:
-        """Check if all required data is available."""
+    def _check_data_prerequisites_sync(self) -> Dict[str, Any]:
+        """Check if all required data is available (synchronous)."""
         try:
             missing = []
             warnings = []
@@ -364,17 +325,17 @@ class BackboneUIModule(UIModule):
                 warnings.append("Pretrained models not found")
             
             # Check raw data using preprocessor API
-            raw_data_check = await self._check_raw_data()
+            raw_data_check = self._check_raw_data_sync()
             if not raw_data_check['available']:
                 missing.append("Raw data not found")
             
             # Check preprocessed data
-            preprocessed_check = await self._check_preprocessed_data()
+            preprocessed_check = self._check_preprocessed_data_sync()
             if not preprocessed_check['available']:
                 warnings.append("Preprocessed data not found")
             
             # Check augmented data
-            augmented_check = await self._check_augmented_data()
+            augmented_check = self._check_augmented_data_sync()
             if not augmented_check['available']:
                 warnings.append("Augmented data not found")
             
@@ -437,8 +398,8 @@ class BackboneUIModule(UIModule):
             self.logger.error(f"Error checking pretrained models: {e}")
             return {'available': False, 'path': '', 'files': 0}
     
-    async def _check_raw_data(self) -> Dict[str, Any]:
-        """Check raw data using preprocessor API."""
+    def _check_raw_data_sync(self) -> Dict[str, Any]:
+        """Check raw data using preprocessor API (synchronous)."""
         try:
             # Use preprocessor API to check raw data
             from smartcash.dataset.preprocessor.api import get_preprocessing_status
@@ -465,8 +426,8 @@ class BackboneUIModule(UIModule):
             self.logger.error(f"Error checking raw data: {e}")
             return {'available': False, 'total_files': 0, 'details': {}}
     
-    async def _check_preprocessed_data(self) -> Dict[str, Any]:
-        """Check preprocessed data using preprocessor API."""
+    def _check_preprocessed_data_sync(self) -> Dict[str, Any]:
+        """Check preprocessed data using preprocessor API (synchronous)."""
         try:
             # Use preprocessor API to check preprocessed data
             from smartcash.dataset.preprocessor.api import get_preprocessing_status
@@ -493,8 +454,8 @@ class BackboneUIModule(UIModule):
             self.logger.error(f"Error checking preprocessed data: {e}")
             return {'available': False, 'total_files': 0, 'details': {}}
     
-    async def _check_augmented_data(self) -> Dict[str, Any]:
-        """Check augmented data using augmentor API."""
+    def _check_augmented_data_sync(self) -> Dict[str, Any]:
+        """Check augmented data using augmentor API (synchronous)."""
         try:
             # Use augmentor API to check augmented data
             from smartcash.dataset.augmentor import get_augmentation_status
@@ -518,8 +479,8 @@ class BackboneUIModule(UIModule):
             self.logger.error(f"Error checking augmented data: {e}")
             return {'available': False, 'total_files': 0, 'details': {}}
     
-    def _disable_operation_buttons(self) -> None:
-        """Disable validate and build buttons during operations."""
+    def _disable_validate_button(self) -> None:
+        """Disable only validate button during validation."""
         try:
             action_container = self._ui_components.get('containers', {}).get('action')
             if action_container:
@@ -529,15 +490,11 @@ class BackboneUIModule(UIModule):
                     buttons['validate'].disabled = True
                     buttons['validate'].description = '⏳ Validating...'
                     
-                if 'build' in buttons:
-                    buttons['build'].disabled = True
-                    buttons['build'].description = '⏳ Building...'
-                    
         except Exception as e:
-            self.logger.error(f"Error disabling buttons: {e}")
+            self.logger.error(f"Error disabling validate button: {e}")
     
-    def _enable_operation_buttons(self) -> None:
-        """Re-enable validate and build buttons after operations."""
+    def _enable_validate_button(self) -> None:
+        """Re-enable validate button after validation."""
         try:
             action_container = self._ui_components.get('containers', {}).get('action')
             if action_container:
@@ -547,12 +504,36 @@ class BackboneUIModule(UIModule):
                     buttons['validate'].disabled = False
                     buttons['validate'].description = '🔍 Validate'
                     
+        except Exception as e:
+            self.logger.error(f"Error enabling validate button: {e}")
+    
+    def _disable_build_button(self) -> None:
+        """Disable only build button during build."""
+        try:
+            action_container = self._ui_components.get('containers', {}).get('action')
+            if action_container:
+                buttons = action_container.get('buttons', {})
+                
+                if 'build' in buttons:
+                    buttons['build'].disabled = True
+                    buttons['build'].description = '⏳ Building...'
+                    
+        except Exception as e:
+            self.logger.error(f"Error disabling build button: {e}")
+    
+    def _enable_build_button(self) -> None:
+        """Re-enable build button after build."""
+        try:
+            action_container = self._ui_components.get('containers', {}).get('action')
+            if action_container:
+                buttons = action_container.get('buttons', {})
+                
                 if 'build' in buttons:
                     buttons['build'].disabled = False
                     buttons['build'].description = '🏗️ Build Model'
                     
         except Exception as e:
-            self.logger.error(f"Error enabling buttons: {e}")
+            self.logger.error(f"Error enabling build button: {e}")
     
     def _update_header_status(self, message: str, status_type: str) -> None:
         """Update header status panel."""

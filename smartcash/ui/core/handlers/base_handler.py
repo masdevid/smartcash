@@ -219,6 +219,34 @@ class BaseHandler(ABC):
             'initialized': self._is_initialized
         }
     
+    def update_status(self, message: str, status_type: str = "info") -> None:
+        """Update header_container status if available.
+        
+        Args:
+            message: Status message to display
+            status_type: Type of status ('info', 'success', 'warning', 'error')
+        """
+        try:
+            # Check if we have a header_container to update
+            if hasattr(self, 'get_component'):
+                header_container = self.get_component('header_container')
+                if header_container and hasattr(header_container, 'update_status'):
+                    header_container.update_status(message, status_type)
+                    return
+            
+            # Log the status update as a fallback
+            if status_type == 'success':
+                self.logger.info(f"✅ {message}")
+            elif status_type == 'error':
+                self.logger.error(f"❌ {message}")
+            elif status_type == 'warning':
+                self.logger.warning(f"⚠️ {message}")
+            else:
+                self.logger.info(f"ℹ️ {message}")
+                
+        except Exception as e:
+            self.logger.error(f"Error updating status: {e}")
+    
     def cleanup(self) -> None:
         """Cleanup handler resources."""
         # Reset internal state

@@ -80,6 +80,10 @@ class ConfigHandler(BaseHandler):
         """Reset ke default configuration."""
         self.config = self._default_config.copy()
         self.logger.info("🔄 Config reset to defaults")
+        
+        # Update status if available (for header_container status updates)
+        if hasattr(self, 'update_status'):
+            self.update_status("Configuration reset to defaults", 'info')
     
     def get_config_value(self, key: str, default: Any = None) -> Any:
         """Get single config value dengan dot notation support."""

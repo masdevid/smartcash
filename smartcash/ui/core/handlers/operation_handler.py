@@ -752,18 +752,80 @@ class OperationHandler(BaseHandler):
                 # If operation container fails, fall back to logger
                 self.logger.error(f"Error logging to operation container: {e}")
         
-        # Fallback to standard logger if no operation container or on error
-        valid_levels = ['debug', 'info', 'warning', 'error', 'critical']
-        if level in valid_levels:
-            log_func = getattr(self.logger, level)
-        else:
-            log_func = self.logger.info
+        # IMPORTANT: Do not fallback to standard logger to prevent logs outside operation container
+        # Instead, store the message and try to log it when operation container becomes available
+        if not hasattr(self, '_pending_logs'):
+            self._pending_logs = []
         
-        # Ensure log_func is callable before calling
-        if callable(log_func):
-            log_func(message)
-        else:
-            self.logger.info(message)
+        # Store the pending log message
+        self._pending_logs.append({
+            'message': message,
+            'level': level,
+            'timestamp': datetime.now()
+        })
+        
+        # Keep only last 100 messages to prevent memory issues
+        if len(self._pending_logs) > 100:
+            self._pending_logs = self._pending_logs[-100:]
+        
+        # Try to flush pending logs if operation container becomes available
+        self._flush_pending_logs()
+    
+    def _flush_pending_logs(self) -> None:
+        """Flush pending logs to operation container if available."""
+        if not hasattr(self, '_pending_logs') or not self._pending_logs:
+            return
+        
+        if hasattr(self, '_operation_container') and self._operation_container:
+            try:
+                # Flush all pending logs
+                for log_entry in self._pending_logs:
+                    message = log_entry['message']
+                    level = log_entry['level']
+                    
+                    # Use the same operation container logic as in main log method
+                    if isinstance(self._operation_container, dict) and 'log_message' in self._operation_container:
+                        log_message = self._operation_container['log_message']
+                        log_message(message, level)
+                    elif hasattr(self._operation_container, 'log_message'):
+                        self._operation_container.log_message(message, level)
+                    elif isinstance(self._operation_container, dict) and 'log' in self._operation_container:
+                        from smartcash.ui.components.log_accordion import LogLevel
+                        level_map = {
+                            'debug': LogLevel.DEBUG,
+                            'info': LogLevel.INFO,
+                            'warning': LogLevel.WARNING,
+                            'error': LogLevel.ERROR,
+                            'critical': LogLevel.ERROR,
+                            'success': LogLevel.INFO
+                        }
+                        log_level = level_map.get(level, LogLevel.INFO)
+                        log_func = self._operation_container['log']
+                        log_func(message, log_level)
+                    elif hasattr(self._operation_container, 'log') and callable(getattr(self._operation_container, 'log')):
+                        from smartcash.ui.components.log_accordion import LogLevel
+                        level_map = {
+                            'debug': LogLevel.DEBUG,
+                            'info': LogLevel.INFO,
+                            'warning': LogLevel.WARNING,
+                            'error': LogLevel.ERROR,
+                            'critical': LogLevel.ERROR,
+                            'success': LogLevel.INFO
+                        }
+                        log_level = level_map.get(level, LogLevel.INFO)
+                        self._operation_container.log(message, log_level)
+                
+                # Clear pending logs after successful flush
+                self._pending_logs = []
+                
+            except Exception as e:
+                # If flushing fails, keep the logs for next attempt
+                self.logger.error(f"Error flushing pending logs: {e}")
+    
+    def set_operation_container(self, operation_container) -> None:
+        """Set the operation container and flush any pending logs."""
+        self._operation_container = operation_container
+        self._flush_pending_logs()
     
     def reset_progress(self) -> None:
         """Reset progress tracking to initial state."""
@@ -809,11 +871,35 @@ class OperationHandler(BaseHandler):
             
             # Update operation container if available
             if hasattr(self, '_operation_container') and self._operation_container:
-                if hasattr(self._operation_container, 'update_progress'):
+                # Ensure progress tracker is properly initialized
+                self._ensure_progress_tracker_initialized()
+                
+                if isinstance(self._operation_container, dict) and 'update_progress' in self._operation_container:
+                    self._operation_container['update_progress'](int(progress), message, level)
+                elif hasattr(self._operation_container, 'update_progress'):
                     self._operation_container.update_progress(int(progress), message, level)
                     
         except Exception as e:
             self.logger.error(f"Error updating progress: {e}")
+    
+    def _ensure_progress_tracker_initialized(self) -> None:
+        """Ensure progress tracker is properly initialized and visible."""
+        try:
+            if hasattr(self, '_operation_container') and self._operation_container:
+                # For dict-type operation containers (from create_operation_container)
+                if isinstance(self._operation_container, dict):
+                    progress_tracker = self._operation_container.get('progress_tracker')
+                    if progress_tracker:
+                        # Initialize if not already initialized
+                        if hasattr(progress_tracker, '_initialized') and not progress_tracker._initialized:
+                            progress_tracker.initialize()
+                        
+                        # Show the progress tracker
+                        if hasattr(progress_tracker, 'show'):
+                            progress_tracker.show()
+                            
+        except Exception as e:
+            self.logger.error(f"Error ensuring progress tracker initialization: {e}")
     
     def show_dialog(
         self,

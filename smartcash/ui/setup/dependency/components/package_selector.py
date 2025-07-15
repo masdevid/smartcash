@@ -195,6 +195,62 @@ def get_packages_by_category(ui_components: Dict[str, Any], category: str) -> Li
         return []
 
 
+def parse_package_name(package_spec: str) -> str:
+    """Parse package name from package specification.
+    
+    Args:
+        package_spec: Package specification (e.g., "numpy>=1.20.0")
+        
+    Returns:
+        Package name without version specifiers
+    """
+    if not package_spec:
+        return ""
+    
+    # Remove version specifiers
+    # Examples: "numpy>=1.20.0" -> "numpy", "pandas==1.3.0" -> "pandas"
+    package_name = re.split(r'[><=!~]', package_spec.strip())[0].strip()
+    
+    # Clean up any additional characters
+    package_name = re.sub(r'[^a-zA-Z0-9_.-]', '', package_name)
+    
+    return package_name
+
+
+def validate_package_name(package_name: str) -> bool:
+    """Validate if a package name is valid.
+    
+    Args:
+        package_name: Package name to validate
+        
+    Returns:
+        True if valid, False otherwise
+    """
+    if not package_name:
+        return False
+    
+    # Check for basic validity
+    if not re.match(r'^[a-zA-Z][a-zA-Z0-9_.-]*$', package_name):
+        return False
+    
+    # Check for minimum length
+    if len(package_name) < 1:
+        return False
+    
+    # Check for maximum length
+    if len(package_name) > 214:  # PyPI limit
+        return False
+    
+    # Check for invalid patterns
+    if package_name.startswith('.') or package_name.endswith('.'):
+        return False
+    
+    if package_name.startswith('-') or package_name.endswith('-'):
+        return False
+    
+    return True
+
+
 def get_package_selection_summary(ui_components: Dict[str, Any]) -> Dict[str, Any]:
     """Get a summary of package selection state.
     

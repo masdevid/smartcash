@@ -115,14 +115,26 @@ class UIHandler(BaseHandler):
     
     def _log_to_component(self, log_component: Any, message: str, level: str):
         """Log message ke component."""
+        # Normalize level to string
+        level_str = self._normalize_level_to_string(level)
+        
         if hasattr(log_component, 'log') and callable(log_component.log):
-            log_component.log(message, level)
+            log_component.log(message, level_str)
         elif hasattr(log_component, 'append_stdout') and callable(log_component.append_stdout):
-            log_component.append_stdout(f"[{level.upper()}] {message}\n")
+            log_component.append_stdout(f"[{level_str.upper()}] {message}\n")
         elif hasattr(log_component, 'value'):
-            log_component.value += f"<div>[{level.upper()}] {message}</div>"
+            log_component.value += f"<div>[{level_str.upper()}] {message}</div>"
         else:
             self.logger.warning(f"Log component has no supported method")
+    
+    def _normalize_level_to_string(self, level):
+        """Normalize level to string format."""
+        if hasattr(level, 'name'):
+            return level.name.lower()
+        elif hasattr(level, 'value'):
+            return str(level.value).lower()
+        else:
+            return str(level).lower()
     
     def show_dialog(self, title: str, message: str, dialog_type: str = 'info'):
         """Show dialog dengan container-aware access."""

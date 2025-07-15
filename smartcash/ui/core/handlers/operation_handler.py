@@ -684,6 +684,14 @@ class OperationHandler(BaseHandler):
             message: Message to log
             level: Log level (debug, info, warning, error, critical)
         """
+        # Normalize level to string if it's an enum
+        if hasattr(level, 'name'):
+            level = level.name.lower()
+        elif hasattr(level, 'value'):
+            level = str(level.value).lower()
+        else:
+            level = str(level).lower()
+        
         # Prefer OperationContainer to avoid duplicate logging
         if hasattr(self, '_operation_container') and self._operation_container:
             try:

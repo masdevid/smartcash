@@ -780,7 +780,22 @@ class OperationContainer(BaseUIComponent):
             # Fallback logging to console if log accordion fails
             import logging
             fallback_logger = logging.getLogger(__name__)
-            fallback_logger.log(getattr(logging, level.value.upper(), logging.INFO), f"[FALLBACK] {message}")
+            
+            # Safely handle LogLevel enum or string
+            try:
+                if hasattr(level, 'value'):
+                    level_value = str(level.value).upper()
+                elif hasattr(level, 'name'):
+                    level_value = level.name.upper()
+                else:
+                    level_value = str(level).upper()
+                
+                fallback_logger.log(getattr(logging, level_value, logging.INFO), f"[FALLBACK] {message}")
+            except Exception as level_error:
+                # Final fallback with INFO level
+                fallback_logger.info(f"[FALLBACK] {message}")
+                fallback_logger.error(f"Level normalization error: {level_error}")
+            
             fallback_logger.error(f"Log accordion error: {e}")
     
     # Alias for backward compatibility

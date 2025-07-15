@@ -65,7 +65,9 @@ class LoggingMixin:
             # Final fallback (use debug to minimize console output)
             if hasattr(self, 'logger'):
                 self.logger.debug(f"Failed to log message: {e}")
-                self.logger.debug(f"[{level.upper()}] {message}")
+                # Normalize level to string before calling upper()
+                level_str = level.name.lower() if hasattr(level, 'name') else str(level).lower()
+                self.logger.debug(f"[{level_str.upper()}] {message}")
             else:
                 # Suppress print during normal operation to avoid console spam
                 pass

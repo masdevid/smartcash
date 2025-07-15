@@ -240,6 +240,16 @@ class CheckStatusOperationHandler(BaseOperationHandler):
         except Exception:
             return None
     
+    def _check_single_package_status(self, package: str) -> Dict[str, Any]:
+        """Check status of a single package (alias for _check_package_status for compatibility).
+        
+        Args:
+            package: Package name to check
+            
+        Returns:
+            Dictionary with package status information
+        """
+        return self._check_package_status(package)
     
     def get_operations(self) -> Dict[str, Callable]:
         """Get available operations for this handler.

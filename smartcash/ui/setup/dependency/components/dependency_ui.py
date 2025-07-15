@@ -82,7 +82,8 @@ def create_dependency_ui_components(module_config: Dict[str, Any]) -> Dict[str, 
                     'tooltip': 'Uninstal paket yang dipilih'
                 }
             ],
-            title="🔧 Operasi Paket"
+            title="🔧 Operasi Paket",
+            show_save_reset=True
         )
         
         # 4. Operation Container with consistent logging and progress
@@ -213,6 +214,8 @@ def _create_package_grid(module_config: Dict[str, Any]) -> tuple:
                 style={'description_width': 'initial'},
                 layout=widgets.Layout(margin='1px 0')
             )
+            # Store the package name as a custom attribute for easy access
+            checkbox.package_name = pkg['name']
             category_checkboxes.append(checkbox)
         
         # Store checkboxes by category

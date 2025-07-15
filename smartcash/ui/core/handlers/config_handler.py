@@ -246,28 +246,34 @@ class PersistentConfigHandler(ConfigurableHandler):
             return False
     
     @handle_errors(error_msg="Failed to save configuration", level=ErrorLevel.ERROR, reraise=True)
-    def save_config(self, name: Optional[str] = None) -> bool:
+    def save_config(self, name: Optional[str] = None) -> Dict[str, Any]:
         """Save configuration ke file."""
-        config_name = name or f"{self.module_name}_config"
-        
-        # Bundle config dengan metadata
-        config_bundle = {
-            'metadata': {
-                'version': self.CONFIG_VERSION,
-                'module': self.full_module_name,
-                'saved_at': datetime.now().isoformat(),
-            },
-            'config': self.config
-        }
-        
-        # Save via config manager
-        self._config_manager.save_config(config_bundle, config_name)
-        
-        self.logger.info(f"💾 Saved config: {config_name}")
-        # update_status method may not be available in all contexts
-        if hasattr(self, 'update_status'):
-            self.update_status("Configuration saved successfully", 'success')
-        return True
+        try:
+            config_name = name or f"{self.module_name}_config"
+            
+            # Bundle config dengan metadata
+            config_bundle = {
+                'metadata': {
+                    'version': self.CONFIG_VERSION,
+                    'module': self.full_module_name,
+                    'saved_at': datetime.now().isoformat(),
+                },
+                'config': self.config
+            }
+            
+            # Save via config manager
+            self._config_manager.save_config(config_bundle, config_name)
+            
+            self.logger.info(f"💾 Saved config: {config_name}")
+            # update_status method may not be available in all contexts
+            if hasattr(self, 'update_status'):
+                self.update_status("Configuration saved successfully", 'success')
+            
+            return {'success': True, 'message': f'Configuration saved as {config_name}'}
+        except Exception as e:
+            error_msg = f"Failed to save configuration: {str(e)}"
+            self.logger.error(error_msg)
+            return {'success': False, 'message': error_msg}
     
     @handle_errors(error_msg="Failed to delete configuration", level=ErrorLevel.ERROR, reraise=True)
     def delete_config(self, name: Optional[str] = None) -> bool:

@@ -25,6 +25,48 @@ class DependencyConfigHandler(SharedConfigHandler):
             enable_sharing=True
         )
     
+    def extract_config_from_ui(self) -> Dict[str, Any]:
+        """Extract configuration from UI components."""
+        try:
+            if not hasattr(self, '_ui_components') or not self._ui_components:
+                self.logger.debug("No UI components available for extraction")
+                return self.config.copy()
+            
+            # Extract selected packages from checkboxes
+            selected_packages = []
+            if 'package_checkboxes' in self._ui_components:
+                checkboxes = self._ui_components['package_checkboxes']
+                for category, checkbox_list in checkboxes.items():
+                    for checkbox in checkbox_list:
+                        if hasattr(checkbox, 'value') and checkbox.value:
+                            if hasattr(checkbox, 'package_name'):
+                                selected_packages.append(checkbox.package_name)
+            
+            # Extract custom packages
+            custom_packages = ""
+            if 'custom_packages' in self._ui_components:
+                custom_widget = self._ui_components['custom_packages']
+                if hasattr(custom_widget, 'value'):
+                    custom_packages = custom_widget.value.strip()
+            
+            # Create config with extracted values
+            extracted_config = self.config.copy()
+            extracted_config.update({
+                'selected_packages': selected_packages,
+                'custom_packages': custom_packages
+            })
+            
+            self.logger.debug(f"Extracted config: {len(selected_packages)} packages, custom: '{custom_packages}'")
+            return extracted_config
+            
+        except Exception as e:
+            self.logger.error(f"Failed to extract config from UI: {e}")
+            return self.config.copy()
+    
+    def set_ui_components(self, ui_components: Dict[str, Any]) -> None:
+        """Set UI components for extraction."""
+        self._ui_components = ui_components
+    
     def validate_config(self, config: Dict[str, Any]) -> bool:
         """Validate dependency configuration"""
         try:

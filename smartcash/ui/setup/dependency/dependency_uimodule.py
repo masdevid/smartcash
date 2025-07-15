@@ -115,6 +115,10 @@ class DependencyUIModule(BaseUIModule):
                 # Setup operation manager after UI components are created
                 self._setup_operation_manager()
                 
+                # Set UI components in config handler for extraction
+                if self._config_handler and hasattr(self._config_handler, 'set_ui_components'):
+                    self._config_handler.set_ui_components(self._ui_components)
+                
                 # Post-initialization logging (now that operation container is ready)
                 self._log_initialization_complete()
             
@@ -411,10 +415,17 @@ class DependencyUIModule(BaseUIModule):
             # Get package checkboxes from UI components
             if self._ui_components and 'package_checkboxes' in self._ui_components:
                 checkboxes = self._ui_components['package_checkboxes']
-                for category, boxes in checkboxes.items():
-                    for package_name, checkbox in boxes.items():
-                        if checkbox.value:  # If checkbox is checked
-                            selected_packages.append(package_name)
+                for category, checkbox_list in checkboxes.items():
+                    for checkbox in checkbox_list:
+                        if hasattr(checkbox, 'value') and checkbox.value:  # If checkbox is checked
+                            if hasattr(checkbox, 'package_name'):
+                                selected_packages.append(checkbox.package_name)
+                            else:
+                                # Fallback: extract package name from description
+                                desc = getattr(checkbox, 'description', '')
+                                if desc and '(' in desc:
+                                    package_name = desc.split('(')[0].strip()
+                                    selected_packages.append(package_name)
             
             # Get custom packages
             if self._ui_components and 'custom_packages' in self._ui_components:

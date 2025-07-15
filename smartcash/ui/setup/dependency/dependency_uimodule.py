@@ -159,6 +159,123 @@ class DependencyUIModule(BaseUIModule):
             # Use logger fallback if operation container logging fails
             self.logger.debug(f"Post-initialization logging failed: {e}")
     
+    def log(self, message: str, level: str = 'info') -> None:
+        """Override log method to ensure operation container logging works."""
+        try:
+            # Check if operation container is available
+            if hasattr(self, '_ui_components') and self._ui_components:
+                operation_container = self._ui_components.get('operation_container')
+                if operation_container:
+                    # Direct logging to operation container
+                    if hasattr(operation_container, 'log'):
+                        operation_container.log(message, level)
+                        return
+                    # Alternative: try to display in operation container
+                    elif hasattr(operation_container, 'children'):
+                        from IPython.display import display, HTML
+                        html_content = f"<div style='margin:2px 0;'>[{level.upper()}] {message}</div>"
+                        with operation_container:
+                            display(HTML(html_content))
+                        return
+            
+            # Fallback to logger but use debug level to reduce console output
+            if hasattr(self, 'logger'):
+                self.logger.debug(f"[{level.upper()}] {message}")
+                
+        except Exception as e:
+            # Final fallback
+            if hasattr(self, 'logger'):
+                self.logger.debug(f"Log failed: {e}")
+    
+    def save_config(self) -> Dict[str, Any]:
+        """Override save_config to add status updates."""
+        try:
+            # Call parent save_config method
+            result = super().save_config()
+            
+            # Add status update
+            if result.get('success'):
+                self.update_operation_status("Configuration saved successfully", "success")
+                self.log("✅ Configuration saved successfully", 'success')
+            else:
+                self.update_operation_status(f"Save failed: {result.get('message', 'Unknown error')}", "error")
+                self.log(f"❌ Save failed: {result.get('message', 'Unknown error')}", 'error')
+            
+            return result
+            
+        except Exception as e:
+            error_msg = f"Failed to save configuration: {str(e)}"
+            self.update_operation_status(error_msg, "error")
+            self.log(f"❌ {error_msg}", 'error')
+            return {'success': False, 'message': error_msg}
+    
+    def reset_config(self) -> Dict[str, Any]:
+        """Override reset_config to add status updates."""
+        try:
+            # Call parent reset_config method
+            result = super().reset_config()
+            
+            # Add status update
+            if result.get('success'):
+                self.update_operation_status("Configuration reset to defaults", "success")
+                self.log("✅ Configuration reset to defaults", 'success')
+            else:
+                self.update_operation_status(f"Reset failed: {result.get('message', 'Unknown error')}", "error")
+                self.log(f"❌ Reset failed: {result.get('message', 'Unknown error')}", 'error')
+            
+            return result
+            
+        except Exception as e:
+            error_msg = f"Failed to reset configuration: {str(e)}"
+            self.update_operation_status(error_msg, "error")
+            self.log(f"❌ {error_msg}", 'error')
+            return {'success': False, 'message': error_msg}
+    
+    def start_progress(self, message: str, total: int = 100) -> None:
+        """Override start_progress to ensure progress tracker is visible."""
+        try:
+            # Call parent method
+            super().start_progress(message, total)
+            
+            # Ensure progress tracker is initialized and visible
+            if hasattr(self, '_ui_components') and self._ui_components:
+                operation_container = self._ui_components.get('operation_container')
+                if operation_container:
+                    # Try to find and initialize progress tracker
+                    if hasattr(operation_container, 'progress_tracker'):
+                        progress_tracker = operation_container.progress_tracker
+                        if hasattr(progress_tracker, 'initialize'):
+                            progress_tracker.initialize()
+                        if hasattr(progress_tracker, 'show'):
+                            progress_tracker.show()
+                    # Alternative: look for progress tracker in children
+                    elif hasattr(operation_container, 'children'):
+                        for child in operation_container.children:
+                            if hasattr(child, 'progress_tracker'):
+                                progress_tracker = child.progress_tracker
+                                if hasattr(progress_tracker, 'initialize'):
+                                    progress_tracker.initialize()
+                                if hasattr(progress_tracker, 'show'):
+                                    progress_tracker.show()
+                                break
+                
+        except Exception as e:
+            if hasattr(self, 'logger'):
+                self.logger.debug(f"Progress tracker initialization failed: {e}")
+    
+    def update_progress(self, progress: int, message: str = "", level: str = "info") -> None:
+        """Override update_progress to ensure progress tracker is visible."""
+        try:
+            # Call parent method
+            super().update_progress(progress, message, level)
+            
+            # Additional logging for visibility
+            self.log(f"📊 Progress: {progress}% - {message}", level)
+            
+        except Exception as e:
+            if hasattr(self, 'logger'):
+                self.logger.debug(f"Progress update failed: {e}")
+    
     def _register_default_operations(self) -> None:
         """Register default operations for Dependency module."""
         # Call parent method first
@@ -179,7 +296,7 @@ class DependencyUIModule(BaseUIModule):
     
     # ==================== OPERATION HANDLERS ====================
     
-    def _operation_install_packages(self, button=None) -> Dict[str, Any]:
+    def _operation_install_packages(self, button=None) -> Dict[str, Any]:  # noqa: ARG002
         """Handle package installation operation using mixin pattern."""
         button_states = None
         try:
@@ -232,7 +349,7 @@ class DependencyUIModule(BaseUIModule):
             if button_states:
                 self.enable_all_buttons(button_states)
     
-    def _operation_uninstall_packages(self, button=None) -> Dict[str, Any]:
+    def _operation_uninstall_packages(self, button=None) -> Dict[str, Any]:  # noqa: ARG002
         """Handle package uninstallation operation using mixin pattern."""
         button_states = None
         try:
@@ -285,7 +402,7 @@ class DependencyUIModule(BaseUIModule):
             if button_states:
                 self.enable_all_buttons(button_states)
     
-    def _operation_check_status(self, button=None) -> Dict[str, Any]:
+    def _operation_check_status(self, button=None) -> Dict[str, Any]:  # noqa: ARG002
         """Handle package status check operation using mixin pattern."""
         button_states = None
         try:
@@ -338,7 +455,7 @@ class DependencyUIModule(BaseUIModule):
             if button_states:
                 self.enable_all_buttons(button_states)
     
-    def _operation_update_packages(self, button=None) -> Dict[str, Any]:
+    def _operation_update_packages(self, button=None) -> Dict[str, Any]:  # noqa: ARG002
         """Handle package update operation using mixin pattern."""
         button_states = None
         try:
@@ -381,7 +498,7 @@ class DependencyUIModule(BaseUIModule):
             if button_states:
                 self.enable_all_buttons(button_states)
     
-    def _operation_refresh_status(self, button=None) -> Dict[str, Any]:
+    def _operation_refresh_status(self, button=None) -> Dict[str, Any]:  # noqa: ARG002
         """Handle refresh package status operation using mixin pattern."""
         try:
             self.log_operation_start("Refresh Status")

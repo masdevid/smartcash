@@ -77,9 +77,42 @@ class CheckStatusOperationHandler(BaseOperationHandler):
         """
         try:
             # Use parent's method to get packages from UI components
-            return self._get_packages_to_process()
+            packages = self._get_packages_to_process()
+            
+            # If no packages are selected, check all default packages
+            if not packages:
+                packages = self._get_all_default_packages()
+            
+            return packages
         except Exception as e:
             self.log(f"Gagal mendapatkan daftar paket: {str(e)}", 'error')
+            return []
+    
+    def _get_all_default_packages(self) -> List[str]:
+        """Get all default packages from the configuration.
+        
+        Returns:
+            List of all default package names
+        """
+        try:
+            from ..configs.dependency_defaults import get_default_package_categories
+            
+            categories = get_default_package_categories()
+            packages = []
+            
+            for category_name, category_data in categories.items():
+                if category_name == 'custom_packages':
+                    continue  # Skip custom packages category
+                
+                for package in category_data.get('packages', []):
+                    if package.get('is_default', False):
+                        packages.append(package['name'])
+            
+            self.log(f"Found {len(packages)} default packages to check", 'info')
+            return packages
+            
+        except Exception as e:
+            self.log(f"Error getting default packages: {str(e)}", 'error')
             return []
     
     def _check_packages_status(self, packages: List[str]) -> List[Dict[str, Any]]:

@@ -1,11 +1,11 @@
-ERROR: Failed to build installable wheels for some pyproject.toml based projects (pytorch)
-[08:53:24] ERROR - ❌ Failed to update operation summary: 'int' object is not iterable
-ERROR - ❌ Gagal menginstal opencv: ERROR: Could not find a version that satisfies the requirement opencv (from versions: none)
-ERROR - ❌ Gagal menginstal notebook_deps: ERROR: Could not find a version that satisfies the requirement notebook_deps (from versions: none)
- ❌ Gagal menginstal yaml_parser: ERROR: Could not find a version that satisfies the requirement yaml_parser (from versions: none)
-ERROR - Kesalahan saat memperbarui pandas: BaseOperationHandler._execute_command() got an unexpected keyword argument 'timeout'
-
-[08:53:24] ERROR - Error details: Traceback (most recent call last):
-  File "/content/smartcash/smartcash/ui/setup/dependency/operations/operation_manager.py", line 632, in _update_operation_summary
-    for pkg in result['installed']:
-TypeError: 'int' object is not iterable
+[12:11:49] INFO - ✅ UI displayed successfully
+[12:12:09] INFO - 🔄 Starting Cek Status Paket...
+[12:12:09] INFO - [Status] Memeriksa status paket...
+[12:12:09] INFO - Checking status of all configured packages
+[12:12:09] INFO - 🔍 Memeriksa status paket...
+[12:12:09] INFO - ℹ️ Tidak ada paket yang perlu diperiksa
+[12:12:09] INFO - 
+### Operation Complete
+[12:12:09] INFO - ✅ Cek Status Paket completed
+[12:12:09] INFO - [Status] Pemeriksaan status selesai
+[12:12:09] INFO - 📊 Status paket: 0/0 terinstal, 0 hilang

@@ -53,19 +53,32 @@ class ProgressTrackingMixin:
             # Try operation container directly
             if hasattr(self, '_ui_components') and self._ui_components:
                 operation_container = self._ui_components.get('operation_container')
-                if operation_container and hasattr(operation_container, 'update_progress'):
-                    operation_container.update_progress(progress, message, level)
-                    return
+                if operation_container:
+                    # Handle dict-style operation container
+                    if isinstance(operation_container, dict) and 'update_progress' in operation_container:
+                        operation_container['update_progress'](progress, message, level)
+                        return
+                    # Handle object-style operation container
+                    elif hasattr(operation_container, 'update_progress'):
+                        operation_container.update_progress(progress, message, level)
+                        return
                 
                 # Try progress tracker component
                 progress_tracker = self._ui_components.get('progress_tracker')
-                if progress_tracker and hasattr(progress_tracker, 'update'):
-                    progress_tracker.update(progress, message)
-                    return
+                if progress_tracker:
+                    # Handle dict-style progress tracker
+                    if isinstance(progress_tracker, dict) and 'update' in progress_tracker:
+                        progress_tracker['update'](progress, message)
+                        return
+                    # Handle object-style progress tracker
+                    elif hasattr(progress_tracker, 'update'):
+                        progress_tracker.update(progress, message)
+                        return
             
-            # Fallback to logging
-            if hasattr(self, 'logger'):
-                self.logger.info(f"📊 Progress: {progress}% - {message}")
+            # NO FALLBACK to console logger - store as pending progress instead
+            if not hasattr(self, '_pending_progress'):
+                self._pending_progress = []
+            self._pending_progress.append({'progress': progress, 'message': message, 'level': level})
                 
         except Exception as e:
             if hasattr(self, 'logger'):

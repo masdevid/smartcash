@@ -671,11 +671,23 @@ class OperationHandler(BaseHandler):
                 # Log the message using operation container logging
                 self.log(f"Progress: {message} ({current or '?'}/{total or '?'})", level.value)
             except Exception as e:
-                self.logger.error(f"Error updating operation container: {e}")
+                # Store error as pending instead of console logging
+                if not hasattr(self, '_pending_logs'):
+                    self._pending_logs = []
+                self._pending_logs.append({
+                    'message': f"Error updating operation container: {e}",
+                    'level': 'error',
+                    'timestamp': datetime.now()
+                })
         else:
-            # Fallback to direct logger only if no operation container is available
-            log_func = getattr(self.logger, level.value, self.logger.info)
-            log_func(f"Progress: {message} ({current or '?'}/{total or '?'})")
+            # Store progress as pending instead of console logging
+            if not hasattr(self, '_pending_logs'):
+                self._pending_logs = []
+            self._pending_logs.append({
+                'message': f"Progress: {message} ({current or '?'}/{total or '?'})",
+                'level': level.value,
+                'timestamp': datetime.now()
+            })
     
     def log(self, message: str, level: str = 'info') -> None:
         """Log a message, preferring OperationContainer to avoid duplication.
@@ -762,8 +774,14 @@ class OperationHandler(BaseHandler):
                     return
                     
             except Exception as e:
-                # If operation container fails, fall back to logger
-                self.logger.error(f"Error logging to operation container: {e}")
+                # Store error as pending log instead of falling back to console
+                if not hasattr(self, '_pending_logs'):
+                    self._pending_logs = []
+                self._pending_logs.append({
+                    'message': f"Error logging to operation container: {e}",
+                    'level': 'error',
+                    'timestamp': datetime.now()
+                })
         
         # IMPORTANT: Do not fallback to standard logger to prevent logs outside operation container
         # Instead, store the message and try to log it when operation container becomes available

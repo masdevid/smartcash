@@ -166,26 +166,35 @@ class DependencyUIModule(BaseUIModule):
             if hasattr(self, '_ui_components') and self._ui_components:
                 operation_container = self._ui_components.get('operation_container')
                 if operation_container:
-                    # Direct logging to operation container
-                    if hasattr(operation_container, 'log'):
+                    # Use log_message method with proper LogLevel enum
+                    if isinstance(operation_container, dict) and 'log_message' in operation_container:
+                        from smartcash.ui.components.log_accordion import LogLevel
+                        level_map = {
+                            'debug': LogLevel.DEBUG,
+                            'info': LogLevel.INFO,
+                            'warning': LogLevel.WARNING,
+                            'error': LogLevel.ERROR,
+                            'critical': LogLevel.ERROR,
+                            'success': LogLevel.INFO
+                        }
+                        log_level = level_map.get(level, LogLevel.INFO)
+                        operation_container['log_message'](message, log_level)
+                        return
+                    # Direct logging to operation container (if it has log method)
+                    elif hasattr(operation_container, 'log'):
                         operation_container.log(message, level)
                         return
-                    # Alternative: try to display in operation container
-                    elif hasattr(operation_container, 'children'):
-                        from IPython.display import display, HTML
-                        html_content = f"<div style='margin:2px 0;'>[{level.upper()}] {message}</div>"
-                        with operation_container:
-                            display(HTML(html_content))
-                        return
             
-            # Fallback to logger but use debug level to reduce console output
-            if hasattr(self, 'logger'):
-                self.logger.debug(f"[{level.upper()}] {message}")
+            # NO FALLBACK to console logger - store as pending log instead
+            if not hasattr(self, '_pending_logs'):
+                self._pending_logs = []
+            self._pending_logs.append({'message': message, 'level': level})
                 
         except Exception as e:
-            # Final fallback
-            if hasattr(self, 'logger'):
-                self.logger.debug(f"Log failed: {e}")
+            # Store error log as pending
+            if not hasattr(self, '_pending_logs'):
+                self._pending_logs = []
+            self._pending_logs.append({'message': f"Log failed: {e}", 'level': 'error'})
     
     def save_config(self) -> Dict[str, Any]:
         """Override save_config to add status updates."""

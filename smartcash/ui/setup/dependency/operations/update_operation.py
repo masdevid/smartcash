@@ -192,7 +192,7 @@ class UpdateOperationHandler(BaseOperationHandler):
             import yaml
             import os
             
-            config_path = os.path.join('/Users/masdevid/Projects/smartcash', 'configs', 'dependency_config.yaml')
+            config_path = self._get_config_path('dependency_config.yaml')
             
             # Read existing config
             if os.path.exists(config_path):

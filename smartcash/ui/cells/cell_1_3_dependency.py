@@ -6,4 +6,4 @@ NOTE: Cell Code should remain minimal (import and run initializer only).
 """
 
 from smartcash.ui.setup.dependency import initialize_dependency_ui
-initialize_dependency_ui()
+initialize_dependency_ui(display=True)

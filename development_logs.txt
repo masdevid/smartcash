@@ -1,20 +1,11 @@
-[08:12:54] INFO - ✅ UI displayed successfully
-[08:13:26] INFO - 🔄 Starting Cek Status Paket...
-[08:13:26] INFO - [Status] Memeriksa status paket...
-[08:13:26] INFO - Checking status of all configured packages
-[08:13:26] INFO - 🔍 Memeriksa status paket...
-[08:13:26] INFO - ℹ️ Tidak ada paket yang perlu diperiksa
-[08:13:26] INFO - 
-### Operation Complete
-[08:13:26] INFO - ✅ Cek Status Paket completed
-[08:13:26] INFO - [Status] Pemeriksaan status selesai
-[08:13:26] INFO - 📊 Status paket: 0/0 terinstal, 0 hilang
-[08:13:36] INFO - 🔄 Starting Instalasi Paket...
-[08:13:36] INFO - [Status] Memulai instalasi paket...
-[08:13:36] INFO - Installing specific packages: ['ipywidgets', 'notebook_deps', 'albumentations', 'yaml_parser', 'ipython', 'pyyaml', 'python-dotenv', 'pytz', 'pytorch', 'torchvision', 'ultralytics', 'timm', 'scikit_learn', 'torch', 'thop', 'tensorboard', 'pandas', 'numpy', 'opencv', 'pillow', 'matplotlib', 'scipy', 'opencv-python', 'pybboxes', 'sahi']
-[08:13:36] INFO - 🚀 Memulai instalasi paket...
-[08:13:36] WARNING - ⚠️ Tidak ada paket yang dipilih untuk diinstal
-[08:13:36] INFO - 
-### 📦 Installation Complete
-[08:13:36] ERROR - ❌ Instalasi Paket failed: Instalasi gagal
-[08:13:36] ERROR - [Status] Instalasi gagal: Instalasi gagal
+ERROR: Failed to build installable wheels for some pyproject.toml based projects (pytorch)
+[08:53:24] ERROR - ❌ Failed to update operation summary: 'int' object is not iterable
+ERROR - ❌ Gagal menginstal opencv: ERROR: Could not find a version that satisfies the requirement opencv (from versions: none)
+ERROR - ❌ Gagal menginstal notebook_deps: ERROR: Could not find a version that satisfies the requirement notebook_deps (from versions: none)
+ ❌ Gagal menginstal yaml_parser: ERROR: Could not find a version that satisfies the requirement yaml_parser (from versions: none)
+ERROR - Kesalahan saat memperbarui pandas: BaseOperationHandler._execute_command() got an unexpected keyword argument 'timeout'
+
+[08:53:24] ERROR - Error details: Traceback (most recent call last):
+  File "/content/smartcash/smartcash/ui/setup/dependency/operations/operation_manager.py", line 632, in _update_operation_summary
+    for pkg in result['installed']:
+TypeError: 'int' object is not iterable

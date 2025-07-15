@@ -39,6 +39,23 @@ class BaseOperationHandler(OperationHandler):
         if 'operation_container' in ui_components:
             self.operation_container = ui_components['operation_container']
     
+    def _get_config_path(self, filename: str = 'dependency_config.yaml') -> str:
+        """Get environment-aware config file path.
+        
+        Args:
+            filename: Name of the config file
+            
+        Returns:
+            Full path to the config file
+        """
+        try:
+            # Use the core-level config path function
+            from smartcash.common.config.manager import get_environment_config_path
+            return get_environment_config_path(filename)
+        except Exception as e:
+            # Fallback to local development path on error
+            return os.path.join('./configs', filename)
+    
     def _get_packages_to_process(self) -> List[str]:
         """Get list of packages to process based on current selection.
         
@@ -81,7 +98,8 @@ class BaseOperationHandler(OperationHandler):
         command: List[str], 
         cwd: Optional[str] = None,
         env: Optional[Dict[str, str]] = None,
-        progress_callback: Optional[Callable[[float, str], None]] = None
+        progress_callback: Optional[Callable[[float, str], None]] = None,
+        timeout: Optional[int] = None
     ) -> Dict[str, Any]:
         """Execute a shell command with error handling and progress tracking.
         
@@ -90,6 +108,7 @@ class BaseOperationHandler(OperationHandler):
             cwd: Working directory for the command
             env: Environment variables to use
             progress_callback: Optional callback for progress updates
+            timeout: Optional timeout in seconds
             
         Returns:
             Dictionary with command execution results
@@ -130,12 +149,24 @@ class BaseOperationHandler(OperationHandler):
                         if progress_callback:
                             progress_callback(0, f"ERROR: {stderr_line.strip()}")
                 
-                # Read any remaining output
-                remaining_stdout, remaining_stderr = process.communicate()
-                if remaining_stdout:
-                    stdout_lines.append(remaining_stdout)
-                if remaining_stderr:
-                    stderr_lines.append(remaining_stderr)
+                # Read any remaining output with timeout
+                try:
+                    remaining_stdout, remaining_stderr = process.communicate(timeout=timeout)
+                    if remaining_stdout:
+                        stdout_lines.append(remaining_stdout)
+                    if remaining_stderr:
+                        stderr_lines.append(remaining_stderr)
+                except subprocess.TimeoutExpired:
+                    process.kill()
+                    try:
+                        remaining_stdout, remaining_stderr = process.communicate(timeout=5)
+                        if remaining_stdout:
+                            stdout_lines.append(remaining_stdout)
+                        if remaining_stderr:
+                            stderr_lines.append(remaining_stderr)
+                    except subprocess.TimeoutExpired:
+                        pass
+                    raise subprocess.TimeoutExpired(command, timeout)
                 
                 return {
                     'success': process.returncode == 0,

@@ -24,7 +24,7 @@ A modular deep learning pipeline for Rupiah currency detection, featuring a YOLO
 ### Cells to Create:
 
 1. **Setup & Configuration**
-   - `cell_1_1_repo_clone.py`: Clone the repository and set up the environment
+   - `cell_1_1_repo_clone.py`: Clone the repository and set up the environment (need no changes)
    - `cell_1_2_colab.py`: Configure Colab-specific settings and requirements
    - `cell_1_3_dependency.py`: Install and verify dependencies
 

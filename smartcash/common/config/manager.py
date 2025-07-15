@@ -336,6 +336,29 @@ In Colab environments, configurations can be synced with Google Drive to persist
     def is_symlink_active(self) -> bool:
         """Check apakah symlink config aktif"""
         return self.config_dir.is_symlink() and self.config_dir.exists()
+    
+    def get_environment_config_path(self, filename: str) -> str:
+        """Get environment-aware config file path.
+        
+        Args:
+            filename: Name of the config file
+            
+        Returns:
+            Full path to the config file based on current environment
+        """
+        try:
+            # Use the existing config_dir which is already environment-aware
+            config_path = self.config_dir / filename
+            
+            # Ensure the directory exists
+            os.makedirs(self.config_dir, exist_ok=True)
+            
+            return str(config_path)
+            
+        except Exception as e:
+            self._logger.error(f"Error getting config path for {filename}: {e}")
+            # Fallback to current directory
+            return os.path.join('./configs', filename)
 
 # Singleton instance
 _INSTANCE = None
@@ -362,3 +385,19 @@ def get_config_manager(base_dir=None, config_file=None, auto_sync=False):
 
 # Compatibility
 SimpleConfigManager.get_instance = staticmethod(get_config_manager)
+
+def get_environment_config_path(filename: str) -> str:
+    """Get environment-aware config file path using the singleton config manager.
+    
+    Args:
+        filename: Name of the config file
+        
+    Returns:
+        Full path to the config file based on current environment
+    """
+    try:
+        config_manager = get_config_manager()
+        return config_manager.get_environment_config_path(filename)
+    except Exception as e:
+        # Fallback to current directory
+        return os.path.join('./configs', filename)

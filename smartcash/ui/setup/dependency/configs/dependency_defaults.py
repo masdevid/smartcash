@@ -72,7 +72,7 @@ def get_default_package_categories() -> Dict[str, Dict[str, Any]]:
                     'size': '~5MB'
                 },
                 {
-                    'name': 'notebook_deps',
+                    'name': 'ipython',
                     'version': '>=8.12.0',
                     'description': 'IPython dan Jupyter dependencies',
                     'pip_name': 'ipython>=8.12.0',
@@ -88,12 +88,28 @@ def get_default_package_categories() -> Dict[str, Dict[str, Any]]:
                     'size': '~2MB'
                 },
                 {
-                    'name': 'yaml_parser',
+                    'name': 'pyyaml',
                     'version': '>=6.0.0',
                     'description': 'Configuration file parsing',
                     'pip_name': 'pyyaml>=6.0.0',
                     'is_default': True,
                     'size': '~1MB'
+                },
+                {
+                    'name': 'python-dotenv',
+                    'version': '>=1.0.1',
+                    'description': 'Environment variable loading',
+                    'pip_name': 'python-dotenv>=1.0.1',
+                    'is_default': True,
+                    'size': '~0.5MB'
+                },
+                {
+                    'name': 'pytz',
+                    'version': '>=2023.3',
+                    'description': 'Timezone support',
+                    'pip_name': 'pytz>=2023.3',
+                    'is_default': True,
+                    'size': '~0.5MB'
                 }
             ]
         },
@@ -105,18 +121,18 @@ def get_default_package_categories() -> Dict[str, Dict[str, Any]]:
             'color': '#2196F3',
             'packages': [
                 {
-                    'name': 'pytorch',
-                    'version': '>=2.2.0',
+                    'name': 'torch',
+                    'version': '>=2.1.0',
                     'description': 'Deep learning framework utama',
-                    'pip_name': 'torch>=2.2.0',
+                    'pip_name': 'torch>=2.1.0',
                     'is_default': True,
                     'size': '~800MB'
                 },
                 {
                     'name': 'torchvision',
-                    'version': '>=0.17.0',
+                    'version': '>=0.16.0',
                     'description': 'Computer vision untuk PyTorch',
-                    'pip_name': 'torchvision>=0.17.0',
+                    'pip_name': 'torchvision>=0.16.0',
                     'is_default': True,
                     'size': '~25MB'
                 },
@@ -137,12 +153,28 @@ def get_default_package_categories() -> Dict[str, Dict[str, Any]]:
                     'size': '~5MB'
                 },
                 {
-                    'name': 'scikit_learn',
+                    'name': 'scikit-learn',
                     'version': '>=1.5.0',
                     'description': 'Machine learning library untuk klasifikasi dan evaluasi',
                     'pip_name': 'scikit-learn>=1.5.0',
                     'is_default': True,
                     'size': '~10MB'
+                },
+                {
+                    'name': 'tensorboard',
+                    'version': '>=2.19.0',
+                    'description': 'TensorBoard visualization tool',
+                    'pip_name': 'tensorboard>=2.19.0',
+                    'is_default': True,
+                    'size': '~10MB'
+                },
+                {
+                    'name': 'thop',
+                    'version': '>=0.1.1',
+                    'description': 'PyTorch model complexity analysis',
+                    'pip_name': 'thop>=0.1.1',
+                    'is_default': True,
+                    'size': '~1MB'
                 }
             ]
         },
@@ -170,7 +202,7 @@ def get_default_package_categories() -> Dict[str, Dict[str, Any]]:
                     'size': '~15MB'
                 },
                 {
-                    'name': 'opencv',
+                    'name': 'opencv-python',
                     'version': '>=4.8.0',
                     'description': 'Computer vision library',
                     'pip_name': 'opencv-python>=4.8.0',
@@ -178,7 +210,7 @@ def get_default_package_categories() -> Dict[str, Dict[str, Any]]:
                     'size': '~45MB'
                 },
                 {
-                    'name': 'pillow',
+                    'name': 'Pillow',
                     'version': '>=10.0.0',
                     'description': 'Python Imaging Library',
                     'pip_name': 'Pillow>=10.0.0',
@@ -200,6 +232,22 @@ def get_default_package_categories() -> Dict[str, Dict[str, Any]]:
                     'pip_name': 'scipy>=1.12.0',
                     'is_default': True,
                     'size': '~30MB'
+                },
+                {
+                    'name': 'pybboxes',
+                    'version': '>=0.1.6',
+                    'description': 'Bounding box manipulation library',
+                    'pip_name': 'pybboxes>=0.1.6',
+                    'is_default': True,
+                    'size': '~1MB'
+                },
+                {
+                    'name': 'sahi',
+                    'version': '>=0.11.21',
+                    'description': 'Slicing aided hyper inference library',
+                    'pip_name': 'sahi>=0.11.21',
+                    'is_default': True,
+                    'size': '~5MB'
                 }
             ]
         },

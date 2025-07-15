@@ -629,8 +629,13 @@ class DependencyOperationManager(OperationHandler):
             # Add installed packages
             if 'installed' in result and result['installed']:
                 summary.append("\n✅ Successfully installed packages:")
-                for pkg in result['installed']:
-                    summary.append(f"- {pkg}")
+                # Handle both list and integer formats
+                if isinstance(result['installed'], list):
+                    for pkg in result['installed']:
+                        summary.append(f"- {pkg}")
+                else:
+                    # If it's an integer, show count
+                    summary.append(f"- {result['installed']} packages installed")
             
             # Add failed packages with errors
             if 'failed' in result and result['failed']:
@@ -641,8 +646,13 @@ class DependencyOperationManager(OperationHandler):
             # Add skipped packages
             if 'skipped' in result and result['skipped']:
                 summary.append("\n⚠️ Skipped packages (already up to date):")
-                for pkg in result['skipped']:
-                    summary.append(f"- {pkg}")
+                # Handle both list and integer formats
+                if isinstance(result['skipped'], list):
+                    for pkg in result['skipped']:
+                        summary.append(f"- {pkg}")
+                else:
+                    # If it's an integer, show count
+                    summary.append(f"- {result['skipped']} packages skipped")
             
             # Convert summary to markdown
             summary_markdown = '\n'.join(summary)

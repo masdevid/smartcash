@@ -210,14 +210,7 @@ class CheckStatusOperationHandler(BaseOperationHandler):
         """
         try:
             # Check if package is installed
-            result = self._execute_command(
-                ['pip', 'show', package],
-                progress_callback=lambda p, msg: self._update_progress(
-                    message=f"Memeriksa {package}...",
-                    current=p,
-                    level_name='secondary'
-                )
-            )
+            result = self._execute_command(['pip', 'show', package])
             
             if not result['success'] or 'not found' in result['stdout'].lower():
                 return {
@@ -238,14 +231,7 @@ class CheckStatusOperationHandler(BaseOperationHandler):
             installed_version = info.get('version', '')
             
             # Check for updates (non-blocking)
-            update_result = self._execute_command(
-                ['pip', 'index', 'versions', package],
-                progress_callback=lambda p, msg: self._update_progress(
-                    message=f"Memeriksa pembaruan untuk {package}...",
-                    current=p,
-                    level_name='secondary'
-                )
-            )
+            update_result = self._execute_command(['pip', 'index', 'versions', package])
             
             latest_version = None
             if update_result['success']:

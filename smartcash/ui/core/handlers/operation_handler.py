@@ -646,10 +646,6 @@ class OperationHandler(BaseHandler):
         if isinstance(level, str):
             level = ProgressLevel(level.lower())
             
-        # Log progress
-        log_func = getattr(self.logger, level.value, self.logger.info)
-        log_func(f"Progress: {message} ({current or '?'}/{total or '?'})")
-        
         # Update progress state (can be used by UI components)
         self._progress = {
             'message': message,
@@ -672,10 +668,14 @@ class OperationHandler(BaseHandler):
                         level=level_name
                     )
                 
-                # Log the message
-                self.log(message, level.value)
+                # Log the message using operation container logging
+                self.log(f"Progress: {message} ({current or '?'}/{total or '?'})", level.value)
             except Exception as e:
                 self.logger.error(f"Error updating operation container: {e}")
+        else:
+            # Fallback to direct logger only if no operation container is available
+            log_func = getattr(self.logger, level.value, self.logger.info)
+            log_func(f"Progress: {message} ({current or '?'}/{total or '?'})")
     
     def log(self, message: str, level: str = 'info') -> None:
         """Log a message, preferring OperationContainer to avoid duplication.

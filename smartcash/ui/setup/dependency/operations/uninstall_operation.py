@@ -128,16 +128,8 @@ class UninstallOperationHandler(BaseOperationHandler):
         command = ["pip", "uninstall", "--yes", pkg_name]
         
         try:
-            # Execute uninstallation with progress tracking
-            result = self._execute_command(
-                command,
-                timeout=300,  # 5 minute timeout
-                progress_callback=lambda p, msg: self._update_progress(
-                    message=f"Menghapus {pkg_name}... {msg if msg else ''}",
-                    current=p,
-                    level_name='secondary'
-                )
-            )
+            # Execute uninstallation (no verbose subprocess output)
+            result = self._execute_command(command, timeout=300)
             
             duration = time.time() - start_time
             
@@ -146,17 +138,14 @@ class UninstallOperationHandler(BaseOperationHandler):
             
             if is_success:
                 message = "Tidak terpasang" if 'not installed' in result.get('stderr', '') else f"Berhasil dihapus dalam {duration:.1f} detik"
-                self.log(f"✅ {pkg_name} {message.lower()}", 'success')
                 return {
                     'success': True,
                     'package': pkg_name,
                     'duration': duration,
-                    'output': result.get('stdout', ''),
                     'message': message
                 }
             else:
-                error_msg = result.get('stderr', result.get('stdout', 'Gagal menghapus'))
-                self.log(f"❌ Gagal menghapus {pkg_name}: {error_msg}", 'error')
+                error_msg = result.get('stderr', result.get('stdout', 'Gagal menghapus'))[:100]  # Limit error message length
                 return {
                     'success': False,
                     'package': pkg_name,
@@ -169,13 +158,11 @@ class UninstallOperationHandler(BaseOperationHandler):
             raise
             
         except Exception as e:
-            error_msg = f"Kesalahan saat menghapus {pkg_name}: {str(e)}"
-            self.log(error_msg, 'error')
             return {
                 'success': False,
                 'package': pkg_name,
-                'error': str(e),
-                'message': f"Kesalahan: {str(e)}"
+                'error': str(e)[:100],  # Limit error message
+                'message': f"Kesalahan: {str(e)[:50]}"
             }
     
     def _update_config_after_uninstall(self, results: List[Dict[str, Any]]) -> None:

@@ -122,17 +122,18 @@ class InstallOperationHandler(BaseOperationHandler):
                 break
                 
             self._update_progress(
-                message=f"Installing package {i}/{total}: {package}",
-                current=(i-1) / total * 100,
+                message=f"Menginstal paket {i}/{total}: {package}",
+                current=i / total * 100,
                 level_name='primary'
             )
             
             result = self._install_single_package(package)
             results.append(result)
             
-            # Update progress after completion
+            # Show result status
+            status = "✅" if result.get('success') else "❌"
             self._update_progress(
-                message=f"Completed {i}/{total}: {package}",
+                message=f"Selesai {i}/{total}: {status} {package}",
                 current=i / total * 100,
                 level_name='primary'
             )
@@ -165,30 +166,20 @@ class InstallOperationHandler(BaseOperationHandler):
         command.append(package)
         
         try:
-            # Execute installation with progress tracking
-            result = self._execute_command(
-                command,
-                progress_callback=lambda p, msg: self._update_progress(
-                    message=f"Menginstal {package}... {msg if msg else ''}",
-                    current=p,
-                    level_name='secondary'
-                )
-            )
+            # Execute installation (no verbose subprocess output)
+            result = self._execute_command(command)
             
             duration = time.time() - start_time
             
             if result['success']:
-                self.log(f"✅ Berhasil menginstal {package} dalam {duration:.1f} detik", 'success')
                 return {
                     'success': True,
                     'package': package,
                     'duration': duration,
-                    'output': result.get('stdout', ''),
                     'message': f"Berhasil diinstal dalam {duration:.1f} detik"
                 }
             else:
-                error_msg = result.get('stderr', result.get('stdout', 'Gagal menginstal'))
-                self.log(f"❌ Gagal menginstal {package}: {error_msg}", 'error')
+                error_msg = result.get('stderr', result.get('stdout', 'Gagal menginstal'))[:100]  # Limit error message length
                 return {
                     'success': False,
                     'package': package,
@@ -201,13 +192,11 @@ class InstallOperationHandler(BaseOperationHandler):
             raise
             
         except Exception as e:
-            error_msg = f"Kesalahan saat menginstal {package}: {str(e)}"
-            self.log(error_msg, 'error')
             return {
                 'success': False,
                 'package': package,
-                'error': str(e),
-                'message': f"Kesalahan: {str(e)}"
+                'error': str(e)[:100],  # Limit error message
+                'message': f"Kesalahan: {str(e)[:50]}"
             }
     
     def _save_config_to_file(self, config: Dict[str, Any]) -> None:

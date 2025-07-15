@@ -25,7 +25,16 @@ class BaseOperationHandler(OperationHandler):
             ui_components: Dictionary of UI components
             config: Configuration dictionary with operation settings
         """
-        super().__init__(operation_type, 'dependency.setup')
+        # Extract operation container for parent constructor
+        operation_container = ui_components.get('operation_container')
+        
+        # Pass operation container to parent constructor so logging works correctly
+        super().__init__(
+            module_name=operation_type, 
+            parent_module='dependency.setup', 
+            operation_container=operation_container
+        )
+        
         self.ui_components = ui_components
         self.config = config
         
@@ -34,10 +43,6 @@ class BaseOperationHandler(OperationHandler):
             self._error_handler = get_error_handler()
         except Exception:
             self._error_handler = None
-        
-        # Set default operation container if available in UI components
-        if 'operation_container' in ui_components:
-            self.operation_container = ui_components['operation_container']
     
     def _get_config_path(self, filename: str = 'dependency_config.yaml') -> str:
         """Get environment-aware config file path.
@@ -52,7 +57,7 @@ class BaseOperationHandler(OperationHandler):
             # Use the core-level config path function
             from smartcash.common.config.manager import get_environment_config_path
             return get_environment_config_path(filename)
-        except Exception as e:
+        except Exception:
             # Fallback to local development path on error
             return os.path.join('./configs', filename)
     

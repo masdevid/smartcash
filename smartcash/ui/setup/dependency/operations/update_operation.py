@@ -140,31 +140,20 @@ class UpdateOperationHandler(BaseOperationHandler):
         command.append(package)
         
         try:
-            # Execute update with progress tracking
-            result = self._execute_command(
-                command,
-                timeout=600,  # 10 minute timeout
-                progress_callback=lambda p, msg: self._update_progress(
-                    message=f"Memperbarui {package}... {msg if msg else ''}",
-                    current=p,
-                    level_name='secondary'
-                )
-            )
+            # Execute update (no verbose subprocess output)
+            result = self._execute_command(command, timeout=600)
             
             duration = time.time() - start_time
             
             if result['success']:
-                self.log(f"✅ Berhasil memperbarui {package} dalam {duration:.1f} detik", 'success')
                 return {
                     'success': True,
                     'package': package,
                     'duration': duration,
-                    'output': result.get('stdout', ''),
                     'message': f"Berhasil diperbarui dalam {duration:.1f} detik"
                 }
             else:
-                error_msg = result.get('stderr', result.get('stdout', 'Gagal memperbarui'))
-                self.log(f"❌ Gagal memperbarui {package}: {error_msg}", 'error')
+                error_msg = result.get('stderr', result.get('stdout', 'Gagal memperbarui'))[:100]  # Limit error message length
                 return {
                     'success': False,
                     'package': package,
@@ -177,13 +166,11 @@ class UpdateOperationHandler(BaseOperationHandler):
             raise
             
         except Exception as e:
-            error_msg = f"Kesalahan saat memperbarui {package}: {str(e)}"
-            self.log(error_msg, 'error')
             return {
                 'success': False,
                 'package': package,
-                'error': str(e),
-                'message': f"Kesalahan: {str(e)}"
+                'error': str(e)[:100],  # Limit error message
+                'message': f"Kesalahan: {str(e)[:50]}"
             }
     
     def _save_config_to_file(self, config: Dict[str, Any]) -> None:

@@ -58,7 +58,7 @@ class DownloaderOperationManager(OperationHandler):
             self.update_progress(0, "Initializing download...")
             
             # Execute download with progress tracking
-            result = await self.download_handler.execute(config)
+            result = await self.download_handler.execute_download(config)
             
             if result.get('success'):
                 self.update_progress(100, "Download completed")

@@ -187,8 +187,8 @@ class DependencyUIModule(BaseUIModule):
             self.log(f"🌍 Lingkungan terdeteksi: {env_type}", 'info')
             self.log(f"📁 Direktori kerja: {self._environment_paths.get('data_root', 'Unknown')}", 'info')
             
-            # Update status panel (Operation Checklist 7.1)
-            self.update_operation_status("Siap untuk manajemen paket", "info")
+            # Update status panel (Operation Checklist 7.1) - use direct log to avoid console output
+            self.log("📊 Status: Siap untuk manajemen paket", 'info')
             
         except Exception as e:
             # Use logger fallback if operation container logging fails

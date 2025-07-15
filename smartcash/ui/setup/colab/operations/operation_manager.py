@@ -142,9 +142,8 @@ class ColabOperationManager(OperationHandler):
             elif hasattr(self.operation_container, 'update_status'):
                 self.operation_container.update_status(message, level=level)
         else:
-            # Fallback to logger only if no operation container
-            log_method = getattr(self.logger, level, self.logger.info)
-            log_method(f"Status update: {message}")
+            # Fallback to logger only if no operation container (use debug to avoid console spam)
+            self.logger.debug(f"Status update: {message}")
     
     def _init_operation(self, progress_callback: Optional[Callable] = None) -> Dict[str, Any]:
         """Execute initialization operation."""

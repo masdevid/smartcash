@@ -57,17 +57,18 @@ class LoggingMixin:
                     operation_container.log(message, level)
                     return
             
-            # Fallback to standard logger (but minimize console output)
+            # Fallback to standard logger (use debug to minimize console output)
             if hasattr(self, 'logger'):
-                getattr(self.logger, level, self.logger.info)(message)
+                self.logger.debug(message)
                 
         except Exception as e:
-            # Final fallback
+            # Final fallback (use debug to minimize console output)
             if hasattr(self, 'logger'):
                 self.logger.debug(f"Failed to log message: {e}")
-                self.logger.info(f"[{level.upper()}] {message}")
+                self.logger.debug(f"[{level.upper()}] {message}")
             else:
-                print(f"[{level.upper()}] {message}")
+                # Suppress print during normal operation to avoid console spam
+                pass
     
     def _setup_ui_logging_bridge(self, operation_container: Any) -> None:
         """

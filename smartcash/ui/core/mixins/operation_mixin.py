@@ -251,16 +251,30 @@ class OperationMixin:
             level: Message level (info, warning, error)
         """
         try:
+            # Try operation manager first
             if self._operation_manager and hasattr(self._operation_manager, 'update_status'):
                 self._operation_manager.update_status(message, level)
-            elif hasattr(self, '_ui_components') and self._ui_components:
+                return
+            
+            # Try operation container next
+            if hasattr(self, '_ui_components') and self._ui_components:
                 operation_container = self._ui_components.get('operation_container')
                 if operation_container and hasattr(operation_container, 'update_status'):
                     operation_container.update_status(message, level)
+                    return
             
-            # Also log the message
-            if hasattr(self, 'logger'):
-                getattr(self.logger, level, self.logger.info)(f"[Status] {message}")
+            # During initialization, suppress status logging to avoid console spam
+            # Status updates during init are not critical for display
+            if hasattr(self, '_is_initialized') and not self._is_initialized:
+                # Module is still initializing - suppress status logs
+                return
+            
+            # Only log if module is fully initialized and no other options worked
+            if hasattr(self, 'log') and hasattr(self, '_ui_components') and self._ui_components and 'operation_container' in self._ui_components:
+                self.log(f"[Status] {message}", level)
+            elif hasattr(self, 'logger'):
+                # Use debug level to avoid console spam
+                self.logger.debug(f"[Status] {message}")
                 
         except Exception as e:
             if hasattr(self, 'logger'):

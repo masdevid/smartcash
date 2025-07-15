@@ -116,11 +116,18 @@ class EnhancedUIModuleFactory:
                 config: Optional configuration dictionary
                 **kwargs: Additional arguments for module creation
             """
+            # Filter out conflicting display parameters from kwargs
+            filtered_kwargs = {k: v for k, v in kwargs.items() 
+                              if k not in ['display', 'show_display']}
+            
+            # Determine final display value - prioritize explicit 'display' parameter
+            final_display = kwargs.get('display', True)
+            
             return EnhancedUIModuleFactory.create_and_display(
                 module_class=module_class,
                 config=config,
-                display=True,
-                **kwargs
+                display=final_display,
+                **filtered_kwargs
             )
         
         # Set function name and docstring

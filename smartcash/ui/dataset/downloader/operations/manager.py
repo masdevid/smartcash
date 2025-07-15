@@ -111,7 +111,7 @@ class DownloaderOperationManager(OperationHandler):
             self.log("🧹 Starting dataset cleanup", 'info')
             self.update_progress(0, "Cleaning up...")
             
-            result = await self.cleanup_handler.execute(targets)
+            result = await self.cleanup_handler.execute_cleanup(targets)
             
             if result.get('success'):
                 cleaned = result.get('cleaned_count', 0)

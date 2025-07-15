@@ -702,17 +702,30 @@ class OperationHandler(BaseHandler):
                 if isinstance(self._operation_container, dict) and 'log_message' in self._operation_container:
                     # Operation container is a dict from create_operation_container()
                     log_message = self._operation_container['log_message']
+                    
+                    # Convert string level to LogLevel enum
+                    from smartcash.ui.components.log_accordion import LogLevel
+                    level_map = {
+                        'debug': LogLevel.DEBUG,
+                        'info': LogLevel.INFO,
+                        'warning': LogLevel.WARNING,
+                        'error': LogLevel.ERROR,
+                        'critical': LogLevel.ERROR,
+                        'success': LogLevel.INFO
+                    }
+                    log_level = level_map.get(level, LogLevel.INFO)
+                    
                     # Check if log_message accepts namespace parameter
                     import inspect
                     try:
                         sig = inspect.signature(log_message)
                         if 'namespace' in sig.parameters:
-                            log_message(message, level, namespace=namespace)
+                            log_message(message, log_level, namespace=namespace)
                         else:
-                            log_message(message, level)
+                            log_message(message, log_level)
                     except:
                         # Fallback to basic call
-                        log_message(message, level)
+                        log_message(message, log_level)
                     return
                 elif hasattr(self._operation_container, 'log_message'):
                     # Operation container is an object

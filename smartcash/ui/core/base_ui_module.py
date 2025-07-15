@@ -153,9 +153,9 @@ class BaseUIModule(
         self.register_operation_handler('validate_all', self.validate_all)
         self.register_operation_handler('display_ui', self.display_ui)
         
-        # Register button handlers
-        self.register_button_handler('save', lambda _: self.save_config())
-        self.register_button_handler('reset', lambda _: self.reset_config())
+        # Register button handlers with status updates
+        self.register_button_handler('save', self._handle_save_config)
+        self.register_button_handler('reset', self._handle_reset_config)
     
     def get_module_info(self) -> Dict[str, Any]:
         """

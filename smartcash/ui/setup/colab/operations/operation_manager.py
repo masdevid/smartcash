@@ -92,6 +92,26 @@ class ColabOperationManager(OperationHandler):
         
         self.logger.info("✅ Colab operation manager initialization complete")
     
+    def execute_full_setup(self) -> Dict[str, Any]:
+        """Execute full Colab setup sequence."""
+        self.logger.info("🔄 Starting full Colab setup sequence...")
+        try:
+            # Clear any previous logs
+            self.clear_outputs()
+            
+            # Execute the full setup operation
+            result = self._full_setup_operation()
+            
+            if result.get('success', False):
+                self.logger.info("✅ Full Colab setup completed successfully")
+            else:
+                self.logger.error(f"❌ Full Colab setup failed: {result.get('error', 'Unknown error')}")
+            
+            return result
+        except Exception as e:
+            self.logger.error(f"❌ Error during full setup: {str(e)}")
+            return {'success': False, 'error': str(e)}
+
     def clear_outputs(self) -> None:
         """Clear outputs from the operation container if available."""
         try:

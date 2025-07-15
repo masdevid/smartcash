@@ -161,8 +161,13 @@ class DownloaderUIModule(UIModule):
             # Create a task to run the async operation
             async def run_check():
                 try:
-                    result = await self.execute_check()
-                    
+                    # Execute check operation through operation manager
+                    if self._operation_manager:
+                        result = await self._operation_manager.execute_check()
+                    else:
+                        result = {'success': False, 'error': 'Operation manager not initialized'}
+                        return result
+
                     if result.get("success", False):
                         count = result.get("count", 0)
                         self._update_status(f"Dataset check completed - {count} files found", "success")
@@ -178,6 +183,7 @@ class DownloaderUIModule(UIModule):
                 finally:
                     # Re-enable buttons when done
                     self._set_buttons_enabled(True)
+                    return result
             
             # Start the async task
             import asyncio
@@ -187,9 +193,6 @@ class DownloaderUIModule(UIModule):
             self.logger.error(f"Failed to start check operation: {e}", exc_info=True)
             self._update_status(f"Failed to start check: {str(e)}", "error")
             self._set_buttons_enabled(True)
-                
-        except Exception as e:
-            self.logger.error(f"Check failed: {e}")
             self._update_status(f"Check error: {e}", "error")
             self.log(f"❌ Check error: {e}", "error")
         finally:

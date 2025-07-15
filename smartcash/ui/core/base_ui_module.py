@@ -116,10 +116,13 @@ class BaseUIModule(
             if hasattr(self, '_initialize_operation_manager'):
                 self._initialize_operation_manager()
             
-            # Setup button handlers
+            # Register default operation handlers FIRST
+            self._register_default_operations()
+            
+            # Setup button handlers AFTER registration
             self._setup_button_handlers()
             
-            # Validate button-handler integrity
+            # Validate button-handler integrity AFTER setup
             self._validate_button_handler_integrity()
             
             # Setup UI logging bridge
@@ -130,9 +133,6 @@ class BaseUIModule(
             
             # Initialize progress display
             self._initialize_progress_display()
-            
-            # Register default operation handlers
-            self._register_default_operations()
             
             self._is_initialized = True
             

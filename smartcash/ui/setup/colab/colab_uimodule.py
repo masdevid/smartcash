@@ -206,10 +206,8 @@ class ColabUIModule(BaseUIModule):
         self.register_operation_handler('detect_environment', self._handle_detect_environment)
         
         # Register button handlers (Operation Checklist 2.2)
+        # Only register handlers for buttons that actually exist in the UI
         self.register_button_handler('colab_setup', self._handle_full_setup)
-        self.register_button_handler('init', self._handle_init_environment)
-        self.register_button_handler('mount_drive', self._handle_mount_drive)
-        self.register_button_handler('verify', self._handle_verify_setup)
     
     def _flush_log_buffer(self) -> None:
         """Flush buffered logs to operation container."""

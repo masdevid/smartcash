@@ -99,8 +99,8 @@ class UninstallOperationHandler(BaseOperationHandler):
             max_workers=min(4, len(packages))  # Limit concurrent uninstallations
         )
         
-        # Extract and return the results
-        return [r for r in processed_results['details'] if r.get('status') != 'error']
+        # Extract and return the results - keep all results, don't filter by status
+        return processed_results['details']
     
     def _uninstall_single_package(self, package: str) -> Dict[str, Any]:
         """Uninstall a single package synchronously.

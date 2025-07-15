@@ -127,19 +127,77 @@ class CheckStatusOperationHandler(BaseOperationHandler):
         if not packages:
             return []
             
-        total = len(packages)
-        checked = 0
-        results = []
-        
-        # Process packages in parallel with progress tracking
-        processed_results = self._process_packages(
+        # Use custom processing to preserve full result structure
+        return self._process_packages_with_full_results(
             packages,
             self._check_package_status,
             progress_message="Memeriksa status paket"
         )
+    
+    def _process_packages_with_full_results(
+        self,
+        packages: List[str],
+        process_func: Callable[[str], Dict[str, Any]],
+        progress_message: str = "Processing packages",
+        max_workers: int = 4
+    ) -> List[Dict[str, Any]]:
+        """Process multiple packages in parallel while preserving full result structure.
         
-        # Extract and return the results
-        return [r for r in processed_results['details'] if r.get('status') != 'error']
+        Args:
+            packages: List of package names to process
+            process_func: Function to call for each package
+            progress_message: Base message for progress updates
+            max_workers: Maximum number of parallel workers
+            
+        Returns:
+            List of full result dictionaries from process_func
+        """
+        if not packages:
+            return []
+            
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+        
+        results = []
+        total = len(packages)
+        processed = 0
+        
+        # Create a thread pool for parallel processing
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            futures = {
+                executor.submit(process_func, pkg): pkg
+                for pkg in packages
+            }
+            
+            # Process results as they complete
+            for future in as_completed(futures):
+                pkg = futures[future]
+                processed += 1
+                
+                try:
+                    result = future.result()
+                    # Keep the full result structure
+                    results.append(result)
+                    
+                    # Update progress
+                    progress = (processed / total) * 100
+                    self._update_progress(
+                        message=f"{progress_message}: {pkg} ({processed}/{total})",
+                        current=progress,
+                        total=100,
+                        level_name='secondary'
+                    )
+                    
+                except Exception as e:
+                    error_result = {
+                        'package': pkg,
+                        'success': False,
+                        'status': 'error',
+                        'message': str(e)
+                    }
+                    results.append(error_result)
+                    self.log(f"Error processing {pkg}: {str(e)}", 'error')
+        
+        return results
     
     def _check_package_status(self, package: str) -> Dict[str, Any]:
         """Check status of a single package.

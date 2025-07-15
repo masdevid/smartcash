@@ -119,6 +119,9 @@ class BaseUIModule(
             # Setup button handlers
             self._setup_button_handlers()
             
+            # Validate button-handler integrity
+            self._validate_button_handler_integrity()
+            
             # Setup UI logging bridge
             if hasattr(self, '_ui_components') and self._ui_components:
                 operation_container = self._ui_components.get('operation_container')
@@ -185,3 +188,86 @@ class BaseUIModule(
     def __str__(self) -> str:
         """String representation of the module."""
         return f"{self.full_module_name} UI Module"
+    
+    def _validate_button_handler_integrity(self) -> None:
+        """
+        Validate button-handler integrity during module setup.
+        
+        This method ensures that all buttons have corresponding handlers
+        and follows naming conventions. It can auto-fix common issues.
+        """
+        try:
+            from smartcash.ui.core.validation.button_validator import validate_button_handlers
+            
+            # Validate with auto-fix enabled
+            result = validate_button_handlers(self, auto_fix=True)
+            
+            # Log validation results
+            if result.has_errors:
+                self.logger.error(f"Button validation errors in {self.full_module_name}: {len([i for i in result.issues if i.level.value == 'error'])} errors")
+                for issue in result.issues:
+                    if issue.level.value == 'error':
+                        self.logger.error(f"🔘 {issue.message}")
+                        if issue.suggestion:
+                            self.logger.error(f"   💡 Suggestion: {issue.suggestion}")
+            
+            if result.has_warnings:
+                self.logger.warning(f"Button validation warnings in {self.full_module_name}: {len([i for i in result.issues if i.level.value == 'warning'])} warnings")
+                for issue in result.issues:
+                    if issue.level.value == 'warning':
+                        self.logger.warning(f"🔘 {issue.message}")
+                        if issue.suggestion:
+                            self.logger.warning(f"   💡 Suggestion: {issue.suggestion}")
+            
+            # Log auto-fixes
+            if result.auto_fixes_applied:
+                self.logger.info(f"Button validation auto-fixes applied: {len(result.auto_fixes_applied)}")
+                for fix in result.auto_fixes_applied:
+                    self.logger.info(f"🔧 {fix}")
+            
+            # Log success if no issues
+            if result.is_valid and not result.has_warnings:
+                self.logger.debug(f"✅ Button validation passed for {self.full_module_name}")
+            
+        except Exception as e:
+            self.logger.warning(f"Button validation failed: {e}")
+    
+    def get_button_validation_status(self) -> Dict[str, Any]:
+        """
+        Get current button validation status.
+        
+        Returns:
+            Dictionary with validation status information
+        """
+        try:
+            from smartcash.ui.core.validation.button_validator import validate_button_handlers
+            
+            result = validate_button_handlers(self, auto_fix=False)
+            
+            return {
+                'is_valid': result.is_valid,
+                'has_errors': result.has_errors,
+                'has_warnings': result.has_warnings,
+                'error_count': len([i for i in result.issues if i.level.value == 'error']),
+                'warning_count': len([i for i in result.issues if i.level.value == 'warning']),
+                'button_count': len(result.button_ids),
+                'handler_count': len(result.handler_ids),
+                'missing_handlers': result.missing_handlers,
+                'orphaned_handlers': result.orphaned_handlers,
+                'issues': [
+                    {
+                        'level': issue.level.value,
+                        'message': issue.message,
+                        'button_id': issue.button_id,
+                        'suggestion': issue.suggestion,
+                        'auto_fixable': issue.auto_fixable
+                    }
+                    for issue in result.issues
+                ]
+            }
+            
+        except Exception as e:
+            return {
+                'is_valid': False,
+                'error': str(e)
+            }

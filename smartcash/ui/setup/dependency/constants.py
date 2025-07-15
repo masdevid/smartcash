@@ -47,8 +47,8 @@ INSTALL_DEFAULTS = {
 
 # UI Configuration
 UI_CONFIG = {
-    'title': "Dependency Manager",
-    'subtitle': "Install, update, and manage Python packages",
+    'title': "Pengelola Dependensi",
+    'subtitle': "Instal, perbarui, dan kelola paket Python",
     'icon': "📦",
     'module_name': "dependency",
     'parent_module': "setup",
@@ -58,24 +58,24 @@ UI_CONFIG = {
 # Button configuration - Using multiple action buttons pattern
 BUTTON_CONFIG = {
     'install': {
-        'text': 'Install',
+        'text': 'Instal',
         'style': 'success',
         'icon': 'download',
-        'tooltip': 'Install selected packages',
+        'tooltip': 'Instal paket yang dipilih',
         'order': 1
     },
     'check_updates': {
-        'text': 'Check & Updates',
+        'text': 'Cek & Perbarui',
         'style': 'info',
         'icon': 'refresh',
-        'tooltip': 'Check package status and available updates',
+        'tooltip': 'Periksa status paket dan pembaruan yang tersedia',
         'order': 2
     },
     'uninstall': {
-        'text': 'Uninstall',
+        'text': 'Uninstal',
         'style': 'danger',
         'icon': 'trash',
-        'tooltip': 'Uninstall selected packages',
+        'tooltip': 'Uninstal paket yang dipilih',
         'order': 3
     }
 }
@@ -159,49 +159,49 @@ def get_status_config(status: str) -> Dict[str, Any]:
         PACKAGE_STATUS['INSTALLED']: {
             'icon': ICONS['SUCCESS'],
             'color': COLORS['SUCCESS'],
-            'text': 'Installed',
+            'text': 'Terinstal',
             'bg_color': '#E8F5E8'
         },
         PACKAGE_STATUS['NOT_INSTALLED']: {
             'icon': ICONS['ERROR'],
             'color': COLORS['ERROR'],
-            'text': 'Not Installed',
+            'text': 'Tidak Terinstal',
             'bg_color': '#FFEBEE'
         },
         PACKAGE_STATUS['CHECKING']: {
             'icon': ICONS['LOADING'],
             'color': COLORS['INFO'],
-            'text': 'Checking...',
+            'text': 'Memeriksa...',
             'bg_color': '#E3F2FD'
         },
         PACKAGE_STATUS['INSTALLING']: {
             'icon': ICONS['INSTALL'],
             'color': COLORS['INFO'],
-            'text': 'Installing...',
+            'text': 'Menginstal...',
             'bg_color': '#E3F2FD'
         },
         PACKAGE_STATUS['UPDATING']: {
             'icon': ICONS['UPDATE'],
             'color': COLORS['SECONDARY'],
-            'text': 'Updating...',
+            'text': 'Memperbarui...',
             'bg_color': '#F3E5F5'
         },
         PACKAGE_STATUS['UNINSTALLING']: {
             'icon': ICONS['UNINSTALL'],
             'color': COLORS['ERROR'],
-            'text': 'Uninstalling...',
+            'text': 'Menguninstal...',
             'bg_color': '#FFEBEE'
         },
         PACKAGE_STATUS['UPDATE_AVAILABLE']: {
             'icon': ICONS['WARNING'],
             'color': COLORS['WARNING'],
-            'text': 'Update Available',
+            'text': 'Pembaruan Tersedia',
             'bg_color': '#FFF3E0'
         },
         PACKAGE_STATUS['ERROR']: {
             'icon': ICONS['ERROR'],
             'color': COLORS['ERROR'],
-            'text': 'Error',
+            'text': 'Kesalahan',
             'bg_color': '#FFEBEE'
         }
     }
@@ -212,25 +212,25 @@ def get_button_config(action: str) -> Dict[str, Any]:
     """Get configuration untuk button actions"""
     button_configs = {
         BUTTON_ACTIONS['INSTALL']: {
-            'text': 'Install',
+            'text': 'Instal',
             'icon': ICONS['INSTALL'],
             'color': COLORS['SUCCESS'],
             'variant': 'primary'
         },
         BUTTON_ACTIONS['UPDATE']: {
-            'text': 'Update',
+            'text': 'Perbarui',
             'icon': ICONS['UPDATE'],
             'color': COLORS['WARNING'],
             'variant': 'warning'
         },
         BUTTON_ACTIONS['UNINSTALL']: {
-            'text': 'Uninstall',
+            'text': 'Uninstal',
             'icon': ICONS['UNINSTALL'],
             'color': COLORS['ERROR'],
             'variant': 'danger'
         },
         BUTTON_ACTIONS['CHECK']: {
-            'text': 'Check',
+            'text': 'Periksa',
             'icon': ICONS['CHECK'],
             'color': COLORS['INFO'],
             'variant': 'info'

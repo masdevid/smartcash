@@ -32,6 +32,19 @@ class LoggingMixin:
             level: Log level (info, warning, error, debug)
         """
         try:
+            # Check if we should buffer logs (operation container not ready yet)
+            if hasattr(self, '_log_buffer') and hasattr(self, '_is_initialized'):
+                operation_container = None
+                
+                # Check for operation container availability
+                if hasattr(self, '_ui_components') and self._ui_components:
+                    operation_container = self._ui_components.get('operation_container')
+                
+                # If operation container isn't ready but we're initialized, buffer the log
+                if not operation_container and self._is_initialized:
+                    self._log_buffer.append((message, level))
+                    return
+            
             # Try operation manager first
             if self._operation_manager and hasattr(self._operation_manager, 'log'):
                 self._operation_manager.log(message, level)
@@ -44,7 +57,7 @@ class LoggingMixin:
                     operation_container.log(message, level)
                     return
             
-            # Fallback to standard logger
+            # Fallback to standard logger (but minimize console output)
             if hasattr(self, 'logger'):
                 getattr(self.logger, level, self.logger.info)(message)
                 

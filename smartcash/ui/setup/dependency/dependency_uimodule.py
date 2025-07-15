@@ -58,6 +58,9 @@ class DependencyUIModule(BaseUIModule):
         self._package_status = {}
         self._environment_paths = {}
         
+        # Initialize log buffer for pre-operation-container logs
+        self._log_buffer = []
+        
         self.logger.debug("✅ DependencyUIModule initialized")
     
     def get_default_config(self) -> Dict[str, Any]:
@@ -112,13 +115,8 @@ class DependencyUIModule(BaseUIModule):
                 # Setup operation manager after UI components are created
                 self._setup_operation_manager()
                 
-                # Log environment information (Operation Checklist 3.2)
-                env_type = "Google Colab" if self._environment_manager.is_colab else "Lokal/Jupyter"
-                self.log(f"🌍 Lingkungan terdeteksi: {env_type}", 'info')
-                self.log(f"📁 Direktori kerja: {self._environment_paths.get('data_root', 'Unknown')}", 'info')
-                
-                # Update status panel (Operation Checklist 7.1)
-                self.update_operation_status("Siap untuk manajemen paket", "info")
+                # Post-initialization logging (now that operation container is ready)
+                self._log_initialization_complete()
             
             return success
             
@@ -177,6 +175,41 @@ class DependencyUIModule(BaseUIModule):
         except Exception as e:
             self.logger.error(f"Failed to initialize operation manager: {e}")
             raise
+    
+    def _log_initialization_complete(self) -> None:
+        """Log initialization completion to operation container (after it's ready)."""
+        try:
+            # First, flush any buffered logs
+            self._flush_log_buffer()
+            
+            # Log environment information (Operation Checklist 3.2)
+            env_type = "Google Colab" if self._environment_manager.is_colab else "Lokal/Jupyter"
+            self.log(f"🌍 Lingkungan terdeteksi: {env_type}", 'info')
+            self.log(f"📁 Direktori kerja: {self._environment_paths.get('data_root', 'Unknown')}", 'info')
+            
+            # Update status panel (Operation Checklist 7.1)
+            self.update_operation_status("Siap untuk manajemen paket", "info")
+            
+        except Exception as e:
+            # Use logger fallback if operation container logging fails
+            self.logger.debug(f"Post-initialization logging failed: {e}")
+    
+    def _flush_log_buffer(self) -> None:
+        """Flush buffered logs to operation container."""
+        try:
+            if not self._log_buffer:
+                return
+                
+            # Display all buffered logs to operation container
+            for log_entry in self._log_buffer:
+                message, level = log_entry
+                self.log(message, level)
+            
+            # Clear the buffer
+            self._log_buffer.clear()
+            
+        except Exception as e:
+            self.logger.debug(f"Failed to flush log buffer: {e}")
     
     def _register_default_operations(self) -> None:
         """Register default operations for Dependency module (Operation Checklist 9.1)."""
@@ -463,11 +496,18 @@ def initialize_dependency_ui(config: Optional[Dict[str, Any]] = None,
                             display: bool = True, 
                             **kwargs) -> Optional[Dict[str, Any]]:
     """Initialize and optionally display the Dependency UI module."""
+    # Filter out conflicting display-related parameters from kwargs
+    filtered_kwargs = {k: v for k, v in kwargs.items() 
+                      if k not in ['display', 'show_display']}
+    
+    # Handle the case where display might be in kwargs (parameter conflict resolution)
+    final_display = kwargs.get('display', display)
+    
     return EnhancedUIModuleFactory.create_and_display(
         module_class=DependencyUIModule,
         config=config,
-        display=display,
-        **kwargs
+        display=final_display,
+        **filtered_kwargs
     )
 
 def get_dependency_components(config: Optional[Dict[str, Any]] = None, 

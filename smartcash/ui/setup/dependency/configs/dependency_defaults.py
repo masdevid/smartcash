@@ -58,7 +58,7 @@ def get_default_package_categories() -> Dict[str, Dict[str, Any]]:
     """Get default package categories untuk SmartCash"""
     base_categories = {
         'core_requirements': {
-            'name': 'Core Requirements',
+            'name': 'Kebutuhan Inti',
             'description': 'Package inti SmartCash',
             'icon': '🔧',
             'color': '#4CAF50',
@@ -99,8 +99,8 @@ def get_default_package_categories() -> Dict[str, Dict[str, Any]]:
         },
         
         'ml_ai_libraries': {
-            'name': 'ML/AI Libraries',
-            'description': 'Machine Learning frameworks',
+            'name': 'Pustaka ML/AI',
+            'description': 'Framework Machine Learning',
             'icon': '🤖',
             'color': '#2196F3',
             'packages': [
@@ -148,8 +148,8 @@ def get_default_package_categories() -> Dict[str, Dict[str, Any]]:
         },
         
         'data_processing': {
-            'name': 'Data Processing',
-            'description': 'Data manipulation tools',
+            'name': 'Pemrosesan Data',
+            'description': 'Alat manipulasi data',
             'icon': '📊',
             'color': '#9C27B0',
             'packages': [
@@ -205,8 +205,8 @@ def get_default_package_categories() -> Dict[str, Dict[str, Any]]:
         },
         
         'custom_packages': {
-            'name': 'Custom Packages',
-            'description': 'User-defined packages and repositories',
+            'name': 'Paket Kustom',
+            'description': 'Paket dan repositori yang didefinisikan pengguna',
             'icon': '📦',
             'color': '#607D8B',
             'packages': []  # Dynamic packages loaded from config
@@ -235,8 +235,8 @@ def get_default_package_categories() -> Dict[str, Dict[str, Any]]:
     additional_packages = requirements_categorized.get('additional_packages', [])
     if additional_packages:
         base_categories['additional_packages'] = {
-            'name': 'Additional Packages',
-            'description': 'Packages from requirements.txt not in standard categories',
+            'name': 'Paket Tambahan',
+            'description': 'Paket dari requirements.txt yang tidak dalam kategori standar',
             'icon': '📦',
             'color': '#607D8B',
             'packages': additional_packages

@@ -14,6 +14,15 @@ def safe_display(widget, fallback_print=True):
         widget: Widget or component to display
         fallback_print: Whether to fall back to print() if all display methods fail
     """
+    # Check if we're in an interactive environment (notebook/Colab)
+    try:
+        from IPython import get_ipython
+        if get_ipython() is None:
+            # Not in IPython environment, suppress display
+            return
+    except ImportError:
+        # IPython not available, suppress display
+        return
     try:
         # Try standard IPython display
         from IPython.display import display

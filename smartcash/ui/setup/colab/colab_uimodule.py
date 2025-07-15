@@ -58,6 +58,9 @@ class ColabUIModule(BaseUIModule):
         self._is_colab_environment = False
         self._environment_paths = {}
         
+        # Initialize log buffer for pre-operation-container logs
+        self._log_buffer = []
+        
         self.logger.debug("✅ ColabUIModule initialized")
     
     def get_default_config(self) -> Dict[str, Any]:
@@ -113,6 +116,9 @@ class ColabUIModule(BaseUIModule):
             if success:
                 # Setup operation manager after UI components are created
                 self._setup_operation_manager()
+                
+                # Flush any buffered logs to operation container
+                self._flush_log_buffer()
                 
                 # Log environment detection results (Operation Checklist 3.2)
                 env_type = "Google Colab" if self._is_colab_environment else "Lokal/Jupyter"
@@ -200,10 +206,27 @@ class ColabUIModule(BaseUIModule):
         self.register_operation_handler('detect_environment', self._handle_detect_environment)
         
         # Register button handlers (Operation Checklist 2.2)
-        self.register_button_handler('setup', self._handle_full_setup)
+        self.register_button_handler('colab_setup', self._handle_full_setup)
         self.register_button_handler('init', self._handle_init_environment)
         self.register_button_handler('mount_drive', self._handle_mount_drive)
         self.register_button_handler('verify', self._handle_verify_setup)
+    
+    def _flush_log_buffer(self) -> None:
+        """Flush buffered logs to operation container."""
+        try:
+            if not self._log_buffer:
+                return
+                
+            # Display all buffered logs to operation container
+            for log_entry in self._log_buffer:
+                message, level = log_entry
+                self.log(message, level)
+            
+            # Clear the buffer
+            self._log_buffer.clear()
+            
+        except Exception as e:
+            self.logger.debug(f"Failed to flush log buffer: {e}")
     
     # ==================== OPERATION HANDLERS ====================
     

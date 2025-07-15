@@ -171,7 +171,7 @@ def create_colab_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> Dict[s
         title=f"🚀 {UI_CONFIG['title']} Operations",
         show_save_reset=True  # Include save/reset for configuration
     )
-    ui_components['action_container'] = action_container['container']
+    ui_components['action_container'] = action_container
     
     # Extract button references
     ui_components['primary_button'] = action_container['primary_button']
@@ -309,7 +309,7 @@ def create_colab_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> Dict[s
     container_order = [
         ui_components.get('main_header_widget'),  # Use the widget, not the object
         ui_components.get('form_container'), 
-        ui_components.get('action_container')
+        ui_components.get('action_container', {}).get('container') if isinstance(ui_components.get('action_container'), dict) else ui_components.get('action_container')
     ]
     
     # Add summary container if enabled

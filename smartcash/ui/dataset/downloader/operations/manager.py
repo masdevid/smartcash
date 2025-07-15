@@ -84,7 +84,7 @@ class DownloaderOperationManager(OperationHandler):
             self.log("🔍 Checking dataset status", 'info')
             self.update_progress(0, "Checking dataset...")
             
-            result = await self.check_handler.execute()
+            result = await self.check_handler.execute_check()
             
             if result.get('success'):
                 count = result.get('count', 0)

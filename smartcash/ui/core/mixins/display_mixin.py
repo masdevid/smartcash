@@ -102,7 +102,10 @@ class DisplayMixin:
             
             if main_widget is None:
                 error_msg = "No main widget available for display"
-                if hasattr(self, 'logger'):
+                # Use self.log() method if available (supports buffering), otherwise use logger
+                if hasattr(self, 'log') and hasattr(self, '_ui_components') and self._ui_components and 'operation_container' in self._ui_components:
+                    self.log(error_msg, 'error')
+                elif hasattr(self, 'logger'):
                     self.logger.error(error_msg)
                 return {'success': False, 'message': error_msg}
             
@@ -117,14 +120,21 @@ class DisplayMixin:
                     'last_display_result': {'success': True}
                 })
                 
-                if hasattr(self, 'logger'):
-                    self.logger.info("✅ UI displayed successfully")
+                # Use self.log() method if available (supports buffering), otherwise suppress
+                if hasattr(self, 'log') and hasattr(self, '_ui_components') and self._ui_components and 'operation_container' in self._ui_components:
+                    self.log("✅ UI displayed successfully", 'info')
+                elif hasattr(self, 'logger'):
+                    # Use debug level to avoid console spam during testing
+                    self.logger.debug("✅ UI displayed successfully")
                 
                 return {'success': True, 'message': 'UI displayed successfully'}
                 
             except Exception as display_error:
                 error_msg = f"Failed to display UI: {str(display_error)}"
-                if hasattr(self, 'logger'):
+                # Use self.log() method if available (supports buffering), otherwise use logger
+                if hasattr(self, 'log') and hasattr(self, '_ui_components') and self._ui_components and 'operation_container' in self._ui_components:
+                    self.log(error_msg, 'error')
+                elif hasattr(self, 'logger'):
                     self.logger.error(error_msg)
                 
                 self._display_state['last_display_result'] = {
@@ -136,7 +146,10 @@ class DisplayMixin:
                 
         except Exception as e:
             error_msg = f"Display operation failed: {str(e)}"
-            if hasattr(self, 'logger'):
+            # Use self.log() method if available (supports buffering), otherwise use logger
+            if hasattr(self, 'log') and hasattr(self, '_ui_components') and self._ui_components and 'operation_container' in self._ui_components:
+                self.log(error_msg, 'error')
+            elif hasattr(self, 'logger'):
                 self.logger.error(error_msg)
             return {'success': False, 'message': error_msg}
     

@@ -188,8 +188,18 @@ class DisplayInitializer(BaseInitializer):
                 # Display the UI components
                 self._display_ui_component(ui_result)
                 
-                # Log successful initialization (now that logging is restored)
-                self.logger.info(f"✅ {self.module_name} UI displayed successfully")
+                # Log successful initialization to operation container if available
+                # Check if UI has operation container for proper log containment
+                if (hasattr(ui_result, 'get') and 
+                    ui_result and 
+                    'operation_container' in ui_result and 
+                    ui_result['operation_container'] and
+                    hasattr(ui_result['operation_container'], 'log')):
+                    # Use operation container logging
+                    ui_result['operation_container'].log(f"✅ {self.module_name} UI displayed successfully", 'info')
+                else:
+                    # Use regular logger only as fallback (may appear in console)
+                    self.logger.debug(f"✅ {self.module_name} UI displayed successfully")
                 
             except Exception as e:
                 # Display beautiful error component

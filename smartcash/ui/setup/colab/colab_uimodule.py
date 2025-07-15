@@ -477,11 +477,21 @@ def initialize_colab_ui(config: Optional[Dict[str, Any]] = None,
                        show_display: bool = True, 
                        **kwargs) -> Optional[Dict[str, Any]]:
     """Initialize and optionally display the Colab UI module."""
+    # Filter out conflicting display-related parameters from kwargs
+    filtered_kwargs = {k: v for k, v in kwargs.items() 
+                      if k not in ['display', 'show_display']}
+    
+    # Determine final display value - prioritize explicit 'display' parameter
+    if 'display' in kwargs:
+        final_display = kwargs['display']
+    else:
+        final_display = show_display
+    
     return EnhancedUIModuleFactory.create_and_display(
         module_class=ColabUIModule,
         config=config,
-        display=show_display,
-        **kwargs
+        display=final_display,
+        **filtered_kwargs
     )
 
 def get_colab_components(config: Optional[Dict[str, Any]] = None, 

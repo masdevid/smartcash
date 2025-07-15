@@ -286,12 +286,12 @@ def display_evaluation_ui(ui_components: Dict[str, Any]) -> None:
     def log_info(msg):
         if logger:
             logger.info(msg)
-        print(f"[INFO] {msg}")
+        # Remove direct print to prevent console output outside operation containers
         
     def log_error(msg, exc_info=False):
         if logger:
             logger.error(msg, exc_info=exc_info)
-        print(f"[ERROR] {msg}")
+        # Remove direct print to prevent console output outside operation containers
     
     log_info("🖥️ ===== Starting Evaluation UI Display =====")
     

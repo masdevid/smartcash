@@ -1,0 +1,15 @@
+---------------------------------------------------------------------------
+TypeError                                 Traceback (most recent call last)
+/tmp/ipython-input-2-3419058358.py in <cell line: 0>()
+      9 
+     10 # Initialize and display the UI
+---> 11 initialize_colab_ui(display=True)
+
+/content/smartcash/smartcash/ui/setup/colab/colab_uimodule.py in initialize_colab_ui(config, show_display, **kwargs)
+    478                        **kwargs) -> Optional[Dict[str, Any]]:
+    479     """Initialize and optionally display the Colab UI module."""
+--> 480     return EnhancedUIModuleFactory.create_and_display(
+    481         module_class=ColabUIModule,
+    482         config=config,
+
+TypeError: smartcash.ui.core.enhanced_ui_module_factory.EnhancedUIModuleFactory.create_and_display() got multiple values for keyword argument 'display'

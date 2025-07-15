@@ -50,6 +50,13 @@ class BaseOperationHandler(OperationHandler):
         packages = []
         
         try:
+            # First, check if explicit packages are provided in config
+            if self.config and 'explicit_packages' in self.config:
+                explicit_packages = self.config['explicit_packages']
+                if isinstance(explicit_packages, list):
+                    packages.extend(explicit_packages)
+                    return list(set(packages))  # Remove duplicates and return early
+            
             # Get selected packages from categories
             selected_packages = get_selected_packages(self.ui_components)
             packages.extend(selected_packages)

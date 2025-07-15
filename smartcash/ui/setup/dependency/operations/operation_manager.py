@@ -270,6 +270,10 @@ class DependencyOperationManager(OperationHandler):
             if progress_callback:
                 ui_components['progress_callback'] = progress_callback
                 
+            # Pass packages to config if provided
+            if packages:
+                self.config['explicit_packages'] = packages
+            
             install_handler = InstallOperationHandler(ui_components, self.config)
             
             # Execute the actual installation
@@ -307,6 +311,10 @@ class DependencyOperationManager(OperationHandler):
             if progress_callback:
                 ui_components['progress_callback'] = progress_callback
                 
+            # Pass packages to config if provided
+            if packages:
+                self.config['explicit_packages'] = packages
+            
             uninstall_handler = UninstallOperationHandler(ui_components, self.config)
             
             # Execute the actual uninstallation
@@ -344,6 +352,10 @@ class DependencyOperationManager(OperationHandler):
             if progress_callback:
                 ui_components['progress_callback'] = progress_callback
                 
+            # Pass packages to config if provided
+            if packages:
+                self.config['explicit_packages'] = packages
+            
             update_handler = UpdateOperationHandler(ui_components, self.config)
             
             # Execute the actual update
@@ -381,6 +393,10 @@ class DependencyOperationManager(OperationHandler):
             if progress_callback:
                 ui_components['progress_callback'] = progress_callback
                 
+            # Pass packages to config if provided
+            if packages:
+                self.config['explicit_packages'] = packages
+            
             check_handler = CheckStatusOperationHandler(ui_components, self.config)
             
             # Execute the actual status check

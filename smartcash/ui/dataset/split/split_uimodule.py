@@ -363,17 +363,10 @@ def register_split_shared_methods() -> None:
 # Create standardized display function using enhanced factory
 from smartcash.ui.core.enhanced_ui_module_factory import create_display_function
 
-def initialize_split_ui(config: Optional[Dict[str, Any]] = None, 
-                           display: bool = True, 
-                           **kwargs):
-    """Initialize and optionally display the Split UI module."""
-    return create_display_function(
-        module_class=SplitUIModule,
-        function_name="initialize_split_ui",
-        config=config,
-        display=display,
-        **kwargs
-    )
+initialize_split_ui = create_display_function(
+    module_class=SplitUIModule,
+    function_name="initialize_split_ui"
+)
 
 
 # Create standardized component function using enhanced factory

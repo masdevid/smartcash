@@ -424,7 +424,7 @@ class DependencyUIModule(BaseUIModule):
                     selected_packages.extend(custom_packages)
             
         except Exception as e:
-            self.logger.warning(f"Failed to get selected packages: {e}")
+            self.log(f"Failed to get selected packages: {e}", 'warning')
         
         return selected_packages
     

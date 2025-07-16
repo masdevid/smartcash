@@ -46,33 +46,34 @@ class LoggingMixin:
                     self._log_buffer.append((message, level))
                     return
             
-            # Try operation manager first
-            if hasattr(self, '_operation_manager') and self._operation_manager and hasattr(self._operation_manager, 'log'):
-                self._operation_manager.log(message, level)
-                return
-            
             # Try operation container directly
             if hasattr(self, '_ui_components') and self._ui_components:
                 operation_container = self._ui_components.get('operation_container')
                 if operation_container:
                     # Handle dict-style operation container
-                    if isinstance(operation_container, dict) and 'log' in operation_container:
-                        operation_container['log'](message, level)
-                        return
+                    if isinstance(operation_container, dict):
+                        if 'log_message' in operation_container:
+                            operation_container['log_message'](message, level)
+                            return
+                        elif 'log' in operation_container:  # For backward compatibility
+                            operation_container['log'](message, level)
+                            return
                     # Handle object-style operation container
-                    elif hasattr(operation_container, 'log'):
+                    elif hasattr(operation_container, 'log_message'):
+                        operation_container.log_message(message, level)
+                        return
+                    elif hasattr(operation_container, 'log'):  # For backward compatibility
                         operation_container.log(message, level)
                         return
             
             # Fallback to standard logger (use debug to minimize console output)
             if hasattr(self, 'logger'):
-                self.logger.debug(message)
+                self.logger.debug(f"[{level.upper()}] {message}")
                 
         except Exception as e:
             # Final fallback (use debug to minimize console output)
             if hasattr(self, 'logger'):
                 self.logger.debug(f"Failed to log message: {e}")
-                # Normalize level to string before calling upper()
                 level_str = level.name.lower() if hasattr(level, 'name') else str(level).lower()
                 self.logger.debug(f"[{level_str.upper()}] {message}")
             else:

@@ -139,39 +139,55 @@ class ConfigurationMixin(ABC):
     
     def reset_config(self) -> Dict[str, Any]:
         """
-        Reset configuration to defaults.
+        Reset configuration to defaults using the config handler.
         
         Returns:
-            Operation result dictionary
+            Dict with operation result
         """
         try:
-            if not self._config_handler:
-                raise RuntimeError("Config handler not available")
-            
-            # Get default configuration
-            default_config = self.get_default_config()
-            
-            # Update internal config
-            self._merged_config = default_config.copy()
-            
-            # Update config handler
-            if hasattr(self._config_handler, 'update_config'):
-                self._config_handler.update_config(default_config)
-            
-            # Sync to UI if components are available
-            if hasattr(self, '_ui_components') and self._ui_components:
-                if hasattr(self._config_handler, 'sync_to_ui'):
-                    self._config_handler.sync_to_ui(self._ui_components, default_config)
-            
-            if hasattr(self, 'logger'):
-                self.logger.info("✅ Configuration reset to defaults")
+            if not hasattr(self, '_config_handler') or not self._config_handler:
+                error_msg = "Configuration handler not available"
+                if hasattr(self, 'logger'):
+                    self.logger.error(f"❌ {error_msg}")
+                if hasattr(self, 'update_operation_status'):
+                    self.update_operation_status(error_msg, 'error')
+                return {'success': False, 'message': error_msg}
                 
-            return {'success': True, 'message': 'Configuration reset to defaults'}
+            # Delegate to config handler's reset_config
+            result = self._config_handler.reset_config()
+            
+            # Update internal state based on handler's result
+            if result.get('success', False):
+                self._merged_config = self._config_handler.get_current_config()
+                
+                # Sync UI if components are available
+                if hasattr(self, '_ui_components') and self._ui_components:
+                    if hasattr(self._config_handler, 'sync_to_ui'):
+                        self._config_handler.sync_to_ui(
+                            self._ui_components, 
+                            self._merged_config
+                        )
+                
+                success_msg = result.get('message', 'Configuration reset to defaults')
+                if hasattr(self, 'logger'):
+                    self.logger.info(f"✅ {success_msg}")
+                if hasattr(self, 'update_operation_status'):
+                    self.update_operation_status(success_msg, 'success')
+            else:
+                error_msg = result.get('message', 'Failed to reset configuration')
+                if hasattr(self, 'logger'):
+                    self.logger.error(f"❌ {error_msg}")
+                if hasattr(self, 'update_operation_status'):
+                    self.update_operation_status(error_msg, 'error')
+            
+            return result
             
         except Exception as e:
             error_msg = f"Failed to reset configuration: {str(e)}"
             if hasattr(self, 'logger'):
-                self.logger.error(error_msg)
+                self.logger.error(f"❌ {error_msg}")
+            if hasattr(self, 'update_operation_status'):
+                self.update_operation_status(error_msg, 'error')
             return {'success': False, 'message': error_msg}
     
     def load_config(self, config_path: str) -> Dict[str, Any]:

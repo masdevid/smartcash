@@ -206,7 +206,45 @@ class DependencyConfigHandler(LoggingMixin, ConfigurationMixin):
             return {'valid': False, 'message': error_msg}
     
     # ==================== CONFIGURATION OPERATIONS ====================
-    # Note: save_config() and reset_config() are provided by ConfigurationMixin
+    
+    def reset_config(self) -> Dict[str, Any]:
+        """
+        Reset configuration to defaults.
+        
+        Returns:
+            Dict with operation result
+        """
+        try:
+            # Get default configuration
+            default_config = self.get_default_config()
+            
+            # Update internal config
+            self._merged_config = default_config.copy()
+            
+            # Update config handler if it has update_config
+            if hasattr(self, 'update_config'):
+                self.update_config(default_config)
+            
+            # Sync UI if components are available
+            if hasattr(self, '_ui_components') and self._ui_components:
+                if hasattr(self, 'sync_to_ui'):
+                    self.sync_to_ui(self._ui_components, self._merged_config)
+            
+            self.logger.info("✅ Configuration reset to defaults")
+            return {
+                'success': True, 
+                'message': 'Configuration reset to defaults',
+                'config': self._merged_config
+            }
+            
+        except Exception as e:
+            error_msg = f"Failed to reset configuration: {str(e)}"
+            self.logger.error(f"❌ {error_msg}")
+            return {
+                'success': False, 
+                'message': error_msg,
+                'config': getattr(self, '_merged_config', {})
+            }
     
     # ==================== DEPENDENCY-SPECIFIC METHODS ====================
     

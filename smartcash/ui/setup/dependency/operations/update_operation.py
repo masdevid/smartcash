@@ -1,51 +1,50 @@
 """
-Handler for package update operations.
+Pure mixin-based handler for package update operations.
+Uses core mixins instead of inheritance.
 """
-from typing import Dict, Any, List, Tuple, Optional, Callable
+
+from typing import Dict, Any, List
 import time
 
-from smartcash.ui.core.handlers.operation_handler import ProgressLevel
 from .base_operation import BaseOperationHandler
 
 
 class UpdateOperationHandler(BaseOperationHandler):
-    """Handler for package update operations."""
+    """
+    Pure mixin-based handler for package update operations.
+    
+    Uses composition over inheritance with core mixins:
+    - LoggingMixin for operation logging
+    - ProgressTrackingMixin for progress updates  
+    - OperationMixin for operation management
+    """
     
     def __init__(self, ui_components: Dict[str, Any], config: Dict[str, Any]):
-        """Initialize update operation handler.
+        """
+        Initialize update operation handler with mixin pattern.
         
         Args:
             ui_components: Dictionary of UI components
             config: Configuration dictionary with update settings
         """
         super().__init__('update', ui_components, config)
-        self._cancelled = False
     
     def execute_operation(self) -> Dict[str, Any]:
-        """Execute package update.
+        """
+        Execute package update using mixin pattern.
         
         Returns:
             Dictionary with operation results
         """
-        self.log("🔄 Memeriksa pembaruan paket...", 'info')
+        self.log("⬆️ Memulai update paket...", 'info')
         self._cancelled = False
         
         try:
             # Get packages to update
             packages = self._get_packages_to_process()
             if not packages:
-                self.log("ℹ️ Tidak ada paket yang dipilih untuk diperbarui", 'info')
-                return {'success': True, 'updated': 0, 'total': 0}
-            
-            # Update config with current packages
-            selected, custom = self._categorize_packages(packages)
-            self.config.update({
-                'selected_packages': selected,
-                'custom_packages': '\n'.join(custom)
-            })
-            
-            # Save config to YAML file
-            self._save_config_to_file(self.config)
+                self.log("ℹ️ Tidak ada paket yang dipilih untuk diupdate", 'info')
+                return {'success': True, 'updated_count': 0, 'total': 0}
             
             # Execute update
             start_time = time.time()
@@ -57,72 +56,65 @@ class UpdateOperationHandler(BaseOperationHandler):
             total = len(results)
             
             if self._cancelled:
-                status_msg = f"⏹️ Pembaruan dibatalkan: {success_count}/{total} paket berhasil diperbarui"
+                status_msg = f"⏹️ Update dibatalkan: {success_count}/{total} paket berhasil diupdate"
                 self.log(status_msg, 'warning')
             elif success_count == total:
-                status_msg = f"✅ Berhasil memperbarui {success_count}/{total} paket dalam {duration:.1f} detik"
+                status_msg = f"✅ Berhasil mengupdate {success_count}/{total} paket dalam {duration:.1f} detik"
                 self.log(status_msg, 'success')
             else:
-                status_msg = f"⚠️ Berhasil memperbarui {success_count}/{total} paket dalam {duration:.1f} detik"
+                status_msg = f"⚠️ Berhasil mengupdate {success_count}/{total} paket dalam {duration:.1f} detik"
                 self.log(status_msg, 'warning')
             
             return {
                 'success': success_count > 0,
                 'cancelled': self._cancelled,
-                'updated': success_count,
+                'updated_count': success_count,  # Added for consistency with dependency module
                 'total': total,
                 'duration': duration,
                 'results': results
             }
             
         except KeyboardInterrupt:
-            self.log("⏹️ Pembaruan dibatalkan oleh pengguna", 'warning')
+            self.log("⏹️ Update dibatalkan oleh pengguna", 'warning')
             return {'success': False, 'cancelled': True, 'error': 'Dibatalkan oleh pengguna'}
             
         except Exception as e:
-            error_msg = f"Gagal memperbarui paket: {str(e)}"
+            error_msg = f"Gagal melakukan update: {str(e)}"
             self.log(error_msg, 'error')
             return {'success': False, 'error': error_msg}
     
-    def _categorize_packages(self, packages: List[str]) -> Tuple[List[str], List[str]]:
-        """Categorize packages into regular and custom (with version specifiers)."""
-        selected, custom = [], []
-        for pkg in packages:
-            (custom if any(c in pkg for c in '><=') else selected).append(pkg)
-        return selected, custom
-    
     def _update_packages(self, packages: List[str]) -> List[Dict[str, Any]]:
-        """Update multiple packages in parallel with progress tracking.
-        
-        Args:
-            packages: List of package names/requirements to update
-            
-        Returns:
-            List of update results with statistics
-        """
+        """Update multiple packages sequentially with progress tracking."""
         if not packages:
             return []
             
-        # Process packages in parallel with progress tracking
-        processed_results = self._process_packages(
-            packages,
-            self._update_single_package,
-            progress_message="Memperbarui paket",
-            max_workers=min(4, len(packages))  # Limit concurrent updates
-        )
+        results = []
+        total = len(packages)
         
-        # Extract and return the results - keep all results, don't filter by status
-        return processed_results['details']
+        for i, package in enumerate(packages, 1):
+            if self._cancelled:
+                break
+                
+            # Update progress using mixin method
+            self.update_progress(
+                (i / total) * 100,
+                f"Mengupdate paket {i}/{total}: {package}"
+            )
+            
+            result = self._update_single_package(package)
+            results.append(result)
+            
+            # Show result status
+            status = "✅" if result.get('success') else "❌"
+            self.update_progress(
+                (i / total) * 100,
+                f"Selesai {i}/{total}: {status} {package}"
+            )
+        
+        return results
     
     def _update_single_package(self, package: str) -> Dict[str, Any]:
-        """Update a single package.
-        
-        Args:
-            package: Package name or requirement specifier to update
-            
-        Returns:
-            Dictionary with update result
-        """
+        """Update a single package."""
         if self._cancelled:
             return {
                 'package': package,
@@ -134,14 +126,11 @@ class UpdateOperationHandler(BaseOperationHandler):
         start_time = time.time()
         
         # Build pip install --upgrade command
-        command = ["pip", "install", "--upgrade"]
-        if self.config.get('use_index_url'):
-            command.extend(["-i", self.config['index_url']])
-        command.append(package)
+        command = ["pip", "install", "--upgrade", package]
         
         try:
-            # Execute update (no verbose subprocess output)
-            result = self._execute_command(command, timeout=600)
+            # Execute update
+            result = self._execute_command(command)
             
             duration = time.time() - start_time
             
@@ -150,10 +139,10 @@ class UpdateOperationHandler(BaseOperationHandler):
                     'success': True,
                     'package': package,
                     'duration': duration,
-                    'message': f"Berhasil diperbarui dalam {duration:.1f} detik"
+                    'message': f"Berhasil diupdate dalam {duration:.1f} detik"
                 }
             else:
-                error_msg = result.get('stderr', result.get('stdout', 'Gagal memperbarui'))[:100]  # Limit error message length
+                error_msg = result.get('stderr', result.get('stdout', 'Gagal mengupdate'))[:100]
                 return {
                     'success': False,
                     'package': package,
@@ -169,52 +158,6 @@ class UpdateOperationHandler(BaseOperationHandler):
             return {
                 'success': False,
                 'package': package,
-                'error': str(e)[:100],  # Limit error message
+                'error': str(e)[:100],
                 'message': f"Kesalahan: {str(e)[:50]}"
             }
-    
-    def _save_config_to_file(self, config: Dict[str, Any]) -> None:
-        """Save configuration to dependency_config.yaml file."""
-        try:
-            import yaml
-            import os
-            
-            config_path = self._get_config_path('dependency_config.yaml')
-            
-            # Read existing config
-            if os.path.exists(config_path):
-                with open(config_path, 'r', encoding='utf-8') as f:
-                    existing_config = yaml.safe_load(f) or {}
-            else:
-                existing_config = {}
-            
-            # Update with new values
-            existing_config.update({
-                'selected_packages': config.get('selected_packages', []),
-                'custom_packages': config.get('custom_packages', '')
-            })
-            
-            # Write back to file
-            with open(config_path, 'w', encoding='utf-8') as f:
-                yaml.dump(existing_config, f, default_flow_style=False, allow_unicode=True)
-            
-            self.log(f"💾 Configuration saved to {config_path}", 'info')
-            
-        except Exception as e:
-            self.log(f"❌ Failed to save config: {str(e)}", 'error')
-
-    def cancel_operation(self) -> None:
-        """Cancel the current update operation."""
-        self._cancelled = True
-        self.log("Permintaan pembatalan diterima, menunggu proses saat ini selesai...", 'warning')
-    
-    def get_operations(self) -> Dict[str, Callable]:
-        """Get available operations for this handler.
-        
-        Returns:
-            Dictionary of operation name to callable mapping
-        """
-        return {
-            'execute': self.execute_operation,
-            'cancel': self.cancel_operation
-        }

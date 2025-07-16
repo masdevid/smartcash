@@ -1,42 +1,50 @@
 """
-Handler for package uninstallation operations.
+Pure mixin-based handler for package uninstallation operations.
+Uses core mixins instead of inheritance.
 """
-from typing import Dict, Any, List, Optional, Callable
-import re
+
+from typing import Dict, Any, List
 import time
 
-# Progress level import removed - not used in synchronous version
 from .base_operation import BaseOperationHandler
 
 
 class UninstallOperationHandler(BaseOperationHandler):
-    """Handler for package uninstallation operations."""
+    """
+    Pure mixin-based handler for package uninstallation operations.
+    
+    Uses composition over inheritance with core mixins:
+    - LoggingMixin for operation logging
+    - ProgressTrackingMixin for progress updates  
+    - OperationMixin for operation management
+    """
     
     def __init__(self, ui_components: Dict[str, Any], config: Dict[str, Any]):
-        """Initialize uninstall operation handler.
+        """
+        Initialize uninstall operation handler with mixin pattern.
         
         Args:
             ui_components: Dictionary of UI components
             config: Configuration dictionary with uninstallation settings
         """
         super().__init__('uninstall', ui_components, config)
-        self._cancelled = False
     
     def execute_operation(self) -> Dict[str, Any]:
-        """Execute package uninstallation synchronously.
+        """
+        Execute package uninstallation using mixin pattern.
         
         Returns:
             Dictionary with operation results
         """
-        self.log("🗑️ Memulai penghapusan paket...", 'info')
+        self.log("🗑️ Memulai uninstal paket...", 'info')
         self._cancelled = False
         
         try:
             # Get packages to uninstall
             packages = self._get_packages_to_process()
             if not packages:
-                self.log("ℹ️ Tidak ada paket yang dipilih untuk dihapus", 'info')
-                return {'success': True, 'uninstalled': 0, 'total': 0}
+                self.log("⚠️ Tidak ada paket yang dipilih untuk diuninstal", 'warning')
+                return {'success': False, 'error': 'Tidak ada paket yang dipilih'}
             
             # Execute uninstallation
             start_time = time.time()
@@ -47,70 +55,69 @@ class UninstallOperationHandler(BaseOperationHandler):
             success_count = sum(1 for r in results if r.get('success'))
             total = len(results)
             
-            # Update config by removing successfully uninstalled packages
-            if success_count > 0:
-                self._update_config_after_uninstall(results)
+            # Update config to track uninstalled packages
+            self._update_config_after_uninstall(packages)
             
             if self._cancelled:
-                status_msg = f"⏹️ Penghapusan dibatalkan: {success_count}/{total} paket berhasil dihapus"
+                status_msg = f"⏹️ Uninstal dibatalkan: {success_count}/{total} paket berhasil diuninstal"
                 self.log(status_msg, 'warning')
             elif success_count == total:
-                status_msg = f"✅ Berhasil menghapus {success_count}/{total} paket dalam {duration:.1f} detik"
+                status_msg = f"✅ Berhasil menguninstal {success_count}/{total} paket dalam {duration:.1f} detik"
                 self.log(status_msg, 'success')
             else:
-                status_msg = f"⚠️ Berhasil menghapus {success_count}/{total} paket dalam {duration:.1f} detik"
+                status_msg = f"⚠️ Berhasil menguninstal {success_count}/{total} paket dalam {duration:.1f} detik"
                 self.log(status_msg, 'warning')
             
             return {
                 'success': success_count > 0,
                 'cancelled': self._cancelled,
-                'uninstalled': success_count,
+                'uninstalled_count': success_count,  # Added for consistency with dependency module
                 'total': total,
                 'duration': duration,
                 'results': results
             }
             
         except KeyboardInterrupt:
-            self.log("⏹️ Penghapusan dibatalkan oleh pengguna", 'warning')
+            self.log("⏹️ Uninstal dibatalkan oleh pengguna", 'warning')
             return {'success': False, 'cancelled': True, 'error': 'Dibatalkan oleh pengguna'}
             
         except Exception as e:
-            error_msg = f"Gagal melakukan penghapusan: {str(e)}"
+            error_msg = f"Gagal melakukan uninstal: {str(e)}"
             self.log(error_msg, 'error')
             return {'success': False, 'error': error_msg}
     
     def _uninstall_packages(self, packages: List[str]) -> List[Dict[str, Any]]:
-        """Uninstall multiple packages sequentially with progress tracking.
-        
-        Args:
-            packages: List of package names to uninstall
-            
-        Returns:
-            List of uninstallation results
-        """
+        """Uninstall multiple packages sequentially with progress tracking."""
         if not packages:
             return []
             
-        # Process packages sequentially with progress tracking
-        processed_results = self._process_packages(
-            packages,
-            self._uninstall_single_package,
-            progress_message="Menghapus paket",
-            max_workers=min(4, len(packages))  # Limit concurrent uninstallations
-        )
+        results = []
+        total = len(packages)
         
-        # Extract and return the results - keep all results, don't filter by status
-        return processed_results['details']
+        for i, package in enumerate(packages, 1):
+            if self._cancelled:
+                break
+                
+            # Update progress using mixin method
+            self.update_progress(
+                (i / total) * 100,
+                f"Menguninstal paket {i}/{total}: {package}"
+            )
+            
+            result = self._uninstall_single_package(package)
+            results.append(result)
+            
+            # Show result status
+            status = "✅" if result.get('success') else "❌"
+            self.update_progress(
+                (i / total) * 100,
+                f"Selesai {i}/{total}: {status} {package}"
+            )
+        
+        return results
     
     def _uninstall_single_package(self, package: str) -> Dict[str, Any]:
-        """Uninstall a single package synchronously.
-        
-        Args:
-            package: Package name to uninstall
-            
-        Returns:
-            Dictionary with uninstallation result
-        """
+        """Uninstall a single package."""
         if self._cancelled:
             return {
                 'package': package,
@@ -121,34 +128,27 @@ class UninstallOperationHandler(BaseOperationHandler):
             
         start_time = time.time()
         
-        # For packages with version specifiers, extract just the package name
-        pkg_name = package.split('>')[0].split('<')[0].split('=')[0].strip()
-        
         # Build pip uninstall command
-        command = ["pip", "uninstall", "--yes", pkg_name]
+        command = ["pip", "uninstall", "-y", package]
         
         try:
-            # Execute uninstallation (no verbose subprocess output)
-            result = self._execute_command(command, timeout=300)
+            # Execute uninstallation
+            result = self._execute_command(command)
             
             duration = time.time() - start_time
             
-            # Check if uninstallation was successful or if package was not installed
-            is_success = result['success'] or 'not installed' in result.get('stderr', '')
-            
-            if is_success:
-                message = "Tidak terpasang" if 'not installed' in result.get('stderr', '') else f"Berhasil dihapus dalam {duration:.1f} detik"
+            if result['success']:
                 return {
                     'success': True,
-                    'package': pkg_name,
+                    'package': package,
                     'duration': duration,
-                    'message': message
+                    'message': f"Berhasil diuninstal dalam {duration:.1f} detik"
                 }
             else:
-                error_msg = result.get('stderr', result.get('stdout', 'Gagal menghapus'))[:100]  # Limit error message length
+                error_msg = result.get('stderr', result.get('stdout', 'Gagal menguninstal'))[:100]
                 return {
                     'success': False,
-                    'package': pkg_name,
+                    'package': package,
                     'error': error_msg,
                     'message': f"Gagal: {error_msg}"
                 }
@@ -160,13 +160,13 @@ class UninstallOperationHandler(BaseOperationHandler):
         except Exception as e:
             return {
                 'success': False,
-                'package': pkg_name,
-                'error': str(e)[:100],  # Limit error message
+                'package': package,
+                'error': str(e)[:100],
                 'message': f"Kesalahan: {str(e)[:50]}"
             }
     
-    def _update_config_after_uninstall(self, results: List[Dict[str, Any]]) -> None:
-        """Update config by removing successfully uninstalled packages."""
+    def _update_config_after_uninstall(self, packages: List[str]) -> None:
+        """Update configuration after uninstalling packages."""
         try:
             import yaml
             import os
@@ -180,46 +180,33 @@ class UninstallOperationHandler(BaseOperationHandler):
             else:
                 existing_config = {}
             
-            # Get successfully uninstalled packages
-            uninstalled_packages = [r['package'] for r in results if r.get('success')]
-            
-            # Get default packages to check which ones should be preserved
-            from ..configs.dependency_defaults import get_default_package_categories
-            default_categories = get_default_package_categories()
-            default_packages = set()
-            for category in default_categories.values():
-                for pkg in category.get('packages', []):
-                    if pkg.get('is_default', False):
-                        default_packages.add(pkg['name'])
-            
-            # Only remove non-default packages from selected_packages
+            # Get current lists
             selected_packages = existing_config.get('selected_packages', [])
-            updated_selected = [pkg for pkg in selected_packages 
-                              if pkg not in uninstalled_packages or pkg in default_packages]
-            
-            # Add uninstalled default packages to uninstalled_defaults list
             uninstalled_defaults = existing_config.get('uninstalled_defaults', [])
-            for pkg in uninstalled_packages:
-                if pkg in default_packages and pkg not in uninstalled_defaults:
-                    uninstalled_defaults.append(pkg)
             
-            # Remove from custom packages (these can be fully removed)
-            custom_packages = existing_config.get('custom_packages', '')
-            if custom_packages:
-                custom_lines = custom_packages.split('\n')
-                updated_custom_lines = []
-                for line in custom_lines:
-                    line = line.strip()
-                    if line and not any(pkg in line for pkg in uninstalled_packages):
-                        updated_custom_lines.append(line)
-                updated_custom = '\n'.join(updated_custom_lines)
-            else:
-                updated_custom = ''
+            # Remove uninstalled packages from selected_packages
+            updated_selected_packages = [pkg for pkg in selected_packages if pkg not in packages]
+            
+            # Add uninstalled packages to uninstalled_defaults if they were default packages
+            from ..configs.dependency_defaults import get_default_dependency_config
+            default_config = get_default_dependency_config()
+            default_categories = default_config.get('package_categories', {})
+            
+            # Check if any uninstalled packages were defaults
+            all_default_packages = set()
+            for category in default_categories.values():
+                for pkg_info in category.get('packages', []):
+                    if pkg_info.get('is_default', False):
+                        all_default_packages.add(pkg_info['name'])
+            
+            # Add uninstalled default packages to uninstalled_defaults
+            for pkg in packages:
+                if pkg in all_default_packages and pkg not in uninstalled_defaults:
+                    uninstalled_defaults.append(pkg)
             
             # Update config
             existing_config.update({
-                'selected_packages': updated_selected,
-                'custom_packages': updated_custom,
+                'selected_packages': updated_selected_packages,
                 'uninstalled_defaults': uninstalled_defaults
             })
             
@@ -227,23 +214,7 @@ class UninstallOperationHandler(BaseOperationHandler):
             with open(config_path, 'w', encoding='utf-8') as f:
                 yaml.dump(existing_config, f, default_flow_style=False, allow_unicode=True)
             
-            self.log(f"💾 Configuration updated after uninstalling {len(uninstalled_packages)} packages", 'info')
+            self.log(f"💾 Configuration updated after uninstallation", 'info')
             
         except Exception as e:
             self.log(f"❌ Failed to update config after uninstall: {str(e)}", 'error')
-
-    def cancel_operation(self) -> None:
-        """Cancel the current uninstallation operation."""
-        self._cancelled = True
-        self.log("Permintaan pembatalan diterima, menunggu proses saat ini selesai...", 'warning')
-    
-    def get_operations(self) -> Dict[str, Callable]:
-        """Get available operations for this handler.
-        
-        Returns:
-            Dictionary of operation name to callable mapping
-        """
-        return {
-            'execute': self.execute_operation,
-            'cancel': self.cancel_operation
-        }

@@ -45,18 +45,23 @@ class ButtonHandlerMixin:
                     self.logger.warning("Cannot setup button handlers - UI components not initialized")
                 return
             
-            # Get action container
-            action_container = self._ui_components.get('action_container')
-            if not action_container:
-                if hasattr(self, 'logger'):
-                    self.logger.warning("Action container not found in UI components")
-                return
+            # Try different container sources for buttons
+            buttons = {}
             
-            # Get buttons from action container
-            buttons = action_container.get('buttons', {})
+            # Method 1: Get from action container
+            action_container = self._ui_components.get('action_container')
+            if action_container and isinstance(action_container, dict):
+                buttons.update(action_container.get('buttons', {}))
+            
+            # Method 2: Get buttons directly from UI components (for individual button widgets)
+            button_keys = [key for key in self._ui_components.keys() if key.endswith('_button')]
+            for button_key in button_keys:
+                button_id = button_key.replace('_button', '')
+                buttons[button_id] = self._ui_components[button_key]
+            
             if not buttons:
                 if hasattr(self, 'logger'):
-                    self.logger.warning("No buttons found in action container")
+                    self.logger.warning("No buttons found in UI components")
                 return
             
             # Setup registered handlers
@@ -260,3 +265,120 @@ class ButtonHandlerMixin:
             Dictionary of button states
         """
         return self._button_states.copy()
+    
+    def disable_all_buttons(self, message: str = "⏳ Operation in progress...") -> Dict[str, Any]:
+        """
+        Disable all buttons and store their previous states.
+        
+        Args:
+            message: Message to display for operation buttons (save/reset keep original text)
+            
+        Returns:
+            Dictionary containing previous button states for restoration
+        """
+        try:
+            if not hasattr(self, '_ui_components') or not self._ui_components:
+                return {}
+            
+            button_states = {}
+            
+            # Get buttons from different sources
+            buttons = {}
+            
+            # Method 1: From action container
+            action_container = self._ui_components.get('action_container')
+            if action_container and isinstance(action_container, dict):
+                buttons.update(action_container.get('buttons', {}))
+            
+            # Method 2: Direct button widgets
+            button_keys = [key for key in self._ui_components.keys() if key.endswith('_button')]
+            for button_key in button_keys:
+                button_id = button_key.replace('_button', '')
+                buttons[button_id] = self._ui_components[button_key]
+            
+            # Disable each button and store its previous state
+            for button_id, button in buttons.items():
+                if button and hasattr(button, 'disabled') and hasattr(button, 'description'):
+                    # Store original state
+                    button_states[button_id] = {
+                        'disabled': button.disabled,
+                        'description': button.description
+                    }
+                    
+                    # Disable button
+                    button.disabled = True
+                    
+                    # Update description only for operation buttons, not save/reset
+                    if button_id not in ['save', 'reset']:
+                        button.description = message
+            
+            return button_states
+            
+        except Exception as e:
+            if hasattr(self, 'logger'):
+                self.logger.error(f"Error disabling buttons: {e}")
+            return {}
+    
+    def enable_all_buttons(self, button_states: Dict[str, Any] = None) -> None:
+        """
+        Re-enable all buttons and restore their previous states.
+        
+        Args:
+            button_states: Previous button states to restore
+        """
+        try:
+            if not button_states or not hasattr(self, '_ui_components') or not self._ui_components:
+                return
+            
+            # Get buttons from different sources
+            buttons = {}
+            
+            # Method 1: From action container
+            action_container = self._ui_components.get('action_container')
+            if action_container and isinstance(action_container, dict):
+                buttons.update(action_container.get('buttons', {}))
+            
+            # Method 2: Direct button widgets
+            button_keys = [key for key in self._ui_components.keys() if key.endswith('_button')]
+            for button_key in button_keys:
+                button_id = button_key.replace('_button', '')
+                buttons[button_id] = self._ui_components[button_key]
+            
+            # Restore all button states
+            for button_id, button_state in button_states.items():
+                button = buttons.get(button_id)
+                if button and hasattr(button, 'disabled'):
+                    # Restore original state
+                    button.disabled = button_state['disabled']
+                    if hasattr(button, 'description'):
+                        button.description = button_state['description']
+            
+        except Exception as e:
+            if hasattr(self, 'logger'):
+                self.logger.error(f"Error enabling buttons: {e}")
+                
+    def set_button_message(self, button_id: str, message: str) -> None:
+        """
+        Set message for a specific button.
+        
+        Args:
+            button_id: Button identifier
+            message: Message to set
+        """
+        try:
+            if hasattr(self, '_ui_components') and self._ui_components:
+                # Try direct button access first
+                button = self._ui_components.get(f'{button_id}_button')
+                if not button:
+                    # Try action container
+                    action_container = self._ui_components.get('action_container')
+                    if action_container and isinstance(action_container, dict):
+                        buttons = action_container.get('buttons', {})
+                        button = buttons.get(button_id)
+                
+                if button and hasattr(button, 'description'):
+                    button.description = message
+                    
+        except Exception as e:
+            if hasattr(self, 'logger'):
+                self.logger.debug(f"Failed to set button message for {button_id}: {e}")

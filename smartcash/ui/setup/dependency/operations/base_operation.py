@@ -1,74 +1,71 @@
 """
-Base operation handler for dependency management operations.
+Pure mixin-based operation handler for dependency operations.
+Uses composition over inheritance with core mixins.
 """
-from typing import Dict, Any, Optional, List, Callable
+
+from typing import Dict, Any, Optional, List, Callable, Tuple
 import subprocess
 import os
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-from smartcash.ui.core.errors.handlers import get_error_handler
-from smartcash.ui.core.handlers.operation_handler import OperationHandler
+from smartcash.ui.logger import get_module_logger
+from smartcash.ui.core.mixins.logging_mixin import LoggingMixin
+from smartcash.ui.core.mixins.progress_tracking_mixin import ProgressTrackingMixin
+from smartcash.ui.core.mixins.operation_mixin import OperationMixin
 
 
-class BaseOperationHandler(OperationHandler):
-    """Base class for dependency management operations.
+class BaseOperationHandler(LoggingMixin, ProgressTrackingMixin, OperationMixin):
+    """
+    Pure mixin-based operation handler for dependency operations.
     
-    This class extends OperationHandler to provide common functionality
-    for dependency management operations like install, update, and uninstall.
+    Uses composition over inheritance - no BaseHandler or OperationHandler inheritance chain.
+    This follows the mixin pattern used throughout the UI module system.
     """
     
     def __init__(self, operation_type: str, ui_components: Dict[str, Any], config: Dict[str, Any]):
-        """Initialize base operation handler.
+        """
+        Initialize operation handler with pure mixin pattern.
         
         Args:
             operation_type: Type of operation (install/update/uninstall/check_status)
             ui_components: Dictionary of UI components
             config: Configuration dictionary with operation settings
         """
-        # Extract operation container for parent constructor
-        operation_container = ui_components.get('operation_container')
+        # Initialize mixins
+        super().__init__()
         
-        # Pass operation container to parent constructor so logging works correctly
-        super().__init__(
-            module_name=operation_type, 
-            parent_module='dependency.setup', 
-            operation_container=operation_container
-        )
+        # Setup logger
+        self.logger = get_module_logger(f"smartcash.ui.setup.dependency.operations.{operation_type}")
         
+        # Core operation state
+        self.operation_type = operation_type
         self.ui_components = ui_components
         self.config = config
+        self._cancelled = False
         
-        # Initialize error handler safely
-        try:
-            self._error_handler = get_error_handler()
-        except Exception:
-            self._error_handler = None
+        # Module identification for mixins
+        self.module_name = f'dependency_{operation_type}'
+        self.parent_module = 'dependency.setup'
+        
+        # Set UI components for mixins
+        self._ui_components = ui_components
+        
+        # Set operation container for logging
+        if 'operation_container' in ui_components:
+            self._operation_container = ui_components['operation_container']
+        
+        self.logger.debug(f"✅ BaseOperationHandler initialized: {operation_type}")
     
     def _get_config_path(self, filename: str = 'dependency_config.yaml') -> str:
-        """Get environment-aware config file path.
-        
-        Args:
-            filename: Name of the config file
-            
-        Returns:
-            Full path to the config file
-        """
+        """Get environment-aware config file path."""
         try:
-            # Use the core-level config path function
             from smartcash.common.config.manager import get_environment_config_path
             return get_environment_config_path(filename)
         except Exception:
-            # Fallback to local development path on error
             return os.path.join('./configs', filename)
     
     def _get_packages_to_process(self) -> List[str]:
-        """Get list of packages to process based on current selection.
-        
-        Returns:
-            List of package names to process
-        """
-        from ..components.package_selector import get_selected_packages, get_custom_packages_text
-        
+        """Get list of packages to process based on current selection."""
         packages = []
         
         try:
@@ -79,18 +76,26 @@ class BaseOperationHandler(OperationHandler):
                     packages.extend(explicit_packages)
                     return list(set(packages))  # Remove duplicates and return early
             
-            # Get selected packages from categories
-            selected_packages = get_selected_packages(self.ui_components)
-            packages.extend(selected_packages)
+            # Get selected packages from UI components
+            if 'package_checkboxes' in self.ui_components:
+                checkboxes = self.ui_components['package_checkboxes']
+                for checkbox_list in checkboxes.values():
+                    for checkbox in checkbox_list:
+                        if hasattr(checkbox, 'value') and checkbox.value:
+                            if hasattr(checkbox, 'package_name'):
+                                packages.append(checkbox.package_name)
+                            elif hasattr(checkbox, 'description'):
+                                desc = checkbox.description
+                                if '(' in desc:
+                                    package_name = desc.split('(')[0].strip()
+                                    packages.append(package_name)
             
             # Get custom packages
-            custom_packages_text = get_custom_packages_text(self.ui_components)
-            
-            if custom_packages_text:
-                for line in custom_packages_text.split('\n'):
-                    line = line.strip()
-                    if line and not line.startswith('#'):
-                        packages.append(line)
+            if 'custom_packages' in self.ui_components:
+                custom_widget = self.ui_components['custom_packages']
+                if hasattr(custom_widget, 'value') and custom_widget.value.strip():
+                    custom_packages = [pkg.strip() for pkg in custom_widget.value.split(',') if pkg.strip()]
+                    packages.extend(custom_packages)
             
             return list(set(packages))  # Remove duplicates
             
@@ -106,18 +111,7 @@ class BaseOperationHandler(OperationHandler):
         progress_callback: Optional[Callable[[float, str], None]] = None,
         timeout: Optional[int] = None
     ) -> Dict[str, Any]:
-        """Execute a shell command with error handling and progress tracking.
-        
-        Args:
-            command: List of command arguments
-            cwd: Working directory for the command
-            env: Environment variables to use
-            progress_callback: Optional callback for progress updates
-            timeout: Optional timeout in seconds
-            
-        Returns:
-            Dictionary with command execution results
-        """
+        """Execute a shell command with error handling and progress tracking."""
         def run_command() -> Dict[str, Any]:
             try:
                 process = subprocess.Popen(
@@ -196,7 +190,6 @@ class BaseOperationHandler(OperationHandler):
                     'returncode': -1
                 }
         
-        # Execute the command synchronously
         return run_command()
     
     def _process_packages(
@@ -206,17 +199,7 @@ class BaseOperationHandler(OperationHandler):
         progress_message: str = "Processing packages",
         max_workers: int = 4
     ) -> Dict[str, Any]:
-        """Process multiple packages in parallel with progress tracking.
-        
-        Args:
-            packages: List of package names to process
-            process_func: Function to call for each package
-            progress_message: Base message for progress updates
-            max_workers: Maximum number of parallel workers
-            
-        Returns:
-            Dictionary with overall results
-        """
+        """Process multiple packages in parallel with progress tracking."""
         results = {
             'success': True,
             'processed': 0,
@@ -257,14 +240,9 @@ class BaseOperationHandler(OperationHandler):
                         results['failed'] += 1
                         results['success'] = False
                         
-                    # Update progress
+                    # Update progress using mixin method
                     progress = (processed / total) * 100
-                    self._update_progress(
-                        message=f"{progress_message}: {pkg} ({processed}/{total})",
-                        current=progress,
-                        total=100,
-                        level_name='secondary'
-                    )
+                    self.update_progress(progress, f"{progress_message}: {pkg} ({processed}/{total})")
                     
                 except Exception as e:
                     results['failed'] += 1
@@ -280,12 +258,74 @@ class BaseOperationHandler(OperationHandler):
         results['processed'] = processed
         return results
     
+    def _categorize_packages(self, packages: List[str]) -> Tuple[List[str], List[str]]:
+        """Categorize packages into regular and custom (with version specifiers)."""
+        selected: List[str] = []
+        custom: List[str] = []
+        for pkg in packages:
+            if any(c in pkg for c in '><='):
+                custom.append(pkg)
+            else:
+                selected.append(pkg)
+        return selected, custom
+    
+    def _save_config_to_file(self, config: Dict[str, Any]) -> None:
+        """Save configuration to dependency_config.yaml file."""
+        try:
+            import yaml
+            import os
+            
+            config_path = self._get_config_path('dependency_config.yaml')
+            
+            # Read existing config
+            if os.path.exists(config_path):
+                with open(config_path, 'r', encoding='utf-8') as f:
+                    existing_config = yaml.safe_load(f) or {}
+            else:
+                existing_config = {}
+            
+            # Remove successfully installed packages from uninstalled_defaults
+            uninstalled_defaults = existing_config.get('uninstalled_defaults', [])
+            selected_packages = config.get('selected_packages', [])
+            custom_packages = config.get('custom_packages', '')
+            
+            # Parse installed packages from both selected and custom
+            all_installed_packages = set(selected_packages)
+            if custom_packages:
+                for line in custom_packages.split('\n'):
+                    line = line.strip()
+                    if line and not line.startswith('#'):
+                        package_name = line.split('>')[0].split('<')[0].split('=')[0].strip()
+                        all_installed_packages.add(package_name)
+            
+            # Remove any installed packages from uninstalled_defaults
+            updated_uninstalled_defaults = [pkg for pkg in uninstalled_defaults 
+                                          if pkg not in all_installed_packages]
+            
+            # Update with new values
+            existing_config.update({
+                'selected_packages': selected_packages,
+                'custom_packages': custom_packages,
+                'uninstalled_defaults': updated_uninstalled_defaults
+            })
+            
+            # Write back to file
+            with open(config_path, 'w', encoding='utf-8') as f:
+                yaml.dump(existing_config, f, default_flow_style=False, allow_unicode=True)
+            
+            self.log(f"💾 Configuration saved to {config_path}", 'info')
+            
+        except Exception as e:
+            self.log(f"❌ Failed to save config: {str(e)}", 'error')
+    
+    def cancel_operation(self) -> None:
+        """Cancel the current operation."""
+        self._cancelled = True
+        self.log("Permintaan pembatalan diterima, menunggu proses saat ini selesai...", 'warning')
+    
     def get_operations(self) -> Dict[str, Callable]:
-        """Get available operations for this handler.
-        
-        Returns:
-            Dictionary of operation name to callable mapping
-        """
+        """Get available operations for this handler."""
         return {
-            'execute': self.execute_operation
+            'execute': self.execute_operation,
+            'cancel': self.cancel_operation
         }

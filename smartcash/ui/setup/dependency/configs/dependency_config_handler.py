@@ -1,46 +1,113 @@
 """
 File: smartcash/ui/setup/dependency/configs/dependency_config_handler.py
-Deskripsi: Config handler untuk dependency menggunakan proper inheritance
+Description: Pure mixin-based dependency config handler using core ConfigurationMixin.
+Uses composition over inheritance for better flexibility and testability.
 """
 
 from typing import Dict, Any, List, Optional
-from pathlib import Path
-import copy
+from datetime import datetime
 
-from smartcash.ui.core.handlers.config_handler import SharedConfigHandler
+from smartcash.ui.core.mixins.configuration_mixin import ConfigurationMixin
+from smartcash.ui.core.mixins.logging_mixin import LoggingMixin
+from smartcash.ui.logger import get_module_logger
 from .dependency_defaults import get_default_dependency_config
 
-class DependencyConfigHandler(SharedConfigHandler):
-    """Handler untuk dependency config dengan shared config support"""
+
+class DependencyConfigHandler(LoggingMixin, ConfigurationMixin):
+    """
+    Pure mixin-based config handler for dependency management.
+    
+    Uses composition over inheritance - no BaseHandler inheritance chain.
+    This follows the mixin pattern used throughout the UI module system.
+    """
     
     def __init__(self, default_config: Optional[Dict[str, Any]] = None):
-        # Use provided default_config or fall back to default dependency config
-        if default_config is None:
-            default_config = get_default_dependency_config()
+        """
+        Initialize dependency config handler using core mixins.
         
-        super().__init__(
-            module_name='dependency',
-            parent_module='setup',
-            default_config=default_config,
-            enable_sharing=True
-        )
+        Args:
+            default_config: Optional default configuration
+        """
+        # Initialize mixins (LoggingMixin and ConfigurationMixin)
+        super().__init__()
+        
+        # Module identification for LoggingMixin
+        self.module_name = 'dependency'
+        self.parent_module = 'setup'
+        
+        # Initialize logger
+        self.logger = get_module_logger('smartcash.ui.setup.dependency.configs.dependency_config_handler')
+        
+        # Store default config for get_default_config() method
+        self._default_config = default_config or get_default_dependency_config()
+        
+        # Initialize config handler with default config
+        self._initialize_config_handler()
+        
+        self.logger.debug("✅ DependencyConfigHandler initialized (using core LoggingMixin + ConfigurationMixin)")
+    
+    # ==================== ABSTRACT METHOD IMPLEMENTATIONS ====================
+    
+    def get_default_config(self) -> Dict[str, Any]:
+        """Get default configuration for dependency module (ConfigurationMixin requirement)."""
+        return self._default_config.copy()
+    
+    def create_config_handler(self, config: Dict[str, Any]) -> 'DependencyConfigHandler':
+        """Create config handler instance (ConfigurationMixin requirement)."""
+        # Return self since we are the config handler
+        return self
+    
+    # ==================== CONFIGURATION ACCESS METHODS ====================
+    
+    def update_config(self, updates: Dict[str, Any]) -> None:
+        """Update configuration with new values."""
+        # Use ConfigurationMixin methods
+        for key, value in updates.items():
+            self.update_config_value(key, value)
+    
+    # ==================== UI INTEGRATION ====================
+    
+    def set_ui_components(self, ui_components: Dict[str, Any]) -> None:
+        """
+        Set UI components for configuration extraction.
+        
+        Args:
+            ui_components: Dictionary of UI components
+        """
+        self._ui_components = ui_components
+        self.logger.debug(f"UI components set: {list(ui_components.keys()) if ui_components else 'None'}")
     
     def extract_config_from_ui(self) -> Dict[str, Any]:
-        """Extract configuration from UI components."""
+        """
+        Extract configuration from UI components.
+        
+        Returns:
+            Extracted configuration dictionary
+        """
         try:
-            if not hasattr(self, '_ui_components') or not self._ui_components:
+            if not self._ui_components:
                 self.logger.debug("No UI components available for extraction")
-                return self.config.copy()
+                return self.get_current_config()
+            
+            # Start with current config from ConfigurationMixin
+            extracted_config = self.get_current_config()
             
             # Extract selected packages from checkboxes
             selected_packages = []
             if 'package_checkboxes' in self._ui_components:
                 checkboxes = self._ui_components['package_checkboxes']
-                for category, checkbox_list in checkboxes.items():
+                for checkbox_list in checkboxes.values():
                     for checkbox in checkbox_list:
                         if hasattr(checkbox, 'value') and checkbox.value:
+                            # Try to get package name
                             if hasattr(checkbox, 'package_name'):
                                 selected_packages.append(checkbox.package_name)
+                            elif hasattr(checkbox, 'description'):
+                                # Fallback: extract from description
+                                desc = checkbox.description
+                                if '(' in desc:
+                                    package_name = desc.split('(')[0].strip()
+                                    selected_packages.append(package_name)
             
             # Extract custom packages
             custom_packages = ""
@@ -49,47 +116,73 @@ class DependencyConfigHandler(SharedConfigHandler):
                 if hasattr(custom_widget, 'value'):
                     custom_packages = custom_widget.value.strip()
             
-            # Create config with extracted values
-            extracted_config = self.config.copy()
+            # Extract install options if available
+            install_options = {}
+            if 'install_options' in self._ui_components:
+                options_widget = self._ui_components['install_options']
+                if hasattr(options_widget, 'value'):
+                    install_options = options_widget.value or {}
+            
+            # Update extracted config
             extracted_config.update({
                 'selected_packages': selected_packages,
-                'custom_packages': custom_packages
+                'custom_packages': custom_packages,
+                'install_options': install_options,
+                'last_extracted': datetime.now().isoformat()
             })
             
-            self.logger.debug(f"Extracted config: {len(selected_packages)} packages, custom: '{custom_packages}'")
+            self.logger.debug(
+                f"Extracted config: {len(selected_packages)} selected packages, "
+                f"custom: '{custom_packages[:50]}...'"
+            )
+            
             return extracted_config
             
         except Exception as e:
             self.logger.error(f"Failed to extract config from UI: {e}")
-            return self.config.copy()
+            return self.get_current_config()
     
-    def set_ui_components(self, ui_components: Dict[str, Any]) -> None:
-        """Set UI components for extraction."""
-        self._ui_components = ui_components
+    # ==================== VALIDATION ====================
     
     def validate_config(self, config: Dict[str, Any]) -> Dict[str, Any]:
-        """Validate dependency configuration"""
+        """
+        Validate dependency configuration.
+        
+        Args:
+            config: Configuration to validate
+            
+        Returns:
+            Validation result with 'valid' and 'message' keys
+        """
         try:
-            # Validate required keys
-            required_keys = ['module_name', 'selected_packages', 'custom_packages']
+            # Check required keys
+            required_keys = ['selected_packages', 'custom_packages']
             for key in required_keys:
                 if key not in config:
                     error_msg = f"Missing required key: {key}"
                     self.logger.error(f"❌ {error_msg}")
                     return {'valid': False, 'message': error_msg}
             
-            # Validate selected_packages adalah list
+            # Validate selected_packages is list
             if not isinstance(config['selected_packages'], list):
                 error_msg = "selected_packages must be a list"
                 self.logger.error(f"❌ {error_msg}")
                 return {'valid': False, 'message': error_msg}
             
-            # Validate custom_packages adalah string
+            # Validate custom_packages is string
             if not isinstance(config['custom_packages'], str):
                 error_msg = "custom_packages must be a string"
                 self.logger.error(f"❌ {error_msg}")
                 return {'valid': False, 'message': error_msg}
             
+            # Validate package names (basic validation)
+            for package in config['selected_packages']:
+                if not isinstance(package, str) or not package.strip():
+                    error_msg = f"Invalid package name: {package}"
+                    self.logger.error(f"❌ {error_msg}")
+                    return {'valid': False, 'message': error_msg}
+            
+            self.logger.debug("✅ Configuration validation passed")
             return {'valid': True, 'message': 'Configuration is valid'}
             
         except Exception as e:
@@ -97,20 +190,32 @@ class DependencyConfigHandler(SharedConfigHandler):
             self.logger.error(f"❌ {error_msg}")
             return {'valid': False, 'message': error_msg}
     
+    # ==================== CONFIGURATION OPERATIONS ====================
+    # Note: save_config() and reset_config() are provided by ConfigurationMixin
+    
+    # ==================== DEPENDENCY-SPECIFIC METHODS ====================
+    
     def add_selected_package(self, package_name: str) -> bool:
-        """Add package ke selected_packages"""
+        """
+        Add package to selected packages.
+        
+        Args:
+            package_name: Name of package to add
+            
+        Returns:
+            True if successful
+        """
         try:
-            config = self.config.copy()
-            selected_packages = config.get('selected_packages', [])
+            selected_packages = self.get_config_value('selected_packages', [])
             
             if package_name not in selected_packages:
                 selected_packages.append(package_name)
-                config['selected_packages'] = selected_packages
-                self.config = config  # Trigger save and broadcast
+                self.update_config_value('selected_packages', selected_packages)
                 
-                self.logger.info(f"✅ Package '{package_name}' ditambahkan ke selected")
+                self.logger.info(f"✅ Package '{package_name}' added to selection")
                 return True
             
+            self.logger.debug(f"Package '{package_name}' already selected")
             return True
             
         except Exception as e:
@@ -118,19 +223,26 @@ class DependencyConfigHandler(SharedConfigHandler):
             return False
     
     def remove_selected_package(self, package_name: str) -> bool:
-        """Remove package dari selected_packages"""
+        """
+        Remove package from selected packages.
+        
+        Args:
+            package_name: Name of package to remove
+            
+        Returns:
+            True if successful
+        """
         try:
-            config = self.config.copy()
-            selected_packages = config.get('selected_packages', [])
+            selected_packages = self.get_config_value('selected_packages', [])
             
             if package_name in selected_packages:
                 selected_packages.remove(package_name)
-                config['selected_packages'] = selected_packages
-                self.config = config  # Trigger save and broadcast
+                self.update_config_value('selected_packages', selected_packages)
                 
-                self.logger.info(f"✅ Package '{package_name}' dihapus dari selected")
+                self.logger.info(f"✅ Package '{package_name}' removed from selection")
                 return True
             
+            self.logger.debug(f"Package '{package_name}' not in selection")
             return True
             
         except Exception as e:
@@ -138,43 +250,56 @@ class DependencyConfigHandler(SharedConfigHandler):
             return False
     
     def update_custom_packages(self, custom_packages: str) -> bool:
-        """Update custom packages string"""
-        try:
-            config = self.config.copy()
-            config['custom_packages'] = custom_packages
-            self.config = config  # Trigger save and broadcast
+        """
+        Update custom packages string.
+        
+        Args:
+            custom_packages: Custom packages string
             
-            self.logger.info("✅ Custom packages berhasil diupdate")
+        Returns:
+            True if successful
+        """
+        try:
+            self.update_config_value('custom_packages', custom_packages)
+            self.logger.info("✅ Custom packages updated successfully")
             return True
             
         except Exception as e:
             self.logger.error(f"❌ Error updating custom packages: {e}")
             return False
     
+    # ==================== UTILITY METHODS ====================
+    
     def get_selected_packages(self) -> List[str]:
-        """Get list selected packages"""
-        return self.config.get('selected_packages', [])
+        """Get list of selected packages."""
+        return self.get_config_value('selected_packages', [])
     
     def get_custom_packages(self) -> str:
-        """Get custom packages string"""
-        return self.config.get('custom_packages', '')
+        """Get custom packages string."""
+        return self.get_config_value('custom_packages', '')
     
     def get_install_options(self) -> Dict[str, Any]:
-        """Get install options"""
-        return self.config.get('install_options', {})
+        """Get installation options."""
+        return self.get_config_value('install_options', {})
     
     def get_ui_settings(self) -> Dict[str, Any]:
-        """Get UI settings"""
-        return self.config.get('ui_settings', {})
+        """Get UI settings."""
+        return self.get_config_value('ui_settings', {})
     
     def get_package_count(self) -> int:
-        """Get total package count"""
+        """Get total package count (selected + custom)."""
         selected_count = len(self.get_selected_packages())
-        custom_count = len([line.strip() for line in self.get_custom_packages().split('\n') if line.strip()])
+        custom_packages = self.get_custom_packages()
+        custom_count = len([line.strip() for line in custom_packages.split('\n') if line.strip()])
         return selected_count + custom_count
     
     def get_all_packages_list(self) -> List[str]:
-        """Get combined list of all packages"""
+        """
+        Get combined list of all packages (selected + custom).
+        
+        Returns:
+            List of all package names
+        """
         packages = []
         
         # Add selected packages
@@ -186,17 +311,27 @@ class DependencyConfigHandler(SharedConfigHandler):
             for line in custom_packages.split('\n'):
                 line = line.strip()
                 if line and not line.startswith('#'):
-                    # Extract package name dari version spec
+                    # Extract package name from version specification
                     pkg_name = line.split('==')[0].split('>=')[0].split('<=')[0].split('>')[0].split('<')[0].strip()
                     if pkg_name:
                         packages.append(pkg_name)
         
         return list(set(packages))  # Remove duplicates
     
-    def get_config(self) -> Dict[str, Any]:
-        """Get current configuration.
+    def get_config_summary(self) -> Dict[str, Any]:
+        """
+        Get configuration summary for display.
         
         Returns:
-            Current configuration dictionary
+            Configuration summary
         """
-        return self.config.copy()
+        current_config = self.get_current_config()
+        return {
+            'handler_type': 'core_mixin_based',
+            'inheritance_chain': ['DependencyConfigHandler', 'LoggingMixin', 'ConfigurationMixin'],
+            'total_packages': self.get_package_count(),
+            'selected_packages': len(self.get_selected_packages()),
+            'custom_packages': len([line.strip() for line in self.get_custom_packages().split('\n') if line.strip()]),
+            'has_install_options': bool(self.get_install_options()),
+            'last_updated': current_config.get('last_saved', 'Never')
+        }

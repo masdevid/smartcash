@@ -23,7 +23,110 @@ This document outlines the refactoring of UI modules to use a standardized base 
 
 ## Core Components
 
+### Key Patterns from Dependency Module
+
+#### 1. Environment-Aware Initialization
+```python
+def _setup_environment(self) -> None:
+    """Setup environment management using EnvironmentManager."""
+    try:
+        # Use standardized environment manager
+        self._environment_manager = get_environment_manager(logger=self.logger)
+        
+        # Get appropriate paths for current environment
+        self._environment_paths = get_paths_for_environment(
+            is_colab=self._environment_manager.is_colab,
+            is_drive_mounted=self._environment_manager.is_drive_mounted if self._environment_manager.is_colab else False
+        )
+        
+    except Exception as e:
+        self.logger.error(f"Failed to setup environment: {e}")
+        # Fallback to default paths
+        self._environment_paths = {
+            'data_root': 'data',
+            'config': './smartcash/configs'
+        }
+```
+
+#### 2. Singleton Pattern with Module Instance
+```python
+# Global module instance for singleton pattern
+_dependency_module_instance = None
+
+def create_dependency_uimodule(
+    config: Optional[Dict[str, Any]] = None,
+    auto_initialize: bool = True,
+    **kwargs
+) -> 'DependencyUIModule':
+    """Create a new Dependency UIModule instance."""
+    global _dependency_module_instance
+    if _dependency_module_instance is None:
+        _dependency_module_instance = DependencyUIModule()
+        if auto_initialize:
+            _dependency_module_instance.initialize(config=config, **kwargs)
+    return _dependency_module_instance
+
+def get_dependency_uimodule() -> 'DependencyUIModule':
+    """Get the current Dependency UIModule instance."""
+    if _dependency_module_instance is None:
+        return create_dependency_uimodule()
+    return _dependency_module_instance
+```
+
+#### 3. Shared Methods Registration
+```python
+def register_dependency_shared_methods() -> None:
+    """Register shared methods for Dependency module."""
+    try:
+        from smartcash.ui.core.ui_module import SharedMethodRegistry
+        
+        # Register Dependency-specific shared methods
+        SharedMethodRegistry.register_method(
+            'dependency.get_package_status',
+            lambda pkg: get_package_status_for_package(pkg),
+            description='Get package installation status'
+        )
+        
+        logger = get_module_logger("smartcash.ui.setup.dependency.shared")
+        logger.debug("📋 Registered Dependency shared methods")
+        
+    except Exception as e:
+        logger = get_module_logger("smartcash.ui.setup.dependency.shared")
+        logger.error(f"Failed to register shared methods: {e}")
+```
+
+#### 4. Factory Functions with Auto-Initialization
+```python
+def display_dependency_ui(
+    config: Optional[Dict[str, Any]] = None, 
+    **kwargs
+) -> Dict[str, Any]:
+    """Display Dependency UI and return components."""
+    module = create_dependency_uimodule(config=config, **kwargs)
+    return module.display_ui()
+```
+
 ### 1. Mixins (`/smartcash/ui/core/mixins/`)
+
+#### Logger Initialization in Mixins
+When using `LoggingMixin`, ensure proper logger initialization in `__init__`:
+
+```python
+def __init__(self):
+    super().__init__()
+    self.logger = get_module_logger(f"smartcash.ui.setup.module_name")
+    self._ui_logging_bridge_setup = False
+    self._log_buffer = []
+```
+
+#### Configuration Handler Pattern
+```python
+def create_config_handler(self, config: Dict[str, Any]) -> Any:
+    """Create and return a module-specific config handler."""
+    handler = ModuleConfigHandler(config)
+    # Additional handler setup if needed
+    return handler
+```
 - **`ConfigurationMixin`**: Config merging, save/reset, validation
 - **`OperationMixin`**: Operation handling, error formatting, decorators
 - **`LoggingMixin`**: Operation container logging with fallbacks
@@ -85,6 +188,28 @@ def __init__(self):
 ```
 
 #### Step 3: Implement Required Abstract Methods
+
+```python
+def get_default_config(self) -> Dict[str, Any]:
+    """Return default configuration for the module."""
+    return get_default_module_config()
+
+def create_config_handler(self, config: Dict[str, Any]) -> Any:
+    """Create and return a module-specific config handler."""
+    return ModuleConfigHandler(config)
+
+def create_ui_components(self, config: Dict[str, Any]) -> Dict[str, Any]:
+    """Create and return UI components."""
+    try:
+        self.logger.debug("Creating UI components...")
+        ui_components = create_module_ui_components(module_config=config)
+        if not ui_components:
+            raise RuntimeError("Failed to create UI components")
+        return ui_components
+    except Exception as e:
+        self.logger.error(f"Failed to create UI components: {e}")
+        raise
+```
 ```python
 def get_default_config(self) -> Dict[str, Any]:
     return get_default_your_config()
@@ -186,6 +311,33 @@ def _register_default_operations(self):
 - `validate_all()` → `Dict[str, Any]`
 - `@requires_initialization`, `@requires_config_handler`, `@requires_ui_components`
 
+## Best Practices from Dependency Module
+
+1. **Environment Handling**
+   - Use `get_environment_manager()` for environment detection
+   - Store environment-specific paths in `_environment_paths`
+   - Handle both Colab and local environments gracefully
+
+2. **Error Handling**
+   - Use specific exception handling for critical sections
+   - Provide fallback behavior when possible
+   - Log errors with sufficient context
+
+3. **Logging**
+   - Initialize logger with module path
+   - Use appropriate log levels (debug, info, warning, error)
+   - Include emojis for better log readability
+
+4. **Configuration**
+   - Use `ConfigurationMixin` for config management
+   - Implement `get_default_config()` for default values
+   - Validate config values before use
+
+5. **UI Components**
+   - Define required components in `_required_components`
+   - Use consistent naming for UI elements
+   - Document component purposes in docstrings
+
 ## Testing
 
 After refactoring, test that:
@@ -196,14 +348,6 @@ After refactoring, test that:
 5. Progress tracking works (if applicable)
 6. All module-specific operations work
 
-## Benefits
-
-- **90% code reduction** in common functionality
-- **Consistent behavior** across all modules
-- **Easier maintenance** - fix once, apply everywhere
-- **Better error handling** - standardized patterns
-- **Improved testing** - test common functionality once
-- **Faster development** - less boilerplate for new modules
 
 ## Example: Before vs After
 
@@ -247,18 +391,21 @@ class SplitUIModule(BaseUIModule):
     # Only module-specific methods remain
 ```
 
-## Status
-
-- ✅ **Completed**: Core mixins and base class
-- ✅ **Completed**: Enhanced factory
-- ✅ **Completed**: Split module refactoring
-- ⏳ **Pending**: Other UI modules
-- ⏳ **Pending**: Full test coverage
-
 ## Next Steps
 
-1. Refactor remaining UI modules using this checklist
-2. Update all `*_uimodule.py` files to use `BaseUIModule`
-3. Test each refactored module thoroughly
-4. Update documentation and examples
-5. Remove deprecated code patterns
+1. **Module Refactoring**
+   - [ ] Audit all `*_uimodule.py`, `*_config_handler.py`, `*_operations.py` files for migration readiness
+   - [ ] Create a migration plan for each module 
+
+2. **Testing Strategy**
+   - [ ] Develop comprehensive test cases for each mixin
+   - [ ] Create integration tests for module initialization
+
+3. **Documentation**
+   - [ ] Update this documentation for all mixins
+   - [ ] Document best practices for new modules
+
+4. **Deprecation & Cleanup**
+   - [ ] Mark deprecated methods with `@deprecated` decorator
+   - [ ] Update all examples to use new patterns
+   - [ ] Remove deprecated code patterns

@@ -150,8 +150,7 @@ class DependencyUIModule(BaseUIModule):
             }
     
     
-    # Removed redundant _connect_save_reset_buttons() method
-    # Button connection is handled automatically by ButtonHandlerMixin
+    # Button connection is handled automatically by ButtonHandlerMixin in BaseUIModule
     
     def _log_initialization_complete(self) -> None:
         """Log initialization completion to operation container (after it's ready)."""
@@ -169,39 +168,19 @@ class DependencyUIModule(BaseUIModule):
             # Use logger fallback if operation container logging fails
             self.logger.debug(f"Post-initialization logging failed: {e}")
     
-    # Removed redundant log() and update_operation_status() methods
-    # These are already provided by LoggingMixin and OperationMixin from BaseUIModule
+    # log() and update_operation_status() methods are provided by LoggingMixin and OperationMixin from BaseUIModule
     
-    # Removed redundant save_config(), reset_config(), _handle_save_config(), and _handle_reset_config() methods
-    # These are already provided by ConfigurationMixin and BaseUIModule
+    # save_config(), reset_config(), _handle_save_config(), and _handle_reset_config() methods
+    # are provided by ConfigurationMixin and BaseUIModule
     
     def start_progress(self, message: str, total: int = 100) -> None:
         """Override start_progress to ensure progress tracker is visible."""
         try:
-            # Call parent method
+            # Call parent method which handles initialization
             super().start_progress(message, total)
             
-            # Ensure progress tracker is initialized and visible
-            if hasattr(self, '_ui_components') and self._ui_components:
-                operation_container = self._ui_components.get('operation_container')
-                if operation_container:
-                    # Try to find and initialize progress tracker
-                    if hasattr(operation_container, 'progress_tracker'):
-                        progress_tracker = operation_container.progress_tracker
-                        if hasattr(progress_tracker, 'initialize'):
-                            progress_tracker.initialize()
-                        if hasattr(progress_tracker, 'show'):
-                            progress_tracker.show()
-                    # Alternative: look for progress tracker in children
-                    elif hasattr(operation_container, 'children'):
-                        for child in operation_container.children:
-                            if hasattr(child, 'progress_tracker'):
-                                progress_tracker = child.progress_tracker
-                                if hasattr(progress_tracker, 'initialize'):
-                                    progress_tracker.initialize()
-                                if hasattr(progress_tracker, 'show'):
-                                    progress_tracker.show()
-                                break
+            # Additional logging for dependency module
+            self.log(f"📊 Progress started: {message}", 'info')
                 
         except Exception as e:
             if hasattr(self, 'logger'):
@@ -210,11 +189,12 @@ class DependencyUIModule(BaseUIModule):
     def update_progress(self, progress: int, message: str = "", level: str = "info") -> None:
         """Override update_progress to ensure progress tracker is visible."""
         try:
-            # Call parent method
+            # Call parent method which handles progress updates
             super().update_progress(progress, message, level)
             
-            # Additional logging for visibility
-            self.log(f"📊 Progress: {progress}% - {message}", level)
+            # Additional logging for visibility in dependency module
+            if message:
+                self.log(f"📊 Progress: {progress}% - {message}", level)
             
         except Exception as e:
             if hasattr(self, 'logger'):
@@ -470,7 +450,7 @@ class DependencyUIModule(BaseUIModule):
     # ==================== OPERATION EXECUTION METHODS ====================
     
     def _execute_install_operation(self, packages: List[str]) -> Dict[str, Any]:
-        """Execute installation operation using operation handlers."""
+        """Execute installation operation using mixin-based handlers."""
         try:
             from smartcash.ui.setup.dependency.operations.install_operation import InstallOperationHandler
             
@@ -503,7 +483,7 @@ class DependencyUIModule(BaseUIModule):
             return {'success': False, 'error': str(e)}
     
     def _execute_uninstall_operation(self, packages: List[str]) -> Dict[str, Any]:
-        """Execute uninstallation operation using operation handlers."""
+        """Execute uninstallation operation using mixin-based handlers."""
         try:
             from smartcash.ui.setup.dependency.operations.uninstall_operation import UninstallOperationHandler
             
@@ -536,7 +516,7 @@ class DependencyUIModule(BaseUIModule):
             return {'success': False, 'error': str(e)}
     
     def _execute_check_status_operation(self) -> Dict[str, Any]:
-        """Execute check status operation using operation handlers."""
+        """Execute check status operation using mixin-based handlers."""
         try:
             from smartcash.ui.setup.dependency.operations.check_operation import CheckStatusOperationHandler
             
@@ -569,7 +549,7 @@ class DependencyUIModule(BaseUIModule):
             return {'success': False, 'error': str(e)}
     
     def _execute_update_operation(self) -> Dict[str, Any]:
-        """Execute update operation using operation handlers."""
+        """Execute update operation using mixin-based handlers."""
         try:
             from smartcash.ui.setup.dependency.operations.update_operation import UpdateOperationHandler
             
@@ -601,82 +581,7 @@ class DependencyUIModule(BaseUIModule):
             self.log(f"Error in update operation: {e}", 'error')
             return {'success': False, 'error': str(e)}
     
-    # ==================== BUTTON MANAGEMENT METHODS ====================
-    
-    def disable_all_buttons(self, message: str = "⏳ Operation in progress...") -> Optional[Dict[str, Any]]:
-        """
-        Disable all buttons in the UI during operations.
-        
-        Args:
-            message: Message to display on buttons
-            
-        Returns:
-            Dictionary containing previous button states for restoration
-        """
-        try:
-            if not hasattr(self, '_ui_components') or not self._ui_components:
-                return None
-            
-            # Store previous states and disable buttons
-            button_states = {}
-            
-            # Disable main operation buttons
-            operation_buttons = ['install_button', 'check_button', 'update_button', 'uninstall_button']
-            for button_key in operation_buttons:
-                button = self._ui_components.get(button_key)
-                if button and hasattr(button, 'disabled') and hasattr(button, 'description'):
-                    # Store original state
-                    button_states[button_key] = {
-                        'disabled': button.disabled,
-                        'description': button.description
-                    }
-                    # Disable and update description
-                    button.disabled = True
-                    button.description = message
-            
-            # Disable save/reset buttons
-            save_reset_buttons = ['save_button', 'reset_button']
-            for button_key in save_reset_buttons:
-                button = self._ui_components.get(button_key)
-                if button and hasattr(button, 'disabled') and hasattr(button, 'description'):
-                    # Store original state
-                    button_states[button_key] = {
-                        'disabled': button.disabled,
-                        'description': button.description
-                    }
-                    # Disable button but keep original description for save/reset buttons
-                    button.disabled = True
-            
-            return button_states
-            
-        except Exception as e:
-            if hasattr(self, 'logger'):
-                self.logger.error(f"Error disabling buttons: {e}")
-            return None
-    
-    def enable_all_buttons(self, button_states: Optional[Dict[str, Any]] = None) -> None:
-        """
-        Re-enable all buttons in the UI after operations.
-        
-        Args:
-            button_states: Previous button states to restore
-        """
-        try:
-            if not button_states or not hasattr(self, '_ui_components') or not self._ui_components:
-                return
-            
-            # Restore all button states
-            for button_key, button_state in button_states.items():
-                button = self._ui_components.get(button_key)
-                if button and hasattr(button, 'disabled'):
-                    # Restore original state
-                    button.disabled = button_state['disabled']
-                    if hasattr(button, 'description'):
-                        button.description = button_state['description']
-            
-        except Exception as e:
-            if hasattr(self, 'logger'):
-                self.logger.error(f"Error enabling buttons: {e}")
+    # Button management methods are provided by ButtonHandlerMixin from BaseUIModule
     
     # ==================== DEPENDENCY-SPECIFIC METHODS ====================
     

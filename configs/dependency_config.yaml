@@ -1,0 +1,24 @@
+custom_packages: ''
+selected_packages: []
+uninstalled_defaults:
+- torchvision
+- scipy
+- matplotlib
+- opencv-python
+- thop
+- tensorboard
+- pybboxes
+- torch
+- ipython
+- numpy
+- pandas
+- timm
+- ipywidgets
+- pytz
+- scikit-learn
+- pyyaml
+- sahi
+- Pillow
+- ultralytics
+- python-dotenv
+- albumentations

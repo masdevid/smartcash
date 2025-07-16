@@ -102,8 +102,19 @@ class ProgressTrackingMixin:
         # Make progress tracker visible before updating
         if hasattr(self, '_ui_components') and self._ui_components:
             progress_tracker = self._ui_components.get('progress_tracker')
-            if progress_tracker and hasattr(progress_tracker, 'show'):
-                progress_tracker.show(operation=message)
+            if progress_tracker:
+                # Ensure initialization
+                if hasattr(progress_tracker, 'initialize') and not getattr(progress_tracker, '_initialized', False):
+                    progress_tracker.initialize()
+                
+                # Show the tracker
+                if hasattr(progress_tracker, 'show'):
+                    progress_tracker.show(operation=message)
+                
+                # Also try operation container progress
+                operation_container = self._ui_components.get('operation_container')
+                if operation_container and hasattr(operation_container, 'update_progress'):
+                    operation_container.update_progress(0, message, 'primary')
         
         self.update_progress(0, message, 'primary')
     
@@ -228,15 +239,30 @@ class ProgressTrackingMixin:
         """Initialize progress display with welcome message."""
         try:
             if hasattr(self, '_ui_components') and self._ui_components:
+                # Initialize progress tracker first
+                progress_tracker = self._ui_components.get('progress_tracker')
+                if progress_tracker:
+                    # Ensure progress tracker is initialized
+                    if hasattr(progress_tracker, 'initialize') and not getattr(progress_tracker, '_initialized', False):
+                        progress_tracker.initialize()
+                    
+                    # Show progress tracker by default for operation modules
+                    if hasattr(progress_tracker, 'show'):
+                        progress_tracker.show()
+                
+                # Initialize operation container progress
                 operation_container = self._ui_components.get('operation_container')
                 if operation_container and hasattr(operation_container, 'initialize_progress'):
                     operation_container.initialize_progress()
                     
-                    # Add initialization logs
+                # Add initialization logs if logging is available
+                if hasattr(self, 'log'):
                     if hasattr(self, 'module_name'):
-                        self.log(f"🚀 {self.module_name.title()} module initialized")
-                        self.log(f"📊 Configuration loaded successfully")
-                        self.log(f"🔧 Operation container ready")
+                        self.log(f"🚀 {self.module_name.title()} module initialized", 'info')
+                        self.log(f"📊 Configuration loaded successfully", 'info')
+                        self.log(f"🔧 Operation container ready", 'info')
+                    else:
+                        self.log("🚀 Module initialized successfully", 'info')
                     
         except Exception as e:
             if hasattr(self, 'logger'):

@@ -22,6 +22,7 @@ class LoggingMixin:
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._ui_logging_bridge_setup: bool = False
+        self._log_buffer: list = []  # Buffer logs until operation container is ready
     
     def log(self, message: str, level: str = 'info') -> None:
         """
@@ -46,16 +47,22 @@ class LoggingMixin:
                     return
             
             # Try operation manager first
-            if self._operation_manager and hasattr(self._operation_manager, 'log'):
+            if hasattr(self, '_operation_manager') and self._operation_manager and hasattr(self._operation_manager, 'log'):
                 self._operation_manager.log(message, level)
                 return
             
             # Try operation container directly
             if hasattr(self, '_ui_components') and self._ui_components:
                 operation_container = self._ui_components.get('operation_container')
-                if operation_container and hasattr(operation_container, 'log'):
-                    operation_container.log(message, level)
-                    return
+                if operation_container:
+                    # Handle dict-style operation container
+                    if isinstance(operation_container, dict) and 'log' in operation_container:
+                        operation_container['log'](message, level)
+                        return
+                    # Handle object-style operation container
+                    elif hasattr(operation_container, 'log'):
+                        operation_container.log(message, level)
+                        return
             
             # Fallback to standard logger (use debug to minimize console output)
             if hasattr(self, 'logger'):
@@ -166,3 +173,27 @@ class LoggingMixin:
                 self.logger.debug(f"Failed to get logs: {e}")
         
         return None
+    
+    def _flush_log_buffer(self) -> None:
+        """Flush buffered logs to operation container when it becomes available."""
+        try:
+            if hasattr(self, '_log_buffer') and self._log_buffer:
+                # Get operation container
+                operation_container = None
+                if hasattr(self, '_ui_components') and self._ui_components:
+                    operation_container = self._ui_components.get('operation_container')
+                
+                if operation_container:
+                    # Flush all buffered logs
+                    for message, level in self._log_buffer:
+                        if isinstance(operation_container, dict) and 'log' in operation_container:
+                            operation_container['log'](message, level)
+                        elif hasattr(operation_container, 'log'):
+                            operation_container.log(message, level)
+                    
+                    # Clear buffer after flushing
+                    self._log_buffer.clear()
+                    
+        except Exception as e:
+            if hasattr(self, 'logger'):
+                self.logger.debug(f"Failed to flush log buffer: {e}")

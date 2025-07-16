@@ -1,339 +1,183 @@
 """
-Handler for package status check operations.
+Pure mixin-based handler for package status check operations.
+Uses core mixins instead of inheritance.
 """
-from typing import Dict, Any, List, Optional, Tuple, Set, Callable
-import re
-import time
-from datetime import datetime
 
-from smartcash.ui.core.handlers.operation_handler import ProgressLevel
+from typing import Dict, Any, List
+import time
+import subprocess
+
 from .base_operation import BaseOperationHandler
 
 
 class CheckStatusOperationHandler(BaseOperationHandler):
-    """Handler for package status check operations."""
+    """
+    Pure mixin-based handler for package status check operations.
+    
+    Uses composition over inheritance with core mixins:
+    - LoggingMixin for operation logging
+    - ProgressTrackingMixin for progress updates  
+    - OperationMixin for operation management
+    """
     
     def __init__(self, ui_components: Dict[str, Any], config: Dict[str, Any]):
-        """Initialize status check operation handler.
+        """
+        Initialize check status operation handler with mixin pattern.
         
         Args:
             ui_components: Dictionary of UI components
-            config: Configuration dictionary with package information
+            config: Configuration dictionary with check settings
         """
         super().__init__('check_status', ui_components, config)
-        self._status_cache: Dict[str, Dict[str, Any]] = {}
     
     def execute_operation(self) -> Dict[str, Any]:
-        """Execute package status check.
+        """
+        Execute package status check using mixin pattern.
         
         Returns:
-            Dictionary with status check results
+            Dictionary with operation results
         """
-        self.log("🔍 Memeriksa status paket...", 'info')
+        self.log("🔍 Memulai pemeriksaan status paket...", 'info')
+        self._cancelled = False
         
-        # Get packages to check
-        packages = self._get_packages_to_check()
-        if not packages:
-            self.log("ℹ️ Tidak ada paket yang perlu diperiksa", 'info')
-            return {'success': True, 'checked': 0, 'total': 0}
-        
-        # Execute status check with progress tracking
-        start_time = time.time()
-        results = self._check_packages_status(packages)
-        duration = time.time() - start_time
-        
-        # Update UI with results
-        self._update_package_statuses(results)
-        
-        # Generate summary
-        installed = sum(1 for r in results if r.get('status') == 'installed')
-        outdated = sum(1 for r in results if r.get('status') == 'outdated')
-        missing = sum(1 for r in results if r.get('status') == 'not_installed')
-        
-        status_msg = (
-            f"📊 Status: {installed} terpasang"
-            f"{', ' + str(outdated) + ' perlu diperbarui' if outdated else ''}"
-            f"{', ' + str(missing) + ' belum terpasang' if missing else ''}"
-            f" dalam {duration:.1f} detik"
-        )
-        
-        self.log(status_msg, 'success')
-        
-        return {
-            'success': True,
-            'checked': len(results),
-            'installed': installed,
-            'outdated': outdated,
-            'missing': missing,
-            'duration': duration,
-            'results': results
-        }
-    
-    def _get_packages_to_check(self) -> List[str]:
-        """Get list of packages to check status for.
-        
-        Returns:
-            List of package names to check
-        """
         try:
-            # Use parent's method to get packages from UI components
+            # Get packages to check
             packages = self._get_packages_to_process()
-            
-            # If no packages are selected, check all default packages
             if not packages:
-                packages = self._get_all_default_packages()
-            
-            return packages
-        except Exception as e:
-            self.log(f"Gagal mendapatkan daftar paket: {str(e)}", 'error')
-            return []
-    
-    def _get_all_default_packages(self) -> List[str]:
-        """Get all default packages from the configuration.
-        
-        Returns:
-            List of all default package names
-        """
-        try:
-            from ..configs.dependency_defaults import get_default_package_categories
-            
-            categories = get_default_package_categories()
-            packages = []
-            
-            for category_name, category_data in categories.items():
-                if category_name == 'custom_packages':
-                    continue  # Skip custom packages category
-                
-                for package in category_data.get('packages', []):
-                    if package.get('is_default', False):
-                        packages.append(package['name'])
-            
-            self.log(f"Found {len(packages)} default packages to check", 'info')
-            return packages
-            
-        except Exception as e:
-            self.log(f"Error getting default packages: {str(e)}", 'error')
-            return []
-    
-    def _check_packages_status(self, packages: List[str]) -> List[Dict[str, Any]]:
-        """Check status of multiple packages in parallel with progress tracking.
-        
-        Args:
-            packages: List of package names to check
-            
-        Returns:
-            List of dictionaries with package status information
-        """
-        if not packages:
-            return []
-            
-        # Use custom processing to preserve full result structure
-        return self._process_packages_with_full_results(
-            packages,
-            self._check_package_status,
-            progress_message="Memeriksa status paket"
-        )
-    
-    def _process_packages_with_full_results(
-        self,
-        packages: List[str],
-        process_func: Callable[[str], Dict[str, Any]],
-        progress_message: str = "Processing packages",
-        max_workers: int = 4
-    ) -> List[Dict[str, Any]]:
-        """Process multiple packages in parallel while preserving full result structure.
-        
-        Args:
-            packages: List of package names to process
-            process_func: Function to call for each package
-            progress_message: Base message for progress updates
-            max_workers: Maximum number of parallel workers
-            
-        Returns:
-            List of full result dictionaries from process_func
-        """
-        if not packages:
-            return []
-            
-        from concurrent.futures import ThreadPoolExecutor, as_completed
-        
-        results = []
-        total = len(packages)
-        processed = 0
-        
-        # Create a thread pool for parallel processing
-        with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            futures = {
-                executor.submit(process_func, pkg): pkg
-                for pkg in packages
-            }
-            
-            # Process results as they complete
-            for future in as_completed(futures):
-                pkg = futures[future]
-                processed += 1
-                
-                try:
-                    result = future.result()
-                    # Keep the full result structure
-                    results.append(result)
-                    
-                    # Update progress
-                    progress = (processed / total) * 100
-                    self._update_progress(
-                        message=f"{progress_message}: {pkg} ({processed}/{total})",
-                        current=progress,
-                        total=100,
-                        level_name='secondary'
-                    )
-                    
-                except Exception as e:
-                    error_result = {
-                        'package': pkg,
-                        'success': False,
-                        'status': 'error',
-                        'message': str(e)
-                    }
-                    results.append(error_result)
-                    self.log(f"Error processing {pkg}: {str(e)}", 'error')
-        
-        return results
-    
-    def _check_package_status(self, package: str) -> Dict[str, Any]:
-        """Check status of a single package.
-        
-        Args:
-            package: Package name to check
-            
-        Returns:
-            Dictionary with package status information
-        """
-        try:
-            # Check if package is installed
-            result = self._execute_command(['pip', 'show', package])
-            
-            if not result['success'] or 'not found' in result['stdout'].lower():
+                self.log("ℹ️ Tidak ada paket yang dipilih untuk dicek", 'info')
                 return {
-                    'package': package,
-                    'status': 'not_installed',
-                    'message': 'Paket belum terpasang',
-                    'success': True
+                    'success': True, 
+                    'package_status': {},
+                    'summary': {'total': 0, 'installed': 0, 'missing': 0}
                 }
             
-            # Parse package info
-            info = {}
-            for line in result['stdout'].split('\n'):
-                if ':' in line:
-                    key, value = line.split(':', 1)
-                    info[key.strip().lower()] = value.strip()
+            # Execute status check
+            start_time = time.time()
+            package_status = self._check_package_status(packages)
+            duration = time.time() - start_time
             
-            # Get installed version
-            installed_version = info.get('version', '')
+            # Create summary
+            total = len(packages)
+            installed = sum(1 for status in package_status.values() if status.get('installed', False))
+            missing = total - installed
             
-            # Check for updates (non-blocking)
-            update_result = self._execute_command(['pip', 'index', 'versions', package])
-            
-            latest_version = None
-            if update_result['success']:
-                # Parse the latest version from the output
-                match = re.search(r'LATEST:\s+([\d.]+)', update_result['stdout'])
-                if match:
-                    latest_version = match.group(1)
-            
-            status = 'installed'
-            message = f"Terpasang: {installed_version}"
-            
-            if latest_version and latest_version != installed_version:
-                status = 'outdated'
-                message = f"Pembaruan tersedia: {installed_version} → {latest_version}"
-            
-            return {
-                'success': True,
-                'package': package,
-                'status': status,
-                'version': installed_version,
-                'latest_version': latest_version,
-                'message': message,
-                'location': info.get('location', '')
+            summary = {
+                'total': total,
+                'installed': installed,
+                'missing': missing
             }
             
+            if self._cancelled:
+                status_msg = f"⏹️ Pemeriksaan status dibatalkan"
+                self.log(status_msg, 'warning')
+            else:
+                status_msg = f"✅ Selesai memeriksa {total} paket dalam {duration:.1f} detik"
+                self.log(status_msg, 'success')
+                self.log(f"📊 Status: {installed}/{total} terinstal, {missing} hilang", 'info')
+            
+            return {
+                'success': not self._cancelled,
+                'cancelled': self._cancelled,
+                'package_status': package_status,
+                'summary': summary,
+                'duration': duration
+            }
+            
+        except KeyboardInterrupt:
+            self.log("⏹️ Pemeriksaan status dibatalkan oleh pengguna", 'warning')
+            return {'success': False, 'cancelled': True, 'error': 'Dibatalkan oleh pengguna'}
+            
         except Exception as e:
-            error_msg = f"Gagal memeriksa status {package}: {str(e)}"
+            error_msg = f"Gagal melakukan pemeriksaan status: {str(e)}"
             self.log(error_msg, 'error')
-            return {
-                'success': False,
-                'package': package,
-                'status': 'error',
-                'message': error_msg
-            }
+            return {'success': False, 'error': error_msg}
     
-    def _update_package_statuses(self, results: List[Dict[str, Any]]) -> None:
-        """Update UI with package status information.
-        
-        Args:
-            results: List of package status dictionaries
-        """
-        try:
-            # Update status panel if available
-            status_panel = self.ui_components.get('status_panel')
-            if status_panel and hasattr(status_panel, 'update_package_statuses'):
-                # Call the method directly since it's now synchronous
-                status_panel.update_package_statuses(results)
+    def _check_package_status(self, packages: List[str]) -> Dict[str, Dict[str, Any]]:
+        """Check status of multiple packages with progress tracking."""
+        if not packages:
+            return {}
             
-            # Also update the package list if available
-            package_list = self.ui_components.get('package_list')
-            if package_list and hasattr(package_list, 'update_package_statuses'):
-                # Call the method directly since it's now synchronous
-                package_list.update_package_statuses(results)
+        package_status = {}
+        total = len(packages)
+        
+        for i, package in enumerate(packages, 1):
+            if self._cancelled:
+                break
                 
-        except Exception as e:
-            self.log(f"Gagal memperbarui UI status paket: {str(e)}", 'error')
-    
-    def _get_latest_version(self, package: str) -> Optional[str]:
-        """Get latest version of a package from PyPI.
-        
-        Args:
-            package: Package name
-            
-        Returns:
-            Latest version string or None if not found
-        """
-        try:
-            # Use pip index versions to get latest version
-            result = self._execute_command(
-                ['pip', 'index', 'versions', package],
-                capture_output=True,
-                text=True
+            # Update progress using mixin method
+            self.update_progress(
+                (i / total) * 100,
+                f"Memeriksa paket {i}/{total}: {package}"
             )
             
-            if result['success'] and result.get('stdout'):
-                # Extract version from output like: "Package 'package' 1.2.3 available"
-                match = re.search(r"'(?:[^']+)'\s+([\d.]+)", result['stdout'])
-                if match:
-                    return match.group(1)
+            status = self._check_single_package(package)
+            package_status[package] = status
             
-            return None
-            
-        except Exception:
-            return None
-    
-    def _check_single_package_status(self, package: str) -> Dict[str, Any]:
-        """Check status of a single package (alias for _check_package_status for compatibility).
+            # Show result status
+            status_icon = "✅" if status.get('installed') else "❌"
+            self.update_progress(
+                (i / total) * 100,
+                f"Selesai {i}/{total}: {status_icon} {package}"
+            )
         
-        Args:
-            package: Package name to check
-            
-        Returns:
-            Dictionary with package status information
-        """
-        return self._check_package_status(package)
+        return package_status
     
-    def get_operations(self) -> Dict[str, Callable]:
-        """Get available operations for this handler.
+    def _check_single_package(self, package: str) -> Dict[str, Any]:
+        """Check status of a single package."""
+        if self._cancelled:
+            return {
+                'package': package,
+                'installed': False,
+                'cancelled': True,
+                'message': 'Dibatalkan oleh pengguna'
+            }
         
-        Returns:
-            Dictionary of operation name to callable mapping
-        """
-        return {
-            'execute': self.execute_operation
-        }
+        try:
+            # Use pip show to check if package is installed
+            result = subprocess.run(
+                ['pip', 'show', package],
+                capture_output=True,
+                text=True,
+                timeout=30
+            )
+            
+            if result.returncode == 0:
+                # Package is installed, parse version info
+                version_info = self._parse_pip_show_output(result.stdout)
+                return {
+                    'package': package,
+                    'installed': True,
+                    'version': version_info.get('version', 'Unknown'),
+                    'location': version_info.get('location', 'Unknown'),
+                    'message': f"Terinstal (v{version_info.get('version', 'Unknown')})"
+                }
+            else:
+                return {
+                    'package': package,
+                    'installed': False,
+                    'message': 'Tidak terinstal'
+                }
+                
+        except subprocess.TimeoutExpired:
+            return {
+                'package': package,
+                'installed': False,
+                'error': 'Timeout saat memeriksa paket',
+                'message': 'Timeout'
+            }
+        except Exception as e:
+            return {
+                'package': package,
+                'installed': False,
+                'error': str(e),
+                'message': f"Error: {str(e)[:50]}"
+            }
+    
+    def _parse_pip_show_output(self, output: str) -> Dict[str, str]:
+        """Parse output from pip show command."""
+        info = {}
+        for line in output.split('\n'):
+            if ':' in line:
+                key, value = line.split(':', 1)
+                info[key.strip().lower()] = value.strip()
+        return info

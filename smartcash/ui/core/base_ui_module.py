@@ -134,6 +134,10 @@ class BaseUIModule(
             # Initialize progress display
             self._initialize_progress_display()
             
+            # Flush any buffered logs now that operation container is ready
+            if hasattr(self, '_flush_log_buffer'):
+                self._flush_log_buffer()
+            
             self._is_initialized = True
             
             self.logger.info(f"✅ {self.full_module_name} initialized successfully")
@@ -165,12 +169,14 @@ class BaseUIModule(
             result = self.save_config()
             if result.get('success'):
                 success_msg = result.get('message', 'Configuration saved successfully')
-                self.log(f"✅ {success_msg}", 'info')
-                self.update_operation_status(success_msg, "info")
+                self.log(f"✅ {success_msg}", 'success')
+                self.update_operation_status(success_msg, "success")
+                self._update_header_status(success_msg, "success")
             else:
                 error_msg = result.get('message', 'Save failed')
                 self.log(f"❌ {error_msg}", 'error')
                 self.update_operation_status(error_msg, "error")
+                self._update_header_status(error_msg, "error")
                 
             return result
             
@@ -178,6 +184,7 @@ class BaseUIModule(
             error_msg = f"Save config error: {e}"
             self.log(f"❌ {error_msg}", 'error')
             self.update_operation_status(error_msg, "error")
+            self._update_header_status(error_msg, "error")
             return {'success': False, 'message': error_msg}
     
     def _handle_reset_config(self, button=None) -> Dict[str, Any]:
@@ -188,12 +195,14 @@ class BaseUIModule(
             result = self.reset_config()
             if result.get('success'):
                 success_msg = result.get('message', 'Configuration reset to defaults')
-                self.log(f"✅ {success_msg}", 'info')
-                self.update_operation_status(success_msg, "info")
+                self.log(f"✅ {success_msg}", 'success')
+                self.update_operation_status(success_msg, "success")
+                self._update_header_status(success_msg, "success")
             else:
                 error_msg = result.get('message', 'Reset failed')
                 self.log(f"❌ {error_msg}", 'error')
                 self.update_operation_status(error_msg, "error")
+                self._update_header_status(error_msg, "error")
                 
             return result
             
@@ -201,6 +210,7 @@ class BaseUIModule(
             error_msg = f"Reset config error: {e}"
             self.log(f"❌ {error_msg}", 'error')
             self.update_operation_status(error_msg, "error")
+            self._update_header_status(error_msg, "error")
             return {'success': False, 'message': error_msg}
     
     def get_module_info(self) -> Dict[str, Any]:
@@ -317,3 +327,28 @@ class BaseUIModule(
                 'is_valid': False,
                 'error': str(e)
             }
+    
+    def _update_header_status(self, message: str, status_type: str = "info") -> None:
+        """
+        Update header container status.
+        
+        Args:
+            message: Status message
+            status_type: Status type (info, success, warning, error)
+        """
+        try:
+            if hasattr(self, '_ui_components') and self._ui_components:
+                header_container = self._ui_components.get('header_container')
+                if header_container:
+                    # Handle object-style header container
+                    if hasattr(header_container, 'update_status'):
+                        header_container.update_status(message, status_type)
+                        return
+                    # Handle dict-style header container
+                    elif isinstance(header_container, dict) and 'update_status' in header_container:
+                        header_container['update_status'](message, status_type)
+                        return
+                        
+        except Exception as e:
+            if hasattr(self, 'logger'):
+                self.logger.debug(f"Failed to update header status: {e}")

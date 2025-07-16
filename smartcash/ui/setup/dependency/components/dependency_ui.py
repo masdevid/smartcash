@@ -153,6 +153,10 @@ def create_dependency_ui_components(module_config: Dict[str, Any]) -> Dict[str, 
             'update_button': action_container['buttons'].get('update'),
             'uninstall_button': action_container['buttons'].get('uninstall'),
             
+            # Save/Reset buttons (from action container instance)
+            'save_button': getattr(action_container.get('action_container'), 'save_button', None) if action_container.get('action_container') else None,
+            'reset_button': getattr(action_container.get('action_container'), 'reset_button', None) if action_container.get('action_container') else None,
+            
             # Operation components (widgets for direct access)
             'operation_container_widget': operation_container.get('container'),
             'progress_tracker': operation_container.get('progress_tracker'),

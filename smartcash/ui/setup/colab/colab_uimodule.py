@@ -117,6 +117,8 @@ class ColabUIModule(BaseUIModule):
                 # Setup operation manager after UI components are created
                 self._setup_operation_manager()
                 
+                # Button handlers are connected automatically by ButtonHandlerMixin
+                
                 # Flush any buffered logs to operation container
                 self._flush_log_buffer()
                 
@@ -131,6 +133,7 @@ class ColabUIModule(BaseUIModule):
                 
                 # Update status panel (Operation Checklist 7.1) - use direct log to avoid console output
                 self.log("📊 Status: Siap untuk pengaturan lingkungan Colab", 'info')
+                self.update_operation_status("Siap untuk pengaturan lingkungan Colab", "info")
             
             return success
             
@@ -225,6 +228,14 @@ class ColabUIModule(BaseUIModule):
             
         except Exception as e:
             self.logger.debug(f"Failed to flush log buffer: {e}")
+    
+    # Removed redundant methods that are already provided by mixins:
+    # - _connect_save_reset_buttons() -> ButtonHandlerMixin handles this
+    # - update_operation_status() -> OperationMixin provides this
+    # - _handle_save_config() -> BaseUIModule provides this
+    # - _handle_reset_config() -> BaseUIModule provides this
+    
+    # Removed redundant log() method - LoggingMixin provides this functionality
     
     # ==================== OPERATION HANDLERS ====================
     

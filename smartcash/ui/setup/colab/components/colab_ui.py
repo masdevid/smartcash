@@ -215,13 +215,13 @@ def create_colab_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> Dict[s
         progress_levels='dual'  # Use dual-level progress tracking
     )
     
-    # Store the main container reference
-    ui_components['operation_container'] = operation_container['container']
+    # Store the full operation container dict (contains all methods)
+    ui_components['operation_container'] = operation_container
     
     # Store operation container components and functions for easy access
     operation_components = {
-        # Core container
-        'container': operation_container['container'],
+        # Core container widget (separate key)
+        'operation_container_widget': operation_container['container'],
         
         # Progress tracking
         'progress_tracker': operation_container['progress_tracker'],
@@ -318,7 +318,7 @@ def create_colab_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> Dict[s
     
     # Add remaining containers
     container_order.extend([
-        ui_components.get('operation_container'),
+        ui_components.get('operation_container_widget'),  # Use the widget for UI assembly
         ui_components.get('environment_container'),
         ui_components.get('footer_container')
     ])

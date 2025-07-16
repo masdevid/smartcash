@@ -112,9 +112,14 @@ class ConfigurationMixin(ABC):
                 if not validation_result.get('valid', True):
                     raise ValueError(validation_result.get('message', 'Configuration validation failed'))
             
-            # Save configuration
+            # Save configuration (pass config as name parameter, not as config data)
             if hasattr(self._config_handler, 'save_config'):
-                save_result = self._config_handler.save_config(config)
+                # First update the handler's config with the extracted config
+                if hasattr(self._config_handler, 'update_config'):
+                    self._config_handler.update_config(config)
+                
+                # Then save (without passing config as name parameter)
+                save_result = self._config_handler.save_config()
                 if not save_result.get('success', False):
                     raise RuntimeError(save_result.get('message', 'Configuration save failed'))
             

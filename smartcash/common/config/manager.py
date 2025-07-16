@@ -50,7 +50,8 @@ class SimpleConfigManager:
             # Try to find the repo config directory in multiple locations
             possible_repo_dirs = [
                 Path('/content/smartcash/configs'),  # Colab default
-                Path(__file__).parent.parent.parent.parent.parent / 'configs',  # Local dev
+                self.base_dir / 'smartcash' / 'configs',  # Local dev: /Users/masdevid/Projects/smartcash/smartcash/configs
+                Path(__file__).parent.parent.parent.parent.parent / 'configs',  # Alternative local dev
                 Path('/content/configs'),  # Alternative location
                 self.base_dir / 'configs'  # Fallback
             ]

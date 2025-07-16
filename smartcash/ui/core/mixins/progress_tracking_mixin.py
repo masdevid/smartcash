@@ -99,6 +99,12 @@ class ProgressTrackingMixin:
             'level': 'primary'
         })
         
+        # Make progress tracker visible before updating
+        if hasattr(self, '_ui_components') and self._ui_components:
+            progress_tracker = self._ui_components.get('progress_tracker')
+            if progress_tracker and hasattr(progress_tracker, 'show'):
+                progress_tracker.show(operation=message)
+        
         self.update_progress(0, message, 'primary')
     
     def complete_progress(self, message: str = "Completed") -> None:
@@ -110,6 +116,18 @@ class ProgressTrackingMixin:
         """
         total = self._progress_state.get('total', 100)
         self.update_progress(total, message, 'success')
+        
+        # Optionally hide progress tracker after completion (with delay)
+        if hasattr(self, '_ui_components') and self._ui_components:
+            progress_tracker = self._ui_components.get('progress_tracker')
+            if progress_tracker and hasattr(progress_tracker, 'hide'):
+                # Hide after a short delay to let user see completion
+                import threading
+                def delayed_hide():
+                    import time
+                    time.sleep(2)  # Wait 2 seconds
+                    progress_tracker.hide()
+                threading.Thread(target=delayed_hide, daemon=True).start()
     
     def error_progress(self, message: str = "Error occurred") -> None:
         """

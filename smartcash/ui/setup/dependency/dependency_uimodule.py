@@ -111,8 +111,14 @@ class DependencyUIModule(BaseUIModule):
                 if self._config_handler and hasattr(self._config_handler, 'set_ui_components'):
                     self._config_handler.set_ui_components(self._ui_components)
                 
+                # Button handlers are connected automatically by ButtonHandlerMixin
+                
                 # Post-initialization logging (now that operation container is ready)
                 self._log_initialization_complete()
+                
+                # Set global instance for convenience access
+                global _dependency_module_instance
+                _dependency_module_instance = self
             
             return success
             
@@ -144,6 +150,9 @@ class DependencyUIModule(BaseUIModule):
             }
     
     
+    # Removed redundant _connect_save_reset_buttons() method
+    # Button connection is handled automatically by ButtonHandlerMixin
+    
     def _log_initialization_complete(self) -> None:
         """Log initialization completion to operation container (after it's ready)."""
         try:
@@ -154,91 +163,17 @@ class DependencyUIModule(BaseUIModule):
             
             # Update status panel - use direct log to avoid console output
             self.log("📊 Status: Siap untuk manajemen paket", 'info')
+            self.update_operation_status("Siap untuk manajemen paket", "info")
             
         except Exception as e:
             # Use logger fallback if operation container logging fails
             self.logger.debug(f"Post-initialization logging failed: {e}")
     
-    def log(self, message: str, level: str = 'info') -> None:
-        """Override log method to ensure operation container logging works."""
-        try:
-            # Check if operation container is available
-            if hasattr(self, '_ui_components') and self._ui_components:
-                operation_container = self._ui_components.get('operation_container')
-                if operation_container:
-                    # Use log_message method with proper LogLevel enum
-                    if isinstance(operation_container, dict) and 'log_message' in operation_container:
-                        from smartcash.ui.components.log_accordion import LogLevel
-                        level_map = {
-                            'debug': LogLevel.DEBUG,
-                            'info': LogLevel.INFO,
-                            'warning': LogLevel.WARNING,
-                            'error': LogLevel.ERROR,
-                            'critical': LogLevel.ERROR,
-                            'success': LogLevel.INFO
-                        }
-                        log_level = level_map.get(level, LogLevel.INFO)
-                        operation_container['log_message'](message, log_level)
-                        return
-                    # Direct logging to operation container (if it has log method)
-                    elif hasattr(operation_container, 'log'):
-                        operation_container.log(message, level)
-                        return
-            
-            # NO FALLBACK to console logger - store as pending log instead
-            if not hasattr(self, '_pending_logs'):
-                self._pending_logs = []
-            self._pending_logs.append({'message': message, 'level': level})
-                
-        except Exception as e:
-            # Store error log as pending
-            if not hasattr(self, '_pending_logs'):
-                self._pending_logs = []
-            self._pending_logs.append({'message': f"Log failed: {e}", 'level': 'error'})
+    # Removed redundant log() and update_operation_status() methods
+    # These are already provided by LoggingMixin and OperationMixin from BaseUIModule
     
-    def save_config(self) -> Dict[str, Any]:
-        """Override save_config to add status updates."""
-        try:
-            # Call parent save_config method
-            result = super().save_config()
-            
-            # Add status update
-            if result.get('success'):
-                self.update_operation_status("Configuration saved successfully", "success")
-                self.log("✅ Configuration saved successfully", 'success')
-            else:
-                self.update_operation_status(f"Save failed: {result.get('message', 'Unknown error')}", "error")
-                self.log(f"❌ Save failed: {result.get('message', 'Unknown error')}", 'error')
-            
-            return result
-            
-        except Exception as e:
-            error_msg = f"Failed to save configuration: {str(e)}"
-            self.update_operation_status(error_msg, "error")
-            self.log(f"❌ {error_msg}", 'error')
-            return {'success': False, 'message': error_msg}
-    
-    def reset_config(self) -> Dict[str, Any]:
-        """Override reset_config to add status updates."""
-        try:
-            # Call parent reset_config method
-            result = super().reset_config()
-            
-            # Add status update
-            if result.get('success'):
-                self.update_operation_status("Configuration reset to defaults", "success")
-                self.log("✅ Configuration reset to defaults", 'success')
-            else:
-                self.update_operation_status(f"Reset failed: {result.get('message', 'Unknown error')}", "error")
-                self.log(f"❌ Reset failed: {result.get('message', 'Unknown error')}", 'error')
-            
-            return result
-            
-        except Exception as e:
-            error_msg = f"Failed to reset configuration: {str(e)}"
-            self.update_operation_status(error_msg, "error")
-            self.log(f"❌ {error_msg}", 'error')
-            return {'success': False, 'message': error_msg}
+    # Removed redundant save_config(), reset_config(), _handle_save_config(), and _handle_reset_config() methods
+    # These are already provided by ConfigurationMixin and BaseUIModule
     
     def start_progress(self, message: str, total: int = 100) -> None:
         """Override start_progress to ensure progress tracker is visible."""
@@ -682,26 +617,35 @@ class DependencyUIModule(BaseUIModule):
             if not hasattr(self, '_ui_components') or not self._ui_components:
                 return None
             
-            # Get action container
-            action_container = self._ui_components.get('action_container')
-            if not action_container:
-                return None
-            
             # Store previous states and disable buttons
             button_states = {}
             
-            # Look for buttons in action container
-            if hasattr(action_container, 'children'):
-                for child in action_container.children:
-                    if hasattr(child, 'disabled') and hasattr(child, 'description'):
-                        # Store original state
-                        button_states[id(child)] = {
-                            'disabled': child.disabled,
-                            'description': child.description
-                        }
-                        # Disable and update description
-                        child.disabled = True
-                        child.description = message
+            # Disable main operation buttons
+            operation_buttons = ['install_button', 'check_button', 'update_button', 'uninstall_button']
+            for button_key in operation_buttons:
+                button = self._ui_components.get(button_key)
+                if button and hasattr(button, 'disabled') and hasattr(button, 'description'):
+                    # Store original state
+                    button_states[button_key] = {
+                        'disabled': button.disabled,
+                        'description': button.description
+                    }
+                    # Disable and update description
+                    button.disabled = True
+                    button.description = message
+            
+            # Disable save/reset buttons
+            save_reset_buttons = ['save_button', 'reset_button']
+            for button_key in save_reset_buttons:
+                button = self._ui_components.get(button_key)
+                if button and hasattr(button, 'disabled') and hasattr(button, 'description'):
+                    # Store original state
+                    button_states[button_key] = {
+                        'disabled': button.disabled,
+                        'description': button.description
+                    }
+                    # Disable button but keep original description for save/reset buttons
+                    button.disabled = True
             
             return button_states
             
@@ -721,23 +665,14 @@ class DependencyUIModule(BaseUIModule):
             if not button_states or not hasattr(self, '_ui_components') or not self._ui_components:
                 return
             
-            # Get action container
-            action_container = self._ui_components.get('action_container')
-            if not action_container:
-                return
-            
-            # Restore button states
-            if hasattr(action_container, 'children'):
-                for child in action_container.children:
-                    if hasattr(child, 'disabled') and hasattr(child, 'description'):
-                        child_id = id(child)
-                        if child_id in button_states:
-                            # Restore original state
-                            child.disabled = button_states[child_id]['disabled']
-                            child.description = button_states[child_id]['description']
-                        else:
-                            # Fallback: just enable
-                            child.disabled = False
+            # Restore all button states
+            for button_key, button_state in button_states.items():
+                button = self._ui_components.get(button_key)
+                if button and hasattr(button, 'disabled'):
+                    # Restore original state
+                    button.disabled = button_state['disabled']
+                    if hasattr(button, 'description'):
+                        button.description = button_state['description']
             
         except Exception as e:
             if hasattr(self, 'logger'):

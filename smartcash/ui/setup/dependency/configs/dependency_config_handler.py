@@ -67,31 +67,35 @@ class DependencyConfigHandler(SharedConfigHandler):
         """Set UI components for extraction."""
         self._ui_components = ui_components
     
-    def validate_config(self, config: Dict[str, Any]) -> bool:
+    def validate_config(self, config: Dict[str, Any]) -> Dict[str, Any]:
         """Validate dependency configuration"""
         try:
             # Validate required keys
             required_keys = ['module_name', 'selected_packages', 'custom_packages']
             for key in required_keys:
                 if key not in config:
-                    self.logger.error(f"❌ Missing required key: {key}")
-                    return False
+                    error_msg = f"Missing required key: {key}"
+                    self.logger.error(f"❌ {error_msg}")
+                    return {'valid': False, 'message': error_msg}
             
             # Validate selected_packages adalah list
             if not isinstance(config['selected_packages'], list):
-                self.logger.error("❌ selected_packages must be a list")
-                return False
+                error_msg = "selected_packages must be a list"
+                self.logger.error(f"❌ {error_msg}")
+                return {'valid': False, 'message': error_msg}
             
             # Validate custom_packages adalah string
             if not isinstance(config['custom_packages'], str):
-                self.logger.error("❌ custom_packages must be a string")
-                return False
+                error_msg = "custom_packages must be a string"
+                self.logger.error(f"❌ {error_msg}")
+                return {'valid': False, 'message': error_msg}
             
-            return True
+            return {'valid': True, 'message': 'Configuration is valid'}
             
         except Exception as e:
-            self.logger.error(f"❌ Error validating config: {e}")
-            return False
+            error_msg = f"Error validating config: {e}"
+            self.logger.error(f"❌ {error_msg}")
+            return {'valid': False, 'message': error_msg}
     
     def add_selected_package(self, package_name: str) -> bool:
         """Add package ke selected_packages"""

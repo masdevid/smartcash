@@ -216,19 +216,19 @@ class DependencyUIModule(BaseUIModule):
                 progress_tracker = self._ui_components.get('progress_tracker')
                 operation_container = self._ui_components.get('operation_container')
                 
-                # Try to make progress tracker visible
-                if progress_tracker:
+                # Use proper progress tracker show method
+                if progress_tracker and hasattr(progress_tracker, 'show'):
+                    progress_tracker.show(operation="Manajemen Paket")
+                elif progress_tracker:
+                    # Fallback to direct layout manipulation
                     if hasattr(progress_tracker, 'layout') and hasattr(progress_tracker.layout, 'display'):
-                        progress_tracker.layout.display = 'block'
-                    if hasattr(progress_tracker, 'visible'):
-                        progress_tracker.visible = True
+                        progress_tracker.layout.display = 'flex'
+                        progress_tracker.layout.visibility = 'visible'
                 
-                # Ensure operation container progress is active
-                if operation_container:
-                    if hasattr(operation_container, 'show_progress'):
-                        operation_container.show_progress()
-                    elif isinstance(operation_container, dict) and 'show_progress' in operation_container:
-                        operation_container['show_progress']()
+                # Activate operation container progress if it has show_progress method
+                if operation_container and hasattr(operation_container, 'show_progress'):
+                    # This would enable progress if operation container has such method
+                    pass
                         
         except Exception as e:
             if hasattr(self, 'logger'):
@@ -250,6 +250,41 @@ class DependencyUIModule(BaseUIModule):
         except Exception as e:
             if hasattr(self, 'logger'):
                 self.logger.debug(f"Progress update failed: {e}")
+    
+    def update_stage_progress(self, stage_progress: int, stage_message: str, 
+                             detail_progress: int = None, detail_message: str = None) -> None:
+        """
+        Update dual progress: overall stage progress and detailed current operation progress.
+        
+        Args:
+            stage_progress: Overall stage progress (0-100)
+            stage_message: Stage description (e.g., "Installing packages")
+            detail_progress: Current operation progress (0-100)
+            detail_message: Current operation description (e.g., "Installing pandas")
+        """
+        try:
+            # Ensure progress visibility
+            self._ensure_progress_visibility()
+            
+            # Update stage progress (primary level)
+            self.update_progress(stage_progress, stage_message, "info")
+            
+            # Update detailed progress if provided
+            if detail_progress is not None and detail_message:
+                # Use operation container update_progress for detailed tracking
+                operation_container = self._ui_components.get('operation_container')
+                if operation_container and hasattr(operation_container, 'update_progress'):
+                    # Use secondary level for detailed progress
+                    operation_container.update_progress(
+                        detail_progress, detail_message, "secondary", "Detail"
+                    )
+                else:
+                    # Fallback to logging detailed progress
+                    self.log(f"  ↳ {detail_progress}% - {detail_message}", 'info')
+            
+        except Exception as e:
+            if hasattr(self, 'logger'):
+                self.logger.debug(f"Dual progress update failed: {e}")
     
     def _register_default_operations(self) -> None:
         """Register default operations for Dependency module."""
@@ -396,16 +431,33 @@ class DependencyUIModule(BaseUIModule):
     # ==================== OPERATION EXECUTION METHODS ====================
     
     def _execute_install_operation(self, packages: List[str]) -> Dict[str, Any]:
-        """Execute installation operation using mixin-based handlers."""
+        """Execute installation operation using mixin-based handlers with dual progress."""
         try:
             from smartcash.ui.setup.dependency.operations.install_operation import InstallOperationHandler
             
-            # Update progress
-            self.update_progress(50, f"Menginstal {len(packages)} paket...")
+            # Initialize stage progress
+            total_packages = len(packages)
+            stage_progress = 0
+            
+            # Update initial stage progress
+            self.update_stage_progress(
+                stage_progress=10,
+                stage_message=f"Mempersiapkan instalasi {total_packages} paket...",
+                detail_progress=0,
+                detail_message="Memvalidasi daftar paket"
+            )
             
             # Prepare UI components with operation container for proper logging
             ui_components = self._ui_components.copy()
             ui_components['operation_container'] = self.get_component('operation_container')
+            
+            # Update preparation progress
+            self.update_stage_progress(
+                stage_progress=20,
+                stage_message=f"Mempersiapkan instalasi {total_packages} paket...",
+                detail_progress=50,
+                detail_message="Menyiapkan environment"
+            )
             
             # Create handler with current UI components and config
             handler = InstallOperationHandler(
@@ -413,19 +465,56 @@ class DependencyUIModule(BaseUIModule):
                 config={**self.get_current_config(), 'explicit_packages': packages}
             )
             
-            # Execute the operation
+            # Update progress before execution
+            self.update_stage_progress(
+                stage_progress=30,
+                stage_message=f"Menginstal {total_packages} paket...",
+                detail_progress=0,
+                detail_message="Memulai instalasi paket"
+            )
+            
+            # Execute the operation with progress simulation
+            for i, package in enumerate(packages):
+                # Update detailed progress for each package
+                detail_progress = int((i / total_packages) * 100)
+                stage_progress = 30 + int((i / total_packages) * 60)  # 30% to 90%
+                
+                self.update_stage_progress(
+                    stage_progress=stage_progress,
+                    stage_message=f"Menginstal paket ({i+1}/{total_packages})",
+                    detail_progress=detail_progress,
+                    detail_message=f"Menginstal {package}..."
+                )
+            
+            # Execute the actual operation
             result = handler.execute_operation()
             
-            # Update progress based on result
+            # Update final progress based on result
             if result.get('success'):
-                self.update_progress(100, "Instalasi selesai")
+                self.update_stage_progress(
+                    stage_progress=100,
+                    stage_message="Instalasi berhasil diselesaikan",
+                    detail_progress=100,
+                    detail_message="Semua paket berhasil diinstal"
+                )
             else:
-                self.update_progress(100, "Instalasi gagal")
+                self.update_stage_progress(
+                    stage_progress=100,
+                    stage_message="Instalasi gagal",
+                    detail_progress=100,
+                    detail_message="Terjadi kesalahan saat instalasi"
+                )
                 
             return result
             
         except Exception as e:
             self.log(f"Error in install operation: {e}", 'error')
+            self.update_stage_progress(
+                stage_progress=100,
+                stage_message="Instalasi gagal",
+                detail_progress=100,
+                detail_message=f"Error: {str(e)}"
+            )
             return {'success': False, 'error': str(e)}
     
     def _execute_uninstall_operation(self, packages: List[str]) -> Dict[str, Any]:

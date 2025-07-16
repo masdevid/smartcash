@@ -8,4 +8,4 @@ NOTE: Cell Code should remain minimal (import and run initializer only).
 from smartcash.ui.setup.colab.colab_uimodule import initialize_colab_ui
 
 # Initialize and display the UI
-initialize_colab_ui(display=True)
+initialize_colab_ui(display=True, enable_environment=False)

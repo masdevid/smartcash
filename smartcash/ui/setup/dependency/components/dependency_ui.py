@@ -86,7 +86,7 @@ def create_dependency_ui_components(module_config: Dict[str, Any]) -> Dict[str, 
             show_save_reset=True
         )
         
-        # 4. Operation Container with consistent logging and progress
+        # 4. Operation Container with dual progress tracking
         operation_container = create_operation_container(
             show_progress=True,
             show_dialog=False,  # Disable dialog to reduce clutter
@@ -94,7 +94,8 @@ def create_dependency_ui_components(module_config: Dict[str, Any]) -> Dict[str, 
             log_module_name="Manajemen Paket",
             log_height="200px",
             log_entry_style='compact',  # Ensure consistent hover behavior
-            progress_style="prominent"  # Make progress more visible
+            progress_style="prominent",  # Make progress more visible
+            progress_levels='dual'  # Enable dual progress tracking
         )
         
         # 5. Footer Container

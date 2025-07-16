@@ -202,53 +202,45 @@ class BaseUIModule(
     def _handle_save_config(self, button=None) -> Dict[str, Any]:
         """Handle save config button click with status updates."""
         try:
-            self.log("💾 Save config button clicked", 'info')
-            
             result = self.save_config()
             if result.get('success'):
                 success_msg = result.get('message', 'Configuration saved successfully')
-                self.log(f"✅ {success_msg}", 'success')
-                self.update_operation_status(success_msg, "success")
-                self._update_header_status(success_msg, "success")
+                # Update both header status and log accordion
+                self._update_header_status(f"💾 {success_msg}", "success")
+                self.log(f"💾 {success_msg}", 'success')
             else:
                 error_msg = result.get('message', 'Save failed')
-                self.log(f"❌ {error_msg}", 'error')
-                self.update_operation_status(error_msg, "error")
-                self._update_header_status(error_msg, "error")
+                self._update_header_status(f"❌ Save failed: {error_msg}", "error")
+                self.log(f"❌ Save failed: {error_msg}", 'error')
                 
             return result
             
         except Exception as e:
             error_msg = f"Save config error: {e}"
+            self._update_header_status(f"❌ {error_msg}", "error")
             self.log(f"❌ {error_msg}", 'error')
-            self.update_operation_status(error_msg, "error")
-            self._update_header_status(error_msg, "error")
             return {'success': False, 'message': error_msg}
     
     def _handle_reset_config(self, button=None) -> Dict[str, Any]:
         """Handle reset config button click with status updates."""
         try:
-            self.log("🔄 Reset config button clicked", 'info')
-            
             result = self.reset_config()
             if result.get('success'):
                 success_msg = result.get('message', 'Configuration reset to defaults')
-                self.log(f"✅ {success_msg}", 'success')
-                self.update_operation_status(success_msg, "success")
-                self._update_header_status(success_msg, "success")
+                # Update both header status and log accordion
+                self._update_header_status(f"🔄 {success_msg}", "success")
+                self.log(f"🔄 {success_msg}", 'success')
             else:
                 error_msg = result.get('message', 'Reset failed')
-                self.log(f"❌ {error_msg}", 'error')
-                self.update_operation_status(error_msg, "error")
-                self._update_header_status(error_msg, "error")
+                self._update_header_status(f"❌ Reset failed: {error_msg}", "error")
+                self.log(f"❌ Reset failed: {error_msg}", 'error')
                 
             return result
             
         except Exception as e:
             error_msg = f"Reset config error: {e}"
+            self._update_header_status(f"❌ {error_msg}", "error")
             self.log(f"❌ {error_msg}", 'error')
-            self.update_operation_status(error_msg, "error")
-            self._update_header_status(error_msg, "error")
             return {'success': False, 'message': error_msg}
     
     def get_module_info(self) -> Dict[str, Any]:

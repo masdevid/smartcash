@@ -92,10 +92,13 @@ class ConfigurationMixin(ABC):
                 self.logger.error(f"Failed to initialize config handler: {e}")
             raise
     
-    def save_config(self) -> Dict[str, Any]:
+    def save_config(self, skip_ui_extraction: bool = False) -> Dict[str, Any]:
         """
         Save current configuration from UI.
         
+        Args:
+            skip_ui_extraction: If True, skip extracting from UI (prevents circular calls)
+            
         Returns:
             Operation result dictionary
         """
@@ -103,39 +106,58 @@ class ConfigurationMixin(ABC):
             if not self._config_handler:
                 raise RuntimeError("Config handler not available")
             
-            # Extract configuration from UI
-            config = self._config_handler.extract_config_from_ui()
+            # Get current config without triggering UI extraction if requested
+            if skip_ui_extraction:
+                config = self.get_current_config()
+            else:
+                # Only extract from UI if explicitly needed
+                config = self._config_handler.extract_config_from_ui()
             
-            # Validate configuration
+            # Validate configuration if validation method exists
             if hasattr(self._config_handler, 'validate_config'):
                 validation_result = self._config_handler.validate_config(config)
                 if not validation_result.get('valid', True):
-                    raise ValueError(validation_result.get('message', 'Configuration validation failed'))
+                    error_msg = validation_result.get('message', 'Configuration validation failed')
+                    if hasattr(self, 'logger'):
+                        self.logger.error(f"❌ {error_msg}")
+                    return {'success': False, 'message': error_msg}
             
-            # Save configuration (pass config as name parameter, not as config data)
-            if hasattr(self._config_handler, 'save_config'):
-                # First update the handler's config with the extracted config
-                if hasattr(self._config_handler, 'update_config'):
-                    self._config_handler.update_config(config)
-                
-                # Then save (without passing config as name parameter)
-                save_result = self._config_handler.save_config()
-                if not save_result.get('success', False):
-                    raise RuntimeError(save_result.get('message', 'Configuration save failed'))
-            
-            # Update internal config
+            # Update internal config first
             self._merged_config.update(config)
+            
+            # Update config handler's internal state
+            if hasattr(self._config_handler, 'update_config'):
+                self._config_handler.update_config(config)
+            
+            # Skip save if config handler doesn't implement it
+            if not hasattr(self._config_handler, 'save_config'):
+                if hasattr(self, 'logger'):
+                    self.logger.info("✅ Configuration updated in memory (no save required)")
+                return {'success': True, 'message': 'Configuration updated in memory'}
+            
+            # Perform the save operation
+            save_result = self._config_handler.save_config()
+            if not save_result.get('success', False):
+                raise RuntimeError(save_result.get('message', 'Configuration save failed'))
             
             if hasattr(self, 'logger'):
                 self.logger.info("✅ Configuration saved successfully")
                 
-            return {'success': True, 'message': 'Configuration saved successfully'}
+            return {
+                'success': True, 
+                'message': 'Configuration saved successfully',
+                'config': self._merged_config
+            }
             
         except Exception as e:
             error_msg = f"Failed to save configuration: {str(e)}"
             if hasattr(self, 'logger'):
-                self.logger.error(error_msg)
-            return {'success': False, 'message': error_msg}
+                self.logger.error(f"❌ {error_msg}")
+            return {
+                'success': False, 
+                'message': error_msg,
+                'config': getattr(self, '_merged_config', {})
+            }
     
     def reset_config(self) -> Dict[str, Any]:
         """

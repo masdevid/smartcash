@@ -136,9 +136,37 @@ class DependencyUIModule(BaseUIModule):
     
     # Button connection is handled automatically by ButtonHandlerMixin in BaseUIModule
     
+    def ensure_components_ready(self) -> bool:
+        """Ensure all required UI components are ready for operations.
+        
+        Returns:
+            bool: True if all components are ready, False otherwise
+        """
+        required_components = ['operation_container', 'progress_tracker']
+        
+        if not hasattr(self, '_ui_components') or not self._ui_components:
+            self.log("⚠️ Komponen UI belum diinisialisasi", 'warning')
+            return False
+            
+        missing = [comp for comp in required_components if comp not in self._ui_components]
+        if missing:
+            self.log(f"⚠️ Komponen UI yang diperlukan belum tersedia: {', '.join(missing)}", 'warning')
+            return False
+            
+        # Ensure progress tracker is ready
+        if not self.ensure_progress_ready():
+            self.log("⚠️ Progress tracker belum siap", 'warning')
+            return False
+            
+        return True
+        
     def _log_initialization_complete(self) -> None:
         """Log initialization completion to operation container (after it's ready)."""
         try:
+            # Ensure components are ready before proceeding
+            if not self.ensure_components_ready():
+                self.log("⚠️ Beberapa komponen UI belum siap, beberapa fitur mungkin terbatas", 'warning')
+            
             # Log environment info if environment support is enabled
             if self.has_environment_support:
                 env_type = "Google Colab" if self.is_colab else "Lokal/Jupyter"
@@ -258,62 +286,73 @@ class DependencyUIModule(BaseUIModule):
             return {'success': False, 'message': error_msg}
         finally:
             # Re-enable only the specific button that was disabled
-            if button_id:
+            if 'button_id' in locals() and button_id:
                 self.enable_all_buttons(button_id=button_id)
     
-    def _operation_uninstall_packages(self, button=None) -> Dict[str, Any]:  # noqa: ARG002
+    def _operation_uninstall_packages(self, button=None) -> Dict[str, Any]:
         """Handle package uninstallation operation using mixin pattern."""
         # Store the button that triggered the operation
         button_id = getattr(button, 'description', 'uninstall').lower().replace(' ', '_')
         
         try:
+            # Ensure UI components are ready
+            if not self.ensure_components_ready():
+                error_msg = "Komponen UI belum siap, silakan coba lagi"
+                self.log_operation_error("Uninstal Paket", error_msg)
+                self.update_operation_status(error_msg, "error")
+                return {'success': False, 'message': error_msg}
+            
             # Start operation logging and progress tracking
             self.log_operation_start("Uninstal Paket")
-            self.start_progress("Memulai uninstal paket...", 0)
+            self.start_progress("Memulai proses uninstal paket...", 100)  # Total 100%
             self.update_operation_status("Memulai uninstal paket...", "info")
             
             # Only disable the clicked button, not all buttons
             button_states = self.disable_all_buttons("⏳ Uninstalling packages...", button_id=button_id)
             
-            # Get selected packages from UI
+            # Get selected packages
             selected_packages = self._get_selected_packages()
-            
             if not selected_packages:
-                warning_msg = "Tidak ada paket yang dipilih untuk diuninstal"
-                self.log(f"⚠️ {warning_msg}", 'warning')
-                self.update_operation_status(warning_msg, "warning")
-                self.error_progress(warning_msg)
-                return {'success': False, 'message': warning_msg}
+                self.log_operation_warning("Uninstal Paket", "Tidak ada paket yang dipilih")
+                self.update_operation_status("Tidak ada paket yang dipilih untuk diuninstal", "warning")
+                self.complete_progress("Tidak ada paket yang dipilih")
+                return {'success': False, 'message': 'No packages selected'}
             
-            # Update progress
-            self.update_progress(25, f"Memproses {len(selected_packages)} paket...")
+            # Update progress (10% - preparation)
+            self.update_progress(10, "Memproses permintaan uninstal...")
+            self.log(f"📦 Paket yang akan diuninstal: {', '.join(selected_packages)}", 'info')
             
-            # Execute uninstallation directly using operation handlers
+            # Execute uninstallation directly using operation handlers (80% of work)
             result = self._execute_uninstall_operation(selected_packages)
             
             if result.get('success'):
+                # Update to 90% on success
+                self.update_progress(90, "Menyelesaikan uninstal...")
                 self.log_operation_complete("Uninstal Paket")
-                self.update_operation_status("Uninstal paket berhasil diselesaikan", "success")
+                
+                # Final update to 100%
                 uninstalled_count = result.get('uninstalled_count', 0)
-                self.log(f"✅ {uninstalled_count} paket berhasil diuninstal", 'success')
-                self.complete_progress(f"Uninstal selesai: {uninstalled_count} paket berhasil diuninstal")
+                status_msg = f"Uninstal berhasil: {uninstalled_count} paket diuninstal"
+                self.update_operation_status(status_msg, "success")
+                self.log(f"✅ {status_msg}", 'success')
+                self.complete_progress("Uninstal selesai")
             else:
                 error_msg = result.get('message', 'Uninstal gagal')
                 self.log_operation_error("Uninstal Paket", error_msg)
                 self.update_operation_status(f"Uninstal gagal: {error_msg}", "error")
-                self.error_progress(f"Uninstal gagal: {error_msg}")
+                self.error_progress(f"Gagal: {error_msg}")
                 
             return result
             
         except Exception as e:
-            error_msg = f"Kesalahan uninstal paket: {e}"
-            self.log_operation_error("Uninstal Paket", str(e))
-            self.update_operation_status(error_msg, "error")
-            self.error_progress(error_msg)
+            error_msg = f"Kesalahan tak terduga: {str(e)}"
+            self.log_operation_error("Uninstal Paket", error_msg)
+            self.update_operation_status("Terjadi kesalahan saat uninstal", "error")
+            self.error_progress("Gagal: Terjadi kesalahan")
             return {'success': False, 'message': error_msg}
         finally:
             # Re-enable only the specific button that was disabled
-            if button_id:
+            if 'button_id' in locals() and button_id:
                 self.enable_all_buttons(button_id=button_id)
     
     def _operation_check_status(self, button=None) -> Dict[str, Any]:  # noqa: ARG002
@@ -322,23 +361,31 @@ class DependencyUIModule(BaseUIModule):
         button_id = getattr(button, 'description', 'check_status').lower().replace(' ', '_')
         
         try:
+            # Ensure UI components are ready
+            if not self.ensure_components_ready():
+                error_msg = "Komponen UI belum siap, silakan coba lagi"
+                self.log_operation_error("Cek Status Paket", error_msg)
+                self.update_operation_status(error_msg, "error")
+                return {'success': False, 'message': error_msg}
+            
             # Start operation logging and progress tracking
             self.log_operation_start("Cek Status Paket")
-            self.start_progress("Memeriksa status paket...", 0)
+            self.start_progress("Memeriksa status paket...", 100)  # Total 100%
             self.update_operation_status("Memeriksa status paket...", "info")
             
             # Only disable the clicked button, not all buttons
-            button_states = self.disable_all_buttons("⏳ Checking package status...", button_id=button_id)
+            button_states = self.disable_all_buttons("⏳ Memeriksa status...", button_id=button_id)
             
-            # Update progress
+            # Update progress (25% - preparation)
             self.update_progress(25, "Memproses pemeriksaan status...")
             
-            # Execute check status directly using operation handlers
+            # Execute check status (50% of work)
             result = self._execute_check_status_operation()
             
             if result.get('success'):
+                # Update to 75% on success
+                self.update_progress(75, "Menyiapkan hasil...")
                 self.log_operation_complete("Cek Status Paket")
-                self.update_operation_status("Pemeriksaan status selesai", "success")
                 
                 # Log status summary
                 status_summary = result.get('summary', {})
@@ -346,8 +393,12 @@ class DependencyUIModule(BaseUIModule):
                 missing = status_summary.get('missing', 0)
                 total = status_summary.get('total', 0)
                 
-                self.log(f"📊 Status paket: {installed}/{total} terinstal, {missing} hilang", 'info')
-                self.complete_progress(f"Pemeriksaan selesai: {installed}/{total} terinstal, {missing} hilang")
+                status_msg = f"Status: {installed}/{total} terinstal, {missing} hilang"
+                self.log(f"📊 {status_msg}", 'info')
+                self.update_operation_status("Pemeriksaan status selesai", "success")
+                
+                # Final update to 100%
+                self.complete_progress(status_msg)
                 
                 # Update internal package status
                 self._package_status = result.get('package_status', {})

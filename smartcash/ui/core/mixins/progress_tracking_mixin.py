@@ -28,9 +28,32 @@ class ProgressTrackingMixin:
             'level': 'primary'
         }
     
+    def is_progress_ready(self) -> bool:
+        """Check if progress tracker is ready for updates."""
+        if not hasattr(self, '_ui_components') or not self._ui_components:
+            return False
+            
+        # Check operation container
+        operation_container = self._ui_components.get('operation_container')
+        if operation_container:
+            if isinstance(operation_container, dict) and 'update_progress' in operation_container:
+                return True
+            if hasattr(operation_container, 'update_progress'):
+                return True
+                
+        # Check progress tracker
+        progress_tracker = self._ui_components.get('progress_tracker')
+        if progress_tracker:
+            if isinstance(progress_tracker, dict) and 'update' in progress_tracker:
+                return True
+            if hasattr(progress_tracker, 'update') and callable(progress_tracker.update):
+                return True
+                
+        return False
+    
     def update_progress(self, progress: int, message: str = "", level: str = "primary") -> None:
         """
-        Update progress display.
+        Update progress display with initialization check.
         
         Args:
             progress: Progress value (0-100)
@@ -38,60 +61,100 @@ class ProgressTrackingMixin:
             level: Progress level (primary, info, warning, error)
         """
         try:
-            # Update internal state
+            # Update internal state first
             self._progress_state.update({
                 'current': progress,
                 'message': message,
                 'level': level
             })
             
-            # Try operation manager first
-            if self._operation_manager and hasattr(self._operation_manager, 'update_progress'):
-                self._operation_manager.update_progress(progress, message, level)
+            # Check if progress tracker is ready
+            if not self.is_progress_ready():
+                # Store progress to be applied once ready
+                if not hasattr(self, '_pending_progress'):
+                    self._pending_progress = []
+                self._pending_progress.append({
+                    'progress': progress, 
+                    'message': message, 
+                    'level': level
+                })
                 return
-            
-            # Try operation container directly
-            if hasattr(self, '_ui_components') and self._ui_components:
-                operation_container = self._ui_components.get('operation_container')
-                if operation_container:
-                    # Handle dict-style operation container
-                    if isinstance(operation_container, dict) and 'update_progress' in operation_container:
-                        operation_container['update_progress'](progress, message, level)
-                        return
-                    # Handle object-style operation container
-                    elif hasattr(operation_container, 'update_progress'):
-                        operation_container.update_progress(progress, message, level)
-                        return
                 
-                # Try progress tracker component
-                progress_tracker = self._ui_components.get('progress_tracker')
-                if progress_tracker:
-                    # Handle dict-style progress tracker
-                    if isinstance(progress_tracker, dict) and 'update' in progress_tracker:
-                        progress_tracker['update'](progress, message)
-                        return
-                    # Handle object-style progress tracker
-                    elif hasattr(progress_tracker, 'update'):
-                        progress_tracker.update(progress, message)
-                        return
-            
-            # NO FALLBACK to console logger - store as pending progress instead
-            if not hasattr(self, '_pending_progress'):
+            # Clear any pending progress
+            if hasattr(self, '_pending_progress') and self._pending_progress:
+                for pending in self._pending_progress:
+                    self._update_progress_internal(**pending)
                 self._pending_progress = []
-            self._pending_progress.append({'progress': progress, 'message': message, 'level': level})
+                
+            # Update current progress
+            self._update_progress_internal(progress, message, level)
                 
         except Exception as e:
             if hasattr(self, 'logger'):
                 self.logger.debug(f"Failed to update progress: {e}")
     
+    def _update_progress_internal(self, progress: int, message: str, level: str) -> None:
+        """Internal method to update progress after initialization check."""
+        try:
+            # Try operation manager first
+            if hasattr(self, '_operation_manager') and self._operation_manager and hasattr(self._operation_manager, 'update_progress'):
+                self._operation_manager.update_progress(progress, message, level)
+                return
+                
+            # Try operation container
+            if hasattr(self, '_ui_components') and self._ui_components:
+                operation_container = self._ui_components.get('operation_container')
+                if operation_container:
+                    # Handle dict-style
+                    if isinstance(operation_container, dict) and 'update_progress' in operation_container:
+                        operation_container['update_progress'](progress, message, level)
+                        return
+                    # Handle object-style
+                    elif hasattr(operation_container, 'update_progress'):
+                        operation_container.update_progress(progress, message, level)
+                        return
+                        
+                # Try progress tracker directly
+                progress_tracker = self._ui_components.get('progress_tracker')
+                if progress_tracker:
+                    # Handle dict-style
+                    if isinstance(progress_tracker, dict) and 'update' in progress_tracker:
+                        progress_tracker['update'](progress, message)
+                        return
+                    # Handle object-style
+                    elif hasattr(progress_tracker, 'update') and callable(progress_tracker.update):
+                        progress_tracker.update(progress, message)
+                        return
+                        
+        except Exception as e:
+            if hasattr(self, 'logger'):
+                self.logger.debug(f"Error in _update_progress_internal: {e}")
+                
+    def ensure_progress_ready(self) -> bool:
+        """Ensure progress tracker is ready and initialize if needed."""
+        if self.is_progress_ready():
+            return True
+            
+        if hasattr(self, '_ui_components') and self._ui_components:
+            progress_tracker = self._ui_components.get('progress_tracker')
+            if progress_tracker and hasattr(progress_tracker, 'initialize'):
+                try:
+                    progress_tracker.initialize()
+                    return True
+                except Exception as e:
+                    if hasattr(self, 'logger'):
+                        self.logger.debug(f"Failed to initialize progress tracker: {e}")
+        return False
+    
     def start_progress(self, message: str = "Processing...", total: int = 100) -> None:
         """
-        Start progress tracking.
+        Start progress tracking with proper initialization.
         
         Args:
             message: Initial progress message
             total: Total progress value
         """
+        # Update internal state first
         self._progress_state.update({
             'current': 0,
             'total': total,
@@ -99,23 +162,31 @@ class ProgressTrackingMixin:
             'level': 'primary'
         })
         
-        # Make progress tracker visible before updating
+        # Ensure progress tracker is ready
+        if not self.ensure_progress_ready():
+            self.logger.warning("Progress tracker not ready, progress updates will be queued")
+        
+        # Make progress tracker visible
         if hasattr(self, '_ui_components') and self._ui_components:
             progress_tracker = self._ui_components.get('progress_tracker')
             if progress_tracker:
-                # Ensure initialization
-                if hasattr(progress_tracker, 'initialize') and not getattr(progress_tracker, '_initialized', False):
-                    progress_tracker.initialize()
-                
-                # Show the tracker
-                if hasattr(progress_tracker, 'show'):
-                    progress_tracker.show(operation=message)
-                
-                # Also try operation container progress
-                operation_container = self._ui_components.get('operation_container')
-                if operation_container and hasattr(operation_container, 'update_progress'):
-                    operation_container.update_progress(0, message, 'primary')
+                try:
+                    # Show the tracker
+                    if hasattr(progress_tracker, 'show') and callable(progress_tracker.show):
+                        progress_tracker.show(operation=message)
+                    
+                    # Also try operation container progress
+                    operation_container = self._ui_components.get('operation_container')
+                    if operation_container:
+                        if isinstance(operation_container, dict) and 'update_progress' in operation_container:
+                            operation_container['update_progress'](0, message, 'primary')
+                        elif hasattr(operation_container, 'update_progress'):
+                            operation_container.update_progress(0, message, 'primary')
+                except Exception as e:
+                    if hasattr(self, 'logger'):
+                        self.logger.debug(f"Error showing progress tracker: {e}")
         
+        # Update progress after ensuring tracker is ready
         self.update_progress(0, message, 'primary')
     
     def complete_progress(self, message: str = "Completed") -> None:

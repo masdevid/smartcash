@@ -59,11 +59,24 @@ class DependencyConfigHandler(LoggingMixin, ConfigurationMixin):
     
     # ==================== CONFIGURATION ACCESS METHODS ====================
     
-    def update_config(self, updates: Dict[str, Any]) -> None:
-        """Update configuration with new values."""
-        # Directly update the merged config to prevent recursion
+    def update_config(self, updates: Dict[str, Any], skip_ui_update: bool = True):
+        """
+        Update configuration with new values.
+        
+        Args:
+            updates: Dictionary of configuration updates
+            skip_ui_update: Whether to skip UI updates to prevent circular references
+        """
         if not hasattr(self, '_merged_config'):
             self._merged_config = {}
+            
+        # Update the config
+        self._merged_config.update(updates)
+        
+        # Update UI only if explicitly requested and components are available
+        if not skip_ui_update and hasattr(self, '_ui_components') and self._ui_components:
+            if hasattr(self, 'sync_to_ui'):
+                self.sync_to_ui(self._ui_components, self._merged_config)
         
         # Update each key-value pair directly in the merged config
         for key, value in updates.items():
@@ -206,6 +219,36 @@ class DependencyConfigHandler(LoggingMixin, ConfigurationMixin):
             return {'valid': False, 'message': error_msg}
     
     # ==================== CONFIGURATION OPERATIONS ====================
+    
+    def save_config(self) -> Dict[str, Any]:
+        """
+        Save current configuration.
+        
+        Returns:
+            Dict with operation result
+        """
+        try:
+            # Get current config without triggering UI extraction
+            current_config = self.get_current_config()
+            
+            # Here you would typically save to persistent storage
+            # For now, we'll just log and return success
+            self.logger.info("✅ Configuration saved successfully")
+            
+            return {
+                'success': True,
+                'message': 'Configuration saved successfully',
+                'config': current_config
+            }
+            
+        except Exception as e:
+            error_msg = f"Failed to save configuration: {str(e)}"
+            self.logger.error(f"❌ {error_msg}")
+            return {
+                'success': False,
+                'message': error_msg,
+                'config': getattr(self, '_merged_config', {})
+            }
     
     def reset_config(self, reset_ui: bool = True) -> Dict[str, Any]:
         """

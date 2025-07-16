@@ -1,26 +1,22 @@
-[19:56:17] INFO - 📊 Progress: 0% - Memeriksa status paket...
-[19:56:17] INFO - 📊 Progress: 25% - Memproses pemeriksaan status...
-[19:56:17] INFO - 📊 Progress: 50% - Memeriksa status paket...
-[19:56:20] INFO - Progress: Memeriksa status paket: thop (1/21) (4.761904761904762/100)
-[19:56:28] INFO - Progress: Memeriksa status paket: scikit-learn (2/21) (9.523809523809524/100)
-[19:56:28] INFO - Progress: Memeriksa status paket: torchvision (3/21) (14.285714285714285/100)
-[19:56:30] INFO - Progress: Memeriksa status paket: scipy (4/21) (19.047619047619047/100)
-[19:56:32] INFO - Progress: Memeriksa status paket: python-dotenv (5/21) (23.809523809523807/100)
-[19:56:35] INFO - Progress: Memeriksa status paket: Pillow (6/21) (28.57142857142857/100)
-[19:56:42] INFO - Progress: Memeriksa status paket: opencv-python (7/21) (33.33333333333333/100)
-[19:56:43] INFO - Progress: Memeriksa status paket: pytz (8/21) (38.095238095238095/100)
-[19:56:46] INFO - Progress: Memeriksa status paket: torch (9/21) (42.857142857142854/100)
-[19:56:48] INFO - Progress: Memeriksa status paket: albumentations (10/21) (47.61904761904761/100)
-[19:56:51] INFO - Progress: Memeriksa status paket: ultralytics (11/21) (52.38095238095239/100)
-[19:56:55] INFO - Progress: Memeriksa status paket: ipywidgets (12/21) (57.14285714285714/100)
-[19:56:55] INFO - Progress: Memeriksa status paket: tensorboard (13/21) (61.904761904761905/100)
-[19:56:57] INFO - Progress: Memeriksa status paket: ipython (14/21) (66.66666666666666/100)
-[19:56:58] INFO - Progress: Memeriksa status paket: sahi (15/21) (71.42857142857143/100)
-[19:56:58] INFO - Progress: Memeriksa status paket: pybboxes (16/21) (76.19047619047619/100)
-[19:57:05] INFO - Progress: Memeriksa status paket: matplotlib (17/21) (80.95238095238095/100)
-[19:57:11] INFO - Progress: Memeriksa status paket: pyyaml (18/21) (85.71428571428571/100)
-[19:57:11] INFO - Progress: Memeriksa status paket: pandas (19/21) (90.47619047619048/100)
-[19:57:12] INFO - Progress: Memeriksa status paket: numpy (20/21) (95.23809523809523/100)
-[19:57:14] INFO - Progress: Memeriksa status paket: timm (21/21) (100.0/100)
-[19:57:14] INFO - 📊 Progress: 100% - Pemeriksaan selesai
-[19:57:14] INFO - 📊 Progress: 0% - Pemeriksaan selesai: 0/0 terinstal, 0 hilang
+[04:10:57] ERROR - Failed to update config value module_name: maximum recursion depth exceeded
+[04:10:57] ERROR - Failed to update config value module_name: maximum recursion depth exceeded
+[04:10:57] ERROR - Failed to update config value version: maximum recursion depth exceeded
+[04:10:57] ERROR - Failed to update config value version: maximum recursion depth exceeded
+[04:10:57] ERROR - Failed to update config value created_by: maximum recursion depth exceeded
+[04:10:57] ERROR - Failed to update config value created_by: maximum recursion depth exceeded
+[04:10:57] ERROR - Failed to update config value description: maximum recursion depth exceeded
+[04:10:57] ERROR - Failed to update config value description: maximum recursion depth exceeded
+[04:10:57] ERROR - Failed to update config value selected_packages: maximum recursion depth exceeded
+[04:10:57] ERROR - Failed to update config value selected_packages: maximum recursion depth exceeded
+[04:10:57] ERROR - Failed to update config value custom_packages: maximum recursion depth exceeded
+[04:10:57] ERROR - Failed to update config value custom_packages: maximum recursion depth exceeded
+[04:10:57] ERROR - Failed to update config value uninstalled_defaults: maximum recursion depth exceeded
+[04:10:57] ERROR - Failed to update config value uninstalled_defaults: maximum recursion depth exceeded
+[04:10:57] ERROR - Failed to update config value package_categories: maximum recursion depth exceeded
+[04:10:57] ERROR - Failed to update config value package_categories: maximum recursion depth exceeded
+[04:10:57] ERROR - Failed to update config value install_options: maximum recursion depth exceeded
+[04:10:57] ERROR - Failed to update config value install_options: maximum recursion depth exceeded
+[04:10:57] ERROR - Failed to update config value ui_settings: maximum recursion depth exceeded
+[04:10:57] ERROR - Failed to update config value ui_settings: maximum recursion depth exceeded
+[04:10:57] ERROR - Failed to update config value last_extracted: maximum recursion depth exceeded
+[04:10:57] ERROR - Failed to update config value last_extracted: maximum recursion depth exceeded

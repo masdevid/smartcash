@@ -61,9 +61,24 @@ class DependencyConfigHandler(LoggingMixin, ConfigurationMixin):
     
     def update_config(self, updates: Dict[str, Any]) -> None:
         """Update configuration with new values."""
-        # Use ConfigurationMixin methods
+        # Directly update the merged config to prevent recursion
+        if not hasattr(self, '_merged_config'):
+            self._merged_config = {}
+        
+        # Update each key-value pair directly in the merged config
         for key, value in updates.items():
-            self.update_config_value(key, value)
+            # Handle nested updates with dot notation
+            keys = key.split('.')
+            current = self._merged_config
+            
+            # Navigate to the parent of the target key
+            for k in keys[:-1]:
+                if k not in current or not isinstance(current[k], dict):
+                    current[k] = {}
+                current = current[k]
+            
+            # Set the final value
+            current[keys[-1]] = value
     
     # ==================== UI INTEGRATION ====================
     

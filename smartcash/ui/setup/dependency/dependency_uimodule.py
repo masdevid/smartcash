@@ -208,15 +208,17 @@ class DependencyUIModule(BaseUIModule):
     
     def _operation_install_packages(self, button=None) -> Dict[str, Any]:  # noqa: ARG002
         """Handle package installation operation using mixin pattern."""
-        button_states = None
+        # Store the button that triggered the operation
+        button_id = getattr(button, 'description', 'install').lower().replace(' ', '_')
+        
         try:
             # Start operation logging and progress tracking
             self.log_operation_start("Instalasi Paket")
             self.start_progress("Memulai instalasi paket...", 0)
             self.update_operation_status("Memulai instalasi paket...", "info")
             
-            # Disable all buttons during operation
-            button_states = self.disable_all_buttons("⏳ Installing packages...")
+            # Only disable the clicked button, not all buttons
+            button_states = self.disable_all_buttons("⏳ Installing packages...", button_id=button_id)
             
             # Get selected packages from UI
             selected_packages = self._get_selected_packages()
@@ -255,21 +257,23 @@ class DependencyUIModule(BaseUIModule):
             self.error_progress(error_msg)
             return {'success': False, 'message': error_msg}
         finally:
-            # Re-enable buttons
-            if button_states:
-                self.enable_all_buttons(button_states)
+            # Re-enable only the specific button that was disabled
+            if button_id:
+                self.enable_all_buttons(button_id=button_id)
     
     def _operation_uninstall_packages(self, button=None) -> Dict[str, Any]:  # noqa: ARG002
         """Handle package uninstallation operation using mixin pattern."""
-        button_states = None
+        # Store the button that triggered the operation
+        button_id = getattr(button, 'description', 'uninstall').lower().replace(' ', '_')
+        
         try:
             # Start operation logging and progress tracking
             self.log_operation_start("Uninstal Paket")
             self.start_progress("Memulai uninstal paket...", 0)
             self.update_operation_status("Memulai uninstal paket...", "info")
             
-            # Disable all buttons during operation
-            button_states = self.disable_all_buttons("⏳ Uninstalling packages...")
+            # Only disable the clicked button, not all buttons
+            button_states = self.disable_all_buttons("⏳ Uninstalling packages...", button_id=button_id)
             
             # Get selected packages from UI
             selected_packages = self._get_selected_packages()
@@ -308,21 +312,23 @@ class DependencyUIModule(BaseUIModule):
             self.error_progress(error_msg)
             return {'success': False, 'message': error_msg}
         finally:
-            # Re-enable buttons
-            if button_states:
-                self.enable_all_buttons(button_states)
+            # Re-enable only the specific button that was disabled
+            if button_id:
+                self.enable_all_buttons(button_id=button_id)
     
     def _operation_check_status(self, button=None) -> Dict[str, Any]:  # noqa: ARG002
         """Handle package status check operation using mixin pattern."""
-        button_states = None
+        # Store the button that triggered the operation
+        button_id = getattr(button, 'description', 'check_status').lower().replace(' ', '_')
+        
         try:
             # Start operation logging and progress tracking
             self.log_operation_start("Cek Status Paket")
             self.start_progress("Memeriksa status paket...", 0)
             self.update_operation_status("Memeriksa status paket...", "info")
             
-            # Disable all buttons during operation
-            button_states = self.disable_all_buttons("⏳ Checking package status...")
+            # Only disable the clicked button, not all buttons
+            button_states = self.disable_all_buttons("⏳ Checking package status...", button_id=button_id)
             
             # Update progress
             self.update_progress(25, "Memproses pemeriksaan status...")
@@ -361,21 +367,23 @@ class DependencyUIModule(BaseUIModule):
             self.error_progress(error_msg)
             return {'success': False, 'message': error_msg}
         finally:
-            # Re-enable buttons
-            if button_states:
-                self.enable_all_buttons(button_states)
+            # Re-enable only the specific button that was disabled
+            if button_id:
+                self.enable_all_buttons(button_id=button_id)
     
     def _operation_update_packages(self, button=None) -> Dict[str, Any]:  # noqa: ARG002
         """Handle package update operation using mixin pattern."""
-        button_states = None
+        # Store the button that triggered the operation
+        button_id = getattr(button, 'description', 'update').lower().replace(' ', '_')
+        
         try:
             # Start operation logging and progress tracking
             self.log_operation_start("Update Paket")
             self.start_progress("Memulai update paket...", 0)
             self.update_operation_status("Memulai update paket...", "info")
             
-            # Disable all buttons during operation
-            button_states = self.disable_all_buttons("⏳ Updating packages...")
+            # Only disable the clicked button, not all buttons
+            button_states = self.disable_all_buttons("⏳ Updating packages...", button_id=button_id)
             
             # Update progress
             self.update_progress(25, "Memproses update paket...")
@@ -404,15 +412,21 @@ class DependencyUIModule(BaseUIModule):
             self.error_progress(error_msg)
             return {'success': False, 'message': error_msg}
         finally:
-            # Re-enable buttons
-            if button_states:
-                self.enable_all_buttons(button_states)
+            # Re-enable only the specific button that was disabled
+            if button_id:
+                self.enable_all_buttons(button_id=button_id)
     
     def _operation_refresh_status(self, button=None) -> Dict[str, Any]:  # noqa: ARG002
         """Handle refresh package status operation using mixin pattern."""
+        # Store the button that triggered the operation
+        button_id = getattr(button, 'description', 'refresh').lower().replace(' ', '_')
+        
         try:
             self.log_operation_start("Refresh Status")
             self.update_operation_status("Memperbarui status paket...", "info")
+            
+            # Only disable the clicked button, not all buttons
+            button_states = self.disable_all_buttons("⏳ Refreshing status...", button_id=button_id)
             
             # Clear cached status
             self._package_status = {}
@@ -432,6 +446,10 @@ class DependencyUIModule(BaseUIModule):
             self.log_operation_error("Refresh Status", str(e))
             self.update_operation_status(error_msg, "error")
             return {'success': False, 'message': error_msg}
+        finally:
+            # Re-enable only the specific button that was disabled
+            if button_id:
+                self.enable_all_buttons(button_id=button_id)
     
     # ==================== OPERATION EXECUTION METHODS ====================
     

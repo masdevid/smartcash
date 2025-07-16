@@ -266,12 +266,13 @@ class ButtonHandlerMixin:
         """
         return self._button_states.copy()
     
-    def disable_all_buttons(self, message: str = "⏳ Operation in progress...") -> Dict[str, Any]:
+    def disable_all_buttons(self, message: str = "⏳ Operation in progress...", button_id: str = None) -> Dict[str, Any]:
         """
-        Disable all buttons and store their previous states.
+        Disable buttons and store their previous states.
         
         Args:
             message: Message to display for operation buttons (save/reset keep original text)
+            button_id: If provided, only disable this specific button. If None, disable all buttons.
             
         Returns:
             Dictionary containing previous button states for restoration
@@ -293,24 +294,37 @@ class ButtonHandlerMixin:
             # Method 2: Direct button widgets
             button_keys = [key for key in self._ui_components.keys() if key.endswith('_button')]
             for button_key in button_keys:
-                button_id = button_key.replace('_button', '')
-                buttons[button_id] = self._ui_components[button_key]
+                btn_id = button_key.replace('_button', '')
+                buttons[btn_id] = self._ui_components[button_key]
+            
+            # If a specific button_id is provided, only process that button
+            if button_id is not None:
+                buttons = {k: v for k, v in buttons.items() if k == button_id}
             
             # Disable each button and store its previous state
-            for button_id, button in buttons.items():
+            for btn_id, button in buttons.items():
                 if button and hasattr(button, 'disabled') and hasattr(button, 'description'):
                     # Store original state
-                    button_states[button_id] = {
+                    button_states[btn_id] = {
                         'disabled': button.disabled,
-                        'description': button.description
+                        'description': button.description,
+                        'modified': False  # Track if we modified this button
                     }
                     
-                    # Disable button
-                    button.disabled = True
+                    # Only modify if not already disabled
+                    if not button.disabled:
+                        button.disabled = True
+                        button_states[btn_id]['modified'] = True
                     
                     # Update description only for operation buttons, not save/reset
-                    if button_id not in ['save', 'reset']:
+                    if btn_id not in ['save', 'reset'] and btn_id != button_id:
+                        button_states[btn_id]['original_description'] = button.description
                         button.description = message
+            
+            # Store the button states for later restoration
+            if not hasattr(self, '_button_states_backup'):
+                self._button_states_backup = {}
+            self._button_states_backup.update(button_states)
             
             return button_states
             
@@ -319,15 +333,23 @@ class ButtonHandlerMixin:
                 self.logger.error(f"Error disabling buttons: {e}")
             return {}
     
-    def enable_all_buttons(self, button_states: Dict[str, Any] = None) -> None:
+    def enable_all_buttons(self, button_states: Dict[str, Any] = None, button_id: str = None) -> None:
         """
-        Re-enable all buttons and restore their previous states.
+        Re-enable buttons and restore their previous states.
         
         Args:
-            button_states: Previous button states to restore
+            button_states: Previous button states to restore. If None, use internal backup.
+            button_id: If provided, only enable this specific button. If None, enable all buttons.
         """
         try:
-            if not button_states or not hasattr(self, '_ui_components') or not self._ui_components:
+            if not hasattr(self, '_ui_components') or not self._ui_components:
+                return
+            
+            # Use internal backup if no button_states provided
+            if button_states is None and hasattr(self, '_button_states_backup'):
+                button_states = self._button_states_backup
+            
+            if not button_states:
                 return
             
             # Get buttons from different sources
@@ -341,17 +363,35 @@ class ButtonHandlerMixin:
             # Method 2: Direct button widgets
             button_keys = [key for key in self._ui_components.keys() if key.endswith('_button')]
             for button_key in button_keys:
-                button_id = button_key.replace('_button', '')
-                buttons[button_id] = self._ui_components[button_key]
+                btn_id = button_key.replace('_button', '')
+                buttons[btn_id] = self._ui_components[button_key]
             
-            # Restore all button states
-            for button_id, button_state in button_states.items():
-                button = buttons.get(button_id)
-                if button and hasattr(button, 'disabled'):
-                    # Restore original state
-                    button.disabled = button_state['disabled']
-                    if hasattr(button, 'description'):
-                        button.description = button_state['description']
+            # If a specific button_id is provided, only process that button
+            if button_id is not None:
+                buttons = {k: v for k, v in buttons.items() if k == button_id}
+            
+            # Restore button states
+            for btn_id, button in buttons.items():
+                if btn_id in button_states and button and hasattr(button, 'disabled'):
+                    state = button_states[btn_id]
+                    # Only modify if we previously modified this button
+                    if state.get('modified', True):
+                        button.disabled = state.get('disabled', False)
+                        
+                        # Restore original description if we have it
+                        if 'original_description' in state and hasattr(button, 'description'):
+                            button.description = state['original_description']
+                        elif 'description' in state and hasattr(button, 'description'):
+                            button.description = state['description']
+            
+            # Clean up the backup
+            if button_id is not None and hasattr(self, '_button_states_backup'):
+                if button_id in self._button_states_backup:
+                    del self._button_states_backup[button_id]
+            else:
+                # Clear all backups if we're enabling all buttons
+                if hasattr(self, '_button_states_backup'):
+                    del self._button_states_backup
             
         except Exception as e:
             if hasattr(self, 'logger'):

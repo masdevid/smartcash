@@ -207,26 +207,25 @@ class DependencyConfigHandler(LoggingMixin, ConfigurationMixin):
     
     # ==================== CONFIGURATION OPERATIONS ====================
     
-    def reset_config(self) -> Dict[str, Any]:
+    def reset_config(self, reset_ui: bool = True) -> Dict[str, Any]:
         """
         Reset configuration to defaults.
         
+        Args:
+            reset_ui: Whether to update the UI after reset
+            
         Returns:
             Dict with operation result
         """
         try:
-            # Get default configuration
+            # Get default configuration directly without calling parent
             default_config = self.get_default_config()
             
             # Update internal config
             self._merged_config = default_config.copy()
             
-            # Update config handler if it has update_config
-            if hasattr(self, 'update_config'):
-                self.update_config(default_config)
-            
-            # Sync UI if components are available
-            if hasattr(self, '_ui_components') and self._ui_components:
+            # Sync UI if components are available and reset_ui is True
+            if reset_ui and hasattr(self, '_ui_components') and self._ui_components:
                 if hasattr(self, 'sync_to_ui'):
                     self.sync_to_ui(self._ui_components, self._merged_config)
             

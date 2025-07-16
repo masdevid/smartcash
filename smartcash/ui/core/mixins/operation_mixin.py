@@ -256,11 +256,11 @@ class OperationMixin:
                 self._operation_manager.update_status(message, level)
                 return
             
-            # Try operation container next
+            # CORRECT: Status updates go to header_container, NOT operation_container
             if hasattr(self, '_ui_components') and self._ui_components:
-                operation_container = self._ui_components.get('operation_container')
-                if operation_container and hasattr(operation_container, 'update_status'):
-                    operation_container.update_status(message, level)
+                header_container = self._ui_components.get('header_container')
+                if header_container and hasattr(header_container, 'update_status'):
+                    header_container.update_status(message, level)
                     return
             
             # During initialization, suppress status logging to avoid console spam
@@ -279,6 +279,69 @@ class OperationMixin:
         except Exception as e:
             if hasattr(self, 'logger'):
                 self.logger.debug(f"Failed to update operation status: {e}")
+    
+    def update_progress(self, progress: int, message: str = "", level: str = "primary") -> None:
+        """
+        Update progress display - delegates to operation_container.
+        
+        Progress updates go to operation_container for centralized handling.
+        
+        Args:
+            progress: Progress value (0-100)
+            message: Progress message
+            level: Progress level (primary, secondary, tertiary)
+        """
+        try:
+            # Try operation manager first
+            if self._operation_manager and hasattr(self._operation_manager, 'update_progress'):
+                self._operation_manager.update_progress(progress, message, level)
+                return
+            
+            # Delegate to operation_container for progress updates
+            if hasattr(self, '_ui_components') and self._ui_components:
+                operation_container = self._ui_components.get('operation_container')
+                if operation_container and hasattr(operation_container, 'update_progress'):
+                    operation_container.update_progress(progress, message, level)
+                    return
+            
+            # Fallback logging
+            if hasattr(self, 'logger'):
+                self.logger.debug(f"[Progress] {progress}% - {message}")
+                
+        except Exception as e:
+            if hasattr(self, 'logger'):
+                self.logger.debug(f"Failed to update progress: {e}")
+    
+    def log_operation(self, message: str, level: str = "info") -> None:
+        """
+        Log operation message - delegates to operation_container.
+        
+        Log messages go to operation_container for centralized handling.
+        
+        Args:
+            message: Log message
+            level: Log level (info, warning, error)
+        """
+        try:
+            # Try operation manager first
+            if self._operation_manager and hasattr(self._operation_manager, 'log'):
+                self._operation_manager.log(message, level)
+                return
+            
+            # Delegate to operation_container for log messages
+            if hasattr(self, '_ui_components') and self._ui_components:
+                operation_container = self._ui_components.get('operation_container')
+                if operation_container and hasattr(operation_container, 'log'):
+                    operation_container.log(message, level)
+                    return
+            
+            # Fallback logging
+            if hasattr(self, 'logger'):
+                getattr(self.logger, level, self.logger.info)(message)
+                
+        except Exception as e:
+            if hasattr(self, 'logger'):
+                self.logger.debug(f"Failed to log operation message: {e}")
     
     def get_operation_result(self, operation_name: str) -> Optional[Dict[str, Any]]:
         """
@@ -309,3 +372,172 @@ class OperationMixin:
             return self._operation_manager.is_running(operation_name)
         
         return False
+    
+    def update_summary(self, content: str, theme: str = "default") -> None:
+        """
+        Update summary container content.
+        
+        Args:
+            content: HTML content to display in summary
+            theme: Theme for the summary container
+        """
+        try:
+            # Try operation manager first
+            if self._operation_manager and hasattr(self._operation_manager, 'update_summary'):
+                self._operation_manager.update_summary(content, theme)
+                return
+            
+            # Delegate to summary_container for summary updates
+            if hasattr(self, '_ui_components') and self._ui_components:
+                summary_container = self._ui_components.get('summary_container')
+                if summary_container and hasattr(summary_container, 'set_html'):
+                    summary_container.set_html(content, theme)
+                    return
+            
+            # Fallback logging
+            if hasattr(self, 'logger'):
+                self.logger.debug(f"[Summary] {content}")
+                
+        except Exception as e:
+            if hasattr(self, 'logger'):
+                self.logger.debug(f"Failed to update summary: {e}")
+    
+    def show_summary_message(self, title: str, message: str, message_type: str = "info", icon: str = None) -> None:
+        """
+        Show a message in the summary container.
+        
+        Args:
+            title: Message title
+            message: Message content
+            message_type: Message type (info, success, warning, danger, primary)
+            icon: Optional icon to display
+        """
+        try:
+            # Try operation manager first
+            if self._operation_manager and hasattr(self._operation_manager, 'show_summary_message'):
+                self._operation_manager.show_summary_message(title, message, message_type, icon)
+                return
+            
+            # Delegate to summary_container for message display
+            if hasattr(self, '_ui_components') and self._ui_components:
+                summary_container = self._ui_components.get('summary_container')
+                if summary_container and hasattr(summary_container, 'show_message'):
+                    summary_container.show_message(title, message, message_type, icon)
+                    return
+            
+            # Fallback logging
+            if hasattr(self, 'logger'):
+                self.logger.info(f"[Summary] {title}: {message}")
+                
+        except Exception as e:
+            if hasattr(self, 'logger'):
+                self.logger.debug(f"Failed to show summary message: {e}")
+    
+    def show_summary_status(self, items: Dict[str, Any], title: str = "", icon: str = "") -> None:
+        """
+        Show status items in the summary container.
+        
+        Args:
+            items: Dictionary of status items and their values
+            title: Optional title for the status
+            icon: Optional icon for the title
+        """
+        try:
+            # Try operation manager first
+            if self._operation_manager and hasattr(self._operation_manager, 'show_summary_status'):
+                self._operation_manager.show_summary_status(items, title, icon)
+                return
+            
+            # Delegate to summary_container for status display
+            if hasattr(self, '_ui_components') and self._ui_components:
+                summary_container = self._ui_components.get('summary_container')
+                if summary_container and hasattr(summary_container, 'show_status'):
+                    summary_container.show_status(items, title, icon)
+                    return
+            
+            # Fallback logging
+            if hasattr(self, 'logger'):
+                status_text = ", ".join([f"{k}: {v}" for k, v in items.items()])
+                self.logger.info(f"[Summary Status] {title}: {status_text}")
+                
+        except Exception as e:
+            if hasattr(self, 'logger'):
+                self.logger.debug(f"Failed to show summary status: {e}")
+    
+    def clear_summary(self) -> None:
+        """Clear the summary container content."""
+        try:
+            # Try operation manager first
+            if self._operation_manager and hasattr(self._operation_manager, 'clear_summary'):
+                self._operation_manager.clear_summary()
+                return
+            
+            # Delegate to summary_container for clearing
+            if hasattr(self, '_ui_components') and self._ui_components:
+                summary_container = self._ui_components.get('summary_container')
+                if summary_container and hasattr(summary_container, 'clear'):
+                    summary_container.clear()
+                    return
+            
+            # Fallback logging
+            if hasattr(self, 'logger'):
+                self.logger.debug("[Summary] Cleared")
+                
+        except Exception as e:
+            if hasattr(self, 'logger'):
+                self.logger.debug(f"Failed to clear summary: {e}")
+    
+    def show_operation_dialog(self, message: str, title: str = "Operation", dialog_type: str = "info", buttons: Optional[Dict[str, Any]] = None, callback: Optional[callable] = None) -> None:
+        """
+        Show an operation dialog.
+        
+        Args:
+            message: Dialog message
+            title: Dialog title
+            dialog_type: Dialog type (info, confirmation, warning, error)
+            buttons: Optional custom buttons configuration
+            callback: Optional callback function for dialog actions
+        """
+        try:
+            # Try operation manager first
+            if self._operation_manager and hasattr(self._operation_manager, 'show_operation_dialog'):
+                self._operation_manager.show_operation_dialog(message, title, dialog_type, buttons, callback)
+                return
+            
+            # Delegate to operation_container for dialog display
+            if hasattr(self, '_ui_components') and self._ui_components:
+                operation_container = self._ui_components.get('operation_container')
+                if operation_container and hasattr(operation_container, 'show_dialog'):
+                    operation_container.show_dialog(message, title, dialog_type, buttons, callback)
+                    return
+            
+            # Fallback logging
+            if hasattr(self, 'logger'):
+                self.logger.info(f"[Dialog] {title}: {message}")
+                
+        except Exception as e:
+            if hasattr(self, 'logger'):
+                self.logger.debug(f"Failed to show operation dialog: {e}")
+    
+    def clear_operation_dialog(self) -> None:
+        """Clear the operation dialog."""
+        try:
+            # Try operation manager first
+            if self._operation_manager and hasattr(self._operation_manager, 'clear_operation_dialog'):
+                self._operation_manager.clear_operation_dialog()
+                return
+            
+            # Delegate to operation_container for dialog clearing
+            if hasattr(self, '_ui_components') and self._ui_components:
+                operation_container = self._ui_components.get('operation_container')
+                if operation_container and hasattr(operation_container, 'clear_dialog'):
+                    operation_container.clear_dialog()
+                    return
+            
+            # Fallback logging
+            if hasattr(self, 'logger'):
+                self.logger.debug("[Dialog] Cleared")
+                
+        except Exception as e:
+            if hasattr(self, 'logger'):
+                self.logger.debug(f"Failed to clear operation dialog: {e}")

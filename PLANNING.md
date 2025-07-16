@@ -1,12 +1,12 @@
 # SmartCash Development Plan
 
 ## Overview
-SmartCash UI system has evolved to a modern **UIModule-centric architecture** with improved success rates and consistent patterns.
+SmartCash UI system now features a **modern BaseUIModule architecture** with a robust mixin-based design, standardized patterns, and comprehensive error handling.
 
 ## 🚀 Recent Updates (July 2025)
 
 ### ✅ Dependency Module Modernization Complete
-**Date**: July 15, 2025  
+**Date**: July 16, 2025  
 **Impact**: Major architectural improvements and production readiness
 
 **Key Achievements**:
@@ -14,101 +14,131 @@ SmartCash UI system has evolved to a modern **UIModule-centric architecture** wi
 - **Full Indonesian Localization**: Entire UI translated to Bahasa Indonesia for local users but keep data science terms in English
 - **BaseUIModule Migration**: Successfully migrated from legacy UIModule to modern BaseUIModule pattern
 - **Environment Integration**: Added robust EnvironmentManager support for Colab/Local detection (see `smartcash/common/environment.py`)
-- **Package Selector Component**: Created missing component with advanced package selection logic
 - **Code Quality**: Resolved all minor issues, unused parameters, and diagnostic warnings
 - **Comprehensive Testing**: Full test coverage including mock UI components and edge cases
 - **Maintainability**: BaseUIModule pattern reduces code duplication and standardizes architecture
 
-## Architecture Overview
+### ✅ BaseUIModule Architecture Refinement
+**Date**: July 16, 2025  
+**Impact**: Simplified and more maintainable UI architecture
 
-### 🏗️ New UIModule-Centric Architecture
-The system has been completely refactored from legacy patterns to a unified UIModule approach:
+**Key Improvements**:
+- **Config Orchestration Pattern**: BaseUIModule now acts as pure config orchestrator, delegating implementation to separate config_handler classes
+- **Removed UIModule Compatibility**: Eliminated legacy UIModule compatibility layer for cleaner architecture
+- **Shared Methods Cleanup**: Removed unnecessary shared methods from dependency module for better separation of concerns
+- **Progress Tracking Delegation**: Granular progress tracking properly delegated to individual operation handlers with operation mixin
+- **Button Handler Integration**: Comprehensive button handler registration and management working correctly
+- **Operation Container Logging**: All initialization and operation logs properly redirected to operation container
+- **IPython Compatibility**: Fixed import issues for environments without IPython/Jupyter
+
+## Architecture Overview
 
 ### 🔧 Core Infrastructure (smartcash/ui/core/)
 
-#### ⭐ New UIModule Pattern
-- **`ui_module.py`** - Central UIModule class with handler composition
-- **`ui_module_factory.py`** - Factory pattern for module creation and lifecycle
-- **Template System** - Reusable module configurations
-- **SharedMethodRegistry** - Cross-module method sharing with categories
-- **Thread-safe operations** - Proper locking and weak reference management
+#### ⭐ BaseUIModule Pattern
+- **Core Mixins**
+  - `ConfigurationMixin` - Config management with validation
+  - `OperationMixin` - Operation lifecycle and UI coordination
+  - `LoggingMixin` - Unified logging interface
+  - `ButtonHandlerMixin` - Button event management
+  - `ValidationMixin` - Input validation
+  - `DisplayMixin` - UI theming and layout
 
-#### 🔄 Legacy Support (Maintained for Backward Compatibility)
-- **`handlers/`** - Original handler patterns (24+ modules still using)
-- **`initializers/`** - Legacy initialization patterns  
-- **`errors/`** - Comprehensive error handling system
-- **`configs/`** - Base configuration handlers
-- **`decorators/`** - UI operation decorators
-- **`logging/`** - UI logging management
-- **`shared/`** - Shared configuration management
-- **`utils/`** - Utility functions (log suppression, etc.)
+- **Key Features**
+  - Standardized component initialization
+  - Built-in error handling and recovery
+  - Progress tracking and status updates
+  - Dialog and notification system
+  - Environment detection (Colab, local, etc.)
 
-### 📦 Container Architecture (smartcash/ui/components/)
-Keep original forms with standardized container system used across all modules:
-- **Header Container** - Title, subtitle, status
-- **Form Container** - Module-specific forms and inputs
-- **Action Container** - Save/reset, primary actions, operation buttons
-- **Operation Container** - Progress tracking, dialogs, logging
-- **Footer Container** - Info accordions, tips, documentation
+#### 🔄 Legacy Components (Phasing Out)
+- `handlers/` - Being replaced by mixins
+- `initializers/` - Superseded by BaseUIModule
+- `configs/` - Functionality moved to ConfigurationMixin
 
-## 🏗️ UI Module Refactoring Architecture
+> ℹ️ See `UI_ARCHITECTURE.md` for detailed component specifications and usage examples.
 
-### ⭐ NEW: BaseUIModule Pattern
-A comprehensive refactoring has been completed to eliminate code duplication and standardize UI module development:
+## 🏗️ UI Module Architecture
 
-**Location**: `smartcash/ui/core/base_ui_module.py` and `smartcash/ui/core/mixins/`
+### ⭐ Modern BaseUIModule Implementation
+A streamlined, mixin-based architecture that provides consistent UI behavior and reduces boilerplate:
 
-**Key Components**:
-- **7 Specialized Mixins**: Configuration, Operation, Logging, Progress, Button Handling, Validation, Display
-- **BaseUIModule Class**: Combines all mixins into unified base class
-- **Enhanced Factory**: Generates standardized initialization functions
-- **90% Code Reduction**: Common functionality moved to reusable mixins
+**Core Files**:
+- `base_ui_module.py`: Central class combining all essential mixins
+- `mixins/`: Directory containing modular functionality components
 
-**Benefits**:
-- Consistent behavior across all modules
-- Massive reduction in boilerplate code
-- Easier maintenance and testing
-- Standardized error handling and logging
+**Key Mixins**:
+1. `ConfigurationMixin`: Centralized config management with validation
+2. `OperationMixin`: Operation lifecycle and UI coordination
+3. `LoggingMixin`: Unified logging interface
+4. `ButtonHandlerMixin`: Event handling for UI controls
+5. `ValidationMixin`: Input validation framework
+6. `DisplayMixin`: UI theming and layout utilities
 
-**Documentation**: See `UI_MODULE_REFACTORING.md` for complete migration guide
-- Implement correct Operation Container API (see `OPERATION_CONTAINER_GUIDE.md`)
-- Verifiy operation robustnest using Operation checklist at `OPERATION_CHECKLISTS.md`
+**Development Benefits**:
+- 🚀 90% less boilerplate code
+- 🛡️ Built-in error handling and recovery
+- 🔄 Consistent behavior across modules
+- 🧪 Simplified testing through modular design
+- 📱 Responsive layout support
+
+**Implementation Notes**:
+- All new modules should inherit from `BaseUIModule`
+- Use the provided mixins instead of direct handler implementations
+- Refer to `UI_ARCHITECTURE.md` for detailed usage patterns
 
 ## 🏗️ Current Core UI Structure
 
 ### New UIModule Architecture
 ```
 smartcash/ui/core/
-    ├── ui_module.py                    # ⭐ NEW: Central UIModule class
-    ├── ui_module_factory.py            # ⭐ NEW: Factory pattern & templates
-    ├── __init__.py                     # Core exports
-    ├── handlers/                       # 🔄 Legacy handlers (still in use)
-    │   ├── base_handler.py            # Base handler with error handling
-    │   ├── config_handler.py          # Configuration management
-    │   ├── ui_handler.py              # UI interaction handling  
-    │   ├── operation_handler.py       # Operation execution
-    │   └── global_ui_handler.py       # Global UI state (DEPRECATED)
-    ├── initializers/                   # 🔄 Legacy initializers (24+ modules)
-    │   ├── base_initializer.py        # Base initialization pattern
-    │   ├── module_initializer.py      # Module-specific initialization
-    │   ├── display_initializer.py     # Display management
-    │   └── config_initializer.py      # Configuration initialization
-    ├── errors/                         # ✅ Active error handling system
-    │   ├── __init__.py                # Error handling API
-    │   ├── decorators.py              # Error decorators
-    │   ├── handlers.py                # Error handlers
-    │   ├── exceptions.py              # Custom exceptions
-    │   └── context.py                 # Error context management
-    ├── configs/                        # ✅ Configuration management
-    │   └── base_config_handler.py     # Base configuration handling
-    ├── decorators/                     # ✅ UI operation decorators
-    │   └── ui_decorators.py           # Safe UI operation decorators
-    ├── logging/                        # ✅ UI logging system
-    │   └── ui_logging_manager.py      # UI-specific logging
-    ├── shared/                         # ✅ Shared state management
-    │   └── shared_config_manager.py   # Cross-module configuration
-    └── utils/                          # ✅ Utility functions
-        └── log_suppression.py         # Log suppression during UI init
+    # ================= ACTIVE COMPONENTS =================
+    ├── base_ui_module.py              # ✅ Base class for all UI modules
+    ├── enhanced_ui_module_factory.py  # ✅ Factory for creating UI modules
+    ├── __init__.py                    # Core exports and type definitions
+    │
+    # ❌ DEPRECATED: Configuration management - Replaced by configuration_mixin
+    # ├── configs/
+    # │   ├── __init__.py               # ❌ Use configuration_mixin.py
+    # │   └── base_config_handler.py    # ❌ Use configuration_mixin.py
+    │
+    ├── decorators/                    # ✅ UI operation decorators
+    │   ├── __init__.py               # Decorator exports
+    │   ├── error_decorators.py       # Error handling decorators
+    │   ├── log_decorators.py         # Logging decorators
+    │   └── ui_operation_decorators.py # UI operation safety decorators
+    │
+    ├── errors/                        # ✅ Error handling system
+    │   ├── __init__.py               # Error handling API
+    │   ├── context.py                # Error context management
+    │   ├── enums.py                  # Error levels and types
+    │   ├── error_component.py        # UI component for error display
+    │   ├── exceptions.py             # Custom exceptions
+    │   ├── handlers.py               # Core error handlers
+    │   └── validators.py             # Input validation
+    │
+    └── mixins/                        # ✅ Reusable UI functionality
+        ├── __init__.py               # Mixin exports
+        ├── button_handler_mixin.py   # Button event handling
+        ├── configuration_mixin.py    # Configuration management
+        ├── display_mixin.py          # Display and theming
+        ├── environment_mixin.py      # Environment detection
+        ├── logging_mixin.py          # Logging functionality
+        ├── operation_mixin.py        # Operation lifecycle
+        └── validation_mixin.py       # Input validation
+
+    # ============== DEPRECATED COMPONENTS ===============
+    # ❌ DEPRECATED: Legacy handler system - Replaced by mixins
+    ├── handlers/
+    │   ├── base_handler.py           # ❌ Use mixins/
+    │   ├── config_handler.py         # ❌ Use configuration_mixin.py
+    │   ├── operation_handler.py      # ❌ Use operation_mixin.py
+    │   └── ui_handler.py             # ❌ Use appropriate mixins
+    │
+    # ❌ DEPRECATED: Legacy initializers - Replaced by BaseUIModule
+    └── initializers/
+        ├── base_initializer.py       # ❌ Use base_ui_module.py
+        └── module_initializer.py     # ❌ Use enhanced_ui_module_factory.py
 ```
 
 ### Container Architecture
@@ -127,71 +157,105 @@ smartcash/ui/components/
 ### Module Structure (BaseUIModule Pattern)
 ```
 [module]/
-├── __init__.py                    # BaseUIModule exports
-├── [module]_uimodule.py          # ⭐ BaseUIModule implementation (400 lines vs 800+)
-├── configs/                       # Configuration management
-│   ├── [module]_defaults.py      # Default configurations
-│   └── [module]_config_handler.py # Config handler
-├── operations/                    # Operation management (preserved)
-│   ├── operation_manager.py      # Operation orchestration (optional)
-│   └── [operation]_operation.py  # Individual operations (optional)
-└── services/                      # Backend services (preserved)
+├── __init__.py                    # ✅ BaseUIModule init exports
+├── [module]_constants.py          # ✅ Constants
+├── [module]_initializer.py        # ✅ Legacy initializer pattern
+├── components/                    # ✅ Complex UI components
+├── configs/                       # ✅ Configuration management
+├── handlers/                      # ❌ UI handlers (legacy handler: being phased out)
+├── operations/                    # ✅ Operation handlers
+└── services/                      # ✅ Backend services
 ```
 
 ### BaseUIModule Implementation Pattern
 ```python
-class YourUIModule(BaseUIModule):
-    def __init__(self):
-        super().__init__('module_name', 'parent_module')
-        self._required_components = ['main_container', 'action_container']
-    
-    def get_default_config(self) -> Dict[str, Any]:
-        return get_default_your_config()
-    
-    def create_config_handler(self, config: Dict[str, Any]) -> Any:
-        return YourConfigHandler(config)
-    
-    def create_ui_components(self, config: Dict[str, Any]) -> Dict[str, Any]:
-        return create_your_ui(config)
-    
-    # Only module-specific methods needed - all common functionality in mixins
+from typing import Dict, Any
+from smartcash.ui.core.base_ui_module import BaseUIModule
+from smartcash.ui.core.mixins import (
+    OperationMixin, ConfigurationMixin, LoggingMixin,
+    ButtonHandlerMixin, ValidationMixin, DisplayMixin
+)
 
-# Factory-generated functions
-initialize_your_ui = create_display_function(YourUIModule)
-get_your_components = create_component_function(YourUIModule)
+class YourUIModule(BaseUIModule, OperationMixin, ConfigurationMixin, 
+                  LoggingMixin, ButtonHandlerMixin, ValidationMixin, DisplayMixin):
+    """Your module's UI implementation using BaseUIModule pattern."""
+    
+    def __init__(self, module_name: str = 'your_module', parent_module: str = None):
+        super().__init__(
+            module_name=module_name,
+            parent_module=parent_module,
+            required_components=[
+                'main_container',
+                'header_container',
+                'operation_container',
+                'action_container'
+            ]
+        )
+        self._components = {}
+    
+    async def _setup_ui_components(self) -> Dict[str, Any]:
+        """Initialize and return UI components."""
+        if not hasattr(self, '_initialized'):
+            self._components = {
+                'main': self.get_component('main_container'),
+                'header': self.get_component('header_container'),
+                'ops': self.get_component('operation_container'),
+                'actions': self.get_component('action_container')
+            }
+            await self._setup_ui()
+            self._initialized = True
+        return self._components
+    
+    async def _setup_ui(self) -> None:
+        """Configure UI components and event handlers."""
+        self.header.update_title("Your Module")
+        self.actions.add_button(
+            'run', 'Run', 'primary', callback=self._on_run
+        )
+    
+    async def _on_run(self, _) -> None:
+        """Handle run operation with progress and error handling."""
+        with self.operation_container.progress_context():
+            try:
+                await self._execute()
+                self.ops.show_success("Done!")
+            except Exception as e:
+                self.ops.show_error(f"Failed: {e}")
+    
+    async def _execute(self) -> None:
+        """Implement your operation logic here."""
+        self.ops.update_progress(0, "Working...")
+        # Your code here
+        self.ops.update_progress(100, "Complete!")
+
+def initialize_ui(display: bool = True, **kwargs) -> YourUIModule:
+    """Initialize and display the UI module."""
+    module = YourUIModule(**kwargs)
+    if display:
+        module.display()
+    return module
 ```
 
-### Legacy Module Structure (24+ modules)
-```
-[module]/
-├── __init__.py                    # Legacy initializer exports
-├── [module]_initializer.py       # 🔄 Legacy initializer pattern
-├── components/                    # Complex UI components
-├── configs/                       # Configuration management
-├── handlers/                      # UI handlers (being phased out)
-├── operations/                    # Operation handlers
-└── services/                      # Backend services
-```
 ## Cell entry
 All cells are created minimalistic with single execution `initialize_[module]_ui(display=True)`, delegating all logics to modules:
 
 1. **Setup & Configuration** (this module need no method and config sharing)
    - `cell_1_1_repo_clone.py`: Clone the repository and set up the environment (need no changes)
-   - `cell_1_2_colab.py`: Configure Colab-specific settings and requirements
-   - `cell_1_3_dependency.py`: Install and verify dependencies
+   - `cell_1_2_colab.py`: `initialize_colab_ui(display=True, enable_environment=False)` - Configure Colab-specific settings and requirements
+   - `cell_1_3_dependency.py`: `initialize_dependency_ui(display=True)` - Install and verify dependencies
 
 2. **Data Processing** (this module need no method and config sharing)
-   - `cell_2_1_downloader.py`: Download from Roboflow and organize the dataset
-   - `cell_2_2_split.py`: Split data into training, validation, and test sets configuration cell
-   - `cell_2_3_preprocessing.py`: Preprocess images and annotations
-   - `cell_2_4_augmentation.py`: Apply data augmentation techniques
-   - `cell_2_5_visualization.py`: Visualize dataset samples and annotations
+   - `cell_2_1_downloader.py`: `initialize_downloader_ui(display=True)` - Download from Roboflow and organize the dataset
+   - `cell_2_2_split.py`: `initialize_split_ui(display=True)` - Split data into training, validation, and test sets
+   - `cell_2_3_preprocessing.py`: `initialize_preprocessing_ui(display=True)` - Preprocess images and annotations
+   - `cell_2_4_augmentation.py`: `initialize_augmentation_ui(display=True)` - Apply data augmentation techniques
+   - `cell_2_5_visualization.py`: `initialize_visualization_ui(display=True)` - Visualize dataset samples and annotations
 
-3. **Model Training** (this modue should has method and config sharing)
-   - `cell_3_1_pretrained.py`: Download -> Sync pretrained model for later use
-   - `cell_3_2_backbone.py`: Set up EfficientNet-B4 backbone for YOLOv5
-   - `cell_3_3_training.py`: Train the model with configurable parameters
-   - `cell_3_4_evaluation.py`: Evaluate model performance on test set
+3. **Model Training** (this module should have method and config sharing)
+   - `cell_3_1_pretrained.py`: `initialize_pretrained_ui(display=True)` - Download and sync pretrained model
+   - `cell_3_2_backbone.py`: `initialize_backbone_ui(display=True)` - Set up EfficientNet-B4 backbone for YOLOv5
+   - `cell_3_3_training.py`: `initialize_training_ui(display=True)` - Train the model with configurable parameters
+   - `cell_3_4_evaluation.py`: `initialize_evaluation_ui(display=True)` - Evaluate model performance on test set
 
 ## 🧪 Testing Strategy
 
@@ -204,5 +268,5 @@ All cells are created minimalistic with single execution `initialize_[module]_ui
 
 ---
 
-*Last Updated: July 15, 2025*  
+*Last Updated: July 16, 2025*  
 *Architecture Version: UIModule Pattern v2.0*

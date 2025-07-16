@@ -7,9 +7,40 @@ This module provides a clean, interactive error display component that can show/
 detailed traceback information and supports different error types (error, warning, info, success).
 """
 
-import ipywidgets as widgets
 from typing import Optional, Dict, Any, List, Union
-from IPython.display import display, HTML
+
+# Conditional imports to handle environments without IPython/Jupyter
+try:
+    import ipywidgets as widgets
+    from IPython.display import display, HTML
+    JUPYTER_AVAILABLE = True
+except ImportError:
+    # Fallback for environments without IPython/Jupyter
+    JUPYTER_AVAILABLE = False
+    
+    # Mock widgets for non-Jupyter environments
+    class MockWidget:
+        def __init__(self, *args, **kwargs):
+            self.value = kwargs.get('value', '')
+            self.description = kwargs.get('description', '')
+        def __getattr__(self, name):
+            return MockWidget()
+    
+    class widgets:
+        VBox = MockWidget
+        HBox = MockWidget
+        HTML = MockWidget
+        Button = MockWidget
+        Output = MockWidget
+        Layout = MockWidget
+        Widget = MockWidget
+        
+    def display(obj):
+        print(obj)
+    
+    class HTML:
+        def __init__(self, html_str):
+            self.data = html_str
 
 class ErrorComponent:
     """🚨 Clean error component with reliable traceback toggle"""

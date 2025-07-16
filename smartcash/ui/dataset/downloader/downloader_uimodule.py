@@ -247,19 +247,29 @@ class DownloaderUIModule(UIModule):
         }
     
     def _update_status(self, message: str, status_type: str = "info") -> None:
-        """Update status panel in header container."""
-        header_container = self.get_component("header_container")
-        if header_container and hasattr(header_container, 'update_status'):
-            header_container.update_status(message, status_type)
+        """Update status - delegates to operation_mixin for correct architecture."""
+        if hasattr(self, 'update_operation_status'):
+            self.update_operation_status(message, status_type)
+        else:
+            # Fallback to header container
+            header_container = self.get_component("header_container")
+            if header_container and hasattr(header_container, 'update_status'):
+                header_container.update_status(message, status_type)
     
     def _set_buttons_enabled(self, enabled: bool) -> None:
-        """Enable or disable operation buttons."""
-        button_ids = ['download_button', 'check_button', 'cleanup_button']
+        """Enable or disable operation buttons - delegates to button_handler_mixin for DRY compliance."""
+        button_ids = ['download', 'check', 'cleanup']  # Remove _button suffix for mixin compatibility
         
-        for button_id in button_ids:
-            button = self.get_component(button_id)
-            if button and hasattr(button, 'disabled'):
-                button.disabled = not enabled
+        if enabled:
+            # Use button_handler_mixin methods for consistency
+            for button_id in button_ids:
+                if hasattr(self, 'enable_button'):
+                    self.enable_button(button_id)
+        else:
+            # Use button_handler_mixin methods for consistency  
+            for button_id in button_ids:
+                if hasattr(self, 'disable_button'):
+                    self.disable_button(button_id)
                 
         # Also update button appearance based on state
         if not enabled:
@@ -375,8 +385,10 @@ class DownloaderUIModule(UIModule):
         return self._config_handler
     
     def log(self, message: str, level: str = 'info') -> None:
-        """Log message to operation container."""
-        if self._operation_manager and hasattr(self._operation_manager, 'log'):
+        """Log message - delegates to operation_mixin for correct architecture."""
+        if hasattr(self, 'log_operation'):
+            self.log_operation(message, level)
+        elif self._operation_manager and hasattr(self._operation_manager, 'log'):
             self._operation_manager.log(message, level)
         else:
             getattr(self.logger, level, self.logger.info)(message)

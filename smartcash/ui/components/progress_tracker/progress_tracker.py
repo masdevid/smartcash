@@ -136,33 +136,22 @@ class ProgressTracker(BaseUIComponent):
         """Assemble the container with appropriate widgets based on config level."""
         container = self._ui_components['container']
         
-        # Only include outputs for active and visible levels
-        outputs = []
-        for level in self._active_levels:
-            if self._config.get_level_config(level).visible:
-                output_key = f'{level}_output'
-                if output_key in self._ui_components:
-                    outputs.append(self._ui_components[output_key])
-        
-        container.children = [
+        # Build children list starting with header and status
+        children = [
             self._ui_components['header'],
-            self._ui_components['status'],
-            *outputs
+            self._ui_components['status']
         ]
         
-        # Add progress outputs based on level
-        if self._config.level.value >= 2:  # DUAL or TRIPLE
-            container.children += (self._ui_components['overall_output'],)
+        # Add progress outputs based on active levels and visibility
+        for level in self._active_levels:
+            level_config = self._config.get_level_config(level)
+            if level_config and level_config.visible:
+                output_key = f'{level}_output'
+                if output_key in self._ui_components:
+                    children.append(self._ui_components[output_key])
         
-        if self._config.level.value >= 3:  # TRIPLE
-            container.children += (
-                self._ui_components['step_output'],
-                self._ui_components['current_output']
-            )
-        elif self._config.level.value == 2:  # DUAL
-            container.children += (self._ui_components['current_output'],)
-        elif self._config.level.value == 1:  # SINGLE
-            container.children += (self._ui_components['overall_output'],)
+        # Set the container children
+        container.children = children
     
     def _register_default_callbacks(self) -> None:
         """Register default callbacks."""

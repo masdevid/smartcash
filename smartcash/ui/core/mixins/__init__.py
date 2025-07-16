@@ -8,7 +8,7 @@ UI modules to provide consistent behavior and reduce code duplication.
 from .configuration_mixin import ConfigurationMixin
 from .operation_mixin import OperationMixin
 from .logging_mixin import LoggingMixin
-from .progress_tracking_mixin import ProgressTrackingMixin
+# ProgressTrackingMixin removed - use operation_container.update_progress() instead
 from .button_handler_mixin import ButtonHandlerMixin
 from .validation_mixin import ValidationMixin
 from .display_mixin import DisplayMixin
@@ -17,7 +17,7 @@ __all__ = [
     'ConfigurationMixin',
     'OperationMixin', 
     'LoggingMixin',
-    'ProgressTrackingMixin',
+    # 'ProgressTrackingMixin',  # Removed - use operation_container instead
     'ButtonHandlerMixin',
     'ValidationMixin',
     'DisplayMixin'

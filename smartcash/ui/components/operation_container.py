@@ -196,10 +196,21 @@ class OperationContainer(BaseUIComponent):
         """
         # Create progress tracker if enabled
         if self.show_progress:
+            # Create appropriate progress config based on progress_levels
+            if not progress_config:
+                from smartcash.ui.components.progress_tracker.types import ProgressLevel
+                level_mapping = {
+                    'single': ProgressLevel.SINGLE,
+                    'dual': ProgressLevel.DUAL,
+                    'triple': ProgressLevel.TRIPLE
+                }
+                level = level_mapping.get(self.progress_levels, ProgressLevel.SINGLE)
+                progress_config = ProgressConfig(level=level, operation="Operasi")
+            
             # Create progress tracker with the specified number of levels
             self.progress_tracker = ProgressTracker(
                 component_name=f"{self.component_name}_progress",
-                config=progress_config or ProgressConfig()
+                config=progress_config
             )
             # Initialize the progress tracker
             self.progress_tracker.initialize()
@@ -817,6 +828,10 @@ class OperationContainer(BaseUIComponent):
         """Log an error message."""
         self.log(message, LogLevel.ERROR)
     
+    # NOTE: update_status() removed from operation_container
+    # Status updates should go through operation_mixin → header_container
+    # This maintains proper separation of concerns
+    
     def clear_logs(self) -> None:
         """Clear all log messages from the log accordion."""
         if self.log_accordion and hasattr(self.log_accordion, 'clear'):
@@ -1057,7 +1072,408 @@ class OperationContainer(BaseUIComponent):
         if self.log_accordion:
             self.log_accordion.clear()
     
-    # ===== Additional Dialog Methods =====
+    # ===== Enhanced Dialog Methods =====
+    
+    def show_info_dialog(self, message: str, title: str = "Information", icon: str = "ℹ️") -> bool:
+        """Show an information dialog.
+        
+        Args:
+            message: Dialog message
+            title: Dialog title
+            icon: Icon to display
+            
+        Returns:
+            True if dialog was shown successfully
+        """
+        try:
+            if not self.dialog_area:
+                self.log(f"Info Dialog: {title} - {message}", LogLevel.INFO)
+                return False
+            
+            # Clear any existing dialog
+            self.clear_dialog()
+            
+            # Create info dialog HTML
+            dialog_html = f"""
+            <div style="
+                background: linear-gradient(135deg, #cff4fc 0%, #9eeaf9 100%);
+                border: 1px solid #9eeaf9;
+                border-radius: 8px;
+                padding: 20px;
+                margin: 10px 0;
+                color: #055160;
+                box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            ">
+                <div style="display: flex; align-items: center; margin-bottom: 15px;">
+                    <span style="font-size: 24px; margin-right: 10px;">{icon}</span>
+                    <h4 style="margin: 0; color: #055160; font-size: 1.2rem;">{title}</h4>
+                </div>
+                <div style="margin-bottom: 15px; line-height: 1.5;">
+                    {message}
+                </div>
+                <div style="text-align: right;">
+                    <button id="info-dialog-ok" style="
+                        background: linear-gradient(135deg, #0dcaf0 0%, #31d2f2 100%);
+                        color: white;
+                        border: none;
+                        padding: 8px 16px;
+                        border-radius: 4px;
+                        cursor: pointer;
+                        font-weight: 500;
+                    ">OK</button>
+                </div>
+            </div>
+            """
+            
+            # Create dialog widget
+            dialog_widget = widgets.HTML(value=dialog_html)
+            
+            # Add close functionality
+            def on_ok():
+                self.log(f"Info dialog acknowledged: {title}", LogLevel.INFO)
+                self.clear_dialog()
+            
+            # Since we can't directly attach JS events, we'll rely on the clear_dialog method
+            # Store dialog for management
+            self.dialog_area.children = (dialog_widget,)
+            
+            self.log(f"Info dialog shown: {title}", LogLevel.INFO)
+            return True
+            
+        except Exception as e:
+            self.log(f"Failed to show info dialog: {e}", LogLevel.ERROR)
+            return False
+    
+    def show_warning_dialog(self, message: str, title: str = "Warning", icon: str = "⚠️", callback: Optional[callable] = None) -> bool:
+        """Show a warning dialog.
+        
+        Args:
+            message: Dialog message
+            title: Dialog title
+            icon: Icon to display
+            callback: Optional callback when acknowledged
+            
+        Returns:
+            True if dialog was shown successfully
+        """
+        try:
+            if not self.dialog_area:
+                self.log(f"Warning Dialog: {title} - {message}", LogLevel.WARNING)
+                if callback:
+                    callback()
+                return False
+            
+            # Clear any existing dialog
+            self.clear_dialog()
+            
+            # Create warning dialog HTML
+            dialog_html = f"""
+            <div style="
+                background: linear-gradient(135deg, #fff3cd 0%, #ffe69c 100%);
+                border: 1px solid #ffda6a;
+                border-radius: 8px;
+                padding: 20px;
+                margin: 10px 0;
+                color: #664d03;
+                box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            ">
+                <div style="display: flex; align-items: center; margin-bottom: 15px;">
+                    <span style="font-size: 24px; margin-right: 10px;">{icon}</span>
+                    <h4 style="margin: 0; color: #664d03; font-size: 1.2rem;">{title}</h4>
+                </div>
+                <div style="margin-bottom: 15px; line-height: 1.5;">
+                    {message}
+                </div>
+                <div style="text-align: right;">
+                    <button id="warning-dialog-ok" style="
+                        background: linear-gradient(135deg, #ffc107 0%, #ffb300 100%);
+                        color: #000;
+                        border: none;
+                        padding: 8px 16px;
+                        border-radius: 4px;
+                        cursor: pointer;
+                        font-weight: 500;
+                    ">Understood</button>
+                </div>
+            </div>
+            """
+            
+            # Create dialog widget
+            dialog_widget = widgets.HTML(value=dialog_html)
+            
+            # Add close functionality
+            def on_ok():
+                self.log(f"Warning dialog acknowledged: {title}", LogLevel.WARNING)
+                if callback:
+                    callback()
+                self.clear_dialog()
+            
+            # Store dialog for management
+            self.dialog_area.children = (dialog_widget,)
+            
+            self.log(f"Warning dialog shown: {title}", LogLevel.WARNING)
+            return True
+            
+        except Exception as e:
+            self.log(f"Failed to show warning dialog: {e}", LogLevel.ERROR)
+            return False
+    
+    def show_error_dialog(self, message: str, title: str = "Error", icon: str = "❌", callback: Optional[callable] = None) -> bool:
+        """Show an error dialog.
+        
+        Args:
+            message: Dialog message
+            title: Dialog title
+            icon: Icon to display
+            callback: Optional callback when acknowledged
+            
+        Returns:
+            True if dialog was shown successfully
+        """
+        try:
+            if not self.dialog_area:
+                self.log(f"Error Dialog: {title} - {message}", LogLevel.ERROR)
+                if callback:
+                    callback()
+                return False
+            
+            # Clear any existing dialog
+            self.clear_dialog()
+            
+            # Create error dialog HTML
+            dialog_html = f"""
+            <div style="
+                background: linear-gradient(135deg, #f8d7da 0%, #f1aeb5 100%);
+                border: 1px solid #f5c2c7;
+                border-radius: 8px;
+                padding: 20px;
+                margin: 10px 0;
+                color: #842029;
+                box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            ">
+                <div style="display: flex; align-items: center; margin-bottom: 15px;">
+                    <span style="font-size: 24px; margin-right: 10px;">{icon}</span>
+                    <h4 style="margin: 0; color: #842029; font-size: 1.2rem;">{title}</h4>
+                </div>
+                <div style="margin-bottom: 15px; line-height: 1.5;">
+                    {message}
+                </div>
+                <div style="text-align: right;">
+                    <button id="error-dialog-ok" style="
+                        background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
+                        color: white;
+                        border: none;
+                        padding: 8px 16px;
+                        border-radius: 4px;
+                        cursor: pointer;
+                        font-weight: 500;
+                    ">Close</button>
+                </div>
+            </div>
+            """
+            
+            # Create dialog widget
+            dialog_widget = widgets.HTML(value=dialog_html)
+            
+            # Add close functionality
+            def on_ok():
+                self.log(f"Error dialog acknowledged: {title}", LogLevel.ERROR)
+                if callback:
+                    callback()
+                self.clear_dialog()
+            
+            # Store dialog for management
+            self.dialog_area.children = (dialog_widget,)
+            
+            self.log(f"Error dialog shown: {title}", LogLevel.ERROR)
+            return True
+            
+        except Exception as e:
+            self.log(f"Failed to show error dialog: {e}", LogLevel.ERROR)
+            return False
+    
+    def show_success_dialog(self, message: str, title: str = "Success", icon: str = "✅", callback: Optional[callable] = None) -> bool:
+        """Show a success dialog.
+        
+        Args:
+            message: Dialog message
+            title: Dialog title
+            icon: Icon to display
+            callback: Optional callback when acknowledged
+            
+        Returns:
+            True if dialog was shown successfully
+        """
+        try:
+            if not self.dialog_area:
+                self.log(f"Success Dialog: {title} - {message}", LogLevel.INFO)
+                if callback:
+                    callback()
+                return False
+            
+            # Clear any existing dialog
+            self.clear_dialog()
+            
+            # Create success dialog HTML
+            dialog_html = f"""
+            <div style="
+                background: linear-gradient(135deg, #d1e7dd 0%, #a3cfbb 100%);
+                border: 1px solid #b9d3c7;
+                border-radius: 8px;
+                padding: 20px;
+                margin: 10px 0;
+                color: #0f5132;
+                box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            ">
+                <div style="display: flex; align-items: center; margin-bottom: 15px;">
+                    <span style="font-size: 24px; margin-right: 10px;">{icon}</span>
+                    <h4 style="margin: 0; color: #0f5132; font-size: 1.2rem;">{title}</h4>
+                </div>
+                <div style="margin-bottom: 15px; line-height: 1.5;">
+                    {message}
+                </div>
+                <div style="text-align: right;">
+                    <button id="success-dialog-ok" style="
+                        background: linear-gradient(135deg, #198754 0%, #157347 100%);
+                        color: white;
+                        border: none;
+                        padding: 8px 16px;
+                        border-radius: 4px;
+                        cursor: pointer;
+                        font-weight: 500;
+                    ">Great!</button>
+                </div>
+            </div>
+            """
+            
+            # Create dialog widget
+            dialog_widget = widgets.HTML(value=dialog_html)
+            
+            # Add close functionality
+            def on_ok():
+                self.log(f"Success dialog acknowledged: {title}", LogLevel.INFO)
+                if callback:
+                    callback()
+                self.clear_dialog()
+            
+            # Store dialog for management
+            self.dialog_area.children = (dialog_widget,)
+            
+            self.log(f"Success dialog shown: {title}", LogLevel.INFO)
+            return True
+            
+        except Exception as e:
+            self.log(f"Failed to show success dialog: {e}", LogLevel.ERROR)
+            return False
+    
+    def show_custom_dialog(self, html_content: str, title: str = "Dialog", theme: str = "primary", callback: Optional[callable] = None) -> bool:
+        """Show a custom dialog with HTML content.
+        
+        Args:
+            html_content: Custom HTML content for the dialog
+            title: Dialog title
+            theme: Dialog theme (primary, success, warning, danger, info)
+            callback: Optional callback when acknowledged
+            
+        Returns:
+            True if dialog was shown successfully
+        """
+        try:
+            if not self.dialog_area:
+                self.log(f"Custom Dialog: {title}", LogLevel.INFO)
+                if callback:
+                    callback()
+                return False
+            
+            # Clear any existing dialog
+            self.clear_dialog()
+            
+            # Define theme colors
+            themes = {
+                "primary": {
+                    "bg": "linear-gradient(135deg, #cfe2ff 0%, #9ec5fe 100%)",
+                    "border": "#9ec5fe",
+                    "text": "#084298",
+                    "button": "linear-gradient(135deg, #0d6efd 0%, #0b5ed7 100%)"
+                },
+                "success": {
+                    "bg": "linear-gradient(135deg, #d1e7dd 0%, #a3cfbb 100%)",
+                    "border": "#b9d3c7",
+                    "text": "#0f5132",
+                    "button": "linear-gradient(135deg, #198754 0%, #157347 100%)"
+                },
+                "warning": {
+                    "bg": "linear-gradient(135deg, #fff3cd 0%, #ffe69c 100%)",
+                    "border": "#ffda6a",
+                    "text": "#664d03",
+                    "button": "linear-gradient(135deg, #ffc107 0%, #ffb300 100%)"
+                },
+                "danger": {
+                    "bg": "linear-gradient(135deg, #f8d7da 0%, #f1aeb5 100%)",
+                    "border": "#f5c2c7",
+                    "text": "#842029",
+                    "button": "linear-gradient(135deg, #dc3545 0%, #c82333 100%)"
+                },
+                "info": {
+                    "bg": "linear-gradient(135deg, #cff4fc 0%, #9eeaf9 100%)",
+                    "border": "#9eeaf9",
+                    "text": "#055160",
+                    "button": "linear-gradient(135deg, #0dcaf0 0%, #31d2f2 100%)"
+                }
+            }
+            
+            theme_colors = themes.get(theme, themes["primary"])
+            
+            # Create custom dialog HTML
+            dialog_html = f"""
+            <div style="
+                background: {theme_colors['bg']};
+                border: 1px solid {theme_colors['border']};
+                border-radius: 8px;
+                padding: 20px;
+                margin: 10px 0;
+                color: {theme_colors['text']};
+                box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            ">
+                <div style="margin-bottom: 15px;">
+                    <h4 style="margin: 0; color: {theme_colors['text']}; font-size: 1.2rem;">{title}</h4>
+                </div>
+                <div style="margin-bottom: 15px; line-height: 1.5;">
+                    {html_content}
+                </div>
+                <div style="text-align: right;">
+                    <button id="custom-dialog-ok" style="
+                        background: {theme_colors['button']};
+                        color: white;
+                        border: none;
+                        padding: 8px 16px;
+                        border-radius: 4px;
+                        cursor: pointer;
+                        font-weight: 500;
+                    ">Close</button>
+                </div>
+            </div>
+            """
+            
+            # Create dialog widget
+            dialog_widget = widgets.HTML(value=dialog_html)
+            
+            # Add close functionality
+            def on_ok():
+                self.log(f"Custom dialog acknowledged: {title}", LogLevel.INFO)
+                if callback:
+                    callback()
+                self.clear_dialog()
+            
+            # Store dialog for management
+            self.dialog_area.children = (dialog_widget,)
+            
+            self.log(f"Custom dialog shown: {title}", LogLevel.INFO)
+            return True
+            
+        except Exception as e:
+            self.log(f"Failed to show custom dialog: {e}", LogLevel.ERROR)
+            return False
     
     def close_dialog(self, title: str) -> None:
         """Close a dialog by title.

@@ -110,55 +110,9 @@
 - **DON'T** initialize heavy operations during module import
 - **DON'T** block the UI thread with long-running operations
 
-### 🔧 Common Fix Patterns
-
-#### Logger Callable Error Fix
-```python
-# ❌ DON'T: Module-level logger
-logger = get_module_logger(__name__)
-
-# ✅ DO: Function-based logger
-def _get_logger():
-    return get_module_logger(__name__)
-
-# ✅ DO: Instance logger in classes
-class MyModule:
-    def __init__(self):
-        self.logger = get_module_logger(f"{__name__}.{self.__class__.__name__}")
-```
-
-#### Type Safety Fix
-```python
-# ❌ DON'T: Assume data type
-def format_info(data):
-    return data.get('field', 'default')
-
-# ✅ DO: Check type first
-def format_info(data):
-    if not isinstance(data, dict):
-        return ''
-    return data.get('field', 'default')
-```
-
-#### Status Panel Integration Fix
-```python
-# ❌ DON'T: Store only widget
-ui_components['header_container'] = header_container.container
-
-# ✅ DO: Store both object and widget
-ui_components['header_container'] = header_container
-ui_components['main_header_widget'] = header_container.container
-
-# ✅ DO: Implement status updates
-def _update_status(self, message: str, status_type: str = "info"):
-    header_container = self.get_component("header_container")
-    if header_container and hasattr(header_container, 'update_status'):
-        header_container.update_status(message, status_type)
-```
-
 
 ### 📚 Documentation & Explainability
-- **Update `README.md`** when new features are added, dependencies change, or setup steps are modified.
+- **Update `ARCHITECTURE.md`** when new UI related features are added, dependencies change, or setup steps are modified.
 - **Comment non-obvious code** and ensure everything is understandable to a mid-level developer.
 - When writing complex logic, **add an inline `# Reason:` comment** explaining the why, not just the what.
 

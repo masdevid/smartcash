@@ -1,46 +1,45 @@
 """
-Base UI Module class that integrates all common mixins.
+Base UI Module class that acts as a config orchestrator.
 
-This class provides a standard base for all UI modules with common functionality.
+This class provides a standard base for all UI modules focused on configuration
+orchestration and delegates implementation to separate config_handler classes.
 """
 
 from typing import Dict, Any, Optional
 from abc import ABC, abstractmethod
-from smartcash.ui.core.ui_module import UIModule
 from smartcash.ui.core.mixins import (
     ConfigurationMixin,
     OperationMixin,
     LoggingMixin,
-    ProgressTrackingMixin,
     ButtonHandlerMixin,
     ValidationMixin,
     DisplayMixin
 )
 from smartcash.ui.logger import get_module_logger
-from typing import Optional, Dict, Any
 
 
 class BaseUIModule(
     ConfigurationMixin,
     OperationMixin,
     LoggingMixin,
-    ProgressTrackingMixin,
     ButtonHandlerMixin,
     ValidationMixin,
     DisplayMixin,
-    UIModule,
     ABC
 ):
     """
-    Base UI Module class with all common functionality.
+    Base UI Module class that acts as a config orchestrator.
     
-    This class combines all mixins to provide a comprehensive base for UI modules.
-    Subclasses only need to implement module-specific functionality.
+    This class provides:
+    - Configuration orchestration through config_handler delegation
+    - UI component management through mixins
+    - Environment support when enabled
+    - Operation handling through dedicated handlers
     
-    Environment Features:
-    - Set enable_environment=True to enable environment detection and management
-    - Access environment paths via self.environment_paths
-    - Check env status with self.is_colab and self.is_drive_mounted
+    The main responsibility is to orchestrate configurations and delegate
+    implementation details to separate config_handler classes in each module.
+    BaseUIModule uses composition over inheritance and acts as a config 
+    orchestrator where all config operations are delegated to config_handler.
     """
     
     @property
@@ -76,8 +75,13 @@ class BaseUIModule(
             enable_environment: Whether to enable environment management features
             **kwargs: Additional keyword arguments for parent classes
         """
-        # Initialize base UIModule first
-        super().__init__(module_name, parent_module, **kwargs)
+        # Initialize module identification
+        self.module_name = module_name
+        self.parent_module = parent_module
+        self.full_module_name = f"{parent_module}.{module_name}" if parent_module else module_name
+        
+        # Initialize all mixins
+        super().__init__(**kwargs)
         
         # Initialize environment support if enabled
         self._enable_environment = enable_environment
@@ -95,10 +99,144 @@ class BaseUIModule(
         
         self.logger.debug(f"✅ BaseUIModule initialized: {self.full_module_name}")
     
+    # === Config Orchestration Methods ===
+    
+    def get_current_config(self) -> Dict[str, Any]:
+        """
+        Get current configuration from config_handler.
+        
+        This method delegates to the config_handler to get the current
+        processed configuration state.
+        
+        Returns:
+            Current configuration dictionary
+        """
+        if hasattr(self, '_config_handler') and self._config_handler:
+            if hasattr(self._config_handler, 'get_current_config'):
+                return self._config_handler.get_current_config()
+            elif hasattr(self._config_handler, 'config'):
+                return self._config_handler.config
+        
+        # Fallback to default config
+        return self.get_default_config()
+    
+    def update_config(self, updates: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Update configuration through config_handler.
+        
+        This method delegates configuration updates to the config_handler.
+        All configuration logic is handled by the config_handler instance.
+        
+        Args:
+            updates: Configuration updates to apply
+            
+        Returns:
+            Result dictionary with success status
+        """
+        if not hasattr(self, '_config_handler') or not self._config_handler:
+            return {'success': False, 'message': 'Config handler not initialized'}
+        
+        try:
+            if hasattr(self._config_handler, 'update_config'):
+                return self._config_handler.update_config(updates)
+            else:
+                # Fallback update
+                if hasattr(self._config_handler, 'config'):
+                    self._config_handler.config.update(updates)
+                return {'success': True, 'message': 'Configuration updated'}
+        except Exception as e:
+            return {'success': False, 'message': f'Config update failed: {e}'}
+    
+    def save_config(self) -> Dict[str, Any]:
+        """
+        Save configuration through config_handler.
+        
+        This method delegates configuration saving to the config_handler.
+        All configuration persistence is handled by the config_handler instance.
+        
+        Returns:
+            Result dictionary with success status
+        """
+        if not hasattr(self, '_config_handler') or not self._config_handler:
+            return {'success': False, 'message': 'Config handler not initialized'}
+        
+        try:
+            if hasattr(self._config_handler, 'save_config'):
+                return self._config_handler.save_config()
+            else:
+                return {'success': True, 'message': 'Configuration saved (no-op)'}
+        except Exception as e:
+            return {'success': False, 'message': f'Config save failed: {e}'}
+    
+    def reset_config(self) -> Dict[str, Any]:
+        """
+        Reset configuration through config_handler.
+        
+        This method delegates configuration reset to the config_handler.
+        All configuration reset logic is handled by the config_handler instance.
+        
+        Returns:
+            Result dictionary with success status
+        """
+        if not hasattr(self, '_config_handler') or not self._config_handler:
+            return {'success': False, 'message': 'Config handler not initialized'}
+        
+        try:
+            if hasattr(self._config_handler, 'reset_config'):
+                return self._config_handler.reset_config()
+            else:
+                # Fallback reset
+                if hasattr(self._config_handler, 'config'):
+                    self._config_handler.config = self.get_default_config()
+                return {'success': True, 'message': 'Configuration reset to defaults'}
+        except Exception as e:
+            return {'success': False, 'message': f'Config reset failed: {e}'}
+    
+    def _initialize_config_handler(self) -> None:
+        """
+        Initialize the config handler for this module.
+        
+        This method creates and sets up the config handler that will handle
+        all configuration operations for this module. The BaseUIModule
+        acts as a config orchestrator and delegates implementation to
+        separate config_handler classes.
+        """
+        try:
+            # Get default configuration
+            default_config = self.get_default_config()
+            
+            # Create config handler with default config
+            self._config_handler = self.create_config_handler(default_config)
+            
+            # Additional setup if config handler has initialization method
+            if hasattr(self._config_handler, 'initialize'):
+                self._config_handler.initialize()
+            
+            self.logger.debug(f"✅ Config handler initialized for {self.full_module_name}")
+            
+        except Exception as e:
+            self.logger.error(f"❌ Failed to initialize config handler: {e}")
+            raise
+    
+    def get_config_handler(self) -> Any:
+        """
+        Get the config handler instance.
+        
+        The config handler is responsible for all configuration-related
+        operations. The BaseUIModule delegates to this handler.
+        
+        Returns:
+            Config handler instance or None if not initialized
+        """
+        return getattr(self, '_config_handler', None)
+    
     @abstractmethod
     def get_default_config(self) -> Dict[str, Any]:
         """
         Get default configuration for this module.
+        
+        This method should return the default configuration that will be
+        passed to the config_handler for processing.
         
         Returns:
             Default configuration dictionary
@@ -110,11 +248,14 @@ class BaseUIModule(
         """
         Create config handler instance for this module.
         
+        The config handler is responsible for all configuration-related
+        operations including validation, merging, saving, and loading.
+        
         Args:
             config: Configuration dictionary
             
         Returns:
-            Config handler instance
+            Config handler instance (e.g., DependencyConfigHandler)
         """
         pass
     
@@ -123,8 +264,12 @@ class BaseUIModule(
         """
         Create UI components for this module.
         
+        This method should create and return all UI components needed
+        for the module. The config parameter contains the processed
+        configuration from the config_handler.
+        
         Args:
-            config: Configuration dictionary
+            config: Processed configuration dictionary from config_handler
             
         Returns:
             UI components dictionary
@@ -144,7 +289,7 @@ class BaseUIModule(
             
             self.logger.debug(f"🔄 Initializing {self.full_module_name}")
             
-            # Initialize configuration handler
+            # Initialize configuration handler (delegates to config_handler)
             self._initialize_config_handler()
             
             # Create UI components
@@ -199,13 +344,12 @@ class BaseUIModule(
         self.register_button_handler('save', self._handle_save_config)
         self.register_button_handler('reset', self._handle_reset_config)
     
-    def _handle_save_config(self, button=None) -> Dict[str, Any]:
+    def _handle_save_config(self, button=None) -> Dict[str, Any]:  # noqa: ARG002
         """Handle save config button click with status updates."""
         try:
             result = self.save_config()
             if result.get('success'):
                 success_msg = result.get('message', 'Configuration saved successfully')
-                # Update both header status and log accordion
                 self._update_header_status(f"💾 {success_msg}", "success")
                 self.log(f"💾 {success_msg}", 'success')
             else:
@@ -221,13 +365,12 @@ class BaseUIModule(
             self.log(f"❌ {error_msg}", 'error')
             return {'success': False, 'message': error_msg}
     
-    def _handle_reset_config(self, button=None) -> Dict[str, Any]:
+    def _handle_reset_config(self, button=None) -> Dict[str, Any]:  # noqa: ARG002
         """Handle reset config button click with status updates."""
         try:
             result = self.reset_config()
             if result.get('success'):
                 success_msg = result.get('message', 'Configuration reset to defaults')
-                # Update both header status and log accordion
                 self._update_header_status(f"🔄 {success_msg}", "success")
                 self.log(f"🔄 {success_msg}", 'success')
             else:
@@ -256,14 +399,10 @@ class BaseUIModule(
             'full_module_name': self.full_module_name,
             'is_initialized': self._is_initialized,
             'has_config_handler': self._config_handler is not None,
-            'has_operation_manager': getattr(self, '_operation_manager', None) is not None,
             'has_ui_components': self._ui_components is not None,
             'ui_components_count': len(self._ui_components) if self._ui_components else 0,
-            'registered_operations': len(self._operation_handlers),
-            'registered_button_handlers': len(self._button_handlers),
-            'validation_errors': self.get_validation_errors(),
-            'display_state': self.get_display_state(),
-            'progress_state': self.get_progress_state()
+            'registered_operations': len(getattr(self, '_operation_handlers', {})),
+            'registered_button_handlers': len(getattr(self, '_button_handlers', {}))
         }
     
     def __repr__(self) -> str:
@@ -317,6 +456,51 @@ class BaseUIModule(
             
         except Exception as e:
             self.logger.warning(f"Button validation failed: {e}")
+    
+    # === Core Module Methods ===
+    
+    def get_component(self, component_type: str) -> Optional[Any]:
+        """
+        Get a UI component from the current components.
+        
+        This method provides access to UI components created by the module.
+        Components are created by the create_ui_components method.
+        
+        Args:
+            component_type: Type of component to retrieve
+            
+        Returns:
+            Component instance or None if not found
+        """
+        if hasattr(self, '_ui_components') and self._ui_components:
+            return self._ui_components.get(component_type)
+        return None
+    
+    def get_status(self) -> Dict[str, Any]:
+        """Get current module status."""
+        return {
+            'module_name': self.module_name,
+            'full_module_name': self.full_module_name,
+            'is_initialized': self._is_initialized,
+            'has_config_handler': hasattr(self, '_config_handler') and self._config_handler is not None,
+            'has_ui_components': hasattr(self, '_ui_components') and self._ui_components is not None,
+            'component_count': len(self._ui_components) if hasattr(self, '_ui_components') and self._ui_components else 0
+        }
+    
+    def cleanup(self) -> None:
+        """Cleanup module resources."""
+        try:
+            # Clear UI components
+            if hasattr(self, '_ui_components') and self._ui_components:
+                self._ui_components.clear()
+            
+            # Reset initialization state
+            self._is_initialized = False
+            
+            self.logger.debug(f"🧹 Cleaned up BaseUIModule: {self.full_module_name}")
+            
+        except Exception as e:
+            self.logger.error(f"❌ Error during cleanup: {e}")
     
     def get_button_validation_status(self) -> Dict[str, Any]:
         """

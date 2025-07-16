@@ -10,11 +10,11 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from smartcash.ui.logger import get_module_logger
 from smartcash.ui.core.mixins.logging_mixin import LoggingMixin
-from smartcash.ui.core.mixins.progress_tracking_mixin import ProgressTrackingMixin
+# ProgressTrackingMixin removed - use operation_container.update_progress() instead
 from smartcash.ui.core.mixins.operation_mixin import OperationMixin
 
 
-class BaseOperationHandler(LoggingMixin, ProgressTrackingMixin, OperationMixin):
+class BaseOperationHandler(LoggingMixin, OperationMixin):
     """
     Pure mixin-based operation handler for dependency operations.
     

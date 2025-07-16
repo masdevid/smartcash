@@ -28,8 +28,7 @@ def _lazy_import(module_path: str) -> ModuleType:
 # ---------------------------------------------------------------------------
 
 _lazy_attrs = {
-    "initialize_env_config_ui": "smartcash.ui.setup.env_config.env_config_initializer.initialize_env_config_ui",
-    "initialize_dependency_ui": "smartcash.ui.setup.dependency.dependency_initializer.initialize_dependency_ui",
+    "initialize_dependency_ui": "smartcash.ui.setup.dependency.initialize_dependency_ui",
     "colab": "smartcash.ui.setup.colab",
     "initialize_colab_ui": "smartcash.ui.setup.colab.initializer.initialize_colab_env_ui",
 }

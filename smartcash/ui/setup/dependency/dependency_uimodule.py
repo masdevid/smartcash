@@ -12,10 +12,6 @@ from smartcash.ui.core.base_ui_module import BaseUIModule
 from smartcash.ui.core.decorators import suppress_ui_init_logs
 from smartcash.ui.logger import get_module_logger
 
-# Environment management imports
-from smartcash.common.environment import get_environment_manager, EnvironmentManager
-from smartcash.common.constants.paths import get_paths_for_environment
-
 # Dependency module imports
 from smartcash.ui.setup.dependency.components.dependency_ui import create_dependency_ui_components
 from smartcash.ui.setup.dependency.configs.dependency_config_handler import DependencyConfigHandler
@@ -24,11 +20,11 @@ from smartcash.ui.setup.dependency.configs.dependency_defaults import get_defaul
 
 class DependencyUIModule(BaseUIModule):
     """
-    Dependency Module implementation using BaseUIModule mixin pattern.
+    Dependency Module implementation using BaseUIModule with environment support.
     
     Features:
     - 📦 Package management (install, uninstall, check, update)
-    - 🌍 Environment-aware package installation
+    - 🌍 Environment-aware package installation (via BaseUIModule environment support)
     - 📊 Real-time package status tracking
     - 🔄 Enhanced factory-based initialization functions
     - ✅ Full compliance with OPERATION_CHECKLISTS.md requirements
@@ -36,10 +32,12 @@ class DependencyUIModule(BaseUIModule):
     """
     
     def __init__(self):
-        """Initialize Dependency UI module."""
+        """Initialize Dependency UI module with environment support."""
+        # Initialize BaseUIModule with environment support enabled
         super().__init__(
             module_name='dependency',
-            parent_module='setup'
+            parent_module='setup',
+            enable_environment=True  # Enable environment management features
         )
         
         # Set required components for validation
@@ -52,9 +50,7 @@ class DependencyUIModule(BaseUIModule):
         ]
         
         # Dependency-specific attributes
-        self._environment_manager: Optional[EnvironmentManager] = None
         self._package_status = {}
-        self._environment_paths = {}
         
         self.logger.debug("✅ DependencyUIModule initialized")
     
@@ -104,14 +100,12 @@ class DependencyUIModule(BaseUIModule):
                 self._user_config = config
             
             # Initialize using base class which handles everything
-            success = super().initialize()
+            success = BaseUIModule.initialize(self)
             
             if success:
                 # Set UI components in config handler for extraction
                 if self._config_handler and hasattr(self._config_handler, 'set_ui_components'):
                     self._config_handler.set_ui_components(self._ui_components)
-                
-                # Button handlers are connected automatically by ButtonHandlerMixin
                 
                 # Post-initialization logging (now that operation container is ready)
                 self._log_initialization_complete()
@@ -127,27 +121,16 @@ class DependencyUIModule(BaseUIModule):
             return False
     
     def _setup_environment(self) -> None:
-        """Setup environment management using EnvironmentManager."""
-        try:
-            # Use standardized environment manager
-            self._environment_manager = get_environment_manager(logger=self.logger)
-            
-            # Get appropriate paths for current environment
-            self._environment_paths = get_paths_for_environment(
-                is_colab=self._environment_manager.is_colab,
-                is_drive_mounted=self._environment_manager.is_drive_mounted if self._environment_manager.is_colab else False
-            )
-            
-            env_type = "Google Colab" if self._environment_manager.is_colab else "Lokal/Jupyter"
-            self.logger.debug(f"✅ Environment detected: {env_type}")
-            
-        except Exception as e:
-            self.logger.error(f"Failed to setup environment: {e}")
-            # Create fallback environment info
-            self._environment_paths = {
-                'data_root': 'data',
-                'config': './smartcash/configs'
-            }
+        """Setup environment management.
+        
+        This method is called during initialization when environment support is enabled.
+        It's automatically handled by BaseUIModule when enable_environment=True.
+        """
+        # Environment setup is handled by BaseUIModule when enable_environment=True
+        # This method is kept for backward compatibility
+        if not self.has_environment_support:
+            self.logger.warning("Environment support is not enabled")
+            return
     
     
     # Button connection is handled automatically by ButtonHandlerMixin in BaseUIModule
@@ -155,12 +138,14 @@ class DependencyUIModule(BaseUIModule):
     def _log_initialization_complete(self) -> None:
         """Log initialization completion to operation container (after it's ready)."""
         try:
-            # Log environment information
-            env_type = "Google Colab" if self._environment_manager.is_colab else "Lokal/Jupyter"
-            self.log(f"🌍 Lingkungan terdeteksi: {env_type}", 'info')
-            self.log(f"📁 Direktori kerja: {self._environment_paths.get('data_root', 'Unknown')}", 'info')
+            # Log environment info if environment support is enabled
+            if self.has_environment_support:
+                env_type = "Google Colab" if self.is_colab else "Lokal/Jupyter"
+                self.log(f"🌍 Lingkungan terdeteksi: {env_type}", 'info')
+                if self.environment_paths and 'data_root' in self.environment_paths:
+                    self.log(f"📁 Direktori kerja: {self.environment_paths['data_root']}", 'info')
             
-            # Update status panel - use direct log to avoid console output
+            # Update status panel
             self.log("📊 Status: Siap untuk manajemen paket", 'info')
             self.update_operation_status("Siap untuk manajemen paket", "info")
             
@@ -697,6 +682,7 @@ _dependency_module_instance: Optional[DependencyUIModule] = None
 def create_dependency_uimodule(
     config: Optional[Dict[str, Any]] = None,
     auto_initialize: bool = True,
+    enable_environment: bool = True,
     **kwargs
 ) -> DependencyUIModule:
     """
@@ -705,6 +691,7 @@ def create_dependency_uimodule(
     Args:
         config: Optional configuration dictionary
         auto_initialize: Whether to auto-initialize the module
+        enable_environment: Whether to enable environment management features
         **kwargs: Additional arguments
         
     Returns:
@@ -713,7 +700,7 @@ def create_dependency_uimodule(
     module = DependencyUIModule()
     
     if auto_initialize:
-        module.initialize(config, **kwargs)
+        module.initialize(config, enable_environment=enable_environment, **kwargs)
     
     return module
 

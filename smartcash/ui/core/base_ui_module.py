@@ -17,6 +17,7 @@ from smartcash.ui.core.mixins import (
     DisplayMixin
 )
 from smartcash.ui.logger import get_module_logger
+from typing import Optional, Dict, Any
 
 
 class BaseUIModule(
@@ -35,17 +36,54 @@ class BaseUIModule(
     
     This class combines all mixins to provide a comprehensive base for UI modules.
     Subclasses only need to implement module-specific functionality.
+    
+    Environment Features:
+    - Set enable_environment=True to enable environment detection and management
+    - Access environment paths via self.environment_paths
+    - Check env status with self.is_colab and self.is_drive_mounted
     """
     
-    def __init__(self, module_name: str, parent_module: str = None):
+    @property
+    def has_environment_support(self) -> bool:
+        """Check if environment features are enabled."""
+        return self._enable_environment and hasattr(self, '_environment_paths')
+    
+    @property
+    def environment_paths(self) -> Optional[Dict[str, str]]:
+        """Get environment paths if environment support is enabled."""
+        if not self.has_environment_support:
+            self.logger.warning("Environment support is not enabled for this module")
+            return None
+        return getattr(self, '_environment_paths', None)
+    
+    @property
+    def is_colab(self) -> Optional[bool]:
+        """Check if running in Google Colab (if environment support is enabled)."""
+        return getattr(self, '_is_colab', None) if self.has_environment_support else None
+    
+    @property
+    def is_drive_mounted(self) -> Optional[bool]:
+        """Check if Google Drive is mounted (if environment support is enabled)."""
+        return getattr(self, '_is_drive_mounted', None) if self.has_environment_support else None
+    
+    def __init__(self, module_name: str, parent_module: str = None, enable_environment: bool = False, **kwargs):
         """
         Initialize base UI module.
         
         Args:
             module_name: Name of the module
             parent_module: Parent module name
+            enable_environment: Whether to enable environment management features
+            **kwargs: Additional keyword arguments for parent classes
         """
-        super().__init__(module_name, parent_module)
+        # Initialize base UIModule first
+        super().__init__(module_name, parent_module, **kwargs)
+        
+        # Initialize environment support if enabled
+        self._enable_environment = enable_environment
+        if self._enable_environment:
+            from smartcash.ui.core.mixins.environment_mixin import EnvironmentMixin
+            EnvironmentMixin.__init__(self)
         
         # Set up logger
         self.logger = get_module_logger(f"smartcash.ui.{self.full_module_name}")

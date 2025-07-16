@@ -128,14 +128,14 @@ class ButtonHandlerMixin:
         Args:
             buttons: Dictionary of button widgets
         """
-        # Setup save button
+        # Setup save button (skip if already registered by BaseUIModule)
         if 'save' in buttons and 'save' not in self._button_handlers:
-            if hasattr(self, 'save_config'):
+            if hasattr(self, 'save_config') and not hasattr(self, '_handle_save_config'):
                 self.register_button_handler('save', lambda _: self.save_config())
         
-        # Setup reset button
+        # Setup reset button (skip if already registered by BaseUIModule)
         if 'reset' in buttons and 'reset' not in self._button_handlers:
-            if hasattr(self, 'reset_config'):
+            if hasattr(self, 'reset_config') and not hasattr(self, '_handle_reset_config'):
                 self.register_button_handler('reset', lambda _: self.reset_config())
         
         # Setup load button

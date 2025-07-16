@@ -390,3 +390,81 @@ class BaseUIModule(
         except Exception as e:
             if hasattr(self, 'logger'):
                 self.logger.debug(f"Failed to update header status: {e}")
+    
+    def _execute_operation_with_wrapper(self, 
+                                       operation_name: str,
+                                       operation_func: callable,
+                                       button: Any = None,
+                                       validation_func: callable = None,
+                                       success_message: str = None,
+                                       error_message: str = None) -> Dict[str, Any]:
+        """
+        Common wrapper for executing operations with standard logging, progress, and button management.
+        
+        Args:
+            operation_name: Display name for the operation
+            operation_func: Function to execute the actual operation
+            button: Button that triggered the operation
+            validation_func: Optional validation function to run before operation
+            success_message: Custom success message (optional)
+            error_message: Custom error message prefix (optional)
+            
+        Returns:
+            Operation result dictionary
+        """
+        # Extract button ID for individual button management
+        button_id = getattr(button, 'description', operation_name.lower()).lower().replace(' ', '_')
+        
+        try:
+            # Start operation logging and progress tracking
+            self.log_operation_start(operation_name)
+            self.start_progress(f"Memulai {operation_name.lower()}...", 0)
+            self.update_operation_status(f"Memulai {operation_name.lower()}...", "info")
+            
+            # Only disable the clicked button, not all buttons
+            self.disable_all_buttons(f"⏳ {operation_name}...", button_id=button_id)
+            
+            # Run validation if provided
+            if validation_func:
+                validation_result = validation_func()
+                if not validation_result.get('valid', True):
+                    warning_msg = validation_result.get('message', f'Validasi {operation_name.lower()} gagal')
+                    self.log(f"⚠️ {warning_msg}", 'warning')
+                    self.update_operation_status(warning_msg, "warning")
+                    self.error_progress(warning_msg)
+                    return {'success': False, 'message': warning_msg}
+            
+            # Update progress for execution
+            self.update_progress(25, f"Memproses {operation_name.lower()}...")
+            
+            # Execute the actual operation
+            result = operation_func()
+            
+            # Handle result
+            if result.get('success'):
+                success_msg = success_message or result.get('message', f'{operation_name} berhasil diselesaikan')
+                self.log_operation_complete(operation_name)
+                self.update_operation_status(success_msg, "success")
+                self.log(f"✅ {success_msg}", 'success')
+                self.complete_progress(f"{operation_name} selesai")
+            else:
+                error_prefix = error_message or f'{operation_name} gagal'
+                error_msg = result.get('message', 'Operasi gagal')
+                full_error = f"{error_prefix}: {error_msg}"
+                self.log_operation_error(operation_name, error_msg)
+                self.update_operation_status(full_error, "error")
+                self.error_progress(full_error)
+                
+            return result
+            
+        except Exception as e:
+            error_prefix = error_message or f'Kesalahan {operation_name.lower()}'
+            error_msg = f"{error_prefix}: {e}"
+            self.log_operation_error(operation_name, str(e))
+            self.update_operation_status(error_msg, "error")
+            self.error_progress(error_msg)
+            return {'success': False, 'message': error_msg}
+        finally:
+            # Re-enable only the specific button that was disabled
+            if button_id:
+                self.enable_all_buttons(button_id=button_id)

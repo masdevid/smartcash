@@ -16,8 +16,6 @@ def __getattr__(name):
     elif name == 'FooterContainer':
         from smartcash.ui.components.footer_container import FooterContainer
         return FooterContainer
-    elif name == 'create_footer_container':
-        from smartcash.ui.components.footer_container import create_footer_container
     elif name == 'VisualizationContainer':
         from smartcash.ui.components.visualization_container import VisualizationContainer
         return VisualizationContainer

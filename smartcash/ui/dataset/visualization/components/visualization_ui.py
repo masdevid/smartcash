@@ -167,11 +167,26 @@ def create_visualization_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -
     
     # Simpan container aksi dan tombol
     ui_components['containers']['actions'] = action_container
-    if hasattr(action_container, 'get'):
-        # Simpan widget tombol dengan akhiran _button
-        ui_components['refresh_button'] = action_container.get('refresh')
-        ui_components['preprocessed_button'] = action_container.get('preprocessed')
-        ui_components['augmented_button'] = action_container.get('augmented')
+    
+    # Simpan referensi tombol dengan beberapa format yang mungkin
+    if hasattr(action_container, 'get_button'):
+        # Jika action container memiliki method get_button
+        ui_components['refresh_button'] = action_container.get_button('refresh')
+        ui_components['preprocessed_button'] = action_container.get_button('preprocessed')
+        ui_components['augmented_button'] = action_container.get_button('augmented')
+    elif hasattr(action_container, 'buttons') and isinstance(action_container.buttons, dict):
+        # Jika action container memiliki atribut buttons yang berupa dictionary
+        ui_components['refresh_button'] = action_container.buttons.get('refresh')
+        ui_components['preprocessed_button'] = action_container.buttons.get('preprocessed')
+        ui_components['augmented_button'] = action_container.buttons.get('augmented')
+    
+    # Juga simpan dengan format btn_* untuk kompatibilitas
+    if 'refresh_button' in ui_components:
+        ui_components['btn_refresh'] = ui_components['refresh_button']
+    if 'preprocessed_button' in ui_components:
+        ui_components['btn_preprocessed'] = ui_components['preprocessed_button']
+    if 'augmented_button' in ui_components:
+        ui_components['btn_augmented'] = ui_components['augmented_button']
     
     # === 4. Buat Summary Container ===
     summary_content = _create_module_summary_content(current_config)

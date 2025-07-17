@@ -183,7 +183,7 @@ def create_split_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> Dict[s
         # Create header with title and subtitle
         header = create_header_container(
             title=UI_CONFIG['title'],
-            description=UI_CONFIG['subtitle'],
+            description=UI_CONFIG['description'],
             logo_path=UI_CONFIG.get('logo_path'),
             icon='📊',  # Set the icon here
             initial_status='idle',

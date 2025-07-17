@@ -316,7 +316,7 @@ def create_colab_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> Dict[s
         'action_container': action_container,
         'operation_container': operation_container,
         'footer_container': footer_container,
-        'main_container': ui_components.get('main_container'),  # Add main container to top level
+        'main_container': ui_components.get('main_layout'),  # Use the actual widget, not the MainContainer object
         'environment_container': ui_components.get('environment_container'),
         **widgets_dict,
         **button_refs,  # Include all button references and phase methods
@@ -328,7 +328,7 @@ def create_colab_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> Dict[s
             'operation': operation_container,
             'footer': footer_container,
             'environment': ui_components.get('environment_container'),
-            'main': ui_components.get('main_container'),  # Also include in ui_components
+            'main': ui_components.get('main_layout'),  # Use the actual widget, not the MainContainer object
             'widgets': widgets_dict,
             'metadata': MODULE_METADATA,
             'config': config

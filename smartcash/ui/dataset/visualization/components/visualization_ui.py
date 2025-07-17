@@ -234,8 +234,8 @@ def create_visualization_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -
     # Create the result dictionary with all components
     result = {
         'ui_components': ui_components,
-        'ui': main_container,
-        'main_container': main_container,
+        'ui': main_container.container,  # Use the actual widget, not the MainContainer object
+        'main_container': main_container.container,
         'containers': ui_components['containers'],
         'widgets': ui_components['widgets']
     }

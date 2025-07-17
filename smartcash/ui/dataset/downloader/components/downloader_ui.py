@@ -209,7 +209,7 @@ def create_downloader_ui_components(
     
     # Create the final components dictionary
     components = {
-        'ui': main_container,
+        'ui': main_container.container,  # Use the actual widget, not the MainContainer object
         'ui_components': {
             'header': header_container,
             'form': form_container,
@@ -222,7 +222,7 @@ def create_downloader_ui_components(
         'parent_module': UI_CONFIG['parent_module'],
         'version': UI_CONFIG['version'],
         'config': config,
-        'main_container': main_container,
+        'main_container': main_container.container,
         
         # Add container references
         'header_container': header_container,

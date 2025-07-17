@@ -168,7 +168,6 @@ Primary buttons support the following standard phases:
    - Be consistent with terminology
 
 2. **Icons**:
-   - Use standard Font Awesome icons
    - Choose intuitive icons that match the action
    - Include both icon and text for clarity
 

@@ -1,29 +1,15 @@
 """
 File: smartcash/ui/setup/colab/configs/colab_config_handler.py
-Description: Configuration handler for colab module following dependency pattern
+Description: Configuration handler for colab module using mixin composition pattern
 """
 
 from typing import Dict, Any, Optional, List
 import copy
 import os
 
-try:
-    from smartcash.common.logger import SmartCashLogger
-    from smartcash.ui.core.handlers.config_handler import ConfigHandler
-except ImportError as e:
-    # Fallback for testing
-    class SmartCashLogger:
-        def __init__(self, name=None): pass
-        def info(self, msg): print(f"INFO: {msg}")
-        def error(self, msg): print(f"ERROR: {msg}")
-        def warning(self, msg): print(f"WARNING: {msg}")
-        def success(self, msg): print(f"SUCCESS: {msg}")
-    
-    class ConfigHandler:
-        def __init__(self, *args, **kwargs):
-            self.config = {}
-        def update_config(self, *args, **kwargs): pass
-        def get_config(self): return {}
+from smartcash.ui.logger import get_module_logger
+from smartcash.ui.core.mixins.logging_mixin import LoggingMixin
+from smartcash.ui.core.mixins.configuration_mixin import ConfigurationMixin
 
 from .colab_defaults import (
     get_default_colab_config,
@@ -33,23 +19,29 @@ from .colab_defaults import (
 )
 
 
-class ColabConfigHandler(ConfigHandler):
-    """Configuration handler for colab module following dependency pattern."""
+class ColabConfigHandler(LoggingMixin, ConfigurationMixin):
+    """Configuration handler for colab module using mixin composition pattern."""
     
-    def __init__(self, logger: Optional[SmartCashLogger] = None):
-        """Initialize configuration handler.
+    def __init__(self, logger=None):
+        """Initialize configuration handler with mixin pattern.
         
         Args:
             logger: Optional logger instance
         """
-        # Initialize with default config
-        super().__init__(
-            module_name='colab',
-            parent_module='setup',
-            default_config=get_default_colab_config()
-        )
+        # Initialize mixins
+        super().__init__()
         
-        self.logger = logger or SmartCashLogger('ColabConfigHandler')
+        # Setup logger
+        self.logger = logger or get_module_logger("smartcash.ui.setup.colab.config")
+        
+        # Module identification
+        self.module_name = 'colab'
+        self.parent_module = 'setup'
+        
+        # Initialize with default config
+        self.config = get_default_colab_config()
+        
+        # Initialize colab-specific data
         self._available_environments = get_available_environments()
         self._setup_stages = get_setup_stages_config()
         self._gpu_configurations = get_gpu_configurations()
@@ -59,13 +51,51 @@ class ColabConfigHandler(ConfigHandler):
         
         self.logger.debug("✅ ColabConfigHandler initialized with in-memory configuration")
     
+    def get_default_config(self) -> Dict[str, Any]:
+        """Get default configuration for colab module (required by ConfigurationMixin)."""
+        return get_default_colab_config()
+    
+    def create_config_handler(self, config: Dict[str, Any]) -> 'ColabConfigHandler':
+        """Create config handler instance (required by ConfigurationMixin)."""
+        handler = ColabConfigHandler(logger=self.logger)
+        if config:
+            handler.update_config(config)
+        return handler
+    
     def get_config(self) -> Dict[str, Any]:
         """Get current configuration.
         
         Returns:
             Current configuration dictionary
         """
-        return super().config
+        return self.config
+    
+    def extract_config_from_ui(self) -> Dict[str, Any]:
+        """Extract configuration from UI components (required by ConfigurationMixin).
+        
+        For Colab module, this returns the current in-memory configuration
+        since Colab doesn't persist configuration to files.
+        
+        Returns:
+            Current configuration dictionary
+        """
+        # For Colab, we use in-memory configuration
+        return self.config.copy()
+    
+    def save_config(self) -> Dict[str, Any]:
+        """Save configuration (required by BaseUIModule).
+        
+        For Colab module, configuration is kept in-memory only and doesn't
+        need to be persisted to files.
+        
+        Returns:
+            Success result dictionary
+        """
+        # For Colab, we don't save to files - configuration is ephemeral
+        return {
+            'success': True,
+            'message': 'Konfigurasi disimpan dalam memori (tidak perlu persistensi untuk Colab)'
+        }
     
     def update_config(self, new_config: Dict[str, Any], merge: bool = True) -> None:
         """Update configuration with new values.
@@ -74,14 +104,26 @@ class ColabConfigHandler(ConfigHandler):
             new_config: Dictionary containing new configuration values
             merge: If True, merge with existing config. If False, replace entire config.
         """
-        if merge:
-            # Use parent class update_config which handles merging
-            super().update_config(new_config)
-        else:
-            # Replace entire config
-            self.config = new_config
+        try:
+            if merge:
+                # Deep merge with existing config
+                self._deep_merge(self.config, new_config)
+            else:
+                # Replace entire config
+                self.config = new_config
+                
+            self.logger.debug(f"✅ Configuration updated")
+            
+        except Exception as e:
             self.logger.error(f"❌ Failed to update configuration: {e}")
-            return False
+    
+    def _deep_merge(self, target: Dict[str, Any], source: Dict[str, Any]) -> None:
+        """Deep merge source dict into target dict."""
+        for key, value in source.items():
+            if key in target and isinstance(target[key], dict) and isinstance(value, dict):
+                self._deep_merge(target[key], value)
+            else:
+                target[key] = value
     
     def validate_config(self, config: Dict[str, Any]) -> bool:
         """Validate configuration.
@@ -124,7 +166,7 @@ class ColabConfigHandler(ConfigHandler):
     
     def reset_to_defaults(self) -> None:
         """Reset configuration to defaults."""
-        self._config = get_default_colab_config()
+        self.config = get_default_colab_config()
         self._detect_environment()
         self.logger.info("🔄 Configuration reset to defaults")
     
@@ -165,15 +207,15 @@ class ColabConfigHandler(ConfigHandler):
             self.logger.warning(f"⚠️ Unknown environment type: {env_type}")
             return False
         
-        self._config['environment']['type'] = env_type
+        self.config['environment']['type'] = env_type
         
         # Update paths based on environment
         env_info = self._available_environments[env_type]
-        self._config['environment']['base_path'] = env_info['base_path']
+        self.config['environment']['base_path'] = env_info['base_path']
         
         # Update mount requirement
         if env_info.get('mount_required', False):
-            self._config['environment']['auto_mount_drive'] = True
+            self.config['environment']['auto_mount_drive'] = True
         
         self.logger.info(f"✅ Environment type set to: {env_type}")
         return True
@@ -193,7 +235,7 @@ class ColabConfigHandler(ConfigHandler):
                 self.logger.warning(f"⚠️ Unknown setup stage: {stage}")
                 return False
         
-        self._config['setup']['stages'] = stages
+        self.config['setup']['stages'] = stages
         self.logger.info(f"✅ Setup stages set to: {stages}")
         return True
     
@@ -207,13 +249,13 @@ class ColabConfigHandler(ConfigHandler):
         Returns:
             True if successful, False otherwise
         """
-        self._config['environment']['gpu_enabled'] = enabled
+        self.config['environment']['gpu_enabled'] = enabled
         
         if enabled and gpu_type:
             if gpu_type not in self._gpu_configurations:
                 self.logger.warning(f"⚠️ Unknown GPU type: {gpu_type}")
                 return False
-            self._config['environment']['gpu_type'] = gpu_type
+            self.config['environment']['gpu_type'] = gpu_type
         
         self.logger.info(f"✅ GPU enabled: {enabled}")
         return True
@@ -227,7 +269,7 @@ class ColabConfigHandler(ConfigHandler):
         Returns:
             True if successful, False otherwise
         """
-        self._config['environment']['auto_mount_drive'] = auto_mount
+        self.config['environment']['auto_mount_drive'] = auto_mount
         self.logger.info(f"✅ Auto mount drive set to: {auto_mount}")
         return True
     
@@ -244,7 +286,7 @@ class ColabConfigHandler(ConfigHandler):
             self.logger.warning("⚠️ Project name cannot be empty")
             return False
         
-        self._config['environment']['project_name'] = project_name.strip()
+        self.config['environment']['project_name'] = project_name.strip()
         
         # Update paths with new project name
         self._update_project_paths(project_name.strip())
@@ -258,7 +300,7 @@ class ColabConfigHandler(ConfigHandler):
         Returns:
             Current environment type
         """
-        return self._config['environment']['type']
+        return self.config['environment']['type']
     
     def get_current_gpu_config(self) -> Dict[str, Any]:
         """Get current GPU configuration.
@@ -266,7 +308,7 @@ class ColabConfigHandler(ConfigHandler):
         Returns:
             Current GPU configuration
         """
-        env_config = self._config['environment']
+        env_config = self.config['environment']
         gpu_enabled = env_config.get('gpu_enabled', False)
         gpu_type = env_config.get('gpu_type', 'none')
         
@@ -323,31 +365,12 @@ class ColabConfigHandler(ConfigHandler):
     
     def _update_project_paths(self, project_name: str) -> None:
         """Update project paths with new project name."""
-        paths = self._config['paths']
-        base_path = self._config['environment']['base_path']
+        paths = self.config['paths']
+        base_path = self.config['environment']['base_path']
         
-        if self._config['environment']['type'] == 'colab':
+        if self.config['environment']['type'] == 'colab':
             paths['drive_base'] = f"/content/drive/MyDrive/{project_name}"
             paths['colab_base'] = f"/content/{project_name}"
         else:
             paths['colab_base'] = f"{base_path}/{project_name}"
     
-    def _deep_merge(self, dict1: Dict[str, Any], dict2: Dict[str, Any]) -> Dict[str, Any]:
-        """Deep merge two dictionaries.
-        
-        Args:
-            dict1: First dictionary
-            dict2: Second dictionary
-            
-        Returns:
-            Merged dictionary
-        """
-        result = copy.deepcopy(dict1)
-        
-        for key, value in dict2.items():
-            if key in result and isinstance(result[key], dict) and isinstance(value, dict):
-                result[key] = self._deep_merge(result[key], value)
-            else:
-                result[key] = copy.deepcopy(value)
-        
-        return result

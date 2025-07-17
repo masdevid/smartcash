@@ -10,7 +10,7 @@ Note: This container handles only button management. For dialogs and other UI el
 use the OperationContainer class.
 """
 from ipywidgets import widgets, Layout, VBox, HBox, HTML, Button, ToggleButton, ButtonStyle
-from typing import Dict, Any, Optional, Callable, Literal, TypedDict, List, Tuple
+from typing import Dict, List, Any, Tuple, Literal, Union, Optional, Callable, TypedDict
 import ipywidgets as widgets
 from .save_reset_buttons import create_save_reset_buttons
 from .action_buttons import create_action_buttons
@@ -95,6 +95,7 @@ def create_action_container(
     container_margin: str = "12px 0",
     show_save_reset: bool = True,
     alignment: Literal['left', 'center', 'right'] = None,  # Deprecated, kept for compatibility
+    phases: Dict[str, dict] = None,
     **kwargs
 ) -> Dict[str, Any]:
     """Create an action container with fixed layout and the specified buttons.
@@ -113,6 +114,7 @@ def create_action_container(
         container_margin: Margin around the container (e.g., '12px 0')
         show_save_reset: Whether to show save/reset buttons (default: True)
         alignment: [DEPRECATED] This parameter is ignored - layout is now fixed
+        phases: Dictionary of phase configurations for the primary button
         **kwargs: Additional arguments to pass to ActionContainer
         
     Returns:
@@ -127,6 +129,7 @@ def create_action_container(
         container_margin=container_margin,
         show_save_reset=show_save_reset,
         title=title,
+        phases=phases,  # Pass phases to ActionContainer
         **kwargs
     )
     
@@ -156,8 +159,8 @@ def create_action_container(
         except Exception as e:
             print(f"Warning: Failed to add primary button {btn_id}: {str(e)}")
     
-    # Process action buttons if no primary button exists
-    elif action_configs:
+    # Process action buttons
+    if action_configs:
         for btn_config in action_configs:
             btn_config = btn_config.copy()
             btn_id = btn_config.pop('id', btn_config.pop('button_id', None))
@@ -314,25 +317,66 @@ class ActionContainer:
         finally:
             self._initializing = False
             
-    def set_phases(self, phases: Dict[str, dict]) -> None:
+    def set_phases(self, phases: Union[Dict[str, dict], List[dict], None]) -> None:
         """Set available phases for the primary button.
         
         Args:
-            phases: Dictionary of phase configurations
+            phases: Either a dictionary of phase configurations or a list of phase configs with 'id' keys
+            
+        Raises:
+            TypeError: If phases is not a dictionary or list, or if list items don't have 'id' keys
         """
-        self.phases = phases or {}
-        
-        # Ensure we have at least the default phases
-        if not self.phases and hasattr(self, 'phases'):
-            self.phases = COLAB_PHASES
+        try:
+            processed_phases = {}
             
-        # Set default phase if current_phase is not set or invalid
-        if not hasattr(self, 'current_phase') or self.current_phase not in self.phases:
-            self.current_phase = next(iter(self.phases.keys()), '')
+            # Handle None case
+            if phases is None:
+                processed_phases = COLAB_PHASES
+            # Handle dictionary input (preferred format)
+            elif isinstance(phases, dict):
+                processed_phases = phases.copy()
+            # Handle list input (legacy format)
+            elif isinstance(phases, list):
+                for phase in phases:
+                    if not isinstance(phase, dict) or 'id' not in phase:
+                        raise ValueError("Each phase in the list must be a dictionary with an 'id' key")
+                    phase_id = phase['id']
+                    processed_phases[phase_id] = {
+                        'text': phase.get('text', phase_id.capitalize()),
+                        'style': phase.get('style', 'primary'),
+                        'description': phase.get('description', ''),
+                        'icon': phase.get('icon', '')
+                    }
+            else:
+                raise TypeError(f"Expected phases to be a dictionary or list, got {type(phases).__name__}")
             
-        # Update primary button with current phase if it exists
-        if self.current_phase and self.buttons['primary'] is not None:
-            self.set_phase(self.current_phase)
+            # Ensure we have at least the default phases
+            if not processed_phases:
+                processed_phases = COLAB_PHASES
+                
+            self.phases = processed_phases
+            
+            # Set default phase if current_phase is not set or invalid
+            if not hasattr(self, 'current_phase') or self.current_phase not in self.phases:
+                self.current_phase = next(iter(self.phases.keys()), '')
+                
+            # Debug logging
+            if hasattr(self, 'logger'):
+                self.logger.debug(f"Set phases: {list(self.phases.keys())}, current_phase: {self.current_phase}")
+                
+            # Update primary button with current phase if it exists
+            if self.current_phase and self.buttons['primary'] is not None:
+                self.set_phase(self.current_phase)
+                
+        except Exception as e:
+            error_msg = f"Error in set_phases: {str(e)}"
+            if hasattr(self, 'logger'):
+                self.logger.error(error_msg, exc_info=True)
+            else:
+                print(f"ERROR: {error_msg}")
+                import traceback
+                traceback.print_exc()
+            raise
     
     def set_phase(self, phase_id: str) -> None:
         """Set the current phase of the primary button.

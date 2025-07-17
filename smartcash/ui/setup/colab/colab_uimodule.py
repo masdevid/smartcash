@@ -132,6 +132,9 @@ class ColabUIModule(BaseUIModule):
             if success:
                 # Button handlers are connected automatically by ButtonHandlerMixin
                 
+                # Setup button phases for sequential operations
+                self._setup_button_phases()
+                
                 # Flush any buffered logs to operation container
                 self._flush_log_buffer()
                 
@@ -181,32 +184,54 @@ class ColabUIModule(BaseUIModule):
                 self._is_colab_environment = False
             self._environment_detected = True
     
+    def _setup_button_phases(self) -> None:
+        """Setup button phases for sequential colab operations."""
+        try:
+            # Define sequential phases for colab setup
+            phases = [
+                {'id': 'detect', 'text': '🔍 Deteksi Lingkungan', 'description': 'Mendeteksi lingkungan sistem'},
+                {'id': 'init', 'text': '🔧 Inisialisasi', 'description': 'Menginisialisasi environment'},
+                {'id': 'mount', 'text': '📁 Mount Drive', 'description': 'Memasang Google Drive'},
+                {'id': 'setup', 'text': '🚀 Setup Lengkap', 'description': 'Menjalankan pengaturan lengkap'},
+                {'id': 'verify', 'text': '🔍 Verifikasi', 'description': 'Memverifikasi pengaturan'}
+            ]
+            
+            # Set phases to UI components if available
+            if hasattr(self, '_ui_components') and self._ui_components:
+                # Check if _ui_components is a dictionary and has set_phases method
+                if isinstance(self._ui_components, dict) and 'set_phases' in self._ui_components:
+                    self._ui_components['set_phases'](phases)
+                    self.logger.debug("✅ Button phases configured")
+                elif hasattr(self, 'set_phases'):
+                    self.set_phases(phases)
+                    self.logger.debug("✅ Button phases configured via method")
+                else:
+                    self.logger.debug("⚠️ Button phases not configured - set_phases method not found")
+                    
+        except Exception as e:
+            self.logger.error(f"Failed to setup button phases: {e}")
     
     def _register_default_operations(self) -> None:
         """Register default operations for Colab module (Operation Checklist 9.1)."""
         # Call parent method first
         super()._register_default_operations()
         
-        # Register Colab-specific operations (Operation Checklist 8.3)
-        self.register_operation_handler('full_setup', self._handle_full_setup)
-        self.register_operation_handler('init_environment', self._handle_init_environment)
-        self.register_operation_handler('mount_drive', self._handle_mount_drive)
-        self.register_operation_handler('verify_setup', self._handle_verify_setup)
-        self.register_operation_handler('detect_environment', self._handle_detect_environment)
+        # Note: Colab operations are now handled directly through the primary button
+        # with phase states, eliminating the need for separate operation registrations
         
         # Register button handlers (Operation Checklist 2.2)
-        # Primary button handler
-        self.register_button_handler('colab_setup', self._handle_full_setup)
+        # Single primary button handler with phase states
+        self.register_button_handler('colab_setup', self._handle_primary_button)
+        self.register_button_handler('primary_button', self._handle_primary_button)
         
         # Register save/reset button handlers (these are required for all modules)
         self.register_button_handler('save', self._handle_save_config)
+        self.register_button_handler('save_button', self._handle_save_config)
         self.register_button_handler('reset', self._handle_reset_config)
+        self.register_button_handler('reset_button', self._handle_reset_config)
         
-        # Register additional colab operation handlers for potential UI buttons
-        self.register_button_handler('init_environment', self._handle_init_environment)
-        self.register_button_handler('mount_drive', self._handle_mount_drive)
-        self.register_button_handler('verify_setup', self._handle_verify_setup)
-        self.register_button_handler('detect_environment', self._handle_detect_environment)
+        # Register setup button handler
+        self.register_button_handler('setup_button', self._handle_primary_button)
     
     def _flush_log_buffer(self) -> None:
         """Flush buffered logs to operation container."""
@@ -225,15 +250,69 @@ class ColabUIModule(BaseUIModule):
         except Exception as e:
             self.logger.debug(f"Failed to flush log buffer: {e}")
     
-    # Removed redundant methods that are already provided by mixins:
-    # - _connect_save_reset_buttons() -> ButtonHandlerMixin handles this
-    # - update_operation_status() -> OperationMixin provides this
-    # - _handle_save_config() -> BaseUIModule provides this
-    # - _handle_reset_config() -> BaseUIModule provides this
-    
-    # Removed redundant log() method - LoggingMixin provides this functionality
+    # All core functionality is provided by BaseUIModule and its mixins
     
     # ==================== OPERATION HANDLERS ====================
+    
+    def _handle_primary_button(self, button=None) -> Dict[str, Any]:  # noqa: ARG002
+        """Handle primary button click - routes to appropriate operation based on current phase."""
+        try:
+            # Get current phase from button or default to 'detect'
+            current_phase = 'detect'
+            
+            # Try to get phase from UI components
+            if hasattr(self, '_ui_components') and self._ui_components:
+                if 'primary_button' in self._ui_components:
+                    primary_button = self._ui_components['primary_button']
+                    if hasattr(primary_button, 'current_phase'):
+                        current_phase = primary_button.current_phase
+                    elif hasattr(primary_button, 'phase'):
+                        current_phase = primary_button.phase
+                        
+            # Route to appropriate operation based on phase
+            if current_phase == 'detect':
+                result = self._handle_detect_environment(button)
+                if result.get('success'):
+                    self._advance_to_next_phase('init')
+                return result
+            elif current_phase == 'init':
+                result = self._handle_init_environment(button)
+                if result.get('success'):
+                    self._advance_to_next_phase('mount')
+                return result
+            elif current_phase == 'mount':
+                result = self._handle_mount_drive(button)
+                if result.get('success'):
+                    self._advance_to_next_phase('setup')
+                return result
+            elif current_phase == 'setup':
+                result = self._handle_full_setup(button)
+                if result.get('success'):
+                    self._advance_to_next_phase('verify')
+                return result
+            elif current_phase == 'verify':
+                result = self._handle_verify_setup(button)
+                if result.get('success'):
+                    self.log("🎉 Semua tahapan setup Colab telah selesai!", 'success')
+                return result
+            else:
+                return {'success': False, 'message': f'Unknown phase: {current_phase}'}
+                
+        except Exception as e:
+            error_msg = f"Error in primary button handler: {e}"
+            self.logger.error(error_msg)
+            return {'success': False, 'message': error_msg}
+    
+    def _advance_to_next_phase(self, next_phase: str) -> None:
+        """Advance button to next phase."""
+        try:
+            if hasattr(self, '_ui_components') and self._ui_components:
+                if 'set_phase' in self._ui_components:
+                    self._ui_components['set_phase'](next_phase)
+                    self.logger.debug(f"✅ Advanced to phase: {next_phase}")
+                    
+        except Exception as e:
+            self.logger.error(f"Failed to advance to next phase: {e}")
     
     def _handle_full_setup(self, button=None) -> Dict[str, Any]:  # noqa: ARG002
         """Handle full Colab setup operation using modern BaseUIModule pattern."""

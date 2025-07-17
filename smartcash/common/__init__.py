@@ -14,7 +14,13 @@ from smartcash.common.config import (
 ConfigManager = SimpleConfigManager
 
 # ===== Kompatibilitas OpenCV =====
-from smartcash.common.opencv_compat import CV_8U, threshold as cv2_threshold, convert_to_uint8
+try:
+    from smartcash.common.opencv_compat import CV_8U, threshold as cv2_threshold, convert_to_uint8
+except ImportError:
+    # Fallback if OpenCV is not available
+    CV_8U = None
+    cv2_threshold = None
+    convert_to_uint8 = None
 
 # ===== Lingkungan =====
 from smartcash.common.environment import (

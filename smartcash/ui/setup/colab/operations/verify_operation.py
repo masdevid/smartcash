@@ -5,33 +5,24 @@ Description: Comprehensive verification of the setup
 
 import os
 from typing import Dict, Any, Optional, Callable
-from smartcash.ui.core.handlers.operation_handler import OperationHandler
+from smartcash.ui.components.operation_container import OperationContainer
+from .base_colab_operation import BaseColabOperation
 from ..constants import SYMLINK_MAP, REQUIRED_FOLDERS
 from ..utils.env_detector import detect_environment_info
 
 
-class VerifyOperation(OperationHandler):
+class VerifyOperation(BaseColabOperation):
     """Comprehensive verification of the setup."""
     
-    def __init__(self, config: Dict[str, Any], **kwargs):
+    def __init__(self, config: Dict[str, Any], operation_container: Optional[OperationContainer] = None, **kwargs):
         """Initialize verify operation.
         
         Args:
             config: Configuration dictionary
+            operation_container: Optional operation container for UI integration
             **kwargs: Additional arguments
         """
-        super().__init__(
-            module_name='verify_operation',
-            parent_module='colab',
-            **kwargs
-        )
-        self.config = config
-    
-    def initialize(self) -> None:
-        """Initialize the verify operation."""
-        self.logger.info("🚀 Initializing verify operation")
-        # No specific initialization needed for verify operation
-        self.logger.info("✅ Verify operation initialization complete")
+        super().__init__('verify_operation', config, operation_container, **kwargs)
     
     def get_operations(self) -> Dict[str, Callable]:
         """Get available operations."""
@@ -48,18 +39,16 @@ class VerifyOperation(OperationHandler):
         Returns:
             Dictionary with verification results
         """
-        try:
-            if progress_callback:
-                progress_callback(10, "🔍 Starting verification...")
-            
+        def execute_operation():
+            progress_steps = self.get_progress_steps('verify')
             verification_results = {}
             issues = []
             
+            # Step 1: Starting verification
+            self.update_progress_safe(progress_callback, progress_steps[0]['progress'], progress_steps[0]['message'])
+            
             # Only verify drive mount if explicitly requested in config
             if self.config.get('check_drive', False):
-                if progress_callback:
-                    progress_callback(20, "🔍 Verifying drive mount status...")
-                
                 # Verify Drive mount with check_drive=True
                 drive_verification = self._verify_drive_mount()
                 verification_results['drive_mount'] = drive_verification
@@ -79,16 +68,14 @@ class VerifyOperation(OperationHandler):
                     'message': 'Drive verification skipped as check_drive=False'
                 }
             
+            # Step 2: Verifying symlinks
+            self.update_progress_safe(progress_callback, progress_steps[1]['progress'], progress_steps[1]['message'])
+            
             # Verify symlinks if drive is mounted
             if self.config.get('drive_mounted', False):
-                if progress_callback:
-                    progress_callback(30, "🔗 Verifying symlinks...")
-                
-                symlink_verification = self._verify_symlinks()
+                symlink_verification = self.verify_symlinks_batch(SYMLINK_MAP)
                 verification_results['symlinks'] = symlink_verification
-                
-                if not symlink_verification.get('all_valid', False):
-                    issues.append("Some required symlinks are invalid")
+                issues.extend(symlink_verification['issues'])
             else:
                 # Skip symlink verification if drive is not mounted
                 verification_results['symlinks'] = {
@@ -96,50 +83,46 @@ class VerifyOperation(OperationHandler):
                     'message': 'Symlink verification skipped as drive is not mounted'
                 }
             
-            if progress_callback:
-                progress_callback(50, "📁 Verifying folders...")
+            # Step 3: Verifying folders
+            self.update_progress_safe(progress_callback, progress_steps[2]['progress'], progress_steps[2]['message'])
             
             # Verify folders
-            folder_verification = self._verify_folders()
+            folder_verification = self.validate_items_exist(REQUIRED_FOLDERS, "folder")
             verification_results['folders'] = folder_verification
-            issues.extend(folder_verification['issues'])
+            if not folder_verification['all_exist']:
+                issues.extend([f"Missing folder: {folder}" for folder in folder_verification['missing_items']])
             
-            if progress_callback:
-                progress_callback(70, "🌍 Verifying environment variables...")
+            # Step 4: Verifying environment variables
+            self.update_progress_safe(progress_callback, progress_steps[3]['progress'], progress_steps[3]['message'])
             
             # Verify environment variables
-            env_verification = self._verify_environment_variables()
+            required_vars = ['SMARTCASH_ROOT', 'SMARTCASH_ENV', 'SMARTCASH_DATA_ROOT']
+            env_verification = self.verify_environment_variables(required_vars)
             verification_results['env_vars'] = env_verification
             issues.extend(env_verification['issues'])
             
-            if progress_callback:
-                progress_callback(90, "💻 Gathering system info...")
+            # Step 5: Gathering system info
+            self.update_progress_safe(progress_callback, progress_steps[4]['progress'], progress_steps[4]['message'])
             
             # Enhanced system information using env_detector
             system_info = self._get_enhanced_system_info()
             verification_results['system_info'] = system_info
             
-            if progress_callback:
-                progress_callback(100, "✅ Verification complete")
+            # Step 6: Verification complete
+            self.update_progress_safe(progress_callback, progress_steps[5]['progress'], progress_steps[5]['message'])
             
             # Determine overall success
             all_verified = len(issues) == 0
             
-            return {
-                'success': all_verified,
-                'verification': verification_results,
-                'issues': issues,
-                'system_info': system_info,
-                'summary': self._generate_verification_summary(verification_results, issues),
-                'message': 'All verifications passed' if all_verified else f'{len(issues)} issues found'
-            }
+            return self.create_success_result(
+                'All verifications passed' if all_verified else f'{len(issues)} issues found',
+                verification=verification_results,
+                issues=issues,
+                system_info=system_info,
+                summary=self.create_verification_summary(verification_results, issues)
+            )
             
-        except Exception as e:
-            self.log(f"Verification failed: {str(e)}", 'error')
-            return {
-                'success': False,
-                'error': f'Verification failed: {str(e)}'
-            }
+        return self.execute_with_error_handling(execute_operation)
     
     def _verify_drive_mount(self) -> Dict[str, Any]:
         """Verify Google Drive mount status.
@@ -179,144 +162,8 @@ class VerifyOperation(OperationHandler):
             'status': 'verified' if drive_mounted and write_access else 'not_verified'
         }
     
-    def _verify_symlinks(self) -> Dict[str, Any]:
-        """Verify symbolic links.
-        
-        Returns:
-            Dictionary with symlink verification results
-        """
-        symlink_status = {}
-        issues = []
-        valid_count = 0
-        
-        for source, target in SYMLINK_MAP.items():
-            exists = os.path.islink(target) and os.path.exists(target)
-            valid = False
-            
-            if exists:
-                try:
-                    valid = os.path.samefile(source, target)
-                    if valid:
-                        valid_count += 1
-                except Exception:
-                    pass
-            
-            symlink_status[target] = {
-                'exists': exists,
-                'source': source,
-                'valid': valid,
-                'target_basename': os.path.basename(target)
-            }
-            
-            if not exists:
-                issues.append(f"Symlink missing: {target}")
-            elif not valid:
-                issues.append(f"Symlink invalid: {target}")
-        
-        self.log(f"✅ {valid_count}/{len(SYMLINK_MAP)} symlinks verified", 'info')
-        
-        return {
-            'symlink_status': symlink_status,
-            'valid_count': valid_count,
-            'total_count': len(SYMLINK_MAP),
-            'all_valid': valid_count == len(SYMLINK_MAP),
-            'issues': issues
-        }
     
-    def _verify_folders(self) -> Dict[str, Any]:
-        """Verify required folders.
-        
-        Returns:
-            Dictionary with folder verification results
-        """
-        folder_status = {}
-        issues = []
-        existing_count = 0
-        
-        for folder in REQUIRED_FOLDERS:
-            exists = os.path.exists(folder)
-            is_dir = os.path.isdir(folder) if exists else False
-            writable = False
-            
-            if exists and is_dir:
-                existing_count += 1
-                # Test write access
-                try:
-                    test_file = os.path.join(folder, '.smartcash_write_test')
-                    with open(test_file, 'w') as f:
-                        f.write('test')
-                    os.remove(test_file)
-                    writable = True
-                except Exception:
-                    pass
-            
-            folder_status[folder] = {
-                'exists': exists,
-                'is_directory': is_dir,
-                'writable': writable,
-                'basename': os.path.basename(folder)
-            }
-            
-            if not exists:
-                issues.append(f"Required folder missing: {folder}")
-            elif not is_dir:
-                issues.append(f"Path exists but not a directory: {folder}")
-            elif not writable:
-                issues.append(f"Folder not writable: {folder}")
-        
-        self.log(f"✅ {existing_count}/{len(REQUIRED_FOLDERS)} folders verified", 'info')
-        
-        return {
-            'folder_status': folder_status,
-            'existing_count': existing_count,
-            'total_count': len(REQUIRED_FOLDERS),
-            'all_exist': existing_count == len(REQUIRED_FOLDERS),
-            'issues': issues
-        }
     
-    def _verify_environment_variables(self) -> Dict[str, Any]:
-        """Verify environment variables.
-        
-        Returns:
-            Dictionary with environment variable verification results
-        """
-        required_vars = ['SMARTCASH_ROOT', 'SMARTCASH_ENV', 'SMARTCASH_DATA_ROOT']
-        env_vars_status = {}
-        issues = []
-        valid_count = 0
-        
-        for var in required_vars:
-            exists = var in os.environ
-            value = os.environ.get(var) if exists else None
-            valid_path = False
-            
-            if exists and value:
-                valid_count += 1
-                # For path variables, check if they exist
-                if 'ROOT' in var or 'PATH' in var:
-                    valid_path = os.path.exists(value)
-            
-            env_vars_status[var] = {
-                'exists': exists,
-                'value': value,
-                'valid_path': valid_path if 'ROOT' in var or 'PATH' in var else None
-            }
-            
-            if not exists:
-                issues.append(f"Environment variable missing: {var}")
-            elif 'ROOT' in var and not valid_path:
-                issues.append(f"Environment variable path invalid: {var} = {value}")
-        
-        self.log(f"✅ Environment variables verified", 'info')
-        
-        return {
-            'env_vars_status': env_vars_status,
-            'valid_count': valid_count,
-            'total_count': len(required_vars),
-            'all_valid': valid_count == len(required_vars),
-            'python_path': os.environ.get('PYTHONPATH', ''),
-            'issues': issues
-        }
     
     def _get_enhanced_system_info(self) -> Dict[str, Any]:
         """Get enhanced system information using env_detector.
@@ -326,89 +173,12 @@ class VerifyOperation(OperationHandler):
         """
         try:
             # Use enhanced env_detector for comprehensive info
-            env_info = detect_environment_info()
+            env_info = self.detect_environment_enhanced()
             
             # Extract and format system information
-            system_info = {
-                'environment': {
-                    'type': env_info.get('runtime', {}).get('type', 'unknown'),
-                    'is_colab': env_info.get('is_colab', False),
-                    'display': env_info.get('runtime', {}).get('display', 'Unknown')
-                },
-                'hardware': {
-                    'cpu_cores': env_info.get('cpu_cores', 'Unknown'),
-                    'total_ram_gb': round(env_info.get('total_ram', 0) / (1024**3), 2) if env_info.get('total_ram') else 0,
-                    'gpu_info': env_info.get('gpu', 'No GPU available')
-                },
-                'operating_system': env_info.get('os', {}),
-                'storage': env_info.get('storage_info', {}),
-                'drive_status': {
-                    'mounted': env_info.get('drive_mounted', False),
-                    'mount_path': env_info.get('drive_mount_path', '')
-                },
-                'python': {
-                    'version': env_info.get('python_version', 'Unknown'),
-                    'executable': os.sys.executable
-                }
-            }
-            
-            return system_info
+            return self.format_system_info(env_info)
             
         except Exception as e:
-            self.log(f"Error getting enhanced system info: {str(e)}", 'warning')
+            self.logger.warning(f"Error getting enhanced system info: {str(e)}")
             return {'error': str(e)}
     
-    def _generate_verification_summary(self, verification_results: Dict[str, Any], issues: list) -> Dict[str, Any]:
-        """Generate a summary of verification results.
-        
-        Args:
-            verification_results: Complete verification results
-            issues: List of issues found
-            
-        Returns:
-            Dictionary with verification summary
-        """
-        summary = {
-            'overall_status': 'PASS' if len(issues) == 0 else 'FAIL',
-            'total_issues': len(issues),
-            'components': {}
-        }
-        
-        # Drive mount summary
-        drive_mount = verification_results.get('drive_mount', {})
-        summary['components']['drive_mount'] = {
-            'status': 'PASS' if drive_mount.get('mounted', False) else 'FAIL',
-            'details': 'Mounted and accessible' if drive_mount.get('accessible', False) else 'Not mounted or not accessible'
-        }
-        
-        # Symlinks summary
-        symlinks = verification_results.get('symlinks', {})
-        symlink_status = 'PASS' if symlinks.get('all_valid', False) else 'FAIL'
-        valid_count = symlinks.get('valid_count', 0)
-        total_count = symlinks.get('total_count', 0)
-        summary['components']['symlinks'] = {
-            'status': symlink_status,
-            'details': f'{valid_count}/{total_count} symlinks valid'
-        }
-        
-        # Folders summary
-        folders = verification_results.get('folders', {})
-        folder_status = 'PASS' if folders.get('all_exist', False) else 'FAIL'
-        existing_count = folders.get('existing_count', 0)
-        total_folders = folders.get('total_count', 0)
-        summary['components']['folders'] = {
-            'status': folder_status,
-            'details': f'{existing_count}/{total_folders} folders exist'
-        }
-        
-        # Environment variables summary
-        env_vars = verification_results.get('env_vars', {})
-        env_status = 'PASS' if env_vars.get('all_valid', False) else 'FAIL'
-        valid_env_count = env_vars.get('valid_count', 0)
-        total_env_count = env_vars.get('total_count', 0)
-        summary['components']['environment_variables'] = {
-            'status': env_status,
-            'details': f'{valid_env_count}/{total_env_count} variables valid'
-        }
-        
-        return summary

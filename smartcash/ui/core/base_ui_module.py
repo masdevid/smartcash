@@ -79,9 +79,10 @@ class BaseUIModule(
         self.module_name = module_name
         self.parent_module = parent_module
         self.full_module_name = f"{parent_module}.{module_name}" if parent_module else module_name
-        
-        # Initialize all mixins
-        super().__init__(**kwargs)
+
+        # Initialize mixins directly. This is the correct pattern.
+        LoggingMixin.__init__(self)
+        OperationMixin.__init__(self)
         
         # Initialize environment support if enabled
         self._enable_environment = enable_environment

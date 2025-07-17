@@ -134,6 +134,37 @@ def create_colab_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> Dict[s
     # Create module-specific form widgets first
     form_widgets = _create_module_form_widgets(config)
     
+    # Define colab phases
+    colab_phases = {
+        'init': {'text': 'Menginisialisasi...', 'style': 'primary'},
+        'drive': {'text': 'Mounting Google Drive...', 'style': 'primary'},
+        'symlink': {'text': 'Menyiapkan symlink...', 'style': 'primary'},
+        'folders': {'text': 'Membuat folder...', 'style': 'primary'},
+        'config': {'text': 'Menyiapkan konfigurasi...', 'style': 'primary'},
+        'env': {'text': 'Menyiapkan environment...', 'style': 'primary'},
+        'verify': {'text': 'Memverifikasi setup...', 'style': 'primary'},
+        'complete': {'text': 'Setup Selesai!', 'style': 'success'},
+        'error': {'text': 'Terjadi Kesalahan', 'style': 'danger'}
+    }
+    
+    # Create action container with primary button and phases
+    action_container = create_action_container(
+        buttons=[
+            {
+                'id': 'setup_button',
+                'text': 'Mulai Setup',
+                'style': 'primary',
+                'icon': 'rocket',
+                'tooltip': 'Klik untuk memulai setup environment',
+                'disabled': False
+            }
+        ],
+        title="<h3>Setup Environment</h3>",
+        container_margin="24px 0 12px 0",
+        show_save_reset=False,
+        phases=colab_phases  # Pass phases during initialization
+    )
+    
     # Create form container with consistent styling
     form_container = create_form_container(
         title=f"⚙️ {UI_CONFIG['title']} Configuration",
@@ -182,7 +213,33 @@ def create_colab_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> Dict[s
     ui_components['save_button'] = getattr(action_container_instance, 'save_button', None)
     ui_components['reset_button'] = getattr(action_container_instance, 'reset_button', None)
     
-    # Expose phase management methods for primary button
+    # Get phase management methods
+    action_container_instance = action_container.get('action_container')
+    if action_container_instance:
+        try:
+            # Ensure we have a valid phases dictionary
+            if not hasattr(action_container_instance, 'phases') or not isinstance(action_container_instance.phases, dict):
+                action_container_instance.phases = {}
+                
+            # Set initial phase if set_phase is available
+            if hasattr(action_container_instance, 'set_phase'):
+                if 'init' in action_container_instance.phases:
+                    action_container_instance.set_phase('init')
+                elif action_container_instance.phases:
+                    # Use the first available phase if 'init' doesn't exist
+                    first_phase = next(iter(action_container_instance.phases.keys()))
+                    action_container_instance.set_phase(first_phase)
+                    
+        except Exception as e:
+            import traceback
+            error_msg = f"Error setting initial phase: {e}"
+            print(error_msg)
+            print(traceback.format_exc())
+            # Ensure we have a logger instance
+            if hasattr(action_container_instance, 'logger'):
+                action_container_instance.logger.error(error_msg, exc_info=True)
+    
+    # Expose phase management methods
     ui_components['set_phase'] = action_container.get('set_phase')
     ui_components['set_phases'] = action_container.get('set_phases')
     ui_components['enable_all'] = action_container.get('enable_all')

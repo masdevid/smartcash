@@ -7,34 +7,25 @@ import os
 import logging
 from pathlib import Path
 from typing import Dict, Any, Optional, Callable
-from smartcash.ui.core.handlers.operation_handler import OperationHandler
+from smartcash.ui.components.operation_container import OperationContainer
+from .base_colab_operation import BaseColabOperation
 from smartcash.common.config.manager import get_config_manager
 from smartcash.common.constants.paths import COLAB_DATA_ROOT
 
 
-class ConfigSyncOperation(OperationHandler):
+class ConfigSyncOperation(BaseColabOperation):
     """Sync configuration files using the config manager."""
     
-    def __init__(self, config: Dict[str, Any], **kwargs):
+    def __init__(self, config: Dict[str, Any], operation_container: Optional[OperationContainer] = None, **kwargs):
         """Initialize config sync operation.
         
         Args:
             config: Configuration dictionary
+            operation_container: Optional operation container for UI integration
             **kwargs: Additional arguments
         """
-        super().__init__(
-            module_name='config_sync_operation',
-            parent_module='colab',
-            **kwargs
-        )
-        self.config = config
+        super().__init__('config_sync_operation', config, operation_container, **kwargs)
         self.config_manager = get_config_manager(auto_sync=False)
-    
-    def initialize(self) -> None:
-        """Initialize the config sync operation."""
-        self.logger.info("🚀 Initializing config sync operation")
-        # No specific initialization needed for config sync operation
-        self.logger.info("✅ Config sync operation initialization complete")
     
     def get_operations(self) -> Dict[str, Callable]:
         """Get available operations."""
@@ -51,14 +42,15 @@ class ConfigSyncOperation(OperationHandler):
         Returns:
             Dictionary with operation results
         """
-        try:
-            if progress_callback:
-                progress_callback(10, "🔍 Checking config templates...")
+        def execute_operation():
+            progress_steps = self.get_progress_steps('config_sync')
+            
+            # Step 1: Check configuration
+            self.update_progress_safe(progress_callback, progress_steps[0]['progress'], progress_steps[0]['message'])
             
             # Check if COLAB_DATA_ROOT exists
-            if not os.path.exists(COLAB_DATA_ROOT):
-                os.makedirs(COLAB_DATA_ROOT, exist_ok=True)
-                self.log(f"Created COLAB_DATA_ROOT directory: {COLAB_DATA_ROOT}", 'info')
+            if not self.ensure_directory_exists(COLAB_DATA_ROOT):
+                return self.create_error_result(f"Failed to create COLAB_DATA_ROOT directory: {COLAB_DATA_ROOT}")
             
             # Ensure config directory exists
             config_dir = Path('/content/smartcash/configs')
@@ -74,17 +66,15 @@ class ConfigSyncOperation(OperationHandler):
                         sample_config.write_text("# Sample Configuration\n# Add your configuration here\n")
                         self.log(f"Created sample config: {sample_config}", 'info')
                 except Exception as e:
-                    self.log(f"Error creating config directory: {str(e)}", 'error')
-                    return {
-                        'success': False,
-                        'error': f'Failed to create config directory: {str(e)}',
-                        'config_dir': str(config_dir),
-                        'cwd': os.getcwd(),
-                        'ls_content': os.listdir('/content/smartcash' if os.path.exists('/content/smartcash') else '/content')
-                    }
+                    return self.create_error_result(
+                        f'Failed to create config directory: {str(e)}',
+                        config_dir=str(config_dir),
+                        cwd=os.getcwd(),
+                        ls_content=os.listdir('/content/smartcash' if os.path.exists('/content/smartcash') else '/content')
+                    )
             
-            if progress_callback:
-                progress_callback(25, "📋 Discovering available configs...")
+            # Step 2: Sync configuration
+            self.update_progress_safe(progress_callback, progress_steps[1]['progress'], progress_steps[1]['message'])
             
             # Discover configs from repo
             available_configs = self.config_manager.discover_repo_configs()
@@ -95,29 +85,22 @@ class ConfigSyncOperation(OperationHandler):
                 try:
                     contents = os.listdir(config_dir)
                     self.log(f"No config files found in {config_dir}. Contents: {contents}", 'warning')
-                    return {
-                        'success': False,
-                        'error': f'No configuration templates found in {config_dir}. Directory contents: {contents}',
-                        'config_dir': str(config_dir),
-                        'directory_contents': contents
-                    }
+                    return self.create_error_result(
+                        f'No configuration templates found in {config_dir}. Directory contents: {contents}',
+                        config_dir=str(config_dir),
+                        directory_contents=contents
+                    )
                 except Exception as e:
-                    return {
-                        'success': False,
-                        'error': f'Error reading config directory: {str(e)}',
-                        'config_dir': str(config_dir)
-                    }
-            
-            if progress_callback:
-                progress_callback(40, f"🔄 Syncing {len(available_configs)} configs...")
+                    return self.create_error_result(
+                        f'Error reading config directory: {str(e)}',
+                        config_dir=str(config_dir)
+                    )
             
             # Perform sync with progress tracking
             configs_processed = []
             configs_failed = []
             
-            for i, config_name in enumerate(available_configs):
-                current_progress = 40 + ((i + 1) / len(available_configs)) * 50  # 40% to 90%
-                
+            for config_name in available_configs:
                 try:
                     success, message = self.config_manager.sync_single_config(
                         config_name, 
@@ -137,10 +120,6 @@ class ConfigSyncOperation(OperationHandler):
                             'error': message
                         })
                         self.log(f"❌ {message}", 'error')
-                    
-                    if progress_callback:
-                        status_icon = "✅" if success else "❌"
-                        progress_callback(current_progress, f"{status_icon} {config_name}")
                         
                 except Exception as e:
                     configs_failed.append({
@@ -148,35 +127,32 @@ class ConfigSyncOperation(OperationHandler):
                         'error': str(e)
                     })
                     self.log(f"❌ Error syncing {config_name}: {str(e)}", 'error')
-                    
-                    if progress_callback:
-                        progress_callback(current_progress, f"❌ {config_name}")
             
-            if progress_callback:
-                progress_callback(100, f"✅ Config sync complete")
+            # Step 3: Validate sync
+            self.update_progress_safe(progress_callback, progress_steps[2]['progress'], progress_steps[2]['message'])
+            
+            integrity_check = self.check_config_integrity()
+            
+            # Step 4: Complete
+            self.update_progress_safe(progress_callback, progress_steps[3]['progress'], progress_steps[3]['message'])
             
             success_count = len([c for c in configs_processed if c['status'] == 'synced'])
             skip_count = len([c for c in configs_processed if c['status'] == 'skipped'])
             
             overall_success = len(configs_failed) == 0
             
-            return {
-                'success': overall_success,
-                'configs_processed': configs_processed,
-                'configs_failed': configs_failed,
-                'synced_count': success_count,
-                'skipped_count': skip_count,
-                'error_count': len(configs_failed),
-                'total_count': len(available_configs),
-                'message': f'Synced {success_count} configs, skipped {skip_count}, {len(configs_failed)} errors'
-            }
+            return self.create_success_result(
+                f'Synced {success_count} configs, skipped {skip_count}, {len(configs_failed)} errors',
+                configs_processed=configs_processed,
+                configs_failed=configs_failed,
+                synced_count=success_count,
+                skipped_count=skip_count,
+                error_count=len(configs_failed),
+                total_count=len(available_configs),
+                integrity_check=integrity_check
+            )
             
-        except Exception as e:
-            self.log(f"Config sync failed: {str(e)}", 'error')
-            return {
-                'success': False,
-                'error': f'Configuration sync failed: {str(e)}'
-            }
+        return self.execute_with_error_handling(execute_operation)
     
     def check_config_integrity(self) -> Dict[str, Any]:
         """Check integrity of configuration files.

@@ -50,18 +50,39 @@ class ButtonHandlerMixin:
             
             # Method 1: Get from action container
             action_container = self._ui_components.get('action_container')
-            if action_container and isinstance(action_container, dict):
-                buttons.update(action_container.get('buttons', {}))
+            if action_container:
+                # Check if action_container has a 'buttons' attribute (direct access)
+                if hasattr(action_container, 'buttons') and isinstance(action_container.buttons, dict):
+                    buttons.update(action_container.buttons)
+                # Check if action_container is a dictionary with a 'buttons' key
+                elif isinstance(action_container, dict) and 'buttons' in action_container:
+                    buttons.update(action_container['buttons'])
+                # Check for buttons as direct attributes
+                elif hasattr(action_container, 'get_buttons'):
+                    container_buttons = action_container.get_buttons()
+                    if container_buttons and isinstance(container_buttons, dict):
+                        buttons.update(container_buttons)
             
-            # Method 2: Get buttons directly from UI components (for individual button widgets)
-            button_keys = [key for key in self._ui_components.keys() if key.endswith('_button')]
-            for button_key in button_keys:
-                button_id = button_key.replace('_button', '')
-                buttons[button_id] = self._ui_components[button_key]
+            # Method 2: Look for buttons directly in UI components
+            for key, widget in self._ui_components.items():
+                # Skip non-widget items and the action container itself
+                if key == 'action_container' or not hasattr(widget, 'on_click'):
+                    continue
+                
+                # Get button ID from _button_id attribute or use the key
+                button_id = getattr(widget, '_button_id', key)
+                buttons[button_id] = widget
             
-            if not buttons:
-                if hasattr(self, 'logger'):
+            # Log the buttons we found for debugging
+            if hasattr(self, 'logger'):
+                if buttons:
+                    self.logger.debug(f"Found {len(buttons)} button(s) in UI components: {list(buttons.keys())}")
+                else:
                     self.logger.warning("No buttons found in UI components")
+                    # Log all available UI components for debugging
+                    self.logger.debug(f"Available UI components: {list(self._ui_components.keys())}")
+                    
+            if not buttons:
                 return
             
             # Setup registered handlers

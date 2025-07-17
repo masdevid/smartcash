@@ -6,32 +6,23 @@ Description: Create symbolic links using SYMLINK_MAP with detailed progress
 import os
 import shutil
 from typing import Dict, Any, Optional, Callable
-from smartcash.ui.core.handlers.operation_handler import OperationHandler
+from smartcash.ui.components.operation_container import OperationContainer
+from .base_colab_operation import BaseColabOperation
 from ..constants import SYMLINK_MAP, SOURCE_DIRECTORIES
 
 
-class SymlinkOperation(OperationHandler):
+class SymlinkOperation(BaseColabOperation):
     """Create symbolic links using SYMLINK_MAP with detailed progress."""
     
-    def __init__(self, config: Dict[str, Any], **kwargs):
+    def __init__(self, config: Dict[str, Any], operation_container: Optional[OperationContainer] = None, **kwargs):
         """Initialize symlink operation.
         
         Args:
             config: Configuration dictionary
+            operation_container: Optional operation container for UI integration
             **kwargs: Additional arguments
         """
-        super().__init__(
-            module_name='symlink_operation',
-            parent_module='colab',
-            **kwargs
-        )
-        self.config = config
-    
-    def initialize(self) -> None:
-        """Initialize the symlink operation."""
-        self.logger.info("🚀 Initializing symlink operation")
-        # No specific initialization needed for symlink operation
-        self.logger.info("✅ Symlink operation initialization complete")
+        super().__init__('symlink_operation', config, operation_container, **kwargs)
     
     def get_operations(self) -> Dict[str, Callable]:
         """Get available operations."""
@@ -48,27 +39,20 @@ class SymlinkOperation(OperationHandler):
         Returns:
             Dictionary with operation results
         """
-        try:
+        def execute_operation():
+            progress_steps = self.get_progress_steps('symlink')
+            
+            # Step 1: Check symlink configuration
+            self.update_progress_safe(progress_callback, progress_steps[0]['progress'], progress_steps[0]['message'])
+            
             env_config = self.config.get('environment', {})
             
             if env_config.get('type') != 'colab':
-                return {
-                    'success': False,
-                    'error': 'Symbolic links are only created in Colab environment'
-                }
-            
-            if progress_callback:
-                progress_callback(5, "🔍 Checking Drive mount...")
+                return self.create_error_result('Symbolic links are only created in Colab environment')
             
             # Check if Drive is mounted
             if not os.path.exists('/content/drive/MyDrive'):
-                return {
-                    'success': False,
-                    'error': 'Google Drive must be mounted before creating symlinks'
-                }
-            
-            if progress_callback:
-                progress_callback(10, "📋 Checking source directories...")
+                return self.create_error_result('Google Drive must be mounted before creating symlinks')
             
             # Check source directories exist
             missing_sources = self._check_source_directories()
@@ -76,17 +60,15 @@ class SymlinkOperation(OperationHandler):
                 self.log(f"Creating {len(missing_sources)} missing source directories", 'info')
                 self._create_missing_directories(missing_sources)
             
-            if progress_callback:
-                progress_callback(25, f"📁 Creating {len(SYMLINK_MAP)} symbolic links...")
+            # Step 2: Create symlinks
+            self.update_progress_safe(progress_callback, progress_steps[1]['progress'], progress_steps[1]['message'])
             
             # Create symlinks using SYMLINK_MAP
             symlinks_created = []
             symlinks_failed = []
             total_symlinks = len(SYMLINK_MAP)
             
-            for i, (source, target) in enumerate(SYMLINK_MAP.items()):
-                current_progress = 25 + ((i + 1) / total_symlinks) * 65  # 25% to 90%
-                
+            for source, target in SYMLINK_MAP.items():
                 try:
                     # Remove target if it exists and is not a symlink
                     if os.path.exists(target) and not os.path.islink(target):
@@ -114,9 +96,6 @@ class SymlinkOperation(OperationHandler):
                     
                     self.log(f"✅ Symlink created: {source} → {target}", 'info')
                     
-                    if progress_callback:
-                        progress_callback(current_progress, f"✅ Created: {os.path.basename(target)}")
-                    
                 except Exception as e:
                     symlinks_failed.append({
                         'source': source,
@@ -124,36 +103,29 @@ class SymlinkOperation(OperationHandler):
                         'error': str(e)
                     })
                     self.log(f"❌ Symlink failed: {source} → {target}: {str(e)}", 'error')
-                    
-                    if progress_callback:
-                        progress_callback(current_progress, f"❌ Failed: {os.path.basename(target)}")
             
-            if progress_callback:
-                progress_callback(95, "🔍 Verifying symlinks...")
+            # Step 3: Verify symlinks
+            self.update_progress_safe(progress_callback, progress_steps[2]['progress'], progress_steps[2]['message'])
             
-            # Final verification
+            # Final verification using base class method
+            verification = self.verify_symlinks_batch(SYMLINK_MAP)
+            
+            # Step 4: Complete
+            self.update_progress_safe(progress_callback, progress_steps[3]['progress'], progress_steps[3]['message'])
+            
             verified_count = sum(1 for sl in symlinks_created if sl['verified'])
-            
-            if progress_callback:
-                progress_callback(100, f"✅ Created {verified_count}/{total_symlinks} symlinks")
-            
             success = len(symlinks_failed) == 0
             
-            return {
-                'success': success,
-                'symlinks_created': symlinks_created,
-                'symlinks_failed': symlinks_failed,
-                'verified_count': verified_count,
-                'total_count': total_symlinks,
-                'message': f'Created {verified_count}/{total_symlinks} symbolic links'
-            }
+            return self.create_success_result(
+                f'Created {verified_count}/{total_symlinks} symbolic links',
+                symlinks_created=symlinks_created,
+                symlinks_failed=symlinks_failed,
+                verified_count=verified_count,
+                total_count=total_symlinks,
+                verification=verification
+            )
             
-        except Exception as e:
-            self.log(f"Symlink operation failed: {str(e)}", 'error')
-            return {
-                'success': False,
-                'error': f'Symlink creation failed: {str(e)}'
-            }
+        return self.execute_with_error_handling(execute_operation)
     
     def _check_source_directories(self) -> list:
         """Check if source directories exist and return missing ones.
@@ -174,9 +146,6 @@ class SymlinkOperation(OperationHandler):
         Args:
             missing_dirs: List of missing directories to create
         """
-        for source_dir in missing_dirs:
-            try:
-                os.makedirs(source_dir, exist_ok=True)
-                self.log(f"Created: {source_dir}", 'info')
-            except Exception as e:
-                self.log(f"Failed to create {source_dir}: {str(e)}", 'error')
+        created_dirs, failed_dirs = self.create_directories_batch(missing_dirs)
+        if failed_dirs:
+            self.log(f"Failed to create {len(failed_dirs)} directories", 'warning')

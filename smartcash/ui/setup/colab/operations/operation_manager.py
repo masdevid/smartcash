@@ -4,7 +4,9 @@ Description: Manager for coordinating individual colab operations
 """
 
 from typing import Dict, Any, Optional, Callable
-from smartcash.ui.core.handlers.operation_handler import OperationHandler
+from smartcash.ui.logger import get_module_logger
+from smartcash.ui.core.mixins.logging_mixin import LoggingMixin
+from smartcash.ui.core.mixins.operation_mixin import OperationMixin
 from smartcash.ui.components.operation_container import OperationContainer
 
 from .init_operation import InitOperation
@@ -18,7 +20,7 @@ from .verify_operation import VerifyOperation
 from ..constants import SetupStage, STAGE_WEIGHTS
 
 
-class ColabOperationManager(OperationHandler):
+class ColabOperationManager(LoggingMixin, OperationMixin):
     """Manager for coordinating individual colab operations."""
     
     def __init__(self, 
@@ -32,13 +34,20 @@ class ColabOperationManager(OperationHandler):
             operation_container: OperationContainer for UI integration
             max_workers: Maximum number of worker threads
         """
-        super().__init__(
-            module_name='colab_operation_manager',
-            parent_module='setup',
-            max_workers=max_workers,
-            use_process_pool=False,
-            operation_container=operation_container
-        )
+        # Initialize mixins
+        super().__init__()
+        
+        # Setup logger
+        self.logger = get_module_logger("smartcash.ui.setup.colab.operations.operation_manager")
+        
+        # Module identification for mixins
+        self.module_name = 'colab_operation_manager'
+        self.parent_module = 'setup'
+        
+        # Set operation container for logging
+        self.operation_container = operation_container
+        if operation_container:
+            self._operation_container = operation_container
         
         self.config = config
         # Stage names must match SetupStage enum values exactly (but in lowercase)
@@ -135,7 +144,6 @@ class ColabOperationManager(OperationHandler):
             except Exception as e:
                 self.logger.error(f"Error cleaning up operation {operation.__class__.__name__}: {e}")
         
-        self._executor.shutdown(wait=False)
         self.logger.info("✅ Colab operation manager cleanup complete")
         
     def update_status(self, message: str, level: str = 'info') -> None:

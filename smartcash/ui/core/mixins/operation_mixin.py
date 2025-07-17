@@ -541,3 +541,207 @@ class OperationMixin:
         except Exception as e:
             if hasattr(self, 'logger'):
                 self.logger.debug(f"Failed to clear operation dialog: {e}")
+    
+    def start_progress(self, message: str = "Starting...", progress: int = 0, level: str = "primary") -> None:
+        """
+        Start progress tracking - initializes progress display for an operation.
+        
+        This method is semantically different from update_progress() as it:
+        - Initializes progress tracking for a new operation
+        - Typically sets progress to 0% 
+        - May reset previous progress states
+        
+        Args:
+            message: Initial progress message
+            progress: Initial progress value (0-100, typically 0)
+            level: Progress level (primary, secondary, tertiary)
+        """
+        try:
+            # Try operation manager first
+            if self._operation_manager and hasattr(self._operation_manager, 'start_progress'):
+                self._operation_manager.start_progress(message, progress, level)
+                return
+            
+            # Delegate to operation_container - use update_progress since no dedicated start method exists
+            if hasattr(self, '_ui_components') and self._ui_components:
+                operation_container = self._ui_components.get('operation_container')
+                if operation_container:
+                    # Check for dedicated start_progress method first
+                    if hasattr(operation_container, 'start_progress'):
+                        operation_container.start_progress(message, progress, level)
+                        return
+                    # Fallback to update_progress for initialization
+                    elif hasattr(operation_container, 'update_progress'):
+                        operation_container.update_progress(progress, message, level)
+                        return
+            
+            # Fallback logging
+            if hasattr(self, 'logger'):
+                self.logger.debug(f"[Progress Start] {progress}% - {message}")
+                
+        except Exception as e:
+            if hasattr(self, 'logger'):
+                self.logger.debug(f"Failed to start progress: {e}")
+    
+    def complete_progress(self, message: str = "Completed!", level: str = "primary") -> None:
+        """
+        Complete progress tracking - delegates to operation_container.
+        
+        Args:
+            message: Completion message
+            level: Progress level (primary, secondary, tertiary)
+        """
+        try:
+            # Try operation manager first
+            if self._operation_manager and hasattr(self._operation_manager, 'complete_progress'):
+                self._operation_manager.complete_progress(message, level)
+                return
+            
+            # Delegate to operation_container for progress completion
+            if hasattr(self, '_ui_components') and self._ui_components:
+                operation_container = self._ui_components.get('operation_container')
+                if operation_container and hasattr(operation_container, 'complete_progress'):
+                    operation_container.complete_progress(message, level)
+                    return
+            
+            # Fallback logging
+            if hasattr(self, 'logger'):
+                self.logger.debug(f"[Progress Complete] {message}")
+                
+        except Exception as e:
+            if hasattr(self, 'logger'):
+                self.logger.debug(f"Failed to complete progress: {e}")
+    
+    def error_progress(self, message: str = "An error occurred!", level: str = "primary") -> None:
+        """
+        Set progress to error state - delegates to operation_container.
+        
+        Args:
+            message: Error message
+            level: Progress level (primary, secondary, tertiary)
+        """
+        try:
+            # Try operation manager first
+            if self._operation_manager and hasattr(self._operation_manager, 'error_progress'):
+                self._operation_manager.error_progress(message, level)
+                return
+            
+            # Delegate to operation_container for progress error
+            if hasattr(self, '_ui_components') and self._ui_components:
+                operation_container = self._ui_components.get('operation_container')
+                if operation_container and hasattr(operation_container, 'error_progress'):
+                    operation_container.error_progress(message, level)
+                    return
+            
+            # Fallback logging
+            if hasattr(self, 'logger'):
+                self.logger.debug(f"[Progress Error] {message}")
+                
+        except Exception as e:
+            if hasattr(self, 'logger'):
+                self.logger.debug(f"Failed to set error progress: {e}")
+    
+    def log_operation_start(self, operation_name: str) -> None:
+        """
+        Log operation start.
+        
+        Args:
+            operation_name: Name of the operation starting
+        """
+        try:
+            # Try operation manager first
+            if self._operation_manager and hasattr(self._operation_manager, 'log_operation_start'):
+                self._operation_manager.log_operation_start(operation_name)
+                return
+            
+            # Use the log method if available
+            if hasattr(self, 'log'):
+                self.log(f"🚀 Memulai operasi: {operation_name}", 'info')
+                return
+            
+            # Fallback logging
+            if hasattr(self, 'logger'):
+                self.logger.info(f"🚀 Memulai operasi: {operation_name}")
+                
+        except Exception as e:
+            if hasattr(self, 'logger'):
+                self.logger.debug(f"Failed to log operation start: {e}")
+    
+    def log_operation_complete(self, operation_name: str) -> None:
+        """
+        Log operation completion.
+        
+        Args:
+            operation_name: Name of the operation completed
+        """
+        try:
+            # Try operation manager first
+            if self._operation_manager and hasattr(self._operation_manager, 'log_operation_complete'):
+                self._operation_manager.log_operation_complete(operation_name)
+                return
+            
+            # Use the log method if available
+            if hasattr(self, 'log'):
+                self.log(f"✅ Operasi selesai: {operation_name}", 'success')
+                return
+            
+            # Fallback logging
+            if hasattr(self, 'logger'):
+                self.logger.info(f"✅ Operasi selesai: {operation_name}")
+                
+        except Exception as e:
+            if hasattr(self, 'logger'):
+                self.logger.debug(f"Failed to log operation completion: {e}")
+    
+    def log_operation_error(self, operation_name: str, error_message: str) -> None:
+        """
+        Log operation error.
+        
+        Args:
+            operation_name: Name of the operation that failed
+            error_message: Error message
+        """
+        try:
+            # Try operation manager first
+            if self._operation_manager and hasattr(self._operation_manager, 'log_operation_error'):
+                self._operation_manager.log_operation_error(operation_name, error_message)
+                return
+            
+            # Use the log method if available
+            if hasattr(self, 'log'):
+                self.log(f"❌ Operasi gagal: {operation_name} - {error_message}", 'error')
+                return
+            
+            # Fallback logging
+            if hasattr(self, 'logger'):
+                self.logger.error(f"❌ Operasi gagal: {operation_name} - {error_message}")
+                
+        except Exception as e:
+            if hasattr(self, 'logger'):
+                self.logger.debug(f"Failed to log operation error: {e}")
+    
+    def ensure_progress_ready(self) -> bool:
+        """
+        Ensure progress tracking components are ready.
+        
+        Returns:
+            True if progress tracking is ready, False otherwise
+        """
+        try:
+            # Check if operation_container is available for progress tracking
+            if hasattr(self, '_ui_components') and self._ui_components:
+                operation_container = self._ui_components.get('operation_container')
+                if operation_container and hasattr(operation_container, 'update_progress'):
+                    return True
+            
+            # Check if operation_manager is available for progress tracking
+            if self._operation_manager and hasattr(self._operation_manager, 'update_progress'):
+                return True
+            
+            # Progress tracking not available
+            return False
+            
+        except Exception as e:
+            if hasattr(self, 'logger'):
+                self.logger.debug(f"Failed to check progress readiness: {e}")
+            return False

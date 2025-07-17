@@ -1,10 +1,9 @@
 """
 File: smartcash/ui/setup/colab/operations/__init__.py
-Description: Colab operations module exports
+Description: Colab operations module using mixin composition pattern
 """
 
 from .operation_manager import ColabOperationManager
-
 from .init_operation import InitOperation
 from .drive_mount_operation import DriveMountOperation
 from .symlink_operation import SymlinkOperation
@@ -16,7 +15,7 @@ from .verify_operation import VerifyOperation
 __all__ = [
     'ColabOperationManager',
     'InitOperation',
-    'DriveMountOperation', 
+    'DriveMountOperation',
     'SymlinkOperation',
     'FoldersOperation',
     'ConfigSyncOperation',

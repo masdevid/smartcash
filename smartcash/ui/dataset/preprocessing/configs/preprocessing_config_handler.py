@@ -1,0 +1,88 @@
+"""
+File: smartcash/ui/dataset/preprocessing/configs/preprocessing_config_handler.py
+Description: Mixin-based config handler for the preprocessing module.
+"""
+
+from typing import Dict, Any, Optional
+
+from smartcash.ui.core.mixins.configuration_mixin import ConfigurationMixin
+from smartcash.ui.core.mixins.logging_mixin import LoggingMixin
+from smartcash.ui.logger import get_module_logger
+from smartcash.ui.dataset.preprocessing.configs.preprocessing_defaults import get_default_config
+from smartcash.ui.dataset.preprocessing.constants import YOLO_PRESETS, CleanupTarget
+
+
+class PreprocessingConfigHandler(LoggingMixin, ConfigurationMixin):
+    """
+    Manages preprocessing configuration using a pure mixin-based approach.
+    """
+
+    def __init__(self, default_config: Optional[Dict[str, Any]] = None, **kwargs) -> None:
+        """Initializes the PreprocessingConfigHandler."""
+        super().__init__(**kwargs)
+        self.module_name = 'preprocessing'
+        self.parent_module = 'dataset'
+        self.logger = get_module_logger('smartcash.ui.dataset.preprocessing.configs.preprocessing_config_handler')
+        self._default_config = default_config or get_default_config()
+        self._initialize_config_handler()
+        self.logger.debug("✅ PreprocessingConfigHandler initialized.")
+
+    # --- Abstract Method Implementations ---
+
+    def get_default_config(self) -> Dict[str, Any]:
+        """Returns the default configuration for the module."""
+        return self._default_config.copy()
+
+    def create_config_handler(self, config: Dict[str, Any]) -> 'PreprocessingConfigHandler':
+        """Returns self as the config handler instance."""
+        return self
+
+    # --- UI Integration ---
+
+    def extract_config_from_ui(self) -> Dict[str, Any]:
+        """Extracts the current configuration from the UI components."""
+        if not self._ui_components:
+            self.logger.warning("No UI components available for extraction.")
+            return self.get_current_config()
+
+        config = self.get_current_config()
+        prep_cfg = config.setdefault('preprocessing', {})
+        norm_cfg = prep_cfg.setdefault('normalization', {})
+        val_cfg = prep_cfg.setdefault('validation', {})
+
+        norm_cfg['preset'] = self.get_ui_value('resolution_dropdown')
+        norm_cfg['method'] = self.get_ui_value('normalization_dropdown')
+        norm_cfg['preserve_aspect_ratio'] = self.get_ui_value('preserve_aspect_checkbox', default=True)
+        prep_cfg['target_splits'] = list(self.get_ui_value('target_splits_select', default=[]))
+        prep_cfg['batch_size'] = self.get_ui_value('batch_size_input', default=32)
+        val_cfg['enabled'] = self.get_ui_value('validation_checkbox', default=False)
+        prep_cfg['move_invalid'] = self.get_ui_value('move_invalid_checkbox', default=False)
+        prep_cfg['invalid_dir'] = self.get_ui_value('invalid_dir_input', default='data/invalid')
+        prep_cfg['cleanup_target'] = self.get_ui_value('cleanup_target_dropdown')
+        prep_cfg['backup_enabled'] = self.get_ui_value('backup_checkbox', default=True)
+
+        if norm_cfg.get('preset') in YOLO_PRESETS:
+            norm_cfg['target_size'] = YOLO_PRESETS[norm_cfg['preset']]['target_size']
+
+        return config
+
+    def update_ui_from_config(self, config: Dict[str, Any]) -> None:
+        """Updates the UI components with values from the configuration."""
+        if not self._ui_components:
+            self.logger.warning("No UI components available to update.")
+            return
+
+        prep_cfg = config.get('preprocessing', {})
+        norm_cfg = prep_cfg.get('normalization', {})
+        val_cfg = prep_cfg.get('validation', {})
+
+        self.set_ui_value('resolution_dropdown', norm_cfg.get('preset', 'yolov5s'))
+        self.set_ui_value('normalization_dropdown', norm_cfg.get('method', 'minmax'))
+        self.set_ui_value('preserve_aspect_checkbox', norm_cfg.get('preserve_aspect_ratio', True))
+        self.set_ui_value('target_splits_select', tuple(prep_cfg.get('target_splits', [])))
+        self.set_ui_value('batch_size_input', prep_cfg.get('batch_size', 32))
+        self.set_ui_value('validation_checkbox', val_cfg.get('enabled', False))
+        self.set_ui_value('move_invalid_checkbox', prep_cfg.get('move_invalid', False))
+        self.set_ui_value('invalid_dir_input', prep_cfg.get('invalid_dir', 'data/invalid'))
+        self.set_ui_value('cleanup_target_dropdown', prep_cfg.get('cleanup_target', CleanupTarget.PREPROCESSED.value))
+        self.set_ui_value('backup_checkbox', prep_cfg.get('backup_enabled', True))

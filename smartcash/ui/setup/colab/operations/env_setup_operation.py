@@ -5,32 +5,23 @@ Description: Set up environment variables and Python path
 
 import os
 from typing import Dict, Any, Optional, Callable
-from smartcash.ui.core.handlers.operation_handler import OperationHandler
+from smartcash.ui.components.operation_container import OperationContainer
+from .base_colab_operation import BaseColabOperation
 from smartcash.common.constants.paths import COLAB_DATA_ROOT
 
 
-class EnvSetupOperation(OperationHandler):
+class EnvSetupOperation(BaseColabOperation):
     """Set up environment variables and Python path."""
     
-    def __init__(self, config: Dict[str, Any], **kwargs):
+    def __init__(self, config: Dict[str, Any], operation_container: Optional[OperationContainer] = None, **kwargs):
         """Initialize environment setup operation.
         
         Args:
             config: Configuration dictionary
+            operation_container: Optional operation container for UI integration
             **kwargs: Additional arguments
         """
-        super().__init__(
-            module_name='env_setup_operation',
-            parent_module='colab',
-            **kwargs
-        )
-        self.config = config
-    
-    def initialize(self) -> None:
-        """Initialize the env setup operation."""
-        self.logger.info("🚀 Initializing env setup operation")
-        # No specific initialization needed for env setup operation
-        self.logger.info("✅ Env setup operation initialization complete")
+        super().__init__('env_setup_operation', config, operation_container, **kwargs)
     
     def get_operations(self) -> Dict[str, Callable]:
         """Get available operations."""
@@ -47,14 +38,18 @@ class EnvSetupOperation(OperationHandler):
         Returns:
             Dictionary with operation results
         """
-        try:
-            if progress_callback:
-                progress_callback(20, "🌍 Setting environment variables...")
+        def execute_operation():
+            progress_steps = self.get_progress_steps('env_setup')
+            
+            # Step 1: Check environment configuration
+            self.update_progress_safe(progress_callback, progress_steps[0]['progress'], progress_steps[0]['message'])
             
             env_vars_set = []
             env_config = self.config.get('environment', {})
             
-            # Set environment variables based on type
+            # Step 2: Set environment variables based on type
+            self.update_progress_safe(progress_callback, progress_steps[1]['progress'], progress_steps[1]['message'])
+            
             if env_config.get('type') == 'colab':
                 # Set project root
                 smartcash_root = '/content/smartcash'
@@ -70,9 +65,6 @@ class EnvSetupOperation(OperationHandler):
                 os.environ['SMARTCASH_DATA_ROOT'] = COLAB_DATA_ROOT
                 env_vars_set.extend(['SMARTCASH_ROOT', 'SMARTCASH_ENV', 'SMARTCASH_DATA_ROOT'])
                 
-                if progress_callback:
-                    progress_callback(60, "🎮 Checking GPU configuration...")
-                
                 # GPU setup if enabled
                 gpu_result = self._setup_gpu(env_config)
                 if gpu_result['gpu_configured']:
@@ -82,22 +74,22 @@ class EnvSetupOperation(OperationHandler):
                 additional_vars = self._set_additional_colab_vars()
                 env_vars_set.extend(additional_vars)
             
-            if progress_callback:
-                progress_callback(100, f"✅ Set {len(env_vars_set)} environment variables")
+            # Step 3: Verify environment setup
+            self.update_progress_safe(progress_callback, progress_steps[2]['progress'], progress_steps[2]['message'])
             
-            return {
-                'success': True,
-                'env_vars_set': env_vars_set,
-                'env_vars_detail': self._get_env_vars_detail(env_vars_set),
-                'message': f'Set {len(env_vars_set)} environment variables'
-            }
+            verification = self.verify_environment()
             
-        except Exception as e:
-            self.log(f"Environment setup failed: {str(e)}", 'error')
-            return {
-                'success': False,
-                'error': f'Environment setup failed: {str(e)}'
-            }
+            # Step 4: Complete
+            self.update_progress_safe(progress_callback, progress_steps[3]['progress'], progress_steps[3]['message'])
+            
+            return self.create_success_result(
+                f'Set {len(env_vars_set)} environment variables',
+                env_vars_set=env_vars_set,
+                env_vars_detail=self._get_env_vars_detail(env_vars_set),
+                verification=verification
+            )
+            
+        return self.execute_with_error_handling(execute_operation)
     
     def _setup_gpu(self, env_config: Dict[str, Any]) -> Dict[str, Any]:
         """Set up GPU configuration if enabled.
@@ -180,22 +172,4 @@ class EnvSetupOperation(OperationHandler):
             Dictionary with verification results
         """
         required_vars = ['SMARTCASH_ROOT', 'SMARTCASH_ENV', 'SMARTCASH_DATA_ROOT']
-        env_vars_status = {}
-        missing_vars = []
-        
-        for var in required_vars:
-            exists = var in os.environ
-            env_vars_status[var] = {
-                'exists': exists,
-                'value': os.environ.get(var) if exists else None
-            }
-            if not exists:
-                missing_vars.append(var)
-        
-        return {
-            'all_set': len(missing_vars) == 0,
-            'env_vars_status': env_vars_status,
-            'missing_vars': missing_vars,
-            'python_path': os.environ.get('PYTHONPATH', ''),
-            'current_working_dir': os.getcwd()
-        }
+        return self.verify_environment_variables(required_vars)

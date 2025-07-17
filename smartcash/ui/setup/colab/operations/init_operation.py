@@ -3,34 +3,25 @@ File: smartcash/ui/setup/colab/operations/init_operation.py
 Description: Initialize environment setup with detection and validation
 """
 
-import os
 from typing import Dict, Any, Optional, Callable
-from smartcash.ui.core.handlers.operation_handler import OperationHandler
-from ..utils.env_detector import detect_environment_info
+from smartcash.ui.components.operation_container import OperationContainer
+from .base_colab_operation import BaseColabOperation
+from .colab_operation_utils import get_colab_utils
 
 
-class InitOperation(OperationHandler):
+class InitOperation(BaseColabOperation):
     """Initialize environment setup with detection and validation."""
     
-    def __init__(self, config: Dict[str, Any], **kwargs):
+    def __init__(self, config: Dict[str, Any], operation_container: Optional[OperationContainer] = None, **kwargs):
         """Initialize init operation.
         
         Args:
             config: Configuration dictionary
+            operation_container: Optional operation container for UI integration
             **kwargs: Additional arguments
         """
-        super().__init__(
-            module_name='init_operation',
-            parent_module='colab',
-            **kwargs
-        )
-        self.config = config
-    
-    def initialize(self) -> None:
-        """Initialize the init operation."""
-        self.logger.info("🚀 Initializing init operation")
-        # No specific initialization needed for init operation
-        self.logger.info("✅ Init operation initialization complete")
+        super().__init__('init_operation', config, operation_container, **kwargs)
+        self.utils = get_colab_utils(self.logger)
     
     def get_operations(self) -> Dict[str, Callable]:
         """Get available operations."""
@@ -47,12 +38,14 @@ class InitOperation(OperationHandler):
         Returns:
             Dictionary with operation results
         """
-        try:
-            if progress_callback:
-                progress_callback(10, "🔍 Detecting runtime environment...")
+        def _execute_init_internal() -> Dict[str, Any]:
+            # Get progress steps
+            steps = self.utils.get_progress_steps('init')
             
-            # Detect environment using enhanced env_detector
-            env_info = detect_environment_info()
+            # Step 1: Detect environment
+            self.update_progress_safe(progress_callback, steps[0]['progress'], steps[0]['message'])
+            
+            env_info = self.utils.detect_environment_enhanced()
             env_type = env_info.get('runtime', {}).get('type', 'local')
             
             # Update config with detected environment
@@ -62,99 +55,36 @@ class InitOperation(OperationHandler):
             
             self.log(f"Environment detected: {env_type}", 'debug')
             
-            if progress_callback:
-                progress_callback(30, f"✅ Environment: {env_type}")
+            # Step 2: Environment detected
+            self.update_progress_safe(progress_callback, steps[1]['progress'], 
+                                    f"✅ Environment: {env_type}")
             
-            # Validate system requirements
-            if progress_callback:
-                progress_callback(50, "🔧 Checking system requirements...")
+            # Step 3: Check system requirements
+            self.update_progress_safe(progress_callback, steps[2]['progress'], steps[2]['message'])
             
-            system_info = self._get_system_info(env_info)
+            system_info = self.utils.format_system_info(env_info)
             self.log(f"System: {system_info['os_display']}", 'info')
             self.log(f"RAM: {system_info['ram_gb']:.1f}GB available", 'info')
             
-            if progress_callback:
-                progress_callback(80, "🔍 Validating configuration...")
+            # Step 4: Validate configuration
+            self.update_progress_safe(progress_callback, steps[3]['progress'], steps[3]['message'])
             
-            # Validate config
-            validation_result = self._validate_config()
+            validation_result = self.utils.validate_colab_environment(self.config)
             if not validation_result['valid']:
-                return {
-                    'success': False,
-                    'error': f"Configuration validation failed: {validation_result['issues']}"
-                }
+                return self.create_error_result(
+                    f"Configuration validation failed: {validation_result['issues']}"
+                )
             
-            if progress_callback:
-                progress_callback(100, "✅ Initialization complete")
+            # Step 5: Complete
+            self.update_progress_safe(progress_callback, steps[4]['progress'], steps[4]['message'])
             
-            return {
-                'success': True,
-                'environment': env_type,
-                'system_info': system_info,
-                'env_info': env_info,
-                'validation': validation_result,
-                'message': f'Environment initialized as {env_type}'
-            }
-            
-        except Exception as e:
-            self.log(f"Initialization failed: {str(e)}", 'error')
-            return {
-                'success': False,
-                'error': f'Initialization failed: {str(e)}'
-            }
+            return self.create_success_result(
+                f'Environment initialized as {env_type}',
+                environment=env_type,
+                system_info=system_info,
+                env_info=env_info,
+                validation=validation_result
+            )
+        
+        return self.execute_with_error_handling(_execute_init_internal)
     
-    def _get_system_info(self, env_info: Dict[str, Any]) -> Dict[str, Any]:
-        """Get enhanced system information from env_detector data.
-        
-        Args:
-            env_info: Environment information from detect_environment_info()
-            
-        Returns:
-            Dictionary with system information
-        """
-        os_info = env_info.get('os', {})
-        ram_bytes = env_info.get('total_ram', 0)
-        
-        return {
-            'os': os_info.get('system', 'Unknown'),
-            'release': os_info.get('release', 'Unknown'),
-            'machine': os_info.get('machine', 'Unknown'),
-            'os_display': f"{os_info.get('system', 'Unknown')} {os_info.get('release', '')}".strip(),
-            'ram_gb': ram_bytes / (1024**3) if ram_bytes > 0 else 0,
-            'cpu_cores': env_info.get('cpu_cores', 'Unknown'),
-            'gpu_available': env_info.get('gpu', 'No GPU available') != 'No GPU available',
-            'gpu_name': env_info.get('gpu', 'None'),
-            'is_colab': env_info.get('is_colab', False),
-            'drive_mounted': env_info.get('drive_mounted', False),
-            'drive_mount_path': env_info.get('drive_mount_path', '')
-        }
-    
-    def _validate_config(self) -> Dict[str, Any]:
-        """Validate the current configuration.
-        
-        Returns:
-            Dictionary with validation results
-        """
-        validation = {'valid': True, 'issues': []}
-        
-        # Validate environment config
-        env_config = self.config.get('environment', {})
-        if not env_config:
-            validation['issues'].append('Missing environment configuration')
-            validation['valid'] = False
-        
-        if 'type' not in env_config:
-            validation['issues'].append('Environment type not specified')
-            validation['valid'] = False
-        
-        # Validate environment-specific requirements
-        env_type = env_config.get('type', 'local')
-        if env_type == 'colab':
-            # Check if we're actually in Colab
-            try:
-                import google.colab
-            except ImportError:
-                validation['issues'].append('Configuration set to Colab but not running in Colab environment')
-                validation['valid'] = False
-        
-        return validation

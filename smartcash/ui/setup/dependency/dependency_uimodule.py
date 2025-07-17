@@ -58,9 +58,18 @@ class DependencyUIModule(BaseUIModule):
         
         # Register dependency-specific button handlers
         self.register_button_handler('install', self._operation_install_packages)
+        self.register_button_handler('install_button', self._operation_install_packages)
         self.register_button_handler('uninstall', self._operation_uninstall_packages) 
+        self.register_button_handler('uninstall_button', self._operation_uninstall_packages)
         self.register_button_handler('update', self._operation_update_packages)
+        self.register_button_handler('update_button', self._operation_update_packages)
         self.register_button_handler('check_status', self._operation_check_status)
+        self.register_button_handler('check', self._operation_check_status)
+        self.register_button_handler('check_button', self._operation_check_status)
+        
+        # Register save/reset button handlers (required for all modules)
+        self.register_button_handler('save_button', self._handle_save_config)
+        self.register_button_handler('reset_button', self._handle_reset_config)
     
     def get_default_config(self) -> Dict[str, Any]:
         """Get default configuration for Dependency module (BaseUIModule requirement)."""

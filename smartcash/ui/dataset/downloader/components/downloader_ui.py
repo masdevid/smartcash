@@ -1,60 +1,45 @@
-"""
-Dataset Downloader UI Module.
+"""Dataset Downloader UI components following SmartCash UI standards.
 
-This module implements the UI components for the dataset downloader interface,
-following the SmartCash UI standardization guidelines.
-
-Features:
-- Standardized container structure
-- Consistent error handling
-- Progress tracking and logging
-- Configurable action buttons
-- Responsive layout
+Implements a container-based UI with form inputs, action buttons, and progress tracking.
 """
 
 from typing import Dict, Any, Optional
 
 # Standard container imports
-from smartcash.ui.components.header_container import create_header_container
-from smartcash.ui.components.form_container import create_form_container, LayoutType
-from smartcash.ui.components.action_container import create_action_container
-from smartcash.ui.components.operation_container import create_operation_container
-from smartcash.ui.components.footer_container import create_footer_container
-from smartcash.ui.components.main_container import create_main_container
+from smartcash.ui.components import (create_header_container, create_form_container, create_action_container, 
+                                  create_operation_container, create_footer_container, create_main_container)
+from smartcash.ui.components.form_container import LayoutType
 from smartcash.ui.core.decorators import handle_ui_errors
-
-# Global UI handler removed - functionality moved to UIModule pattern
-
-# Import downloader specific components
-from .input_options import create_downloader_input_options
 from smartcash.ui.dataset.downloader.constants import (
-    UI_CONFIG,
-    BUTTON_CONFIG,
-    VALIDATION_RULES
+    UI_CONFIG, BUTTON_CONFIG, VALIDATION_RULES,
+    OperationType, UIComponent, ButtonStyle
 )
+from .input_options import create_downloader_input_options
 
-# Re-export constants to maintain backward compatibility and satisfy validation
-UI_CONFIG = UI_CONFIG
-BUTTON_CONFIG = BUTTON_CONFIG
-VALIDATION_RULES = VALIDATION_RULES
+# Re-export constants for backward compatibility
+__all__ = ['UI_CONFIG', 'BUTTON_CONFIG', 'VALIDATION_RULES', 'create_downloader_ui_components']
 
 
 @handle_ui_errors(error_component_title="Dataset Downloader UI Creation Error")
-def create_downloader_ui(config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-    """Create and initialize the Dataset Downloader UI components.
-    
-    This function creates a standardized UI for the dataset downloader module,
-    following the SmartCash UI component architecture.
+def create_downloader_ui_components(
+    config: Optional[Dict[str, Any]] = None, 
+    **kwargs
+) -> Dict[str, Any]:
+    """Create and initialize the Dataset Downloader UI.
     
     Args:
-        config: Optional configuration dictionary to initialize the UI
-        **kwargs: Additional keyword arguments passed to component creators
+        config: Optional configuration dictionary
+        **kwargs: Additional arguments including module_config
         
     Returns:
-        Dict containing all UI components and their references
+        Dict: UI components and references
     """
     if config is None:
         config = {}
+        
+    # Merge module_config into config if provided
+    if 'module_config' in kwargs:
+        config.update(kwargs['module_config'])
     
     # Initialize components dictionary
     components = {
@@ -67,11 +52,11 @@ def create_downloader_ui(config: Optional[Dict[str, Any]] = None) -> Dict[str, A
     
     # 1. Create Header Container
     header_container = create_header_container(
-        title=UI_CONFIG['title'],
-        subtitle=UI_CONFIG['subtitle'],
+        title=UI_CONFIG['module_title'],
+        subtitle=UI_CONFIG['module_description'],
         status_message="Ready",
         status_type="info",
-        icon=UI_CONFIG['icon']
+        icon=UI_CONFIG['module_icon']
     )
     
     # 2. Create Form Container
@@ -86,48 +71,58 @@ def create_downloader_ui(config: Optional[Dict[str, Any]] = None) -> Dict[str, A
     form_container['add_item'](input_options, "input_options")
     
     # 3. Create Action Container
-    # Create all three action buttons: download, check, cleanup (all as action buttons)
+    # Create action buttons using OperationType enum
     buttons = [
         {
-            'button_id': 'download_button',  # Use button_id instead of id
-            'text': BUTTON_CONFIG['download']['text'],
-            'style': 'success',  # Use success style for download
-            'tooltip': BUTTON_CONFIG['download']['tooltip'],
+            'button_id': UIComponent.button_id(OperationType.DOWNLOAD),
+            'text': BUTTON_CONFIG[OperationType.DOWNLOAD.value]['text'],
+            'style': BUTTON_CONFIG[OperationType.DOWNLOAD.value]['style'],
+            'tooltip': BUTTON_CONFIG[OperationType.DOWNLOAD.value]['tooltip'],
             'order': 1
         },
         {
-            'button_id': 'check_button',  # Use button_id instead of id
-            'text': BUTTON_CONFIG['check']['text'],
-            'style': BUTTON_CONFIG['check']['style'],
-            'tooltip': BUTTON_CONFIG['check']['tooltip'],
+            'button_id': UIComponent.button_id(OperationType.CHECK),
+            'text': BUTTON_CONFIG[OperationType.CHECK.value]['text'],
+            'style': BUTTON_CONFIG[OperationType.CHECK.value]['style'],
+            'tooltip': BUTTON_CONFIG[OperationType.CHECK.value]['tooltip'],
             'order': 2
         },
         {
-            'button_id': 'cleanup_button',  # Use button_id instead of id
-            'text': BUTTON_CONFIG['cleanup']['text'], 
-            'style': BUTTON_CONFIG['cleanup']['style'],
-            'tooltip': BUTTON_CONFIG['cleanup']['tooltip'],
+            'button_id': UIComponent.button_id(OperationType.CLEANUP),
+            'text': BUTTON_CONFIG[OperationType.CLEANUP.value]['text'],
+            'style': BUTTON_CONFIG[OperationType.CLEANUP.value]['style'],
+            'tooltip': BUTTON_CONFIG[OperationType.CLEANUP.value]['tooltip'],
             'order': 3
         }
     ]
     
     
-    # Create action container
+    # Create action container with save/reset buttons as requested
     action_container = create_action_container(
         title="📥 Dataset Operations",
         buttons=buttons,
         show_save_reset=True
     )
     
-    
-    # 4. Create Operation Container
+    # 4. Create Operation Container with progress tracker
     operation_container = create_operation_container(
         show_progress=True,
         show_logs=True,
-        log_module_name=UI_CONFIG['title'],
+        log_module_name=UI_CONFIG['module_title'],
         log_height="200px",
         log_entry_style='compact'  # Ensure consistent hover behavior
     )
+    
+    # Get progress tracker and log accordion from operation container
+    progress_tracker = operation_container.get('progress_tracker')
+    log_accordion = operation_container.get('log_accordion')
+    
+    # Initialize progress tracker if available
+    if progress_tracker and hasattr(progress_tracker, 'initialize'):
+        progress_tracker.initialize()
+        # Start with the first step if the progress tracker supports it
+        if hasattr(progress_tracker, 'start'):
+            progress_tracker.start()
     
     # 5. Create Footer Container
     from smartcash.ui.info_boxes.download_info import get_download_info
@@ -139,16 +134,14 @@ def create_downloader_ui(config: Optional[Dict[str, Any]] = None) -> Dict[str, A
         ]
     )
     
-    # Extract buttons from action container
+    # Extract and validate action buttons
     action_buttons = action_container.get('buttons', {})
     
-    # Ensure all required buttons exist and are properly referenced
+    # Map operation types to their button references
     button_components = {}
-    for btn_id in ['download_button', 'check_button', 'cleanup_button']:
-        if btn_id in action_buttons and action_buttons[btn_id] is not None:
-            button_components[btn_id] = action_buttons[btn_id]
-        else:
-            button_components[btn_id] = None
+    for op in OperationType:
+        btn_id = UIComponent.button_id(op)
+        button_components[btn_id] = action_buttons.get(btn_id)
     
     # 6. Create components dictionary with all UI elements
     components = {
@@ -187,11 +180,21 @@ def create_downloader_ui(config: Optional[Dict[str, Any]] = None) -> Dict[str, A
     
     # 8. Create the final UI components dictionary with proper null checks
     
-    # Get operation container components directly using the correct names
-    progress_tracker = operation_container.get('progress_tracker') if operation_container else None
+    # Safely get operation container components with proper fallbacks
+    progress_tracker = (
+        operation_container.get('progress_tracker') 
+        if operation_container and hasattr(operation_container, 'get') 
+        else None
+    )
+    
+    # Get other operation container components
     log_accordion = operation_container.get('log_accordion') if operation_container else None
     update_progress = operation_container.get('update_progress') if operation_container else None
     show_dialog = operation_container.get('show_dialog') if operation_container else None
+    
+    # Try to get progress tracker from widget if not found directly
+    if not progress_tracker and hasattr(operation_container, 'widget'):
+        progress_tracker = getattr(operation_container.widget, 'progress_tracker', None)
     
     # For backward compatibility, set the old variable names
     progress_bar = progress_tracker
@@ -199,7 +202,7 @@ def create_downloader_ui(config: Optional[Dict[str, Any]] = None) -> Dict[str, A
     
     # Get status text from progress tracker if available
     status_text = None
-    if hasattr(progress_tracker, 'get_status_text'):
+    if progress_tracker and hasattr(progress_tracker, 'get_status_text'):
         status_text = progress_tracker.get_status_text()
     
     
@@ -228,10 +231,14 @@ def create_downloader_ui(config: Optional[Dict[str, Any]] = None) -> Dict[str, A
         'operation_container': operation_container,
         'footer_container': footer_container,
         
-        # Add all button references
-        'download_button': action_buttons.get('download_button'),
-        'check_button': action_buttons.get('check_button'),
-        'cleanup_button': action_buttons.get('cleanup_button'),
+        # Add all button references (using consistent naming)
+        'download': action_buttons.get('download'),
+        'check': action_buttons.get('check'),
+        'cleanup': action_buttons.get('cleanup'),
+        # Keep legacy names for backward compatibility
+        'download_button': action_buttons.get('download'),
+        'check_button': action_buttons.get('check'),
+        'cleanup_button': action_buttons.get('cleanup'),
         
         # Add form widgets - accessed as attributes of input_options
         'workspace_input': input_options.workspace_input,
@@ -249,16 +256,4 @@ def create_downloader_ui(config: Optional[Dict[str, Any]] = None) -> Dict[str, A
         'show_dialog': show_dialog
     }
     
-    # Save/Reset functionality is now handled by the UIModule pattern
-    # DownloaderUIModule provides: _extract_ui_config(), _update_status(), reset_downloader()
-    # This eliminates the need for global_ui_handler
-    
     return components
-
-
-
-
-
-
-
-

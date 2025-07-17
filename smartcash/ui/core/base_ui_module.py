@@ -148,6 +148,16 @@ class BaseUIModule(
         except Exception as e:
             return {'success': False, 'message': f'Pembaruan konfigurasi gagal: {e}'}
     
+    @property
+    def config(self) -> Dict[str, Any]:
+        """
+        Get current configuration.
+        
+        Returns:
+            Current configuration dictionary
+        """
+        return self.get_current_config()
+    
     def save_config(self) -> Dict[str, Any]:
         """
         Save configuration through config_handler.

@@ -1,86 +1,66 @@
 """
-File: smartcash/ui/dataset/downloader/handlers/defaults.py
-Deskripsi: Hardcoded default configuration untuk reset operations tanpa dependency ke yaml files
+File: smartcash/ui/dataset/downloader/configs/downloader_defaults.py
+Deskripsi: Default configuration untuk dataset downloader module
 """
 
-from typing import Dict, Any
+from typing import Dict, Any, List
+from datetime import datetime
+from .downloader_config_constants import get_default_config_structure
 
 def get_default_downloader_config() -> Dict[str, Any]:
-    """
-    Get hardcoded default configuration untuk downloader reset operations.
-    Tidak bergantung pada yaml files untuk menghindari circular dependency.
+    """Get default downloader configuration"""
+    config = get_default_config_structure()
     
-    Returns:
-        Dictionary berisi default configuration
-    """
-    return {
-        'data': {
-            'source': 'roboflow',
-            'roboflow': {
-                'workspace': 'smartcash-wo2us',
-                'project': 'rupiah-emisi-2022',
-                'version': '3',
-                'api_key': '',
-                'output_format': 'yolov5pytorch'
-            },
-            'file_naming': {
-                'uuid_format': True,
-                'naming_strategy': 'research_uuid',
-                'preserve_original': False
-            }
-        },
-        'download': {
-            'rename_files': True,
-            'organize_dataset': True,
-            'validate_download': True,
-            'backup_existing': False,
-            'retry_count': 3,
-            'timeout': 30,
-            'chunk_size': 8192
-        },
-        'uuid_renaming': {
-            'enabled': True,
-            'backup_before_rename': False,
-            'batch_size': 1000,
-            'parallel_workers': 4,
-            'validate_consistency': True
-        }
-    }
+    # Add timestamp information
+    current_time = datetime.now().isoformat()
+    config['history']['created_at'] = current_time
+    config['history']['updated_at'] = current_time
+    
+    return config
 
-def get_roboflow_defaults() -> Dict[str, str]:
-    """Get default Roboflow configuration untuk UI reset dengan one-liner"""
-    config = get_default_downloader_config()
-    roboflow = config['data']['roboflow']
-    return {
-        'workspace': roboflow['workspace'],
-        'project': roboflow['project'], 
-        'version': roboflow['version'],
-        'api_key': roboflow['api_key']
-    }
+def get_preset_workspaces() -> List[Dict[str, str]]:
+    """Get list of preset workspaces for quick selection"""
+    return [
+        {'name': 'SmartCash', 'id': 'smartcash-wo2us'},
+        {'name': 'Public Datasets', 'id': 'public'}
+    ]
 
-def get_download_defaults() -> Dict[str, Any]:
-    """Get default download options untuk UI reset dengan one-liner"""
-    download = get_default_downloader_config()['download']
-    return {
-        'validate_download': download['validate_download'],
-        'backup_existing': download['backup_existing'],
-        'rename_files': download['rename_files'],
-        'organize_dataset': download['organize_dataset']
-    }
+def get_supported_formats() -> List[Dict[str, str]]:
+    """Get supported dataset formats"""
+    return [
+        {'id': 'yolov5pytorch', 'name': 'YOLOv5 PyTorch'},
+        {'id': 'coco', 'name': 'COCO JSON'},
+        {'id': 'pascalvoc', 'name': 'Pascal VOC XML'},
+        {'id': 'tensorflow', 'name': 'TensorFlow TFRecord'}
+    ]
 
-def get_uuid_defaults() -> Dict[str, Any]:
-    """Get default UUID renaming settings untuk reset dengan one-liner"""
-    uuid_config = get_default_downloader_config()['uuid_renaming']
-    return {
-        'enabled': uuid_config['enabled'],
-        'backup_before_rename': uuid_config['backup_before_rename'],
-        'validate_consistency': uuid_config['validate_consistency']
-    }
+def get_naming_strategies() -> List[Dict[str, str]]:
+    """Get available naming strategies"""
+    return [
+        {'id': 'research_uuid', 'name': 'Research UUID'},
+        {'id': 'original', 'name': 'Original Filenames'},
+        {'id': 'sequential', 'name': 'Sequential Numbering'}
+    ]
 
-# Alias for test compatibility
+# Alias for backward compatibility
 get_default_config = get_default_downloader_config
 
-# One-liner utilities untuk quick access
+def get_roboflow_defaults() -> Dict[str, str]:
+    """Get default Roboflow configuration"""
+    config = get_default_downloader_config()
+    return config['data']['roboflow'].copy()
+
+def get_download_defaults() -> Dict[str, Any]:
+    """Get default download settings"""
+    config = get_default_downloader_config()
+    return config['download'].copy()
+
+def get_uuid_defaults() -> Dict[str, Any]:
+    """Get default UUID renaming settings"""
+    config = get_default_downloader_config()
+    return config['uuid_renaming'].copy()
+
+# One-liner utilities for quick access
 get_default_workspace = lambda: 'smartcash-wo2us'
 get_default_project = lambda: 'rupiah-emisi-2022'
 get_default_version = lambda: '3'

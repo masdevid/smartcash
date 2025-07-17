@@ -1,201 +1,361 @@
 """
-File: smartcash/ui/dataset/downloader/handlers/operation/download.py
-Deskripsi: Handler untuk operasi download dataset dengan centralized error handling
+File: smartcash/ui/dataset/downloader/operations/download_operation.py
+Description: Core download operation implementation with dual progress tracking.
 """
 
-from typing import Dict, Any, Optional
-from smartcash.ui.dataset.downloader.operations.base_operation import BaseDownloaderHandler
-from smartcash.ui.core.decorators import handle_ui_errors
+from typing import Dict, Any, Optional, Callable, TYPE_CHECKING
 
-class DownloadOperationHandler(BaseDownloaderHandler):
-    """Handler untuk operasi download dataset dengan centralized error handling."""
+from .downloader_base_operation import DownloaderBaseOperation, DownloaderOperationPhase
+
+if TYPE_CHECKING:
+    from smartcash.ui.dataset.downloader.downloader_uimodule import DownloaderUIModule
+
+
+class DownloadOperation(DownloaderBaseOperation):
+    """
+    Core download operation that handles dataset downloading with dual progress tracking.
     
-    @handle_ui_errors(error_component_title="Download Operation Error", log_error=True)
-    def __init__(self, ui_components: Optional[Dict[str, Any]] = None, **kwargs):
-        """Initialize download operation handler.
+    This class manages the execution of dataset downloads with:
+    - Main progress bar showing overall download phases (n/total_phases) 
+    - Secondary progress bar showing current backend progress (0-100%)
+    - Phase-based progress mapping from backend callbacks
+    - Comprehensive error handling and UI integration
+    """
+
+    # Download phases with their weights (must sum to 100)
+    DOWNLOAD_PHASES = {
+        'init': {'weight': 5, 'label': '⚙️ Inisialisasi', 'phase': DownloaderOperationPhase.INITIALIZING},
+        'metadata': {'weight': 5, 'label': '📋 Metadata', 'phase': DownloaderOperationPhase.INITIALIZING},
+        'backup': {'weight': 5, 'label': '💾 Backup', 'phase': DownloaderOperationPhase.VALIDATING},
+        'download': {'weight': 30, 'label': '⬇️ Download', 'phase': DownloaderOperationPhase.DOWNLOADING},
+        'extract': {'weight': 15, 'label': '📦 Ekstraksi', 'phase': DownloaderOperationPhase.EXTRACTING},
+        'organize': {'weight': 10, 'label': '🗂️ Organisasi', 'phase': DownloaderOperationPhase.PROCESSING},
+        'uuid_rename': {'weight': 10, 'label': '🏷️ UUID Rename', 'phase': DownloaderOperationPhase.PROCESSING},
+        'validate': {'weight': 10, 'label': '✅ Validasi', 'phase': DownloaderOperationPhase.PROCESSING},
+        'cleanup': {'weight': 5, 'label': '🧹 Cleanup', 'phase': DownloaderOperationPhase.FINALIZING},
+        'complete': {'weight': 5, 'label': '🎉 Selesai', 'phase': DownloaderOperationPhase.COMPLETED}
+    }
+
+    def __init__(
+        self,
+        ui_module: 'DownloaderUIModule',
+        config: Dict[str, Any],
+        callbacks: Optional[Dict[str, Callable]] = None
+    ) -> None:
+        """
+        Initialize the download operation.
         
         Args:
-            ui_components: Dictionary UI components
-            **kwargs: Additional arguments passed to parent class
+            ui_module: Reference to the parent UI module
+            config: Configuration dictionary for the download
+            callbacks: Optional callbacks for operation events
         """
-        super().__init__(ui_components=ui_components, **kwargs)
-    
-    @handle_ui_errors(error_component_title="Download Operation Error", log_error=True)
-    async def execute_download(self, ui_config: Dict[str, Any]) -> Dict[str, Any]:
-        """Execute download operation dengan backend service.
+        # Initialize base class first
+        super().__init__(ui_module, config, callbacks)
+        
+        # Progress tracking state
+        self._reset_progress_tracking()
+        
+        # Register backend progress callback
+        self._register_backend_callbacks()
+
+    def _reset_progress_tracking(self) -> None:
+        """Reset progress tracking state for a new operation."""
+        self._completed_phases = set()
+        self._current_phase_name = None
+        self._current_phase_progress = 0
+        self._overall_progress = 0
+        self._phase_order = list(self.DOWNLOAD_PHASES.keys())
+        
+        # Validate phase weights sum to 100
+        total_weight = sum(phase['weight'] for phase in self.DOWNLOAD_PHASES.values())
+        if total_weight != 100:
+            self.logger.warning(f"Phase weights sum to {total_weight}, not 100. Progress may be inaccurate.")
+
+    def _register_backend_callbacks(self) -> None:
+        """Register callbacks for backend progress updates."""
+        if hasattr(self._ui_module, 'register_progress_callback'):
+            self._ui_module.register_progress_callback('download', self._handle_download_progress)
+
+    def _handle_download_progress(self, step: str, current: int, total: int = 100, message: str = "") -> None:
+        """
+        Handle download progress updates from the backend with dual progress tracking.
+        
+        Maps backend progress callbacks to dual progress tracker:
+        - Main bar: Overall progress across all download phases (n/total_phases)
+        - Secondary bar: Current progress within the active phase (0-100%)
         
         Args:
-            ui_config: Config dari UI yang sudah divalidasi
-            
-        Returns:
-            Dictionary dengan status operasi
+            step: Current download phase/step name
+            current: Current progress within the phase (0-100)
+            total: Total progress value (typically 100, unused but kept for compatibility)
+            message: Optional progress message from backend
         """
-        self.logger.info("🚀 Memulai download dataset")
-        
-        # Setup progress tracker
-        self._setup_progress_tracker("Dataset Download")
-        
-        # Create downloader
-        downloader = self._create_backend_downloader(ui_config)
-        if not downloader:
-            self.logger.error("Gagal membuat download service")
-            return {'status': False, 'message': "Gagal membuat download service"}
-        
-        # Setup progress callback
-        if hasattr(downloader, 'set_progress_callback') and 'progress_callback' in self.ui_components:
-            downloader.set_progress_callback(self.ui_components['progress_callback'])
-        
-        # Log config
-        self._log_download_config(ui_config)
-        
-        # Execute download
-        result = downloader.download_dataset()
-        
-        # Get progress tracker
-        progress_tracker = self.ui_components.get('progress_tracker')
-        
         try:
-            if result and result.get('status') == 'success':
-                # Complete the current stage
-                if progress_tracker:
-                    progress_tracker.complete_stage()
-                    progress_tracker.update_overall(100, "✅ Download selesai")
-                
-                self._show_download_success(result)
-                self._update_summary_container(result)
-                download_path = result.get('dataset_path', '')
-                self.logger.info(f"✅ Download berhasil ke {download_path}")
-                return {'status': True, 'message': "Download berhasil", 'result': result}
-            else:
-                error_msg = result.get('message', 'Download gagal') if result else 'Tidak ada respons dari layanan'
-                if progress_tracker:
-                    progress_tracker.update_overall(0, f"❌ {error_msg}")
-                self.logger.error(f"❌ {error_msg}")
-                return {'status': False, 'message': error_msg, 'result': result}
+            # Normalize step name
+            step_name = step.lower().strip()
+            
+            # Get phase configuration
+            phase_config = self.DOWNLOAD_PHASES.get(step_name)
+            if not phase_config:
+                # Handle unknown phases gracefully
+                self.logger.warning(f"Unknown download phase: {step_name}")
+                phase_config = {
+                    'weight': 0,
+                    'label': f"🔄 {step.title()}",
+                    'phase': DownloaderOperationPhase.PROCESSING
+                }
+            
+            # Update UI phase if changed
+            if self.phase != phase_config['phase']:
+                self.phase = phase_config['phase']
+            
+            # Track phase completion
+            if step_name not in self._completed_phases and current >= 100:
+                self._completed_phases.add(step_name)
+                self.logger.info(f"✅ Phase completed: {phase_config['label']}")
+            
+            # Calculate overall progress based on completed phases + current phase progress
+            completed_weight = sum(
+                self.DOWNLOAD_PHASES[phase]['weight'] 
+                for phase in self._completed_phases 
+                if phase in self.DOWNLOAD_PHASES
+            )
+            
+            # Current phase contribution (only if not completed)
+            current_phase_weight = 0
+            if step_name not in self._completed_phases:
+                phase_weight = phase_config['weight']
+                current_phase_weight = (current / 100.0) * phase_weight
+            
+            # Calculate total progress (capped at 100%)
+            self._overall_progress = min(100, completed_weight + current_phase_weight)
+            self._current_phase_progress = current
+            self._current_phase_name = step_name
+            
+            # Calculate phase index for main progress display
+            try:
+                current_phase_index = self._phase_order.index(step_name) + 1
+                total_phases = len(self._phase_order)
+            except ValueError:
+                # Handle unknown phases
+                current_phase_index = len(self._completed_phases) + 1
+                total_phases = len(self._phase_order)
+            
+            # Format progress messages
+            main_message = f"{phase_config['label']} ({current_phase_index}/{total_phases})"
+            if message:
+                main_message += f" - {message}"
+            
+            secondary_message = f"{phase_config['label']}: {current}%"
+            
+            # Update dual progress tracker
+            self.update_progress(
+                progress=self._overall_progress,
+                message=main_message,
+                secondary_progress=current,
+                secondary_message=secondary_message
+            )
+            
+            # Log milestone progress
+            if self._should_log_progress(step_name, current):
+                self.logger.info(
+                    f"📊 Progress: {main_message} | "
+                    f"Overall: {self._overall_progress:.1f}% | "
+                    f"Phase: {current}%"
+                )
                 
         except Exception as e:
-            error_msg = f"Error saat proses download: {str(e)}"
-            if progress_tracker:
-                progress_tracker.update_overall(0, f"❌ {error_msg}")
-            self.logger.error(f"❌ {error_msg}", exc_info=True)
-            return {'status': False, 'message': error_msg, 'result': result}
-    
-    @handle_ui_errors(error_component_title="Progress Tracker Error", log_error=True)
-    def _setup_progress_tracker(self, operation_name: str):
-        """Setup progress tracker untuk operation.
+            self.logger.error(f"Error handling download progress: {e}", exc_info=True)
+
+    def _should_log_progress(self, step: str, current: int) -> bool:
+        """
+        Determine if progress should be logged.
         
         Args:
-            operation_name: Nama operasi yang akan ditampilkan di progress tracker
-        """
-        progress_tracker = self.ui_components.get('progress_tracker')
-        if progress_tracker:
-            # Start a new stage for this operation
-            progress_tracker.start_stage(operation_name)
-            progress_tracker.update_overall(0, f"🚀 Memulai {operation_name.lower()}...")
+            step: Current step name
+            current: Current progress value
             
-            # If there's a progress bar in UI components, update it
-            if 'progress_bar' in self.ui_components and self.ui_components['progress_bar']:
-                self.ui_components['progress_bar'].value = 0
-                self.ui_components['progress_bar'].description = f"Memulai {operation_name.lower()}..."
-    
-    @handle_ui_errors(error_component_title="Backend Service Error", log_error=True)
-    def _create_backend_downloader(self, ui_config: Dict[str, Any]):
-        """Create backend downloader service."""
-        from smartcash.ui.dataset.downloader.services import get_dataset_scanner
-        scanner = get_dataset_scanner()
-        return scanner.create_downloader(ui_config)
-    
-    @handle_ui_errors(error_component_title="UI Operation Error", log_error=True)
-    def _log_download_config(self, ui_config: Dict[str, Any]):
-        """Log download config ke UI menggunakan parent class logging methods."""
-        # Log config details using parent class logging methods
-        self.logger.info("📋 Konfigurasi Download:")
+        Returns:
+            bool: True if progress should be logged
+        """
+        # Log at milestone percentages or phase transitions
+        milestones = [0, 25, 50, 75, 100]
+        return current in milestones or step != getattr(self, '_last_logged_step', None)
+
+    def execute(self) -> Dict[str, Any]:
+        """
+        Execute the download operation with comprehensive error handling.
         
-        # Log source type
-        source_type = ui_config.get('source_type', 'unknown')
-        self.logger.info(f"🔹 Tipe sumber: {source_type}")
+        Returns:
+            Dict[str, Any]: Operation results containing:
+                - success: Boolean indicating operation success
+                - message: Summary message
+                - download_path: Path to downloaded dataset (if successful)
+                - file_count: Number of files downloaded (if successful)
+                - total_size: Total size of downloaded data (if successful)
+                - error: Error details (if failed)
+        """
+        try:
+            self.log_operation_start("Download Dataset")
+            self._reset_progress_tracking()
+            
+            # Phase 1: Validate configuration and API key
+            self.phase = DownloaderOperationPhase.INITIALIZING
+            self.update_progress(0, "🔧 Memvalidasi konfigurasi...")
+            
+            result = self._validate_and_prepare()
+            if not result['success']:
+                return result
+            
+            api_key = result['api_key']
+            backend_config = result['backend_config']
+            
+            # Phase 2: Initialize download service
+            self.update_progress(5, "🚀 Menginisialisasi layanan download...")
+            
+            download_service = self.get_backend_api('download_service')
+            if not download_service:
+                return self._handle_error("Layanan download tidak tersedia")
+            
+            # Phase 3: Create downloader instance
+            self.update_progress(10, "⚙️ Menyiapkan downloader...")
+            
+            try:
+                downloader = download_service(backend_config)
+                if not downloader:
+                    return self._handle_error("Gagal menginisialisasi downloader")
+            except Exception as e:
+                return self._handle_error("Gagal membuat downloader instance", e)
+            
+            # Phase 4: Setup progress callback
+            if hasattr(downloader, 'set_progress_callback'):
+                downloader.set_progress_callback(self._handle_download_progress)
+                self.logger.debug("✅ Progress callback terdaftar")
+            
+            # Phase 5: Execute download with backend progress tracking
+            self.update_progress(15, "📥 Memulai download dataset...")
+            
+            try:
+                download_result = downloader.download(
+                    workspace=self.config['data']['roboflow']['workspace'],
+                    project=self.config['data']['roboflow']['project'],
+                    version=self.config['data']['roboflow']['version'],
+                    api_key=api_key
+                )
+            except Exception as e:
+                return self._handle_error("Download gagal", e)
+            
+            # Phase 6: Process results
+            if not download_result or download_result.get('status') != 'success':
+                error_msg = download_result.get('message', 'Download gagal tanpa detail error') if download_result else 'Download gagal'
+                return self._handle_error(error_msg)
+            
+            # Phase 7: Finalize and return success
+            self.phase = DownloaderOperationPhase.COMPLETED
+            self.update_progress(100, "✅ Download berhasil diselesaikan!")
+            
+            file_count = download_result.get('file_count', 0)
+            total_size = download_result.get('total_size', '0B')
+            download_path = download_result.get('download_path', '')
+            
+            self.log_operation_complete("Download Dataset")
+            
+            return {
+                'success': True,
+                'message': f'Dataset berhasil didownload: {file_count} file ({total_size})',
+                'download_path': download_path,
+                'file_count': file_count,
+                'total_size': total_size,
+                'operation_id': self.operation_id
+            }
+            
+        except Exception as e:
+            return self._handle_error("Error tidak terduga saat download", e)
+
+    def _validate_and_prepare(self) -> Dict[str, Any]:
+        """
+        Validate configuration and prepare for download.
         
-        # Log dataset path
-        dataset_path = ui_config.get('dataset_path', '')
-        self.logger.info(f"🔹 Path dataset: {dataset_path}")
+        Returns:
+            Dict containing validation results and prepared data
+        """
+        try:
+            # Get and validate API key
+            api_key = self._get_api_key()
+            if not api_key:
+                return {
+                    'success': False,
+                    'message': 'API key tidak ditemukan. Silakan konfigurasi API key yang valid.',
+                    'error': 'missing_api_key'
+                }
+            
+            # Validate and convert configuration
+            backend_config, error = self.validate_downloader_config()
+            if error:
+                return {
+                    'success': False,
+                    'message': f'Validasi konfigurasi gagal: {error}',
+                    'error': 'config_validation_failed'
+                }
+            
+            return {
+                'success': True,
+                'api_key': api_key,
+                'backend_config': backend_config
+            }
+            
+        except Exception as e:
+            return {
+                'success': False,
+                'message': f'Error saat validasi: {str(e)}',
+                'error': 'validation_error'
+            }
+
+    def _get_api_key(self) -> Optional[str]:
+        """
+        Get API key from config or secret manager.
         
-        # Log additional options
-        options = ui_config.get('options', {})
-        if options:
-            self.logger.info("🔹 Opsi tambahan:")
-            for key, value in options.items():
-                if isinstance(value, bool) and value:
-                    self.logger.info(f"  - {key}: {value}")
-    
-    @handle_ui_errors(error_component_title="UI Operation Error", log_error=True)
-    def _show_download_success(self, result: Dict[str, Any]):
-        """Show download success di UI menggunakan parent class methods."""
-        # Get summary info from result
-        summary = result.get('summary', {})
-        dataset_path = result.get('dataset_path', '')
+        Returns:
+            str: API key if found, None otherwise
+        """
+        # Check config first
+        try:
+            roboflow_config = self.config.get('data', {}).get('roboflow', {})
+            if 'api_key' in roboflow_config and roboflow_config['api_key']:
+                return roboflow_config['api_key']
+        except (KeyError, TypeError, AttributeError):
+            pass
         
-        # Log success message
-        success_message = f"✅ Download berhasil ke {dataset_path}"
-        self.logger.info(success_message)
-        
-        # Update status panel if available in UI components
-        if 'status_panel' in self.ui_components and self.ui_components['status_panel']:
-            self.ui_components['status_panel'].update(
-                message=success_message,
-                status_type="success",
-                title="Download Berhasil"
-            )
-        
-        # Log detailed summary
-        total_images = summary.get('total_images', 0)
-        total_labels = summary.get('total_labels', 0)
-        
-        # Log detailed information
-        self.logger.info(f"📊 Download Summary:")
-        self.logger.info(f"  - Dataset Path: {dataset_path}")
-        self.logger.info(f"  - Total Images: {total_images}")
-        self.logger.info(f"  - Total Labels: {total_labels}")
-        
-        # If we have a summary container, update it
-        if 'summary_container' in self.ui_components and self.ui_components['summary_container']:
-            self._update_summary_container(result)
-        
-    @handle_ui_errors(error_component_title="Summary Update Error", log_error=True)
-    def _update_summary_container(self, result: Dict[str, Any]):
-        """Update summary container dengan hasil download.
+        # Fall back to secret manager
+        return self.get_roboflow_api_key()
+
+    def _handle_error(self, message: str, exception: Optional[Exception] = None) -> Dict[str, Any]:
+        """
+        Handle operation errors with proper logging and progress updates.
         
         Args:
-            result: Hasil dari operasi download
-        """
-        summary_container = self.ui_components.get('summary_container')
-        if not summary_container:
-            self.logger.debug("Summary container tidak tersedia")
-            return
+            message: Error message
+            exception: Optional exception that caused the error
             
-        # Extract summary data
-        stats = result.get('stats', {})
-        total_images = stats.get('total_images', 0)
-        total_annotations = stats.get('total_annotations', 0)
+        Returns:
+            Error response dictionary
+        """
+        error_details = str(exception) if exception else "No additional details"
         
-        # Format summary content
-        summary_lines = [
-            "<div style='padding: 10px; background-color: #f0f8ff; border-radius: 5px; border-left: 5px solid #4682b4;'>",
-            "<h3>📊 Ringkasan Download Dataset</h3>",
-            f"<p>✅ Total gambar: <b>{total_images:,}</b></p>",
-            f"<p>🏷️ Total anotasi: <b>{total_annotations:,}</b></p>"
-        ]
+        # Log the error
+        if exception:
+            self.logger.error(f"{message}: {error_details}", exc_info=True)
+        else:
+            self.logger.error(message)
         
-        # Add class distribution if available
-        class_distribution = stats.get('class_distribution', {})
-        if class_distribution:
-            summary_lines.append("<p>🔍 Distribusi kelas:</p>")
-            summary_lines.append("<ul>")
-            for class_name, count in class_distribution.items():
-                summary_lines.append(f"<li>{class_name}: {count:,}</li>")
-            summary_lines.append("</ul>")
+        # Update UI state
+        self.phase = DownloaderOperationPhase.FAILED
+        self.update_progress(0, f"❌ {message}")
         
-        summary_lines.append("</div>")
-        
-        # Update summary container
-        summary_container.clear_output()
-        summary_container.append_html("".join(summary_lines))
+        return {
+            'success': False,
+            'message': message,
+            'error': error_details,
+            'operation_id': self.operation_id
+        }

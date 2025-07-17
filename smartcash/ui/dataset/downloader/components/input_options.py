@@ -6,7 +6,7 @@ Deskripsi: Form input components untuk downloader dengan responsive layout
 import ipywidgets as widgets
 from typing import Dict, Any, Optional
 from smartcash.ui.utils.constants import COLORS, ICONS
-from smartcash.ui.dataset.downloader.services import get_secret_manager
+from smartcash.ui.core.mixins.colab_secrets_mixin import ColabSecretsMixin
 
 
 def create_downloader_input_options(config: Optional[Dict[str, Any]] = None) -> widgets.VBox:
@@ -25,9 +25,9 @@ def create_downloader_input_options(config: Optional[Dict[str, Any]] = None) -> 
     roboflow_config = config.get('data', {}).get('roboflow', {})
     download_config = config.get('download', {})
     
-    # Cek API key dari secrets
-    secret_manager = get_secret_manager()
-    api_key = secret_manager.get_api_key()
+    # Cek API key dari secrets menggunakan ColabSecretsMixin
+    secrets_mixin = ColabSecretsMixin()
+    api_key = secrets_mixin.get_secret()
     
     # === KOLOM KIRI: Dataset Info (Fixed Width) ===
     
@@ -113,7 +113,7 @@ def create_downloader_input_options(config: Optional[Dict[str, Any]] = None) -> 
     
     # API key status info
     api_key_status = widgets.HTML(
-        value=secret_manager.create_api_key_info_html({
+        value=secrets_mixin.create_api_key_info_html({
             'data': {
                 'roboflow': {
                     'api_key': api_key or ''

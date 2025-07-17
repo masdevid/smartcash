@@ -133,18 +133,18 @@ def create_ui_compatible_config(ui_config: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
-# Export create_dataset_scanner
-__all__ = [
-    'create_dataset_scanner',
-    'get_downloader_instance',
-    'get_dataset_scanner',
-    'get_cleanup_service',
-    'get_progress_tracker',
-    'create_download_session',
-    'get_default_config',
-    'validate_service_compatibility',
-    'create_ui_compatible_config'
-]
+# # Export create_dataset_scanner
+# __all__ = [
+#     'create_dataset_scanner',
+#     'get_downloader_instance',
+#     'get_dataset_scanner',
+#     'get_cleanup_service',
+#     'get_progress_tracker',
+#     'create_download_session',
+#     'get_default_config',
+#     'validate_service_compatibility',
+#     'create_ui_compatible_config'
+# ]
 
 # Convenience functions
 create_roboflow_downloader = lambda api_key, **kwargs: get_downloader_instance(

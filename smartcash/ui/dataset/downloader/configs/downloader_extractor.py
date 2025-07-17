@@ -5,103 +5,62 @@ Deskripsi: Ekstraksi konfigurasi downloader dari UI components sesuai dengan dat
 
 from typing import Dict, Any
 from datetime import datetime
-from smartcash.common.worker_utils import get_optimal_worker_count, get_download_workers, get_rename_workers
+from .downloader_config_constants import (
+    get_default_config_structure,
+    UI_FIELD_MAPPINGS,
+    get_nested_value,
+    set_nested_value
+)
 
 def extract_downloader_config(ui_components: Dict[str, Any]) -> Dict[str, Any]:
     """Ekstraksi konfigurasi downloader yang konsisten dengan dataset_config.yaml"""
+    # Start with default configuration structure
+    config = get_default_config_structure()
+    
+    # Update timestamp
+    current_time = datetime.now().isoformat()
+    config['updated_at'] = current_time
+    config['history']['updated_at'] = current_time
+    
+    # Extract values from UI components using centralized mapping
+    for ui_key, config_path, config_key, default_value in UI_FIELD_MAPPINGS:
+        # Get value from UI component
+        ui_value = getattr(ui_components.get(ui_key, type('', (), {'value': default_value})()), 'value', default_value)
+        
+        # Handle string stripping for text inputs
+        if isinstance(ui_value, str):
+            ui_value = ui_value.strip()
+        
+        # Set the value in config using dot notation
+        full_path = f"{config_path}.{config_key}" if config_path else config_key
+        set_nested_value(config, full_path, ui_value)
+    
+    return config
+
+def extract_simplified_config(ui_components: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Extract simplified configuration for operations that don't need full config structure.
+    
+    Args:
+        ui_components: Dictionary of UI components
+        
+    Returns:
+        Simplified configuration dictionary
+    """
     # One-liner value extraction dengan fallback
     get_value = lambda key, default: getattr(ui_components.get(key, type('', (), {'value': default})()), 'value', default)
     
-    # Metadata untuk config yang diperbarui
-    current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    
-    # Struktur konfigurasi sesuai dengan dataset_config.yaml
     return {
-        'config_version': '1.0',
-        'updated_at': current_time,
-        '_base_': 'base_config.yaml',
-        
         'data': {
-            'source': 'roboflow',
-            'dir': get_value('data_dir', 'data'),
-            
             'roboflow': {
                 'workspace': get_value('workspace_input', '').strip(),
                 'project': get_value('project_input', '').strip(),
                 'version': get_value('version_input', '').strip(),
                 'api_key': get_value('api_key_input', '').strip(),
-                'output_format': 'yolov5pytorch'
-            },
-            
-            'file_naming': {
-                'uuid_format': True,
-                'naming_strategy': 'research_uuid',
-                'preserve_original': False
-            },
-            
-            'local': {
-                'train': 'data/train',
-                'valid': 'data/valid', 
-                'test': 'data/test'
             }
         },
-        
-        'download': {
-            'enabled': True,
-            'target_dir': get_value('target_dir', 'data'),
-            'temp_dir': 'data/downloads',
-            'backup_existing': get_value('backup_checkbox', False),
-            'validate_download': get_value('validate_checkbox', True),
-            'organize_dataset': True,
-            'rename_files': True,
-            'retry_count': 3,
-            'timeout': 30,
-            'chunk_size': 262144,
-            'parallel_downloads': True,
-            'max_workers': get_value('max_workers', get_download_workers())
-        },
-        
-        'uuid_renaming': {
-            'enabled': True,
-            'backup_before_rename': get_value('backup_checkbox', False),
-            'batch_size': 1000,
-            'parallel_workers': get_rename_workers(5000),  # Estimate 5k files
-            'validate_consistency': True,
-            'target_splits': ['train', 'valid', 'test'],
-            'file_patterns': ['.jpg', '.jpeg', '.png', '.bmp'],
-            'label_patterns': ['.txt'],
-            'progress_reporting': True
-        },
-        
         'validation': {
-            'enabled': get_value('validate_checkbox', True),
-            'check_file_integrity': True,
-            'verify_image_format': True,
-            'validate_labels': True,
-            'check_dataset_structure': True,
-            'minimum_images_per_split': {
-                'train': 100,
-                'valid': 50,
-                'test': 25
-            },
-            'allowed_extensions': ['.jpg', '.jpeg', '.png', '.bmp'],
-            'max_image_size_mb': 50,
-            'generate_report': True,
-            'parallel_workers': get_optimal_worker_count('io')
-        },
-        
-        'cleanup': {
-            'auto_cleanup_downloads': False,
-            'preserve_original_structure': True,
-            'backup_dir': 'data/backup/downloads',
-            'temp_cleanup_patterns': [
-                '*.tmp',
-                '*.temp',
-                '*_download_*',
-                '*.zip'
-            ],
-            'keep_download_logs': True,
-            'cleanup_on_error': True,
-            'parallel_workers': get_optimal_worker_count('io')
+            'validate_download': get_value('validate_checkbox', True),
+            'backup_existing': get_value('backup_checkbox', False),
         }
     }

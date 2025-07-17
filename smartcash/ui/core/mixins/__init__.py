@@ -12,6 +12,7 @@ from .logging_mixin import LoggingMixin
 from .button_handler_mixin import ButtonHandlerMixin
 from .validation_mixin import ValidationMixin
 from .display_mixin import DisplayMixin
+from .colab_secrets_mixin import ColabSecretsMixin
 
 __all__ = [
     'ConfigurationMixin',
@@ -20,5 +21,6 @@ __all__ = [
     # 'ProgressTrackingMixin',  # Removed - use operation_container instead
     'ButtonHandlerMixin',
     'ValidationMixin',
-    'DisplayMixin'
+    'DisplayMixin',
+    'ColabSecretsMixin'
 ]

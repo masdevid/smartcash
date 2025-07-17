@@ -7,7 +7,14 @@ including UI initialization, display, and component access.
 """
 
 from typing import Dict, Any, Optional
-from IPython.display import display
+
+# Conditional import to avoid issues in non-Jupyter environments
+try:
+    from IPython.display import display
+except ImportError:
+    # Fallback for non-Jupyter environments
+    def display(obj):
+        print(obj)
 
 # Import UIModule components
 from smartcash.ui.dataset.downloader.downloader_uimodule import (

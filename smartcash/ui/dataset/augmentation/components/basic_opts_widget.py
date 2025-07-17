@@ -5,9 +5,6 @@ Deskripsi: Basic options widget dengan cleanup options integration dan responsiv
 
 import ipywidgets as widgets
 from typing import Dict, Any
-from smartcash.ui.dataset.augmentation.utils.style_utils import (
-    style_widget, flex_layout, info_panel, create_info_content
-)
 
 def create_basic_options_widget() -> Dict[str, Any]:
     """Create basic options dengan cleanup integration dan responsive styling"""
@@ -54,24 +51,23 @@ def create_basic_options_widget() -> Dict[str, Any]:
         )
     }
     
-    # Create info content dengan cleanup guidance
-    info_content = create_info_content([
-        ('Parameter Guidance', ''),
-        ('Variasi', '2-5 optimal untuk research'),
-        ('Target Count', '500-1000 efektif'),
-        ('Intensitas', '0.7 optimal, 0.3-0.5 conservative'),
-        ('Cleanup', 'Both = comprehensive cleanup')
-    ], theme='basic')
+    # Create info content with simple HTML
+    info_content = widgets.HTML("""
+    <div style='background: #f8f9fa; padding: 10px; border-radius: 5px; margin: 10px 0;'>
+        <strong>Parameter Guidance:</strong><br>
+        • Variasi: 2-5 optimal untuk research<br>
+        • Target Count: 500-1000 efektif<br>
+        • Intensitas: 0.7 optimal, 0.3-0.5 conservative<br>
+        • Cleanup: Both = comprehensive cleanup
+    </div>
+    """)
     
-    # Create container dengan flex layout
+    # Create container with simple layout
     container = widgets.VBox([
         widgets.HTML("<h6 style='color: #4caf50; margin: 6px 0;'>⚙️ Opsi Dasar</h6>"),
         *widgets_dict.values(),
-        info_panel(info_content, theme='basic')
-    ])
-    
-    # Apply flex layout
-    flex_layout(container)
+        info_content
+    ], layout=widgets.Layout(width='100%'))
     
     return {
         'container': container,

@@ -5,9 +5,6 @@ Deskripsi: Live preview widget dengan responsive image container dan generate bu
 
 import ipywidgets as widgets
 from typing import Dict, Any
-from smartcash.ui.dataset.augmentation.utils.style_utils import (
-    flex_layout, info_panel, create_info_content, section_header
-)
 
 def create_live_preview_widget() -> Dict[str, Any]:
     """Create simplified live preview dengan single image dan generate button"""
@@ -43,17 +40,19 @@ def create_live_preview_widget() -> Dict[str, Any]:
         layout=widgets.Layout(width='100%', margin='4px auto')
     )
     
-    # Info content untuk preview
-    info_content = create_info_content([
-        ('Live Preview', ''),
-        ('File', '/data/aug_preview.jpg'),
-        ('Generate', 'Buat preview dari parameter saat ini'),
-        ('Format', '200x200px responsive container')
-    ], theme='normalization')
+    # Info content with simple HTML
+    info_content = widgets.HTML("""
+    <div style='background: #f8f9fa; padding: 8px; border-radius: 4px; margin: 8px 0; font-size: 12px;'>
+        <strong>Live Preview:</strong><br>
+        • File: /data/aug_preview.jpg<br>
+        • Generate: Buat preview dari parameter saat ini<br>
+        • Format: 200x200px responsive container
+    </div>
+    """)
     
     # Main container dengan center alignment  
     container = widgets.VBox([
-        section_header('🎬 Live Preview Augmentasi', theme='normalization'),
+        widgets.HTML("<h6 style='color: #ff9800; margin: 6px 0;'>🎬 Live Preview Augmentasi</h6>"),
         widgets.VBox([
             preview_image,
             preview_status,
@@ -64,11 +63,8 @@ def create_live_preview_widget() -> Dict[str, Any]:
             align_items='center',
             margin='8px 0'
         )),
-        info_panel(info_content, theme='normalization')
-    ])
-    
-    # Apply flex layout
-    flex_layout(container)
+        info_content
+    ], layout=widgets.Layout(width='100%'))
     
     # Widget mapping
     widgets_dict = {

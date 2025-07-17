@@ -9,8 +9,7 @@ from typing import Dict, Any
 # Third-party imports
 import ipywidgets as widgets
 
-# Local imports
-from ..constants import SECTION_STYLES
+# Local imports - removed SECTION_STYLES dependency
 
 
 def create_form_container(
@@ -31,9 +30,9 @@ def create_form_container(
         A styled VBox container with the specified content and theming
     """
     # Use original color scheme from constants
-    style_config = SECTION_STYLES.get(theme, SECTION_STYLES['basic_options'])
-    border_color = style_config['border_color']
-    bg_color = style_config['background']
+    # Use simple default styles instead of SECTION_STYLES
+    border_color = '#e0e0e0'
+    bg_color = '#f8f9fa'
     
     header_html = f"""
     <div style="padding: 8px 12px; margin-bottom: 8px;

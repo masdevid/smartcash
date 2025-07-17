@@ -5,7 +5,7 @@ Description: Main UI component for the augmentation module
 
 # Standard library imports
 from pathlib import Path
-from typing import Any, Dict, Tuple
+from typing import Any, Dict, Tuple, Optional
 
 # Third-party imports
 import ipywidgets as widgets
@@ -81,7 +81,7 @@ def _create_augment_ui_components(config: Dict[str, Any]) -> Tuple[Dict[str, Any
     ui_components['action_container'] = action_container
     
     # 4. Create summary container
-    summary_content = widgets.HBox(layout=widgets.Layout(width='100%', padding='10px'))
+    summary_content = "<div style='padding: 10px; width: 100%;'>Augmentation summary will appear here...</div>"
     summary_container = create_summary_container(
         theme='default',
         title='Augmentation Summary',
@@ -106,7 +106,7 @@ def _create_augment_ui_components(config: Dict[str, Any]) -> Tuple[Dict[str, Any
         header_container=header,
         form_container=form_widgets['container'],
         action_container=action_container,
-        summary_container=summary_container['container'].container,
+        summary_container=summary_container.container,
         operation_container=operation_container,
         footer_container=footer_container
     )
@@ -119,7 +119,7 @@ def _create_augment_ui_components(config: Dict[str, Any]) -> Tuple[Dict[str, Any
     })
     
     # Add summary container to widgets dictionary
-    widgets_dict['summary_container'] = summary_container['container']
+    widgets_dict['summary_container'] = summary_container
     widgets_dict['form_container'] = form_widgets['container']
     
     return ui_components, widgets_dict
@@ -135,7 +135,7 @@ def _create_header() -> Any:
 
 
 def _create_action_buttons() -> Dict[str, Any]:
-    """Create action buttons container."""
+    """Create action buttons container with all operation buttons."""
     action_buttons = [
         {
             'id': btn_id,
@@ -150,7 +150,8 @@ def _create_action_buttons() -> Dict[str, Any]:
     return create_action_container(
         buttons=action_buttons,
         title="🚀 Augmentation Operations",
-        container_margin="15px 0 5px 0"
+        container_margin="15px 0 5px 0",
+        show_save_reset=True  # Include save/reset buttons
     )
 
 

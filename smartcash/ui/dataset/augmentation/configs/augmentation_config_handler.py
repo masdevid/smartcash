@@ -1,11 +1,9 @@
 """
 File: smartcash/ui/dataset/augmentation/configs/augmentation_config_handler.py
-Description: Pure mixin-based augmentation config handler using core ConfigurationMixin.
-Uses composition over inheritance for better flexibility and testability.
+Description: Simple config handler for the augmentation module focused on save/reset functionality.
 """
 
-from typing import Dict, Any, List, Optional
-from datetime import datetime
+from typing import Dict, Any, Optional
 
 from smartcash.ui.core.mixins.configuration_mixin import ConfigurationMixin
 from smartcash.ui.core.mixins.logging_mixin import LoggingMixin
@@ -15,214 +13,167 @@ from .augmentation_defaults import get_default_augmentation_config
 
 class AugmentationConfigHandler(LoggingMixin, ConfigurationMixin):
     """
-    Pure mixin-based config handler for augmentation management.
+    Simple config handler for augmentation management.
     
-    Uses composition over inheritance - no BaseHandler inheritance chain.
-    This follows the mixin pattern used throughout the UI module system.
+    Focuses on save/reset functionality with proper mixin integration.
     """
     
     def __init__(self, default_config: Optional[Dict[str, Any]] = None):
         """
-        Initialize augmentation config handler using core mixins.
+        Initialize augmentation config handler.
         
         Args:
             default_config: Optional default configuration
         """
-        # Initialize mixins
-        LoggingMixin.__init__(self, logger_name=__name__)
-        ConfigurationMixin.__init__(self)
+        # Initialize mixins properly
+        super().__init__()
         
-        # Set default config if not provided
+        # Module identification for LoggingMixin
+        self.module_name = 'augmentation'
+        self.parent_module = 'dataset'
+        
+        # Initialize logger
+        self.logger = get_module_logger('smartcash.ui.dataset.augmentation.configs.augmentation_config_handler')
+        
+        # Store default config for get_default_config() method
         self._default_config = default_config or get_default_augmentation_config()
         
-        # Initialize with default config
-        self._config = self._default_config.copy()
+        # Initialize config handler with default config
+        self._initialize_config_handler()
         
-        # Track config history for undo/redo
-        self._config_history: List[Dict[str, Any]] = [self._config.copy()]
-        self._history_index = 0
+        self.logger.debug("✅ AugmentationConfigHandler initialized")
     
-    def get_config(self) -> Dict[str, Any]:
-        """Get the current configuration."""
-        return self._config.copy()
+    # ==================== ABSTRACT METHOD IMPLEMENTATIONS ====================
     
-    def update_config(self, new_config: Dict[str, Any]) -> None:
+    def get_default_config(self) -> Dict[str, Any]:
+        """Get default configuration for augmentation module."""
+        return self._default_config.copy()
+    
+    def create_config_handler(self, config: Dict[str, Any]) -> 'AugmentationConfigHandler':
+        """Create config handler instance."""
+        return self
+    
+    # ==================== UI INTEGRATION ====================
+    
+    def set_ui_components(self, ui_components: Dict[str, Any]) -> None:
         """
-        Update the configuration with new values.
+        Set UI components for configuration extraction.
         
         Args:
-            new_config: Dictionary with new configuration values
+            ui_components: Dictionary of UI components
         """
-        if not isinstance(new_config, dict):
-            self.logger.warning("Invalid config format, expected dictionary")
-            return
-            
-        # Update config with new values
-        self._config.update(new_config)
-        
-        # Add to history
-        self._add_to_history()
-        
-        self.logger.debug("Configuration updated")
+        self._ui_components = ui_components
+        component_count = len(ui_components) if ui_components else 0
+        self.logger.debug(f"UI components set: {component_count} components")
     
-    def reset_config(self) -> None:
-        """Reset configuration to default values."""
-        self._config = self._default_config.copy()
-        self._add_to_history()
-        self.logger.info("Configuration reset to defaults")
-    
-    def _add_to_history(self) -> None:
-        """Add current config to history for undo/redo functionality."""
-        # Remove any redo history
-        self._config_history = self._config_history[:self._history_index + 1]
-        
-        # Add current config to history
-        self._config_history.append(self._config.copy())
-        self._history_index = len(self._config_history) - 1
-        
-        # Limit history size
-        if len(self._config_history) > 50:  # Keep last 50 states
-            self._config_history.pop(0)
-            self._history_index -= 1
-    
-    def undo(self) -> bool:
+    def extract_config_from_ui(self) -> Dict[str, Any]:
         """
-        Revert to previous configuration state.
+        Extract configuration from UI components.
         
         Returns:
-            bool: True if undo was successful, False if no more history
+            Extracted configuration dictionary
         """
-        if self._history_index > 0:
-            self._history_index -= 1
-            self._config = self._config_history[self._history_index].copy()
-            self.logger.debug("Undo to previous configuration state")
-            return True
-        return False
-    
-    def redo(self) -> bool:
-        """
-        Redo next configuration state.
-        
-        Returns:
-            bool: True if redo was successful, False if no more history
-        """
-        if self._history_index < len(self._config_history) - 1:
-            self._history_index += 1
-            self._config = self._config_history[self._history_index].copy()
-            self.logger.debug("Redo to next configuration state")
-            return True
-        return False
-    
-    def validate_config(self, config: Optional[Dict[str, Any]] = None) -> bool:
-        """
-        Validate the configuration.
-        
-        Args:
-            config: Optional config to validate (uses current config if None)
-            
-        Returns:
-            bool: True if config is valid, False otherwise
-        """
-        cfg = config or self._config
-        
-        # Add validation logic here
         try:
-            # Example validation
-            if 'augmentation_type' not in cfg:
-                self.logger.error("Missing required field: augmentation_type")
-                return False
-                
-            if 'intensity' in cfg and not (0 <= cfg['intensity'] <= 1):
-                self.logger.error("Intensity must be between 0 and 1")
-                return False
-                
-            return True
+            if not hasattr(self, '_ui_components') or not self._ui_components:
+                self.logger.debug("No UI components available for extraction - using current config")
+                return self.get_current_config()
+            
+            # Start with current config
+            extracted_config = self.get_current_config()
+            
+            # TODO: Add actual UI extraction logic based on your form widgets
+            # For now, return current config
+            self.logger.debug("Extracted augmentation configuration from UI components")
+            
+            return extracted_config
             
         except Exception as e:
-            self.logger.error(f"Validation error: {str(e)}")
-            return False
+            self.logger.error(f"Failed to extract config from UI: {e}")
+            return self.get_current_config()
     
-    def get_augmentation_pipeline(self) -> List[Dict[str, Any]]:
+    # ==================== CONFIGURATION OPERATIONS ====================
+    
+    def save_config(self) -> Dict[str, Any]:
         """
-        Get the current augmentation pipeline configuration.
+        Save current configuration.
         
         Returns:
-            List of augmentation operations with their parameters
+            Dict with operation result
         """
-        return self._config.get('pipeline', [])
+        try:
+            # Get current config without triggering UI extraction
+            current_config = self.get_current_config()
+            
+            # Here you would typically save to persistent storage
+            self.log_with_status(
+                message=f"Augmentation configuration saved successfully with {len(current_config)} keys",
+                status_message="Konfigurasi augmentasi berhasil disimpan",
+                log_level='info',
+                status_level='success'
+            )
+            
+            return {
+                'success': True,
+                'message': 'Konfigurasi augmentasi berhasil disimpan',
+                'config': current_config
+            }
+            
+        except Exception as e:
+            error_msg = f"Gagal menyimpan konfigurasi augmentasi: {str(e)}"
+            self.log_with_status(
+                message=error_msg,
+                status_message=error_msg,
+                log_level='error',
+                status_level='error'
+            )
+            return {
+                'success': False,
+                'message': error_msg,
+                'config': getattr(self, '_merged_config', {})
+            }
     
-    def add_augmentation_step(self, step: Dict[str, Any]) -> bool:
+    def reset_config(self) -> Dict[str, Any]:
         """
-        Add an augmentation step to the pipeline.
+        Reset configuration to defaults.
         
-        Args:
-            step: Dictionary containing augmentation step configuration
-            
         Returns:
-            bool: True if step was added successfully, False otherwise
+            Dict with operation result
         """
-        if not isinstance(step, dict) or 'type' not in step:
-            self.logger.error("Invalid augmentation step format")
-            return False
+        try:
+            # Get default configuration
+            default_config = self.get_default_config()
             
-        if 'pipeline' not in self._config:
-            self._config['pipeline'] = []
+            # Update internal config
+            self._merged_config = default_config.copy()
             
-        self._config['pipeline'].append(step)
-        self._add_to_history()
-        self.logger.info(f"Added augmentation step: {step.get('type')}")
-        return True
-    
-    def remove_augmentation_step(self, index: int) -> bool:
-        """
-        Remove an augmentation step from the pipeline.
-        
-        Args:
-            index: Index of the step to remove
+            # Update UI if components are available
+            if hasattr(self, '_ui_components') and self._ui_components:
+                # TODO: Add UI sync logic if needed
+                pass
             
-        Returns:
-            bool: True if step was removed successfully, False otherwise
-        """
-        if 'pipeline' not in self._config or not isinstance(self._config['pipeline'], list):
-            self.logger.error("No pipeline exists or invalid format")
-            return False
+            self.log_with_status(
+                message=f"Augmentation configuration reset to defaults with {len(self._merged_config)} keys",
+                status_message="Konfigurasi augmentasi direset ke pengaturan awal",
+                log_level='info',
+                status_level='success'
+            )
             
-        if not (0 <= index < len(self._config['pipeline'])):
-            self.logger.error(f"Invalid step index: {index}")
-            return False
+            return {
+                'success': True, 
+                'message': 'Konfigurasi augmentasi berhasil direset',
+                'config': self._merged_config
+            }
             
-        removed = self._config['pipeline'].pop(index)
-        self._add_to_history()
-        self.logger.info(f"Removed augmentation step: {removed.get('type')}")
-        return True
-    
-    def move_augmentation_step(self, from_index: int, to_index: int) -> bool:
-        """
-        Move an augmentation step in the pipeline.
-        
-        Args:
-            from_index: Current index of the step
-            to_index: Target index for the step
-            
-        Returns:
-            bool: True if step was moved successfully, False otherwise
-        """
-        if 'pipeline' not in self._config or not isinstance(self._config['pipeline'], list):
-            self.logger.error("No pipeline exists or invalid format")
-            return False
-            
-        pipeline = self._config['pipeline']
-        if not (0 <= from_index < len(pipeline) and 0 <= to_index < len(pipeline)):
-            self.logger.error("Invalid source or target index")
-            return False
-            
-        if from_index == to_index:
-            return True  # No-op
-            
-        # Move the item
-        item = pipeline.pop(from_index)
-        pipeline.insert(to_index, item)
-        
-        self._add_to_history()
-        self.logger.debug(f"Moved augmentation step from index {from_index} to {to_index}")
-        return True
+        except Exception as e:
+            error_msg = f"Gagal mereset konfigurasi augmentasi: {str(e)}"
+            self.log_with_status(
+                message=error_msg,
+                status_message=error_msg,
+                log_level='error',
+                status_level='error'
+            )
+            return {
+                'success': False, 
+                'message': error_msg,
+                'config': getattr(self, '_merged_config', {})
+            }

@@ -5,9 +5,6 @@ Deskripsi: Augmentation types widget yang dioptimasi dengan styling terkonsolida
 
 import ipywidgets as widgets
 from typing import Dict, Any
-from smartcash.ui.dataset.augmentation.utils.style_utils import (
-    flex_layout, info_panel, create_info_content, section_header
-)
 
 def create_augmentation_types_widget() -> Dict[str, Any]:
     """Create compact augmentation types widget dengan styling terkonsolidasi"""
@@ -28,24 +25,23 @@ def create_augmentation_types_widget() -> Dict[str, Any]:
         style={'description_width': '0'}
     )
     
-    # Create info content menggunakan fungsi terkonsolidasi
-    info_content = create_info_content([
-        ('Jenis Augmentasi', ''),
-        ('Combined', 'Research pipeline optimal'),
-        ('Position', 'Geometric transforms + bbox preservation'),
-        ('Lighting', 'Photometric transforms pencahayaan'),
-        ('Advanced', 'Geometric, color, noise transforms')
-    ], theme='types')
+    # Create info content with simple HTML
+    info_content = widgets.HTML("""
+    <div style='background: #f0f8f0; padding: 8px; border-radius: 4px; margin: 8px 0; font-size: 12px;'>
+        <strong>Jenis Augmentasi:</strong><br>
+        • Combined: Research pipeline optimal<br>
+        • Position: Geometric transforms + bbox preservation<br>
+        • Lighting: Photometric transforms pencahayaan<br>
+        • Advanced: Geometric, color, noise transforms
+    </div>
+    """)
     
-    # Create container dengan flex layout
+    # Create container with simple layout
     container = widgets.VBox([
-        section_header('🔄 Jenis Augmentasi', theme='types'),
+        widgets.HTML("<h6 style='color: #2196f3; margin: 6px 0;'>🔄 Jenis Augmentasi</h6>"),
         augmentation_types,
-        info_panel(info_content, theme='types')
-    ])
-    
-    # Apply flex layout
-    flex_layout(container)
+        info_content
+    ], layout=widgets.Layout(width='100%'))
     
     return {
         'container': container,

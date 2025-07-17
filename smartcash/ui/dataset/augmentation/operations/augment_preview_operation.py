@@ -29,40 +29,135 @@ class AugmentPreviewOperation(AugmentationBaseOperation):
         self._preview_path = None
         self._preview_service = None
     
-    def _load_preview_to_widget(self) -> bool:
+    def _load_preview_to_widget(self, preview_path: Optional[str] = None) -> bool:
         """
         Memuat gambar preview ke widget UI.
+        
+        Args:
+            preview_path: Path ke file preview (optional, akan menggunakan self._preview_path jika tidak ada)
         
         Returns:
             bool: True jika berhasil, False jika gagal
         """
         try:
-            if not self._preview_path or not os.path.exists(self._preview_path):
-                self.log_warning("Path preview tidak valid")
+            # Gunakan path yang diberikan atau self._preview_path
+            target_path = preview_path or self._preview_path
+            
+            if not target_path or not os.path.exists(target_path):
+                self.log_warning(f"Path preview tidak valid: {target_path}")
                 return False
                 
-            file_size = os.path.getsize(self._preview_path)
+            file_size = os.path.getsize(target_path)
             if file_size == 0:
                 self.log_warning("File preview kosong")
                 return False
                 
-            with open(self._preview_path, 'rb') as f:
+            with open(target_path, 'rb') as f:
                 image_data = f.read()
                 
             if len(image_data) == 0:
                 self.log_warning("Tidak ada data gambar yang terbaca")
                 return False
                 
-            preview_image = self._ui_components.get('preview_image')
-            if preview_image and hasattr(preview_image, 'value'):
-                preview_image.value = image_data
-                self.log_info("Preview berhasil dimuat ke widget")
+            # Cari preview image widget dari UI components
+            preview_image_widget = self._get_preview_image_widget()
+            preview_status_widget = self._get_preview_status_widget()
+            
+            if preview_image_widget and hasattr(preview_image_widget, 'value'):
+                preview_image_widget.value = image_data
+                self.log_info(f"Preview berhasil dimuat ke widget dari: {target_path}")
+                
+                # Update status widget jika ada
+                if preview_status_widget:
+                    size_kb = file_size / 1024
+                    preview_status_widget.value = f"<div style='text-align: center; color: #4caf50; font-size: 12px; margin: 4px 0;'>✅ Preview loaded ({size_kb:.1f}KB): {target_path}</div>"
+                
                 return True
                 
+            self.log_warning("Preview image widget tidak ditemukan")
             return False
             
         except Exception as e:
             self.log_error(f"Gagal memuat preview: {str(e)}")
+            return False
+    
+    def _get_preview_image_widget(self):
+        """Mendapatkan widget gambar preview dari UI components."""
+        try:
+            # Cari dari berbagai lokasi yang mungkin
+            if hasattr(self._ui_module, '_ui_components') and self._ui_module._ui_components:
+                form_widgets = self._ui_module._ui_components.get('form_container', {}).get('widgets', {})
+                preview_widget = form_widgets.get('preview_widget')
+                
+                if preview_widget and isinstance(preview_widget, dict):
+                    preview_widgets = preview_widget.get('widgets', {})
+                    return preview_widgets.get('preview_image')
+            
+            # Fallback: cari dari self._ui_components
+            return self._ui_components.get('preview_image')
+            
+        except Exception as e:
+            self.log_warning(f"Error getting preview image widget: {e}")
+            return None
+    
+    def _get_preview_status_widget(self):
+        """Mendapatkan widget status preview dari UI components."""
+        try:
+            # Cari dari berbagai lokasi yang mungkin
+            if hasattr(self._ui_module, '_ui_components') and self._ui_module._ui_components:
+                form_widgets = self._ui_module._ui_components.get('form_container', {}).get('widgets', {})
+                preview_widget = form_widgets.get('preview_widget')
+                
+                if preview_widget and isinstance(preview_widget, dict):
+                    preview_widgets = preview_widget.get('widgets', {})
+                    return preview_widgets.get('preview_status')
+            
+            # Fallback: cari dari self._ui_components
+            return self._ui_components.get('preview_status')
+            
+        except Exception as e:
+            self.log_warning(f"Error getting preview status widget: {e}")
+            return None
+    
+    def load_existing_preview(self) -> bool:
+        """
+        Memuat preview yang sudah ada dari berbagai lokasi yang mungkin.
+        Fungsi ini diintegrasikan dari _load_existing_preview di UI module.
+        
+        Returns:
+            bool: True jika berhasil memuat preview, False jika tidak
+        """
+        try:
+            # Define potential preview file paths
+            preview_paths = [
+                '/data/aug_preview.jpg',
+                'data/aug_preview.jpg',
+                './data/aug_preview.jpg',
+                '/Users/masdevid/Projects/smartcash/data/aug_preview.jpg',
+                str(Path.cwd() / 'data' / 'aug_preview.jpg')
+            ]
+            
+            # Try to find and load existing preview
+            for preview_path in preview_paths:
+                if os.path.exists(preview_path):
+                    try:
+                        if self._load_preview_to_widget(preview_path):
+                            self.log_info(f"Existing preview loaded successfully from: {preview_path}")
+                            return True
+                    except Exception as e:
+                        self.log_warning(f"Failed to load preview from {preview_path}: {e}")
+                        continue
+            
+            # If no preview found, update status
+            preview_status_widget = self._get_preview_status_widget()
+            if preview_status_widget:
+                preview_status_widget.value = "<div style='text-align: center; color: #666; font-size: 12px; margin: 4px 0;'>No preview available - Click Generate to create one</div>"
+            
+            self.log_info("No existing preview found in standard locations")
+            return False
+            
+        except Exception as e:
+            self.log_error(f"Error loading existing preview: {e}")
             return False
     
     def execute(self) -> Dict[str, Any]:
@@ -98,7 +193,7 @@ class AugmentPreviewOperation(AugmentationBaseOperation):
             self._preview_path = result['preview_path']
             
             # Muat preview ke widget
-            if not self._load_preview_to_widget():
+            if not self._load_preview_to_widget(self._preview_path):
                 return self._handle_error("Gagal memuat preview ke UI")
             
             # Update status
@@ -106,6 +201,7 @@ class AugmentPreviewOperation(AugmentationBaseOperation):
             
             return {
                 'status': 'success',
+                'success': True,
                 'message': 'Preview berhasil dibuat',
                 'preview_path': self._preview_path
             }

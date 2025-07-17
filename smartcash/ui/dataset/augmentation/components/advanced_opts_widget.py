@@ -5,9 +5,6 @@ Deskripsi: Advanced options widget dengan HSV parameters dan styling terkonsolid
 
 import ipywidgets as widgets
 from typing import Dict, Any
-from smartcash.ui.dataset.augmentation.utils.style_utils import (
-    tabbed_container, create_info_content, info_panel
-)
 
 def create_advanced_options_widget() -> Dict[str, Any]:
     """Create advanced options dengan HSV parameters dan tabbed layout"""
@@ -59,43 +56,44 @@ def create_advanced_options_widget() -> Dict[str, Any]:
         )
     }
     
-    # Create info content untuk setiap tab
-    position_info = create_info_content([
-        ('Parameter Posisi', ''),
-        ('Rotasi', '0-30° (optimal: 8-15°)'),
-        ('Translasi & Skala', '0.0-0.25'),
-        ('Flip', '0.0-1.0 (50% probabilitas)'),
-        ('Backend', 'Albumentations compatible')
-    ], theme='advanced')
+    # Create info content with simple HTML
+    position_info = widgets.HTML("""
+    <div style='background: #f0f8ff; padding: 8px; border-radius: 4px; margin: 8px 0; font-size: 12px;'>
+        <strong>Parameter Posisi:</strong><br>
+        • Rotasi: 0-30° (optimal: 8-15°)<br>
+        • Translasi & Skala: 0.0-0.25<br>
+        • Flip: 0.0-1.0 (50% probabilitas)<br>
+        • Backend: Albumentations compatible
+    </div>
+    """)
     
-    lighting_info = create_info_content([
-        ('Parameter Pencahayaan', ''),
-        ('Brightness/Contrast', '0.0-0.4'),
-        ('HSV Hue', '0-30 (color shift)'),
-        ('HSV Saturation', '0-50 (saturation shift)'),
-        ('Backend', 'OpenCV HSV compatible')
-    ], theme='advanced')
+    lighting_info = widgets.HTML("""
+    <div style='background: #fff8f0; padding: 8px; border-radius: 4px; margin: 8px 0; font-size: 12px;'>
+        <strong>Parameter Pencahayaan:</strong><br>
+        • Brightness/Contrast: 0.0-0.4<br>
+        • HSV Hue: 0-30 (color shift)<br>
+        • HSV Saturation: 0-50 (saturation shift)<br>
+        • Backend: OpenCV HSV compatible
+    </div>
+    """)
     
     # Create tab content
     position_content = widgets.VBox([
         widgets.HTML("<p style='font-size: 10px; color: #666; margin: 2px 0;'>Transformasi geometri dengan Albumentations</p>"),
         *position_widgets.values(),
-        info_panel(position_info, theme='advanced')
+        position_info
     ])
     
     lighting_content = widgets.VBox([
         widgets.HTML("<p style='font-size: 10px; color: #666; margin: 2px 0;'>Variasi pencahayaan dengan OpenCV HSV</p>"),
         *lighting_widgets.values(),
-        info_panel(lighting_info, theme='advanced')
+        lighting_info
     ])
     
-    # Create tabbed container
-    tabs_config = [
-        ('📍 Posisi', position_content),
-        ('💡 Pencahayaan', lighting_content)
-    ]
-    
-    container = tabbed_container(tabs_config, theme='advanced')
+    # Create simple tab container
+    container = widgets.Tab([position_content, lighting_content])
+    container.set_title(0, '📍 Posisi')
+    container.set_title(1, '💡 Pencahayaan')
     
     # Combine all widgets
     all_widgets = {**position_widgets, **lighting_widgets}

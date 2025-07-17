@@ -177,6 +177,13 @@ def create_action_container(
             except Exception as e:
                 print(f"Warning: Failed to add button {btn_id}: {str(e)}")
     
+    # Include save/reset buttons in the returned buttons dictionary if they exist
+    if action_container._show_save_reset:
+        if hasattr(action_container, 'save_button') and action_container.save_button is not None:
+            button_widgets['save'] = action_container.save_button
+        if hasattr(action_container, 'reset_button') and action_container.reset_button is not None:
+            button_widgets['reset'] = action_container.reset_button
+    
     # Return container and utility methods
     return {
         'container': action_container.container,
@@ -306,6 +313,12 @@ class ActionContainer:
                 self.buttons['save_reset'] = save_reset_buttons['container']
                 self.save_button = save_reset_buttons.get('save_button')
                 self.reset_button = save_reset_buttons.get('reset_button')
+                
+                # Also store individual buttons in the buttons dict for handler compatibility
+                if self.save_button is not None:
+                    self.buttons['save'] = self.save_button
+                if self.reset_button is not None:
+                    self.buttons['reset'] = self.reset_button
             
             # Initialize action buttons as empty dict
             if not isinstance(self.buttons['action'], dict):
@@ -735,7 +748,7 @@ class ActionContainer:
         try:
             # Ensure buttons are initialized
             if not self._initialized:
-                self._init_buttons(skip_update=True)
+                self._init_buttons()
                 
             # Check which buttons should be shown
             has_primary = (self.buttons.get('primary') is not None and 

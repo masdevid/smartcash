@@ -145,6 +145,9 @@ class ColabUIModule(BaseUIModule):
             success = super().initialize()
             
             if success:
+                # Setup operation container reference for backwards compatibility
+                self._setup_operation_container()
+                
                 # Button handlers are connected automatically by ButtonHandlerMixin
                 
                 # Setup button phases for sequential operations
@@ -174,6 +177,15 @@ class ColabUIModule(BaseUIModule):
         except Exception as e:
             self.logger.error(f"Failed to initialize Colab module: {e}")
             return False
+    
+    def _setup_operation_container(self) -> None:
+        """Setup operation container reference for backwards compatibility."""
+        try:
+            if hasattr(self, '_ui_components') and self._ui_components:
+                self._operation_container = self._ui_components.get('operation_container')
+                self.logger.debug("✅ Operation container reference set up")
+        except Exception as e:
+            self.logger.error(f"Failed to setup operation container: {e}")
     
     def _initialize_operation_factory(self) -> None:
         """Initialize the operation factory with current config."""
@@ -212,13 +224,16 @@ class ColabUIModule(BaseUIModule):
     def _setup_button_phases(self) -> None:
         """Setup button phases for sequential colab operations."""
         try:
-            # Define sequential phases for colab setup
+            # Define sequential phases for colab setup matching constants
             phases = [
-                {'id': 'detect', 'text': '🔍 Deteksi Lingkungan', 'description': 'Mendeteksi lingkungan sistem'},
                 {'id': 'init', 'text': '🔧 Inisialisasi', 'description': 'Menginisialisasi environment'},
-                {'id': 'mount', 'text': '📁 Mount Drive', 'description': 'Memasang Google Drive'},
-                {'id': 'setup', 'text': '🚀 Setup Lengkap', 'description': 'Menjalankan pengaturan lengkap'},
-                {'id': 'verify', 'text': '🔍 Verifikasi', 'description': 'Memverifikasi pengaturan'}
+                {'id': 'drive', 'text': '📁 Mount Drive', 'description': 'Memasang Google Drive'},
+                {'id': 'symlink', 'text': '🔗 Symlink', 'description': 'Membuat symbolic links'},
+                {'id': 'folders', 'text': '📂 Folders', 'description': 'Membuat direktori'},
+                {'id': 'config', 'text': '⚙️ Config', 'description': 'Sinkronisasi konfigurasi'},
+                {'id': 'env', 'text': '🌍 Environment', 'description': 'Setup environment'},
+                {'id': 'verify', 'text': '🔍 Verifikasi', 'description': 'Memverifikasi pengaturan'},
+                {'id': 'complete', 'text': '🎉 Selesai', 'description': 'Setup selesai'}
             ]
             
             # Set phases to UI components if available
@@ -251,9 +266,11 @@ class ColabUIModule(BaseUIModule):
         # Call parent method to get base handlers (save, reset)
         handlers = super()._get_module_button_handlers()
         
-        # Add Colab-specific handlers - only setup_button for one-click operation
+        # Add Colab-specific handlers - map all possible button names to setup handler
         colab_handlers = {
             'setup': self._handle_setup_button,
+            'setup_button': self._handle_setup_button,
+            'primary_button': self._handle_setup_button,
             'colab_setup': self._handle_setup_button
         }
         

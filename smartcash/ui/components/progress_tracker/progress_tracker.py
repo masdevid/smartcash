@@ -45,29 +45,29 @@ class ProgressTracker(BaseUIComponent):
         self._ui_components['container'] = widgets.VBox(
             [],
             layout=widgets.Layout(
-                display='block',  # Progress tracker akan selalu terlihat setelah diinisialisasi
+                display='block',
                 width='100%',
                 margin='10px 0',
                 padding='15px',
                 border='1px solid #e0e0e0',
                 border_radius='8px',
                 background_color='#f8fff8',
-                min_height='0px',  # Will be updated based on visible bars
-                height='auto',     # Auto-adjust height
-                overflow='visible', # Allow content to determine height
-                box_sizing='content-box'  # Include padding in height calculation
+                min_height='100px',
+                height='auto',
+                overflow='visible',
+                box_sizing='content-box'
             )
         )
         
         # Create header widget
         self._ui_components['header'] = widgets.HTML(
-            "", 
+            f"<h4>{self._config.operation}</h4>",
             layout=widgets.Layout(width='100%', margin='0 0 10px 0')
         )
         
         # Create status widget
         self._ui_components['status'] = widgets.HTML(
-            "",
+            "<i>Initializing...</i>",
             layout=widgets.Layout(width='100%', margin='0 0 8px 0')
         )
         
@@ -75,22 +75,24 @@ class ProgressTracker(BaseUIComponent):
         bar_height = '30px'
         bar_layout = widgets.Layout(
             width='100%',
-            margin='1px 0',
+            margin='5px 0',
             height=bar_height,
             min_height=bar_height,
-            max_height=bar_height,
             overflow='hidden'
         )
         
+        # Create output widgets for each level
         self._ui_components['overall_output'] = widgets.Output(layout=bar_layout)
         self._ui_components['step_output'] = widgets.Output(layout=bar_layout)
         self._ui_components['current_output'] = widgets.Output(layout=bar_layout)
         
+        # Initialize TQDM manager before assembling container
+        self.tqdm_manager = TqdmManager(self)
+        
         # Assemble the container
         self._assemble_container()
         
-        # Initialize TQDM manager
-        self.tqdm_manager = TqdmManager(self)
+        # Initialize progress bars
         self.tqdm_manager.initialize_bars(self._config.get_level_configs())
     
     @property
@@ -136,21 +138,21 @@ class ProgressTracker(BaseUIComponent):
         """Assemble the container with appropriate widgets based on config level."""
         container = self._ui_components['container']
         
-        # Build children list starting with header and status
+        # Always include header and status
         children = [
             self._ui_components['header'],
             self._ui_components['status']
         ]
         
-        # Add progress outputs based on active levels and visibility
-        for level in self._active_levels:
-            level_config = self._config.get_level_config(level)
-            if level_config and level_config.visible:
-                output_key = f'{level}_output'
+        # Add progress bars based on config level
+        level_configs = self._config.get_level_configs()
+        for config in level_configs:
+            if config.visible:
+                output_key = f"{config.name}_output"
                 if output_key in self._ui_components:
                     children.append(self._ui_components[output_key])
         
-        # Set the container children
+        # Update container children
         container.children = children
     
     def _register_default_callbacks(self) -> None:
@@ -215,8 +217,32 @@ class ProgressTracker(BaseUIComponent):
     def set_progress(self, progress: int, level: str = "primary", 
                     message: str = "") -> None:
         """Update progress for a specific level."""
-        if self.tqdm_manager:
-            self.tqdm_manager.update_bar(level, progress, message)
+        if not hasattr(self, 'tqdm_manager') or not self.tqdm_manager:
+            self.tqdm_manager = TqdmManager(self)
+            self.tqdm_manager.initialize_bars(self._config.get_level_configs())
+            
+        if level not in ['overall', 'step', 'current']:
+            level = 'overall'  # Default to overall if invalid level provided
+            
+        # Update the status message
+        if message and 'status' in self._ui_components:
+            self._ui_components['status'].value = message
+            
+        # Update the progress bar
+        self.tqdm_manager.update_bar(level, progress, message)
+        
+        # Force a display update
+        if hasattr(self, '_last_displayed') and self._last_displayed:
+            display(self._ui_components['container'], display_id=self._last_displayed)
+            
+    def show(self):
+        """Display the progress tracker and return the display ID."""
+        container = self._ui_components.get('container')
+        if container:
+            display_id = id(container)
+            self._last_displayed = display_id
+            return display(container, display_id=display_id)
+        return None
     
     def complete(self, message: str = "Completed!") -> None:
         """Mark the operation as complete."""

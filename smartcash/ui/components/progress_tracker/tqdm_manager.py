@@ -27,22 +27,28 @@ class TqdmManager:
         }
     
     def initialize_bars(self, bar_configs: list[ProgressBarConfig]):
-        """Initialize tqdm progress bars di separate output widgets"""
+        """Initialize tqdm progress bars in separate output widgets"""
+        if not hasattr(self, 'ui_manager') or not hasattr(self.ui_manager, '_ui_components'):
+            return
+            
         self.close_all_bars()
         
         for bar_config in bar_configs:
-            if bar_config.visible:
-                output_attr = self.output_mapping.get(bar_config.name)
-                if not output_attr or not hasattr(self.ui_manager, output_attr):
-                    continue
+            if not bar_config.visible:
+                continue
                 
-                output_widget = getattr(self.ui_manager, output_attr)
+            output_key = f"{bar_config.name}_output"
+            if output_key not in self.ui_manager._ui_components:
+                continue
                 
-                with output_widget:
+            output_widget = self.ui_manager._ui_components[output_key]
+            
+            with output_widget:
+                try:
                     clear_output(wait=True)
                     tqdm_bar = tqdm(
                         total=100,
-                        desc=f"{bar_config.description}",  # No emoji here
+                        desc=bar_config.description,
                         bar_format='{desc}: {bar}| {percentage:3.0f}%',
                         colour=bar_config.get_tqdm_color(),
                         leave=True,
@@ -50,27 +56,60 @@ class TqdmManager:
                         dynamic_ncols=True
                     )
                     self.tqdm_bars[bar_config.name] = tqdm_bar
+                except Exception as e:
+                    print(f"Error initializing progress bar {bar_config.name}: {e}")
     
     def update_bar(self, level_name: str, progress: int, message: str = "", 
                    bar_configs: list[ProgressBarConfig] = None):
-        """Update progress bar tanpa double emoji"""
-        if level_name not in self.tqdm_bars:
-            return
-        
-        progress = max(0, min(100, progress))
-        bar = self.tqdm_bars[level_name]
-        bar.n = progress
-        bar.refresh()
-        
-        if message:
-            clean_message = self._clean_message(message)
-            # Simple description tanpa emoji tambahan
-            formatted_desc = self._truncate_message(clean_message, 45)
-            bar.set_description(formatted_desc)
-        
-        self.progress_values[level_name] = progress
-        if message:
-            self.progress_messages[level_name] = message
+        """Update progress bar with proper message handling"""
+        try:
+            # Ensure progress is within bounds
+            progress = max(0, min(100, int(progress)))
+            
+            # Initialize bar if it doesn't exist
+            if level_name not in self.tqdm_bars:
+                if not hasattr(self, 'ui_manager') or not hasattr(self.ui_manager, '_ui_components'):
+                    return
+                    
+                output_key = f"{level_name}_output"
+                if output_key not in self.ui_manager._ui_components:
+                    return
+                    
+                output_widget = self.ui_manager._ui_components[output_key]
+                with output_widget:
+                    bar = tqdm(
+                        total=100,
+                        desc="",
+                        bar_format='{desc}{bar}| {percentage:3.0f}%',
+                        colour='#0078D7',
+                        leave=True,
+                        file=sys.stdout,
+                        dynamic_ncols=True
+                    )
+                    self.tqdm_bars[level_name] = bar
+            
+            # Get the progress bar
+            bar = self.tqdm_bars[level_name]
+            
+            # Update progress
+            bar.n = progress
+            
+            # Update message if provided
+            if message:
+                clean_message = self._clean_message(message)
+                formatted_desc = self._truncate_message(clean_message, 45)
+                bar.set_description_str(formatted_desc)
+            
+            # Force refresh
+            bar.refresh()
+            
+            # Store values
+            self.progress_values[level_name] = progress
+            if message:
+                self.progress_messages[level_name] = message
+                
+        except Exception as e:
+            print(f"Error updating progress bar: {e}")
     
     def set_all_complete(self, message: str, bar_configs: list[ProgressBarConfig] = None):
         """Set all bars ke complete state tanpa emoji duplikat"""

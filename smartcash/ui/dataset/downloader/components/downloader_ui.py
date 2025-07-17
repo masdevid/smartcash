@@ -53,10 +53,11 @@ def create_downloader_ui_components(
     # 1. Create Header Container
     header_container = create_header_container(
         title=UI_CONFIG['module_title'],
-        subtitle=UI_CONFIG['module_description'],
-        status_message="Ready",
-        status_type="info",
-        icon=UI_CONFIG['module_icon']
+        description=UI_CONFIG['module_description'],
+        icon='📥',
+        initial_status='idle',
+        status_text='Siap mengunduh dataset',
+        status_type="info"
     )
     
     # 2. Create Form Container
@@ -243,7 +244,7 @@ def create_downloader_ui_components(
         # Add form widgets - accessed as attributes of input_options
         'workspace_input': input_options.workspace_input,
         'project_input': input_options.project_input,
-        'version_input': input_options.version_input,
+        'version_input': input_options.version_inpu t,
         'api_key_input': input_options.api_key_input,
         'validate_checkbox': input_options.validate_checkbox,
         'backup_checkbox': input_options.backup_checkbox,

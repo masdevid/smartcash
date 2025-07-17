@@ -120,7 +120,10 @@ def create_preprocessing_ui_components(config: Optional[Dict[str, Any]] = None, 
     header_obj = create_header_container(
         title=UI_CONFIG['title'],
         logo_path=UI_CONFIG['logo_path'],
-        subtitle=UI_CONFIG['subtitle']
+        subtitle=UI_CONFIG['subtitle'],
+        icon='🧹',  # Add icon for preprocessing
+        initial_status='idle',  # Set initial operation status
+        status_text='Siap memproses dataset'
     )
     header_widget = header_obj.container
 

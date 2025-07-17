@@ -23,6 +23,7 @@ class LoggingMixin:
         super().__init__(*args, **kwargs)
         self._ui_logging_bridge_setup: bool = False
         self._log_buffer: list = []  # Buffer logs until operation container is ready
+        self._module_namespace: Optional[str] = None
     
     def _get_module_namespace(self) -> str:
         """
@@ -31,31 +32,65 @@ class LoggingMixin:
         Returns:
             Namespace string that matches the log_namespace_filter
         """
+        # Return cached namespace if available
+        if hasattr(self, '_module_namespace') and self._module_namespace:
+            return self._module_namespace
+            
         # Check if module has explicit namespace info
         if hasattr(self, 'module_name'):
-            return self.module_name
+            self._module_namespace = self.module_name
+            return self._module_namespace
         
         # Check if this is a BaseUIModule with module_name
         if hasattr(self, 'full_module_name'):
-            return self.full_module_name
+            self._module_namespace = self.full_module_name
+            return self._module_namespace
         
         # Try to infer from class name
         class_name = self.__class__.__name__.lower()
         if 'colab' in class_name:
-            return 'colab'
+            self._module_namespace = 'colab'
         elif 'downloader' in class_name:
-            return 'downloader'
+            self._module_namespace = 'downloader'
         elif 'split' in class_name:
-            return 'split'
-        elif 'preprocess' in class_name:
-            return 'preprocess'
+            self._module_namespace = 'split'
+        elif 'preprocessing' in class_name:
+            self._module_namespace = 'preprocessing'
         elif 'dependency' in class_name:
-            return 'dependency'
-        elif 'augment' in class_name:
-            return 'augment'
+            self._module_namespace = 'dependency'
+        elif 'augmentation' in class_name:
+            self._module_namespace = 'augmentation'
+        elif 'pretrained' in class_name:
+            self._module_namespace = 'pretrained'
+        elif 'visualization' in class_name:
+            self._module_namespace = 'visualization'
+        elif 'backbone' in class_name:
+            self._module_namespace = 'backbone'
+        elif 'training' in class_name:
+            self._module_namespace = 'training'
+        elif 'evaluation' in class_name:
+            self._module_namespace = 'evaluation'
+        else:
+            # Default fallback
+            self._module_namespace = 'smartcash.ui.core'
+            
+        return self._module_namespace
         
-        # Default fallback
-        return 'smartcash.ui.core'
+    def _update_logging_context(self) -> None:
+        """
+        Update the logging context with the current module information.
+        This should be called after the module is fully initialized.
+        """
+        # Clear any cached namespace to force recalculation
+        if hasattr(self, '_module_namespace'):
+            del self._module_namespace
+            
+        # Get the updated namespace
+        self._get_module_namespace()
+        
+        # Update the logger if it exists
+        if hasattr(self, 'logger') and hasattr(self.logger, 'set_namespace'):
+            self.logger.set_namespace(self._module_namespace)
     
     def log(self, message: str, level: str = 'info') -> None:
         """

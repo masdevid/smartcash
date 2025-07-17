@@ -80,6 +80,11 @@ class BaseUIModule(
         self.parent_module = parent_module
         self.full_module_name = f"{parent_module}.{module_name}" if parent_module else module_name
 
+        # Initialize module identification first
+        self.module_name = module_name
+        self.parent_module = parent_module
+        self.full_module_name = f"{parent_module}.{module_name}" if parent_module else module_name
+        
         # Initialize mixins directly. This is the correct pattern.
         LoggingMixin.__init__(self)
         OperationMixin.__init__(self)
@@ -90,13 +95,17 @@ class BaseUIModule(
             from smartcash.ui.core.mixins.environment_mixin import EnvironmentMixin
             EnvironmentMixin.__init__(self)
         
-        # Set up logger
+        # Set up logger after module name is set
         self.logger = get_module_logger(f"smartcash.ui.{self.full_module_name}")
         
         # Initialize common attributes
         self._is_initialized = False
         self._ui_components = None
         self._required_components = []
+        
+        # Ensure logging mixin has the correct module info
+        if hasattr(self, '_update_logging_context'):
+            self._update_logging_context()
         
         self.logger.debug(f"✅ BaseUIModule diinisialisasi: {self.full_module_name}")
     

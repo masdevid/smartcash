@@ -8,7 +8,7 @@ This module contains all the configuration constants used by the Dataset Split U
 UI_CONFIG = {
     'module_name': 'split',
     'parent_module': 'dataset',
-    'title': '📊 Dataset Split',
+    'title': 'Dataset Split',
     'description': 'Configure how to split your dataset into train/validation/test sets',
     'version': '1.0.0'
 }

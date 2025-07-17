@@ -68,9 +68,11 @@ def create_pretrained_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> D
     
     # === 1. Create Header Container ===
     header_container = create_header_container(
-        title=f"{UI_CONFIG['icon']} {UI_CONFIG['title']}",
+        title=UI_CONFIG['title'],  # Title without icon to prevent duplication
         subtitle=UI_CONFIG['subtitle'],
-        status_message="Ready to manage pretrained models",
+        icon=UI_CONFIG['icon'],  # Icon set separately
+        initial_status='idle',
+        status_text='Siap mengelola model pretrained',
         status_type="info"
     )
     # Store both the container object and its widget

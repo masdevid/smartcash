@@ -52,7 +52,7 @@ CONFIG_ROBOFLOW_VERSION = 'version'
 # Module metadata
 MODULE_GROUP: str = "dataset"
 MODULE_NAME: str = "downloader"
-MODULE_TITLE: str = "📥 Dataset Downloader"
+MODULE_TITLE: str = "Dataset Downloader"
 MODULE_DESCRIPTION: str = "Download datasets from Roboflow"
 MODULE_ICON: str = "📥"
 MODULE_VERSION: str = "1.0.0"

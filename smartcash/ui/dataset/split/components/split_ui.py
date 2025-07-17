@@ -180,12 +180,14 @@ def create_split_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> Dict[s
         )
         log_accordion.set_title(0, '📝 Log Messages')
         
-        # Create header container with module title, description and status panel
+        # Create header with title and subtitle
         header = create_header_container(
             title=UI_CONFIG['title'],
-            subtitle=UI_CONFIG['description'],
-            icon=UI_CONFIG.get('icon', '📊'),
-            status_message="Ready for dataset split configuration",
+            description=UI_CONFIG['subtitle'],
+            logo_path=UI_CONFIG.get('logo_path'),
+            icon='📊',  # Set the icon here
+            initial_status='idle',
+            status_text='Siap mengatur pembagian dataset',
             status_type="info",
             show_status_panel=True,
             **kwargs
@@ -206,27 +208,9 @@ def create_split_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> Dict[s
             for row in form_widgets.get('form_rows', []):
                 form_container['add_item'](row)
         
-        # Create only save/reset buttons as requested - no action buttons
-        action_buttons = [
-            {
-                'name': 'save_button',
-                'label': 'Simpan Konfigurasi',
-                'button_style': 'success',
-                'tooltip': 'Simpan konfigurasi split dataset',
-                'icon': 'save'
-            },
-            {
-                'name': 'reset_button',
-                'label': 'Reset',
-                'button_style': 'warning',
-                'tooltip': 'Reset ke nilai default',
-                'icon': 'undo'
-            }
-        ]
         
         # Create action container with only save/reset buttons
         action_container = create_action_container(
-            buttons=action_buttons,
             show_save_reset=True,
             **kwargs
         )
@@ -238,6 +222,7 @@ def create_split_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> Dict[s
             show_dialog=True,
             log_module_name=UI_CONFIG['module_name'],
             log_height="200px",
+            logs_initially_open=False,  # Close the log by default
             log_entry_style='compact',  # Ensure consistent hover behavior
             log_namespace_filter='split',  # Filter logs for split namespace only
             hide_progress=True,  # Hide progress tracker as requested
@@ -274,36 +259,11 @@ def create_split_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> Dict[s
         summary_content = _create_module_summary_content(components)
         info_box = _create_module_info_box()
         
-        # Get only save/reset buttons from action container
-        buttons = {}
-        if isinstance(action_container, dict):
-            # Try to get buttons from action container structure
-            buttons = action_container.get('buttons', {})
-            if not buttons:
-                # Try direct button access from action container
-                buttons = {
-                    'save': action_container.get('save_button'), 
-                    'reset': action_container.get('reset_button')
-                }
-        
-        # Fallback button creation if any button is missing (only save/reset)
-        if not buttons or not any(buttons.values()):
-            from ipywidgets import Button
-            
-            buttons = {
-                'save': Button(
-                    description='Simpan',
-                    button_style='success', 
-                    icon='save',
-                    tooltip='Simpan konfigurasi split dataset'
-                ),
-                'reset': Button(
-                    description='Reset',
-                    button_style='warning',
-                    icon='undo',
-                    tooltip='Reset ke nilai default'
-                )
-            }
+        # Get save/reset buttons from action container
+        buttons = {
+            'save': action_container.get('save_button'),
+            'reset': action_container.get('reset_button')
+        }
         
         # Helper function to log to operation container
         def log_to_operation_container(message: str, level: str = 'info'):

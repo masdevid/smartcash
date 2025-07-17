@@ -286,13 +286,13 @@ def create_colab_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> Dict[s
         
         # Logging
         'log_accordion': operation_container['log_accordion'],
-        'log_message': operation_container['log_message'],
+        'log_message': operation_container['log'],
         
         # Dialogs
         'show_dialog': operation_container['show_dialog'],
-        'show_info_dialog': operation_container['show_info_dialog'],
+        'show_info_dialog': operation_container.get('show_info_dialog', operation_container['show_dialog']),
         'clear_dialog': operation_container['clear_dialog'],
-        'dialog_area': operation_container.get('dialog_area')
+        'dialog_area': operation_container.get('dialog')
     }
     
     # Update ui_components with all operation container components

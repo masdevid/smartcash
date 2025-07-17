@@ -80,6 +80,58 @@ class LoggingMixin:
                 # Suppress print during normal operation to avoid console spam
                 pass
     
+    def update_operation_status(self, message: str, level: str = 'info') -> None:
+        """
+        Update operation status display.
+        
+        This method is responsible for updating the UI with operation status messages.
+        It's placed in LoggingMixin since status updates are closely related to logging
+        and often used in conjunction with logging operations.
+        
+        Args:
+            message: Status message to display
+            level: Message level ('info', 'warning', 'error', 'success')
+        """
+        try:
+            # Status updates go to header_container
+            if hasattr(self, '_ui_components') and self._ui_components:
+                header_container = self._ui_components.get('header_container')
+                if header_container and hasattr(header_container, 'update_status'):
+                    header_container.update_status(message, level)
+                    return
+            
+            # Fallback to logging if header container not available
+            if hasattr(self, 'log') and hasattr(self, '_ui_components') and self._ui_components and 'operation_container' in self._ui_components:
+                self.log(f"[Status] {message}", level)
+            elif hasattr(self, 'logger'):
+                # Use debug level to avoid console spam
+                self.logger.debug(f"[Status] {message}")
+                
+        except Exception as e:
+            if hasattr(self, 'logger'):
+                self.logger.debug(f"Failed to update operation status: {e}")
+    
+    def log_with_status(self, message: str, status_message: str = None, status_level: str = 'info', log_level: str = 'info') -> None:
+        """
+        Log a message and optionally update operation status.
+        
+        This is a convenience wrapper that combines logging and status updates
+        in a single call when both are needed.
+        
+        Args:
+            message: Message to log
+            status_message: Optional status message (if None, same as message)
+            status_level: Level for status update ('info', 'warning', 'error', 'success')
+            log_level: Level for logging ('debug', 'info', 'warning', 'error')
+        """
+        # Always log the message
+        self.log(message, log_level)
+        
+        # Update status if a status message is provided or if it should mirror the log message
+        if status_message is not None or status_message != '':
+            status_msg = status_message if status_message is not None else message
+            self.update_operation_status(status_msg, status_level)
+    
     def _setup_ui_logging_bridge(self, operation_container: Any) -> None:
         """
         Setup UI logging bridge to capture backend service logs.

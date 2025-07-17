@@ -91,11 +91,34 @@ class ColabConfigHandler(LoggingMixin, ConfigurationMixin):
         Returns:
             Success result dictionary
         """
-        # For Colab, we don't save to files - configuration is ephemeral
-        return {
-            'success': True,
-            'message': 'Konfigurasi disimpan dalam memori (tidak perlu persistensi untuk Colab)'
-        }
+        try:
+            # For Colab, we don't save to files - configuration is ephemeral
+            result = {
+                'success': True,
+                'message': 'Konfigurasi disimpan dalam memori (tidak perlu persistensi untuk Colab)'
+            }
+            
+            self.log_with_status(
+                message="Colab configuration saved in memory",
+                status_message="Konfigurasi Colab disimpan",
+                log_level='info',
+                status_level='success'
+            )
+            
+            return result
+            
+        except Exception as e:
+            error_msg = f"Gagal menyimpan konfigurasi Colab: {str(e)}"
+            self.log_with_status(
+                message=error_msg,
+                status_message=error_msg,
+                log_level='error',
+                status_level='error'
+            )
+            return {
+                'success': False,
+                'message': error_msg
+            }
     
     def update_config(self, new_config: Dict[str, Any], merge: bool = True) -> None:
         """Update configuration with new values.
@@ -164,11 +187,42 @@ class ColabConfigHandler(LoggingMixin, ConfigurationMixin):
             self.logger.error(f"❌ Configuration validation failed: {e}")
             return False
     
-    def reset_to_defaults(self) -> None:
-        """Reset configuration to defaults."""
-        self.config = get_default_colab_config()
-        self._detect_environment()
-        self.logger.info("🔄 Configuration reset to defaults")
+    def reset_config(self) -> Dict[str, Any]:
+        """Reset configuration to defaults.
+        
+        Returns:
+            Dict with operation result
+        """
+        try:
+            self.config = get_default_colab_config()
+            self._detect_environment()  # Re-detect environment after reset
+            
+            self.log_with_status(
+                message="Colab configuration reset to defaults",
+                status_message="Konfigurasi Colab direset ke pengaturan awal",
+                log_level='info',
+                status_level='success'
+            )
+            
+            return {
+                'success': True,
+                'message': 'Configuration reset to defaults',
+                'config': self.config
+            }
+            
+        except Exception as e:
+            error_msg = f"Gagal mereset konfigurasi Colab: {str(e)}"
+            self.log_with_status(
+                message=error_msg,
+                status_message=error_msg,
+                log_level='error',
+                status_level='error'
+            )
+            return {
+                'success': False,
+                'message': error_msg,
+                'config': getattr(self, 'config', {})
+            }
     
     def get_available_environments(self) -> Dict[str, Dict[str, Any]]:
         """Get available environments.

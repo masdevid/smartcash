@@ -77,6 +77,9 @@ class OperationMixin:
     - Error handling and result formatting
     - Operation manager integration
     - Progress tracking during operations
+    
+    Note: Status updates have been moved to LoggingMixin as they are more
+    closely related to logging functionality.
     """
     
     def __init__(self, *args, **kwargs):
@@ -242,43 +245,10 @@ class OperationMixin:
             if hasattr(self, 'logger'):
                 self.logger.error(f"Error during cleanup: {e}")
     
-    def update_operation_status(self, message: str, level: str = 'info') -> None:
-        """
-        Update operation status display.
-        
-        Args:
-            message: Status message
-            level: Message level (info, warning, error)
-        """
-        try:
-            # Try operation manager first
-            if self._operation_manager and hasattr(self._operation_manager, 'update_status'):
-                self._operation_manager.update_status(message, level)
-                return
-            
-            # CORRECT: Status updates go to header_container, NOT operation_container
-            if hasattr(self, '_ui_components') and self._ui_components:
-                header_container = self._ui_components.get('header_container')
-                if header_container and hasattr(header_container, 'update_status'):
-                    header_container.update_status(message, level)
-                    return
-            
-            # During initialization, suppress status logging to avoid console spam
-            # Status updates during init are not critical for display
-            if hasattr(self, '_is_initialized') and not self._is_initialized:
-                # Module is still initializing - suppress status logs
-                return
-            
-            # Only log if module is fully initialized and no other options worked
-            if hasattr(self, 'log') and hasattr(self, '_ui_components') and self._ui_components and 'operation_container' in self._ui_components:
-                self.log(f"[Status] {message}", level)
-            elif hasattr(self, 'logger'):
-                # Use debug level to avoid console spam
-                self.logger.debug(f"[Status] {message}")
-                
-        except Exception as e:
-            if hasattr(self, 'logger'):
-                self.logger.debug(f"Failed to update operation status: {e}")
+    # Note: update_operation_status has been moved to LoggingMixin as it's more
+    # closely related to logging functionality. Use self.log_with_status() for
+    # combined logging and status updates, or access the method directly through
+    # LoggingMixin if you've inherited from it.
     
     def update_progress(self, progress: int, message: str = "", level: str = "primary") -> None:
         """
@@ -300,9 +270,15 @@ class OperationMixin:
             # Delegate to operation_container for progress updates
             if hasattr(self, '_ui_components') and self._ui_components:
                 operation_container = self._ui_components.get('operation_container')
-                if operation_container and hasattr(operation_container, 'update_progress'):
-                    operation_container.update_progress(progress, message, level)
-                    return
+                if operation_container:
+                    # Handle operation_container as OperationContainer object
+                    if hasattr(operation_container, 'update_progress'):
+                        operation_container.update_progress(progress, message, level)
+                        return
+                    # Handle operation_container as dict (returned by create_operation_container)
+                    elif isinstance(operation_container, dict) and 'update_progress' in operation_container:
+                        operation_container['update_progress'](progress, message, level)
+                        return
             
             # Fallback logging
             if hasattr(self, 'logger'):
@@ -566,14 +542,21 @@ class OperationMixin:
             if hasattr(self, '_ui_components') and self._ui_components:
                 operation_container = self._ui_components.get('operation_container')
                 if operation_container:
-                    # Check for dedicated start_progress method first
+                    # Handle operation_container as OperationContainer object
                     if hasattr(operation_container, 'start_progress'):
                         operation_container.start_progress(message, progress, level)
                         return
-                    # Fallback to update_progress for initialization
                     elif hasattr(operation_container, 'update_progress'):
                         operation_container.update_progress(progress, message, level)
                         return
+                    # Handle operation_container as dict (returned by create_operation_container)
+                    elif isinstance(operation_container, dict):
+                        if 'start_progress' in operation_container:
+                            operation_container['start_progress'](message, progress, level)
+                            return
+                        elif 'update_progress' in operation_container:
+                            operation_container['update_progress'](progress, message, level)
+                            return
             
             # Fallback logging
             if hasattr(self, 'logger'):
@@ -600,9 +583,16 @@ class OperationMixin:
             # Delegate to operation_container for progress completion
             if hasattr(self, '_ui_components') and self._ui_components:
                 operation_container = self._ui_components.get('operation_container')
-                if operation_container and hasattr(operation_container, 'complete_progress'):
-                    operation_container.complete_progress(message, level)
-                    return
+                if operation_container:
+                    # Handle operation_container as OperationContainer object
+                    if hasattr(operation_container, 'complete_progress'):
+                        operation_container.complete_progress(message, level)
+                        return
+                    # Handle operation_container as dict (returned by create_operation_container)
+                    elif isinstance(operation_container, dict) and 'update_progress' in operation_container:
+                        # Use update_progress with 100% for completion
+                        operation_container['update_progress'](100, message, level)
+                        return
             
             # Fallback logging
             if hasattr(self, 'logger'):
@@ -629,9 +619,16 @@ class OperationMixin:
             # Delegate to operation_container for progress error
             if hasattr(self, '_ui_components') and self._ui_components:
                 operation_container = self._ui_components.get('operation_container')
-                if operation_container and hasattr(operation_container, 'error_progress'):
-                    operation_container.error_progress(message, level)
-                    return
+                if operation_container:
+                    # Handle operation_container as OperationContainer object
+                    if hasattr(operation_container, 'error_progress'):
+                        operation_container.error_progress(message, level)
+                        return
+                    # Handle operation_container as dict (returned by create_operation_container)
+                    elif isinstance(operation_container, dict) and 'update_progress' in operation_container:
+                        # Use update_progress with error indication
+                        operation_container['update_progress'](0, message, 'danger')
+                        return
             
             # Fallback logging
             if hasattr(self, 'logger'):
@@ -731,8 +728,13 @@ class OperationMixin:
             # Check if operation_container is available for progress tracking
             if hasattr(self, '_ui_components') and self._ui_components:
                 operation_container = self._ui_components.get('operation_container')
-                if operation_container and hasattr(operation_container, 'update_progress'):
-                    return True
+                if operation_container:
+                    # Handle operation_container as OperationContainer object
+                    if hasattr(operation_container, 'update_progress'):
+                        return True
+                    # Handle operation_container as dict (returned by create_operation_container)
+                    elif isinstance(operation_container, dict) and 'update_progress' in operation_container:
+                        return True
             
             # Check if operation_manager is available for progress tracking
             if self._operation_manager and hasattr(self._operation_manager, 'update_progress'):

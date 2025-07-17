@@ -46,132 +46,58 @@ class PreprocessingUIModule(BaseUIModule):
         return create_preprocessing_ui_components(config=config)
 
     def _register_default_operations(self) -> None:
-        """Register default operation handlers for the preprocessing module.
-        
-        This method registers button handlers for all preprocessing operations.
-        It handles both base button IDs and _button suffixed variants for compatibility.
-        """
+        """Register default operation handlers including preprocessing-specific operations."""
+        # Call parent method to register base operations
         super()._register_default_operations()
         
-        # Log all available UI components for debugging
-        self.logger.debug(f"All UI components: {list(self._ui_components.keys())}")
+        # Note: Dynamic button handler registration is now handled by BaseUIModule
+    
+    def _get_module_button_handlers(self) -> Dict[str, Any]:
+        """Get Preprocessing module-specific button handlers."""
+        # Call parent method to get base handlers (save, reset)
+        handlers = super()._get_module_button_handlers()
         
-        # Define button handlers - we'll register both base and _button suffixed variants
-        button_handlers = {
+        # Add Preprocessing-specific handlers
+        preprocessing_handlers = {
             'preprocess': self._operation_preprocess,
             'check': self._operation_check,
-            'cleanup': self._operation_cleanup,
-            'save': self._operation_save,
-            'reset': self._operation_reset
+            'cleanup': self._operation_cleanup
         }
         
-        # Get all available button widgets from UI components
-        button_widgets = {}
+        handlers.update(preprocessing_handlers)
+        return handlers
+    
+    def initialize(self, config: Optional[Dict[str, Any]] = None, **kwargs) -> bool:
+        """
+        Initialize the Preprocessing module.
         
-        # 1. First, collect all button-like widgets from UI components
-        for key, widget in self._ui_components.items():
-            # Check if it's a button or a button-like widget
-            is_button = (
-                key.endswith('_button') or  # Ends with _button
-                key in button_handlers or   # Matches a known button ID
-                (hasattr(widget, 'description') and hasattr(widget, 'on_click'))  # Has button-like attributes
-            )
+        Args:
+            config: Optional configuration dictionary
+            **kwargs: Additional initialization arguments
             
-            if is_button and widget is not None:
-                button_widgets[key] = widget
-                self.logger.debug(f"Found button in UI components: {key} ({type(widget).__name__})")
-        
-        # 2. Check for buttons in the action container
-        action_container = self._ui_components.get('action_container')
-        if action_container:
-            self.logger.debug(f"Action container type: {type(action_container).__name__}")
-            
-            # Try to get buttons from action container's buttons attribute
-            if hasattr(action_container, 'buttons') and action_container.buttons:
-                self.logger.debug(f"Action container buttons structure: {action_container.buttons}")
-                
-                # Helper function to add button with logging
-                def add_button(btn_id, widget, source):
-                    if btn_id and widget is not None:
-                        if btn_id not in button_widgets:
-                            button_widgets[btn_id] = widget
-                            self.logger.debug(f"Added {source} button: {btn_id} ({type(widget).__name__})")
-                        return True
-                    return False
-                
-                # Check for action buttons
-                if hasattr(action_container.buttons, 'get'):
-                    # Handle action buttons
-                    if 'action' in action_container.buttons and isinstance(action_container.buttons['action'], dict):
-                        for btn_id, widget in action_container.buttons['action'].items():
-                            add_button(btn_id, widget, 'action')
-                    
-                    # Handle primary button
-                    if 'primary' in action_container.buttons and action_container.buttons['primary'] is not None:
-                        primary_btn = action_container.buttons['primary']
-                        if hasattr(primary_btn, 'description'):
-                            btn_id = primary_btn.description.lower().replace(' ', '_')
-                            add_button(btn_id, primary_btn, 'primary')
-            
-            # Try to find buttons in children if not found in buttons attribute
-            if not button_widgets and hasattr(action_container, 'children'):
-                for child in action_container.children:
-                    if hasattr(child, 'description') and hasattr(child, 'on_click'):
-                        btn_id = child.description.lower().replace(' ', '_')
-                        if btn_id:
-                            button_widgets[btn_id] = child
-                            self.logger.debug(f"Found button in action container children: {btn_id}")
-        
-        # Log all found button widgets
-        self.logger.info(f"Found {len(button_widgets)} button widgets: {list(button_widgets.keys())}")
-        
-        # Register handlers for each button variant that exists
-        registered_handlers = set()
-        
-        for button_id, handler in button_handlers.items():
-            # Try to register base ID handler
-            if button_id in button_widgets:
-                try:
-                    widget = button_widgets[button_id]
-                    if hasattr(widget, 'on_click'):
-                        self.register_button_handler(button_id, handler)
-                        registered_handlers.add(button_id)
-                        self.logger.info(f"✅ Registered handler for button: {button_id} ({type(widget).__name__})")
-                    else:
-                        self.logger.warning(f"⚠️ Widget {button_id} is not clickable ({type(widget).__name__})")
-                except Exception as e:
-                    self.logger.error(f"❌ Failed to register handler for button '{button_id}': {str(e)}")
-            
-            # Try to register _button suffixed handler
-            button_id_suffixed = f"{button_id}_button"
-            if button_id_suffixed in button_widgets and button_id_suffixed not in registered_handlers:
-                try:
-                    widget = button_widgets[button_id_suffixed]
-                    if hasattr(widget, 'on_click'):
-                        self.register_button_handler(button_id_suffixed, handler)
-                        registered_handlers.add(button_id_suffixed)
-                        self.logger.info(f"✅ Registered handler for button: {button_id_suffixed} ({type(widget).__name__})")
-                    else:
-                        self.logger.warning(f"⚠️ Widget {button_id_suffixed} is not clickable ({type(widget).__name__})")
-                except Exception as e:
-                    self.logger.error(f"❌ Failed to register handler for button '{button_id_suffixed}': {str(e)}")
-            
-            # If neither variant was found, log a warning
-            if button_id not in registered_handlers and button_id_suffixed not in registered_handlers:
-                self.logger.warning(f"⚠️ Button not found or not clickable: {button_id} or {button_id_suffixed}")
-        
-        # Log summary of registered handlers
-        if registered_handlers:
-            self.logger.info(f"✅ Successfully registered {len(registered_handlers)} button handlers: {', '.join(registered_handlers)}")
-        else:
-            self.logger.warning("⚠️ No button handlers were registered!")
-        
-        # Setup button handlers
+        Returns:
+            True if initialization was successful
+        """
         try:
-            self._setup_button_handlers()
-            self.logger.debug("Button handlers setup completed")
+            # Set config if provided before initialization
+            if config:
+                self._user_config = config
+            
+            # Initialize using base class which handles everything
+            success = super().initialize()
+            
+            if success:
+                # Set UI components in config handler for extraction
+                if self._config_handler and hasattr(self._config_handler, 'set_ui_components'):
+                    self._config_handler.set_ui_components(self._ui_components)
+                
+                self.logger.debug("✅ Preprocessing module initialization completed")
+            
+            return success
+            
         except Exception as e:
-            self.logger.error(f"❌ Failed to setup button handlers: {str(e)}")
+            self.logger.error(f"Failed to initialize Preprocessing module: {e}")
+            return False
     
     def _handle_button_click(self, handler, button_id):
         """Handle button click events with error handling."""
@@ -193,37 +119,144 @@ class PreprocessingUIModule(BaseUIModule):
         except (KeyError, AttributeError) as e:
             self.logger.warning(f"Could not initialize progress display: {e}")
 
-    def _operation_preprocess(self, button) -> None:
-        """Handles the preprocess data operation."""
-        self.run_operation('preprocess')
-
-    def _operation_check(self, button) -> None:
-        """Handles the check data operation."""
-        self.run_operation('check')
-
-    def _operation_cleanup(self, button) -> None:
-        """Handles the cleanup data operation."""
-        self.run_operation('cleanup')
+    def _operation_preprocess(self, button=None) -> Dict[str, Any]:  # noqa: ARG002
+        """Handle preprocessing operation with confirmation dialog and backend integration."""
+        def validate_data():
+            # Ensure UI components are ready first
+            if not hasattr(self, '_ui_components') or not self._ui_components:
+                return {'valid': False, 'message': "Komponen UI belum siap, silakan coba lagi"}
+            return {'valid': True}
         
-    def _operation_save(self, button) -> None:
-        """Handles the save button click event."""
-        try:
-            self.logger.info("Save button clicked")
-            # Add save logic here
-            self.show_success("Settings saved successfully!")
-        except Exception as e:
-            self.logger.error(f"Error in save operation: {str(e)}")
-            self.show_error(f"Failed to save settings: {str(e)}")
-    
-    def _operation_reset(self, button) -> None:
-        """Handles the reset button click event."""
-        try:
-            self.logger.info("Reset button clicked")
-            # Add reset logic here
-            self.show_info("Settings have been reset to default values")
-        except Exception as e:
-            self.logger.error(f"Error in reset operation: {str(e)}")
-            self.show_error(f"Failed to reset settings: {str(e)}")
+        def execute_preprocess():
+            self.log("🔄 Memulai preprocessing data...", 'info')
+            
+            # Get current data stats from backend
+            try:
+                preprocessed_files, raw_images = self._get_preprocessed_data_stats()
+                
+                # Show confirmation dialog with current status
+                message = (
+                    f"Anda akan memulai pra-pemrosesan data.\n\n"
+                    f"- Gambar mentah terdeteksi: {raw_images}\n"
+                    f"- File yang sudah diproses: {preprocessed_files}\n\n"
+                    f"Proses ini mungkin menimpa file yang ada. Lanjutkan?"
+                )
+                
+                # Show confirmation dialog
+                op_container = self.get_component('operation_container')
+                if op_container and hasattr(op_container, 'show_dialog'):
+                    def on_confirm():
+                        # Execute actual preprocessing operation
+                        return self._execute_preprocess_operation()
+                    
+                    op_container.show_dialog(
+                        title="Konfirmasi Pra-pemrosesan",
+                        message=message,
+                        on_confirm=on_confirm,
+                        confirm_text="Lanjutkan",
+                        cancel_text="Batal",
+                        danger_mode=True
+                    )
+                    return {'success': True, 'message': 'Dialog konfirmasi ditampilkan'}
+                else:
+                    # Fallback: direct execution if dialog not available
+                    self.log("Dialog tidak tersedia, menjalankan preprocessing langsung", 'warning')
+                    return self._execute_preprocess_operation()
+                    
+            except Exception as e:
+                return {'success': False, 'message': f"Gagal memeriksa status data: {e}"}
+        
+        return self._execute_operation_with_wrapper(
+            operation_name="Preprocessing Data",
+            operation_func=execute_preprocess,
+            button=button,
+            validation_func=validate_data,
+            success_message="Preprocessing data berhasil diselesaikan",
+            error_message="Kesalahan preprocessing data"
+        )
+
+    def _operation_check(self, button=None) -> Dict[str, Any]:  # noqa: ARG002
+        """Handle check operation using common wrapper."""
+        def validate_system():
+            return {'valid': True}  # Check operation is always available
+        
+        def execute_check():
+            self.log("🔍 Memeriksa status data...", 'info')
+            return self._execute_check_operation()
+        
+        return self._execute_operation_with_wrapper(
+            operation_name="Pemeriksaan Data",
+            operation_func=execute_check,
+            button=button,
+            validation_func=validate_system,
+            success_message="Pemeriksaan data berhasil diselesaikan",
+            error_message="Kesalahan pemeriksaan data"
+        )
+
+    def _operation_cleanup(self, button=None) -> Dict[str, Any]:  # noqa: ARG002
+        """Handle cleanup operation with confirmation dialog and backend integration."""
+        def validate_cleanup():
+            preprocessed_files, _ = self._get_preprocessed_data_stats()
+            if preprocessed_files == 0:
+                return {'valid': False, 'message': "Tidak ada data yang sudah diproses untuk dibersihkan"}
+            return {'valid': True, 'preprocessed_files': preprocessed_files}
+        
+        def execute_cleanup():
+            self.log("🧹 Membersihkan data preprocessing...", 'info')
+            
+            # Get current data stats from backend
+            try:
+                preprocessed_files, _ = self._get_preprocessed_data_stats()
+                
+                if preprocessed_files == 0:
+                    # Show info dialog that there's nothing to clean
+                    op_container = self.get_component('operation_container')
+                    if op_container and hasattr(op_container, 'show_dialog'):
+                        op_container.show_dialog(
+                            title="Tidak Ada untuk Dibersihkan",
+                            message="Tidak ada file yang dihasilkan oleh proses preprocessing yang ditemukan.",
+                            confirm_text="OK",
+                            on_cancel=None  # No cancel button
+                        )
+                    return {'success': True, 'message': 'Tidak ada file untuk dibersihkan'}
+                
+                # Show confirmation dialog for cleanup
+                message = (
+                    f"Anda akan menghapus {preprocessed_files} file yang telah diproses.\n\n"
+                    f"Tindakan ini tidak dapat diurungkan. Lanjutkan?"
+                )
+                
+                op_container = self.get_component('operation_container')
+                if op_container and hasattr(op_container, 'show_dialog'):
+                    def on_confirm():
+                        # Execute actual cleanup operation
+                        return self._execute_cleanup_operation()
+                    
+                    op_container.show_dialog(
+                        title="Konfirmasi Pembersihan",
+                        message=message,
+                        on_confirm=on_confirm,
+                        confirm_text=f"Ya, Hapus {preprocessed_files} File",
+                        cancel_text="Batal",
+                        danger_mode=True
+                    )
+                    return {'success': True, 'message': 'Dialog konfirmasi ditampilkan'}
+                else:
+                    # Fallback: direct execution if dialog not available
+                    self.log("Dialog tidak tersedia, menjalankan cleanup langsung", 'warning')
+                    return self._execute_cleanup_operation()
+                    
+            except Exception as e:
+                return {'success': False, 'message': f"Gagal memeriksa status data: {e}"}
+        
+        return self._execute_operation_with_wrapper(
+            operation_name="Pembersihan Data",
+            operation_func=execute_cleanup,
+            button=button,
+            validation_func=validate_cleanup,
+            success_message="Pembersihan data berhasil diselesaikan",
+            error_message="Kesalahan pembersihan data"
+        )
 
     def _run_operation(
         self, 
@@ -281,12 +314,14 @@ class PreprocessingUIModule(BaseUIModule):
     def _get_preprocessed_data_stats(self) -> Tuple[int, int]:
         """Gets the count of preprocessed and raw files from the backend."""
         try:
+            from smartcash.dataset.preprocessor.api.preprocessing_api import get_preprocessing_status
+            
             self.log("Mengecek status dari backend...", 'info')
             status = get_preprocessing_status(config=self.get_current_config())
 
             if not status.get('service_ready'):
                 self.log("Layanan backend tidak siap, mengasumsikan tidak ada file.", 'warning')
-                return False
+                return 0, 0
 
             stats = status.get('file_statistics', {}).get('train', {})
             preprocessed_files = stats.get('preprocessed_files', 0)
@@ -296,42 +331,35 @@ class PreprocessingUIModule(BaseUIModule):
             return preprocessed_files, raw_images
 
         except Exception as e:
-            self.show_error_dialog("Gagal Memeriksa Status", f"Tidak dapat memeriksa keberadaan file yang diproses: {e}")
-            return 0, 0 # Fail safe
+            self.log(f"Tidak dapat memeriksa keberadaan file yang diproses: {e}", 'error')
+            return 0, 0  # Fail safe
 
     # ==================== OPERATION EXECUTION METHODS ====================
 
-    def _execute_preprocess_operation(self) -> None:
-        """Executes the preprocessing operation after a confirmation dialog."""
-        from .operations.preprocess_operation import PreprocessOperationHandler
-        
+    def _execute_preprocess_operation(self) -> Dict[str, Any]:
+        """Execute the preprocessing operation using operation handler."""
         try:
-            preprocessed_files, raw_images = self._get_preprocessed_data_stats()
-
-            message = (
-                f"Anda akan memulai pra-pemrosesan.\n\n"
-                f"- Gambar mentah terdeteksi: {raw_images}\n"
-                f"- File yang sudah diproses: {preprocessed_files}\n\n"
-                f"Proses ini mungkin menimpa file yang ada. Lanjutkan?"
+            from .operations.preprocess_operation import PreprocessOperationHandler
+            
+            # Create handler with current UI components and config
+            handler = PreprocessOperationHandler(
+                ui_module=self,
+                config=self.get_current_config(),
+                callbacks={'on_success': self._update_operation_summary}
             )
-
-            def on_confirm():
-                handler = PreprocessOperationHandler(
-                    ui_module=self,
-                    config=self.get_current_config(),
-                    callbacks={'on_success': self._update_operation_summary}
-                )
-                handler.execute()
-
-            self.show_dialog(
-                title="Konfirmasi Pra-pemrosesan",
-                message=message,
-                on_confirm=on_confirm,
-                confirm_text="Lanjutkan",
-                danger_mode=True
-            )
+            
+            # Execute the operation
+            result = handler.execute()
+            
+            # Return standardized result
+            if result and result.get('success'):
+                return {'success': True, 'message': 'Preprocessing berhasil diselesaikan'}
+            else:
+                error_msg = result.get('message', 'Preprocessing gagal') if result else 'Preprocessing gagal'
+                return {'success': False, 'message': error_msg}
+            
         except Exception as e:
-            self.show_error_dialog("Gagal Memeriksa Status", f"Tidak dapat memeriksa status pra-pemrosesan: {e}")
+            return {'success': False, 'message': f"Error in preprocessing operation: {e}"}
 
     def _update_operation_summary(self, content: str) -> None:
         """Updates the operation summary container with new content."""
@@ -342,25 +370,51 @@ class PreprocessingUIModule(BaseUIModule):
         else:
             self.log("Komponen updater ringkasan operasi tidak ditemukan atau tidak dapat dipanggil.", 'warning')
 
-    def _execute_check_operation(self) -> None:
-        """Executes the check operation."""
-        from .operations.check_operation import CheckOperationHandler
-        handler = CheckOperationHandler(
-            ui_module=self,
-            config=self.get_current_config(),
-            callbacks={'on_success': self._update_operation_summary}
-        )
-        handler.execute()
+    def _execute_check_operation(self) -> Dict[str, Any]:
+        """Execute the check operation using operation handler."""
+        try:
+            from .operations.check_operation import CheckOperationHandler
+            
+            handler = CheckOperationHandler(
+                ui_module=self,
+                config=self.get_current_config(),
+                callbacks={'on_success': self._update_operation_summary}
+            )
+            
+            result = handler.execute()
+            
+            # Return standardized result
+            if result and result.get('success'):
+                return {'success': True, 'message': 'Pemeriksaan berhasil diselesaikan'}
+            else:
+                error_msg = result.get('message', 'Pemeriksaan gagal') if result else 'Pemeriksaan gagal'
+                return {'success': False, 'message': error_msg}
+            
+        except Exception as e:
+            return {'success': False, 'message': f"Error in check operation: {e}"}
 
-    def _execute_cleanup_operation(self) -> None:
-        """Executes the cleanup operation."""
-        from .operations.cleanup_operation import CleanupOperationHandler
-        handler = CleanupOperationHandler(
-            ui_module=self,
-            config=self.get_current_config(),
-            callbacks={'on_success': self._update_operation_summary}
-        )
-        handler.execute()
+    def _execute_cleanup_operation(self) -> Dict[str, Any]:
+        """Execute the cleanup operation using operation handler."""
+        try:
+            from .operations.cleanup_operation import CleanupOperationHandler
+            
+            handler = CleanupOperationHandler(
+                ui_module=self,
+                config=self.get_current_config(),
+                callbacks={'on_success': self._update_operation_summary}
+            )
+            
+            result = handler.execute()
+            
+            # Return standardized result
+            if result and result.get('success'):
+                return {'success': True, 'message': 'Pembersihan berhasil diselesaikan'}
+            else:
+                error_msg = result.get('message', 'Pembersihan gagal') if result else 'Pembersihan gagal'
+                return {'success': False, 'message': error_msg}
+            
+        except Exception as e:
+            return {'success': False, 'message': f"Error in cleanup operation: {e}"}
 
 
 def initialize_preprocessing_ui(display: bool = True, **kwargs: Any) -> PreprocessingUIModule:

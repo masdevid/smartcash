@@ -35,16 +35,13 @@ class DependencyConfigHandler(LoggingMixin, ConfigurationMixin):
         self.module_name = 'dependency'
         self.parent_module = 'setup'
         
-        # Initialize logger
-        self.logger = get_module_logger('smartcash.ui.setup.dependency.configs.dependency_config_handler')
-        
         # Store default config for get_default_config() method
         self._default_config = default_config or get_default_dependency_config()
         
         # Initialize config handler with default config
         self._initialize_config_handler()
         
-        self.logger.debug("✅ DependencyConfigHandler initialized (using core LoggingMixin + ConfigurationMixin)")
+        self.log("DependencyConfigHandler initialized (using core LoggingMixin + ConfigurationMixin)", 'debug')
     
     # ==================== ABSTRACT METHOD IMPLEMENTATIONS ====================
     
@@ -103,7 +100,8 @@ class DependencyConfigHandler(LoggingMixin, ConfigurationMixin):
             ui_components: Dictionary of UI components
         """
         self._ui_components = ui_components
-        self.logger.debug(f"UI components set: {list(ui_components.keys()) if ui_components else 'None'}")
+        component_count = len(ui_components) if ui_components else 0
+        self.log(f"UI components set: {list(ui_components.keys()) if ui_components else 'None'}, count: {component_count}", 'debug')
     
     def extract_config_from_ui(self) -> Dict[str, Any]:
         """
@@ -114,7 +112,7 @@ class DependencyConfigHandler(LoggingMixin, ConfigurationMixin):
         """
         try:
             if not self._ui_components:
-                self.logger.debug("No UI components available for extraction")
+                self.log("No UI components available for extraction - using current config", 'debug')
                 return self.get_current_config()
             
             # Start with current config from ConfigurationMixin
@@ -159,15 +157,15 @@ class DependencyConfigHandler(LoggingMixin, ConfigurationMixin):
                 'last_extracted': datetime.now().isoformat()
             })
             
-            self.logger.debug(
-                f"Extracted config: {len(selected_packages)} selected packages, "
-                f"custom: '{custom_packages[:50]}...'"
+            custom_count = len([p for p in custom_packages.split('\n') if p.strip()])
+            self.log(
+                f"Extracted config: {len(selected_packages)} selected packages, {custom_count} custom packages"
             )
             
             return extracted_config
             
         except Exception as e:
-            self.logger.error(f"Failed to extract config from UI: {e}")
+            self.log(f"Failed to extract config from UI: {e}", 'error')
             return self.get_current_config()
     
     # ==================== VALIDATION ====================
@@ -188,34 +186,34 @@ class DependencyConfigHandler(LoggingMixin, ConfigurationMixin):
             for key in required_keys:
                 if key not in config:
                     error_msg = f"Missing required key: {key}"
-                    self.logger.error(f"❌ {error_msg}")
+                    self.log(f"{error_msg} (missing: {key})", 'error')
                     return {'valid': False, 'message': error_msg}
             
             # Validate selected_packages is list
             if not isinstance(config['selected_packages'], list):
                 error_msg = "selected_packages must be a list"
-                self.logger.error(f"❌ {error_msg}")
+                self.log(f"{error_msg} (got {type(config['selected_packages']).__name__})", 'error')
                 return {'valid': False, 'message': error_msg}
             
             # Validate custom_packages is string
             if not isinstance(config['custom_packages'], str):
                 error_msg = "custom_packages must be a string"
-                self.logger.error(f"❌ {error_msg}")
+                self.log(f"{error_msg} (got {type(config['custom_packages']).__name__})", 'error')
                 return {'valid': False, 'message': error_msg}
             
             # Validate package names (basic validation)
             for package in config['selected_packages']:
                 if not isinstance(package, str) or not package.strip():
                     error_msg = f"Invalid package name: {package}"
-                    self.logger.error(f"❌ {error_msg}")
+                    self.log(f"{error_msg} (package: {package})", 'error')
                     return {'valid': False, 'message': error_msg}
             
-            self.logger.debug("✅ Configuration validation passed")
+            self.log("Configuration validation passed", 'info')
             return {'valid': True, 'message': 'Configuration is valid'}
             
         except Exception as e:
             error_msg = f"Error validating config: {e}"
-            self.logger.error(f"❌ {error_msg}")
+            self.log(f"{error_msg} (error type: {type(e).__name__})", 'error')
             return {'valid': False, 'message': error_msg}
     
     # ==================== CONFIGURATION OPERATIONS ====================
@@ -232,8 +230,12 @@ class DependencyConfigHandler(LoggingMixin, ConfigurationMixin):
             current_config = self.get_current_config()
             
             # Here you would typically save to persistent storage
-            # For now, we'll just log and return success
-            self.logger.info("✅ Configuration saved successfully")
+            self.log_with_status(
+                message=f"Configuration saved successfully with {len(current_config)} keys",
+                status_message="Konfigurasi berhasil disimpan",
+                log_level='info',
+                status_level='success'
+            )
             
             return {
                 'success': True,
@@ -243,7 +245,12 @@ class DependencyConfigHandler(LoggingMixin, ConfigurationMixin):
             
         except Exception as e:
             error_msg = f"Failed to save configuration: {str(e)}"
-            self.logger.error(f"❌ {error_msg}")
+            self.log_with_status(
+                message=f"{error_msg} (error type: {type(e).__name__})",
+                status_message="Gagal menyimpan konfigurasi",
+                log_level='error',
+                status_level='error'
+            )
             return {
                 'success': False,
                 'message': error_msg,
@@ -272,7 +279,12 @@ class DependencyConfigHandler(LoggingMixin, ConfigurationMixin):
                 if hasattr(self, 'sync_to_ui'):
                     self.sync_to_ui(self._ui_components, self._merged_config)
             
-            self.logger.info("✅ Configuration reset to defaults")
+            self.log_with_status(
+                message=f"Configuration reset to defaults with {len(self._merged_config)} keys",
+                status_message="Konfigurasi direset ke pengaturan awal",
+                log_level='info',
+                status_level='success'
+            )
             return {
                 'success': True, 
                 'message': 'Configuration reset to defaults',
@@ -281,7 +293,12 @@ class DependencyConfigHandler(LoggingMixin, ConfigurationMixin):
             
         except Exception as e:
             error_msg = f"Failed to reset configuration: {str(e)}"
-            self.logger.error(f"❌ {error_msg}")
+            self.log_with_status(
+                message=f"{error_msg} (error type: {type(e).__name__})",
+                status_message="Gagal mereset konfigurasi",
+                log_level='error',
+                status_level='error'
+            )
             return {
                 'success': False, 
                 'message': error_msg,
@@ -307,14 +324,14 @@ class DependencyConfigHandler(LoggingMixin, ConfigurationMixin):
                 selected_packages.append(package_name)
                 self.update_config_value('selected_packages', selected_packages)
                 
-                self.logger.info(f"✅ Package '{package_name}' added to selection")
+                self.log(f"Package '{package_name}' added to selection (total: {len(selected_packages)})", 'info')
                 return True
             
-            self.logger.debug(f"Package '{package_name}' already selected")
+            self.log(f"Package '{package_name}' already in selection", 'debug')
             return True
             
         except Exception as e:
-            self.logger.error(f"❌ Error adding package {package_name}: {e}")
+            self.log(f"Error adding package {package_name}: {e} (type: {type(e).__name__})", 'error')
             return False
     
     def remove_selected_package(self, package_name: str) -> bool:
@@ -334,14 +351,14 @@ class DependencyConfigHandler(LoggingMixin, ConfigurationMixin):
                 selected_packages.remove(package_name)
                 self.update_config_value('selected_packages', selected_packages)
                 
-                self.logger.info(f"✅ Package '{package_name}' removed from selection")
+                self.log(f"Package '{package_name}' removed from selection (remaining: {len(selected_packages)-1})", 'info')
                 return True
             
-            self.logger.debug(f"Package '{package_name}' not in selection")
+            self.log(f"Package '{package_name}' not found in selection", 'debug')
             return True
             
         except Exception as e:
-            self.logger.error(f"❌ Error removing package {package_name}: {e}")
+            self.log(f"Error removing package {package_name}: {e} (type: {type(e).__name__})", 'error')
             return False
     
     def update_custom_packages(self, custom_packages: str) -> bool:
@@ -356,11 +373,12 @@ class DependencyConfigHandler(LoggingMixin, ConfigurationMixin):
         """
         try:
             self.update_config_value('custom_packages', custom_packages)
-            self.logger.info("✅ Custom packages updated successfully")
+            package_count = len([line.strip() for line in custom_packages.split('\n') if line.strip()])
+            self.log(f"Updated {package_count} custom packages", 'info')
             return True
             
         except Exception as e:
-            self.logger.error(f"❌ Error updating custom packages: {e}")
+            self.log(f"Error updating custom packages: {e} (type: {type(e).__name__})", 'error')
             return False
     
     # ==================== UTILITY METHODS ====================

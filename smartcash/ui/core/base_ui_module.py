@@ -306,6 +306,9 @@ class BaseUIModule(
             # Setup button handlers AFTER registration
             self._setup_button_handlers()
             
+            # Register dynamic button handlers for consistency
+            self._register_dynamic_button_handlers()
+            
             # Validate button-handler integrity AFTER setup
             self._validate_button_handler_integrity()
             
@@ -502,6 +505,96 @@ class BaseUIModule(
             
         except Exception as e:
             self.logger.error(f"❌ Error during cleanup: {e}")
+    
+    def _register_dynamic_button_handlers(self) -> None:
+        """Register button handlers with dynamic mapping and error handling.
+        
+        This method provides a standardized way to register button handlers across all modules,
+        supporting both base button IDs and _button suffixed variants for maximum compatibility.
+        """
+        try:
+            # Get module-specific button handlers
+            button_handlers = self._get_module_button_handlers()
+            
+            if not button_handlers:
+                self.logger.debug("No module-specific button handlers defined")
+                return
+            
+            # Get available button widgets from UI components
+            button_widgets = {}
+            if hasattr(self, '_ui_components') and self._ui_components:
+                # First, check for buttons stored directly in UI components
+                for component_name, component in self._ui_components.items():
+                    if 'button' in component_name.lower() and component and hasattr(component, 'on_click'):
+                        button_widgets[component_name] = component
+                
+                # Then scan component attributes for additional buttons
+                for component in self._ui_components.values():
+                    if component and hasattr(component, '__dict__'):
+                        # Check direct attributes
+                        for attr_name in dir(component):
+                            if 'button' in attr_name.lower() and not attr_name.startswith('_'):
+                                widget = getattr(component, attr_name, None)
+                                if widget and hasattr(widget, 'on_click'):
+                                    button_widgets[attr_name] = widget
+                    
+                    # Check if component is a dict with button entries
+                    if isinstance(component, dict):
+                        for key, value in component.items():
+                            if 'button' in key.lower() and hasattr(value, 'on_click'):
+                                button_widgets[key] = value
+            
+            # Log found button widgets
+            self.logger.info(f"🔧 Found {len(button_widgets)} button widgets: {list(button_widgets.keys())}")
+            
+            # Register handlers for each button variant that exists
+            registered_handlers = set()
+            
+            for button_id, handler in button_handlers.items():
+                # Try to register base ID handler
+                if button_id in button_widgets:
+                    try:
+                        widget = button_widgets[button_id]
+                        self.register_button_handler(button_id, handler)
+                        registered_handlers.add(button_id)
+                        self.logger.info(f"✅ Registered handler for button: {button_id}")
+                    except Exception as e:
+                        self.logger.error(f"❌ Failed to register handler for button '{button_id}': {e}")
+                
+                # Try to register _button suffixed handler
+                button_id_suffixed = f"{button_id}_button"
+                if button_id_suffixed in button_widgets and button_id_suffixed not in registered_handlers:
+                    try:
+                        widget = button_widgets[button_id_suffixed]
+                        self.register_button_handler(button_id_suffixed, handler)
+                        registered_handlers.add(button_id_suffixed)
+                        self.logger.info(f"✅ Registered handler for button: {button_id_suffixed}")
+                    except Exception as e:
+                        self.logger.error(f"❌ Failed to register handler for button '{button_id_suffixed}': {e}")
+                
+                # If neither variant was found, log a warning
+                if button_id not in registered_handlers and button_id_suffixed not in registered_handlers:
+                    self.logger.warning(f"⚠️ No button widget found for '{button_id}' or '{button_id_suffixed}'")
+            
+            # Summary
+            self.logger.info(f"🎯 Successfully registered {len(registered_handlers)} dynamic button handlers")
+            
+        except Exception as e:
+            self.logger.error(f"❌ Failed to register dynamic button handlers: {e}")
+    
+    def _get_module_button_handlers(self) -> Dict[str, Any]:
+        """Get module-specific button handlers.
+        
+        This method should be overridden by subclasses to provide their specific button mappings.
+        Default implementation includes common save/reset handlers.
+        
+        Returns:
+            Dictionary mapping button IDs to handler functions
+        """
+        return {
+            'save': self._handle_save_config,
+            'reset': self._handle_reset_config
+        }
     
     def get_button_validation_status(self) -> Dict[str, Any]:
         """

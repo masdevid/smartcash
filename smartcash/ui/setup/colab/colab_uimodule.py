@@ -219,19 +219,22 @@ class ColabUIModule(BaseUIModule):
         # Note: Colab operations are now handled directly through the primary button
         # with phase states, eliminating the need for separate operation registrations
         
-        # Register button handlers (Operation Checklist 2.2)
-        # Single primary button handler with phase states
-        self.register_button_handler('colab_setup', self._handle_primary_button)
-        self.register_button_handler('primary_button', self._handle_primary_button)
+        # Note: Dynamic button handler registration is now handled by BaseUIModule
+    
+    def _get_module_button_handlers(self) -> Dict[str, Any]:
+        """Get Colab module-specific button handlers."""
+        # Call parent method to get base handlers (save, reset)
+        handlers = super()._get_module_button_handlers()
         
-        # Register save/reset button handlers (these are required for all modules)
-        self.register_button_handler('save', self._handle_save_config)
-        self.register_button_handler('save_button', self._handle_save_config)
-        self.register_button_handler('reset', self._handle_reset_config)
-        self.register_button_handler('reset_button', self._handle_reset_config)
+        # Add Colab-specific handlers
+        colab_handlers = {
+            'setup': self._handle_primary_button,
+            'primary': self._handle_primary_button,
+            'colab_setup': self._handle_primary_button
+        }
         
-        # Register setup button handler
-        self.register_button_handler('setup_button', self._handle_primary_button)
+        handlers.update(colab_handlers)
+        return handlers
     
     def _flush_log_buffer(self) -> None:
         """Flush buffered logs to operation container."""

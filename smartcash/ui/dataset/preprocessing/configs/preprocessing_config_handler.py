@@ -25,7 +25,7 @@ class PreprocessingConfigHandler(LoggingMixin, ConfigurationMixin):
         self.logger = get_module_logger('smartcash.ui.dataset.preprocessing.configs.preprocessing_config_handler')
         self._default_config = default_config or get_default_config()
         self._initialize_config_handler()
-        self.logger.debug("✅ PreprocessingConfigHandler initialized.")
+        self.logger.info("Modul konfigurasi preprocessing siap")
 
     # --- Abstract Method Implementations ---
 
@@ -39,10 +39,47 @@ class PreprocessingConfigHandler(LoggingMixin, ConfigurationMixin):
 
     # --- UI Integration ---
 
+    def set_ui_components(self, ui_components: Dict[str, Any]) -> None:
+        """
+        Set UI components for configuration extraction.
+        
+        Args:
+            ui_components: Dictionary of UI components
+        """
+        self._ui_components = ui_components
+        self.logger.debug(f"UI components set: {list(ui_components.keys()) if ui_components else 'None'}")
+
+    def get_ui_value(self, component_key: str, default=None) -> Any:
+        """
+        Get a UI component value with error handling.
+        
+        Args:
+            component_key: Key of the component in ui_components
+            default: Default value if component not found or error occurs
+            
+        Returns:
+            Component value or default
+        """
+        try:
+            if hasattr(self, '_ui_components') and self._ui_components and component_key in self._ui_components:
+                component = self._ui_components[component_key]
+                if hasattr(component, 'value'):
+                    return component.value
+                return component
+            return default
+        except Exception as e:
+            self.logger.warning(f"Failed to get UI value for '{component_key}': {e}")
+            return default
+
     def extract_config_from_ui(self) -> Dict[str, Any]:
         """Extracts the current configuration from the UI components."""
         if not self._ui_components:
-            self.logger.warning("No UI components available for extraction.")
+            self.log_with_status(
+                message="No UI components available for extraction",
+                status_message="Tidak ada komponen UI yang tersedia",
+                log_level='warning',
+                status_level='warning'
+            )
             return self.get_current_config()
 
         config = self.get_current_config()
@@ -69,7 +106,12 @@ class PreprocessingConfigHandler(LoggingMixin, ConfigurationMixin):
     def update_ui_from_config(self, config: Dict[str, Any]) -> None:
         """Updates the UI components with values from the configuration."""
         if not self._ui_components:
-            self.logger.warning("No UI components available to update.")
+            self.log_with_status(
+                message="No UI components available to update",
+                status_message="Tidak ada komponen UI yang tersedia untuk diperbarui",
+                log_level='warning',
+                status_level='warning'
+            )
             return
 
         prep_cfg = config.get('preprocessing', {})
@@ -86,3 +128,82 @@ class PreprocessingConfigHandler(LoggingMixin, ConfigurationMixin):
         self.set_ui_value('invalid_dir_input', prep_cfg.get('invalid_dir', 'data/invalid'))
         self.set_ui_value('cleanup_target_dropdown', prep_cfg.get('cleanup_target', CleanupTarget.PREPROCESSED.value))
         self.set_ui_value('backup_checkbox', prep_cfg.get('backup_enabled', True))
+    
+    def save_config(self) -> Dict[str, Any]:
+        """
+        Save the current configuration.
+        
+        Returns:
+            Dict with operation result
+        """
+        try:
+            current_config = self.get_current_config()
+            
+            self.log_with_status(
+                message=f"Preprocessing configuration saved with {len(current_config)} keys",
+                status_message="Konfigurasi preprocessing berhasil disimpan",
+                log_level='info',
+                status_level='success'
+            )
+            
+            return {
+                'success': True,
+                'message': 'Konfigurasi preprocessing berhasil disimpan',
+                'config': current_config
+            }
+            
+        except Exception as e:
+            error_msg = f"Gagal menyimpan konfigurasi preprocessing: {str(e)}"
+            self.log_with_status(
+                message=error_msg,
+                status_message=error_msg,
+                log_level='error',
+                status_level='error'
+            )
+            return {
+                'success': False,
+                'message': error_msg,
+                'config': getattr(self, '_merged_config', {})
+            }
+    
+    def reset_config(self) -> Dict[str, Any]:
+        """
+        Reset configuration to defaults.
+        
+        Returns:
+            Dict with operation result
+        """
+        try:
+            default_config = self.get_default_config()
+            self._merged_config = default_config.copy()
+            
+            # Update UI if components are available
+            if hasattr(self, '_ui_components') and self._ui_components:
+                self.update_ui_from_config(self._merged_config)
+            
+            self.log_with_status(
+                message="Preprocessing configuration reset to defaults",
+                status_message="Konfigurasi preprocessing direset ke pengaturan awal",
+                log_level='info',
+                status_level='success'
+            )
+            
+            return {
+                'success': True,
+                'message': 'Konfigurasi preprocessing berhasil direset',
+                'config': self._merged_config
+            }
+            
+        except Exception as e:
+            error_msg = f"Gagal mereset konfigurasi preprocessing: {str(e)}"
+            self.log_with_status(
+                message=error_msg,
+                status_message=error_msg,
+                log_level='error',
+                status_level='error'
+            )
+            return {
+                'success': False,
+                'message': error_msg,
+                'config': getattr(self, '_merged_config', {})
+            }

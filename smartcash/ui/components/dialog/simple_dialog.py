@@ -84,6 +84,11 @@ class SimpleDialog(BaseUIComponent):
             self._ui_components['button_area']
         ]
     
+    @property
+    def container(self):
+        """Get the dialog container widget for display."""
+        return self._ui_components.get('container')
+    
     def show_confirmation(self, 
                          title: str,
                          message: str,

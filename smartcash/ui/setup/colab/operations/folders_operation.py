@@ -12,15 +12,16 @@ from ..constants import REQUIRED_FOLDERS
 class FoldersOperation(BaseColabOperation):
     """Create required folders in Colab using REQUIRED_FOLDERS."""
     
-    def __init__(self, config: Dict[str, Any], operation_container: Optional[OperationContainer] = None, **kwargs):
+    def __init__(self, operation_name: str, config: Dict[str, Any], operation_container: Optional[OperationContainer] = None, **kwargs):
         """Initialize folders operation.
         
         Args:
+            operation_name: Name of the operation
             config: Configuration dictionary
             operation_container: Optional operation container for UI integration
             **kwargs: Additional arguments
         """
-        super().__init__('folders_operation', config, operation_container, **kwargs)
+        super().__init__(operation_name, config, operation_container, **kwargs)
     
     def get_operations(self) -> Dict[str, Callable]:
         """Get available operations."""

@@ -20,6 +20,18 @@ from smartcash.common.constants.paths import get_paths_for_environment
 from smartcash.ui.setup.colab.components.colab_ui import create_colab_ui
 from smartcash.ui.setup.colab.configs.colab_config_handler import ColabConfigHandler
 from smartcash.ui.setup.colab.configs.colab_defaults import get_default_colab_config
+from smartcash.ui.setup.colab.operations.colab_factory import (
+    ColabOperationFactory,
+    init_environment,
+    mount_drive,
+    create_symlinks,
+    create_folders,
+    sync_config,
+    setup_environment,
+    verify_setup,
+    execute_full_setup,
+    detect_environment
+)
 
 
 class ColabUIModule(BaseUIModule):
@@ -59,6 +71,9 @@ class ColabUIModule(BaseUIModule):
         
         # Initialize log buffer for pre-operation-container logs
         self._log_buffer = []
+        
+        # Initialize operation factory
+        self._operation_factory: Optional[ColabOperationFactory] = None
         
         self.logger.debug("✅ ColabUIModule initialized")
     
@@ -135,6 +150,9 @@ class ColabUIModule(BaseUIModule):
                 # Setup button phases for sequential operations
                 self._setup_button_phases()
                 
+                # Initialize operation factory
+                self._initialize_operation_factory()
+                
                 # Flush any buffered logs to operation container
                 self._flush_log_buffer()
                 
@@ -157,6 +175,16 @@ class ColabUIModule(BaseUIModule):
             self.logger.error(f"Failed to initialize Colab module: {e}")
             return False
     
+    def _initialize_operation_factory(self) -> None:
+        """Initialize the operation factory with current config."""
+        try:
+            config = self.get_current_config() if hasattr(self, 'get_current_config') else {}
+            operation_container = getattr(self, '_operation_container', None)
+            self._operation_factory = ColabOperationFactory(config, operation_container)
+            self.logger.debug("✅ Operation factory initialized")
+        except Exception as e:
+            self.logger.error(f"Failed to initialize operation factory: {e}")
+    
     def _detect_environment(self) -> None:
         """Detect environment using standardized EnvironmentManager (Operation Checklist 8.3)."""
         try:
@@ -177,11 +205,8 @@ class ColabUIModule(BaseUIModule):
         except Exception as e:
             self.logger.error(f"Failed to detect environment: {e}")
             # Fallback to simple detection
-            try:
-                import google.colab  # noqa: F401
-                self._is_colab_environment = True
-            except ImportError:
-                self._is_colab_environment = False
+            env_result = detect_environment()
+            self._is_colab_environment = env_result.get('is_colab', False)
             self._environment_detected = True
     
     def _setup_button_phases(self) -> None:
@@ -252,7 +277,44 @@ class ColabUIModule(BaseUIModule):
         except Exception as e:
             self.logger.debug(f"Failed to flush log buffer: {e}")
     
-    # All core functionality is provided by BaseUIModule and its mixins
+    # ==================== HELPER METHODS ====================
+    
+    def _execute_factory_operation(self, factory_func, operation_name: str, start_message: str, 
+                                   success_message: str, error_message: str, validation_message: str = None,
+                                   validation_condition: bool = True, post_success_callback = None, button=None) -> Dict[str, Any]:
+        """Execute factory operation with standardized pattern."""
+        def validate_operation():
+            if validation_message and not validation_condition:
+                return {'valid': False, 'message': validation_message}
+            if validation_message and not self._environment_detected:
+                return {'valid': False, 'message': validation_message}
+            return {'valid': True}
+        
+        def execute_operation():
+            self.log(start_message, 'info')
+            
+            config = self.get_current_config() if hasattr(self, 'get_current_config') else {}
+            result = factory_func(
+                config=config,
+                operation_container=getattr(self, '_operation_container', None),
+                progress_callback=lambda p, m: self.update_progress(p, m)
+            )
+            
+            if result.get('success'):
+                self.log(f"✅ {operation_name} berhasil diselesaikan", 'success')
+                if post_success_callback:
+                    post_success_callback(result)
+            
+            return result
+        
+        return self._execute_operation_with_wrapper(
+            operation_name=operation_name,
+            operation_func=execute_operation,
+            button=button,
+            validation_func=validate_operation,
+            success_message=success_message,
+            error_message=error_message
+        )
     
     # ==================== OPERATION HANDLERS ====================
     
@@ -320,412 +382,213 @@ class ColabUIModule(BaseUIModule):
     
     # ==================== PHASE-SPECIFIC EXECUTION METHODS ====================
     
-    def _execute_init_phase(self, button=None) -> Dict[str, Any]:
-        """Execute initialization phase."""
-        def validate_init():
+    def _execute_phase(self, phase_config: Dict[str, Any], button=None) -> Dict[str, Any]:
+        """Execute any phase using configuration."""
+        phase_name = phase_config['name']
+        factory_func = phase_config['factory_func']
+        next_phase = phase_config.get('next_phase')
+        
+        def validate_phase():
             return {'valid': True}
         
-        def execute_init():
-            self.log("🔧 Fase Inisialisasi: Mempersiapkan lingkungan...", 'info')
-            self._set_phase('init')
-            # Simulate initialization work
-            import time
-            time.sleep(1)
-            self.log("✅ Inisialisasi berhasil", 'success')
-            self._advance_to_next_phase('drive')
-            return {'success': True, 'message': 'Inisialisasi berhasil'}
+        def execute_phase():
+            self.log(phase_config['start_message'], 'info')
+            self._set_phase(phase_name)
+            
+            config = self.get_current_config() if hasattr(self, 'get_current_config') else {}
+            result = factory_func(
+                config=config,
+                operation_container=getattr(self, '_operation_container', None),
+                progress_callback=lambda p, m: self.update_progress(p, m)
+            )
+            
+            if result.get('success') and next_phase:
+                self.log(phase_config['success_log'], 'success')
+                self._advance_to_next_phase(next_phase)
+            
+            return result
         
         return self._execute_operation_with_wrapper(
-            operation_name="Inisialisasi Lingkungan",
-            operation_func=execute_init,
+            operation_name=phase_config['operation_name'],
+            operation_func=execute_phase,
             button=button,
-            validation_func=validate_init,
-            success_message="Inisialisasi berhasil - melanjutkan ke fase Drive",
-            error_message="Kesalahan inisialisasi"
+            validation_func=validate_phase,
+            success_message=phase_config['success_message'],
+            error_message=phase_config['error_message']
         )
+    
+    def _execute_init_phase(self, button=None) -> Dict[str, Any]:
+        """Execute initialization phase."""
+        return self._execute_phase({
+            'name': 'init',
+            'factory_func': init_environment,
+            'next_phase': 'drive',
+            'start_message': "🔧 Fase Inisialisasi: Mempersiapkan lingkungan...",
+            'success_log': "✅ Inisialisasi berhasil",
+            'operation_name': "Inisialisasi Lingkungan",
+            'success_message': "Inisialisasi berhasil - melanjutkan ke fase Drive",
+            'error_message': "Kesalahan inisialisasi"
+        }, button)
     
     def _execute_drive_phase(self, button=None) -> Dict[str, Any]:
         """Execute Google Drive mounting phase."""
-        def validate_drive():
-            return {'valid': True}
-        
-        def execute_drive():
-            self.log("📁 Fase Drive: Mounting Google Drive...", 'info')
-            self._set_phase('drive')
-            # Use existing mount drive logic
-            result = self._handle_mount_drive(button)
-            if result.get('success'):
-                self._advance_to_next_phase('symlink')
-            return result
-        
-        return self._execute_operation_with_wrapper(
-            operation_name="Mount Google Drive",
-            operation_func=execute_drive,
-            button=button,
-            validation_func=validate_drive,
-            success_message="Drive mounted - melanjutkan ke fase Symlink",
-            error_message="Kesalahan mount drive"
-        )
+        return self._execute_phase({
+            'name': 'drive',
+            'factory_func': mount_drive,
+            'next_phase': 'symlink',
+            'start_message': "📁 Fase Drive: Mounting Google Drive...",
+            'success_log': "✅ Drive berhasil dipasang",
+            'operation_name': "Mount Google Drive",
+            'success_message': "Drive mounted - melanjutkan ke fase Symlink",
+            'error_message': "Kesalahan mount drive"
+        }, button)
     
     def _execute_symlink_phase(self, button=None) -> Dict[str, Any]:
         """Execute symlink creation phase."""
-        def validate_symlink():
-            return {'valid': True}
-        
-        def execute_symlink():
-            self.log("🔗 Fase Symlink: Menyiapkan symbolic links...", 'info')
-            self._set_phase('symlink')
-            # Simulate symlink creation
-            import time
-            time.sleep(0.5)
-            self.log("✅ Symlink berhasil dibuat", 'success')
-            self._advance_to_next_phase('folders')
-            return {'success': True, 'message': 'Symlink berhasil dibuat'}
-        
-        return self._execute_operation_with_wrapper(
-            operation_name="Membuat Symlinks",
-            operation_func=execute_symlink,
-            button=button,
-            validation_func=validate_symlink,
-            success_message="Symlinks dibuat - melanjutkan ke fase Folders",
-            error_message="Kesalahan pembuatan symlink"
-        )
+        return self._execute_phase({
+            'name': 'symlink',
+            'factory_func': create_symlinks,
+            'next_phase': 'folders',
+            'start_message': "🔗 Fase Symlink: Menyiapkan symbolic links...",
+            'success_log': "✅ Symlink berhasil dibuat",
+            'operation_name': "Membuat Symlinks",
+            'success_message': "Symlinks dibuat - melanjutkan ke fase Folders",
+            'error_message': "Kesalahan pembuatan symlink"
+        }, button)
     
     def _execute_folders_phase(self, button=None) -> Dict[str, Any]:
         """Execute folder creation phase."""
-        def validate_folders():
-            return {'valid': True}
-        
-        def execute_folders():
-            self.log("📂 Fase Folders: Membuat direktori yang diperlukan...", 'info')
-            self._set_phase('folders')
-            # Simulate folder creation
-            import time
-            time.sleep(0.5)
-            self.log("✅ Direktori berhasil dibuat", 'success')
-            self._advance_to_next_phase('config')
-            return {'success': True, 'message': 'Direktori berhasil dibuat'}
-        
-        return self._execute_operation_with_wrapper(
-            operation_name="Membuat Direktori",
-            operation_func=execute_folders,
-            button=button,
-            validation_func=validate_folders,
-            success_message="Direktori dibuat - melanjutkan ke fase Config",
-            error_message="Kesalahan pembuatan direktori"
-        )
+        return self._execute_phase({
+            'name': 'folders',
+            'factory_func': create_folders,
+            'next_phase': 'config',
+            'start_message': "📂 Fase Folders: Membuat direktori yang diperlukan...",
+            'success_log': "✅ Direktori berhasil dibuat",
+            'operation_name': "Membuat Direktori",
+            'success_message': "Direktori dibuat - melanjutkan ke fase Config",
+            'error_message': "Kesalahan pembuatan direktori"
+        }, button)
     
     def _execute_config_phase(self, button=None) -> Dict[str, Any]:
         """Execute configuration phase."""
-        def validate_config():
-            return {'valid': True}
-        
-        def execute_config():
-            self.log("⚙️ Fase Config: Menyiapkan konfigurasi...", 'info')
-            self._set_phase('config')
-            # Simulate config setup
-            import time
-            time.sleep(0.5)
-            self.log("✅ Konfigurasi berhasil disiapkan", 'success')
-            self._advance_to_next_phase('env')
-            return {'success': True, 'message': 'Konfigurasi berhasil disiapkan'}
-        
-        return self._execute_operation_with_wrapper(
-            operation_name="Setup Konfigurasi",
-            operation_func=execute_config,
-            button=button,
-            validation_func=validate_config,
-            success_message="Konfigurasi selesai - melanjutkan ke fase Environment",
-            error_message="Kesalahan setup konfigurasi"
-        )
+        return self._execute_phase({
+            'name': 'config',
+            'factory_func': sync_config,
+            'next_phase': 'env',
+            'start_message': "⚙️ Fase Config: Menyiapkan konfigurasi...",
+            'success_log': "✅ Konfigurasi berhasil disiapkan",
+            'operation_name': "Setup Konfigurasi",
+            'success_message': "Konfigurasi selesai - melanjutkan ke fase Environment",
+            'error_message': "Kesalahan setup konfigurasi"
+        }, button)
     
     def _execute_env_phase(self, button=None) -> Dict[str, Any]:
         """Execute environment setup phase."""
-        def validate_env():
-            return {'valid': True}
-        
-        def execute_env():
-            self.log("🌍 Fase Environment: Menyiapkan environment variables...", 'info')
-            self._set_phase('env')
-            # Simulate environment setup
-            import time
-            time.sleep(0.5)
-            self.log("✅ Environment berhasil disiapkan", 'success')
-            self._advance_to_next_phase('verify')
-            return {'success': True, 'message': 'Environment berhasil disiapkan'}
-        
-        return self._execute_operation_with_wrapper(
-            operation_name="Setup Environment",
-            operation_func=execute_env,
-            button=button,
-            validation_func=validate_env,
-            success_message="Environment selesai - melanjutkan ke fase Verifikasi",
-            error_message="Kesalahan setup environment"
-        )
+        return self._execute_phase({
+            'name': 'env',
+            'factory_func': setup_environment,
+            'next_phase': 'verify',
+            'start_message': "🌍 Fase Environment: Menyiapkan environment variables...",
+            'success_log': "✅ Environment berhasil disiapkan",
+            'operation_name': "Setup Environment",
+            'success_message': "Environment selesai - melanjutkan ke fase Verifikasi",
+            'error_message': "Kesalahan setup environment"
+        }, button)
     
     def _execute_verify_phase(self, button=None) -> Dict[str, Any]:
         """Execute verification phase."""
-        def validate_verify():
-            return {'valid': True}
-        
-        def execute_verify():
-            self.log("🔍 Fase Verify: Memverifikasi setup lengkap...", 'info')
-            self._set_phase('verify')
-            # Use existing verification logic
-            result = self._handle_verify_setup(button)
-            if result.get('success'):
-                self._set_phase('complete')
-                self.log("🎉 Semua fase setup Colab telah selesai!", 'success')
-            return result
-        
-        return self._execute_operation_with_wrapper(
-            operation_name="Verifikasi Setup",
-            operation_func=execute_verify,
-            button=button,
-            validation_func=validate_verify,
-            success_message="🎉 Setup Colab selesai sempurna!",
-            error_message="Kesalahan verifikasi setup"
-        )
+        return self._execute_phase({
+            'name': 'verify',
+            'factory_func': verify_setup,
+            'next_phase': 'complete',
+            'start_message': "🔍 Fase Verify: Memverifikasi setup lengkap...",
+            'success_log': "🎉 Semua fase setup Colab telah selesai!",
+            'operation_name': "Verifikasi Setup",
+            'success_message': "🎉 Setup Colab selesai sempurna!",
+            'error_message': "Kesalahan verifikasi setup"
+        }, button)
     
     def _handle_full_setup(self, button=None) -> Dict[str, Any]:  # noqa: ARG002
-        """Handle full Colab setup operation using modern BaseUIModule pattern."""
-        def validate_environment():
-            if not self._environment_detected:
-                return {'valid': False, 'message': "Lingkungan belum terdeteksi, silakan coba lagi"}
-            return {'valid': True}
-        
-        def execute_full_setup():
-            self.log("🚀 Memulai pengaturan lengkap lingkungan Colab...", 'info')
-            
-            # Single progress tracking - start
-            self.update_progress(0, "Memulai pengaturan lengkap...")
-            
-            # Simulate full setup process with single progress tracking
-            import time
-            steps = [
-                (20, "Menginisialisasi lingkungan..."),
-                (40, "Memeriksa Google Drive..."),
-                (60, "Menyiapkan direktori kerja..."),
-                (80, "Menyinkronkan konfigurasi..."),
-                (100, "Pengaturan selesai!")
-            ]
-            
-            for progress, message in steps:
-                self.update_progress(progress, message)
-                time.sleep(0.5)  # Simulate work
-                
-            # Log completion
-            self.log("✅ Pengaturan lengkap lingkungan Colab berhasil diselesaikan", 'success')
-            
-            return {
-                'success': True,
-                'message': 'Pengaturan lengkap berhasil diselesaikan',
-                'environment_type': 'colab' if self._is_colab_environment else 'local'
-            }
-        
-        return self._execute_operation_with_wrapper(
+        """Handle full Colab setup operation using factory pattern."""
+        return self._execute_factory_operation(
+            factory_func=execute_full_setup,
             operation_name="Pengaturan Lengkap Colab",
-            operation_func=execute_full_setup,
-            button=button,
-            validation_func=validate_environment,
+            start_message="🚀 Memulai pengaturan lengkap lingkungan Colab...",
             success_message="Pengaturan lengkap Colab berhasil diselesaikan",
-            error_message="Kesalahan pengaturan lengkap Colab"
+            error_message="Kesalahan pengaturan lengkap Colab",
+            validation_message="Lingkungan belum terdeteksi, silakan coba lagi",
+            button=button
         )
     
     def _handle_init_environment(self, button=None) -> Dict[str, Any]:  # noqa: ARG002
-        """Handle environment initialization using modern BaseUIModule pattern."""
-        def validate_environment():
-            if not self._environment_detected:
-                return {'valid': False, 'message': "Lingkungan belum terdeteksi, silakan coba lagi"}
-            return {'valid': True}
-        
-        def execute_init():
-            self.log("🔧 Menginisialisasi lingkungan...", 'info')
-            
-            # Single progress tracking
-            self.update_progress(0, "Memulai inisialisasi...")
-            
-            # Simulate initialization steps
-            import time
-            steps = [
-                (25, "Memeriksa dependencies..."),
-                (50, "Menyiapkan direktori kerja..."),
-                (75, "Mengonfigurasi environment..."),
-                (100, "Inisialisasi selesai!")
-            ]
-            
-            for progress, message in steps:
-                self.update_progress(progress, message)
-                time.sleep(0.3)
-                
-            self.log("✅ Inisialisasi lingkungan berhasil diselesaikan", 'success')
-            
-            return {
-                'success': True,
-                'message': 'Inisialisasi lingkungan berhasil',
-                'environment_type': 'colab' if self._is_colab_environment else 'local'
-            }
-        
-        return self._execute_operation_with_wrapper(
+        """Handle environment initialization using factory pattern."""
+        return self._execute_factory_operation(
+            factory_func=init_environment,
             operation_name="Inisialisasi Lingkungan",
-            operation_func=execute_init,
-            button=button,
-            validation_func=validate_environment,
+            start_message="🔧 Menginisialisasi lingkungan...",
             success_message="Inisialisasi lingkungan berhasil diselesaikan",
-            error_message="Kesalahan inisialisasi lingkungan"
+            error_message="Kesalahan inisialisasi lingkungan",
+            validation_message="Lingkungan belum terdeteksi, silakan coba lagi",
+            button=button
         )
     
     def _handle_mount_drive(self, button=None) -> Dict[str, Any]:  # noqa: ARG002
-        """Handle Google Drive mounting using modern BaseUIModule pattern."""
-        def validate_colab_environment():
-            if not self._is_colab_environment:
-                return {'valid': False, 'message': "Mount Google Drive hanya tersedia di lingkungan Colab"}
-            return {'valid': True}
+        """Handle Google Drive mounting using factory pattern."""
+        def post_success_callback(result):  # noqa: ARG001
+            if self._environment_manager:
+                self._environment_paths = get_paths_for_environment(is_colab=True, is_drive_mounted=True)
         
-        def execute_mount_drive():
-            self.log("📁 Memasang Google Drive...", 'info')
-            
-            # Single progress tracking
-            self.update_progress(0, "Memulai mount drive...")
-            
-            if not self._environment_manager:
-                self._detect_environment()  # Ensure environment manager is initialized
-            
-            self.update_progress(30, "Memeriksa koneksi Google Drive...")
-            
-            # Use EnvironmentManager to mount drive
-            success, message = self._environment_manager.mount_drive()
-            
-            if success:
-                self.update_progress(80, "Mengonfigurasi akses drive...")
-                
-                drive_path = self._environment_manager.drive_path
-                self.log(f"✅ Google Drive dipasang di: {drive_path}", 'success')
-                
-                # Update paths after successful mount
-                self._environment_paths = get_paths_for_environment(
-                    is_colab=True,
-                    is_drive_mounted=True
-                )
-                
-                self.update_progress(100, "Mount drive selesai!")
-                
-                return {
-                    'success': True, 
-                    'message': message,
-                    'path': str(drive_path) if drive_path else '/content/drive',
-                    'paths': self._environment_paths
-                }
-            else:
-                self.update_progress(100, "Mount drive gagal!")
-                return {'success': False, 'message': f"Mount drive gagal: {message}"}
-        
-        return self._execute_operation_with_wrapper(
+        return self._execute_factory_operation(
+            factory_func=mount_drive,
             operation_name="Mount Google Drive",
-            operation_func=execute_mount_drive,
-            button=button,
-            validation_func=validate_colab_environment,
+            start_message="📁 Memasang Google Drive...",
             success_message="Google Drive berhasil dipasang",
-            error_message="Kesalahan mount Google Drive"
+            error_message="Kesalahan mount Google Drive",
+            validation_message="Mount Google Drive hanya tersedia di lingkungan Colab",
+            validation_condition=self._is_colab_environment,
+            post_success_callback=post_success_callback,
+            button=button
         )
     
     def _handle_verify_setup(self, button=None) -> Dict[str, Any]:  # noqa: ARG002
-        """Handle setup verification using modern BaseUIModule pattern."""
-        def validate_environment():
-            if not self._environment_detected:
-                return {'valid': False, 'message': "Lingkungan belum terdeteksi, silakan coba lagi"}
-            return {'valid': True}
-        
-        def execute_verify():
-            self.log("🔍 Memverifikasi pengaturan lingkungan...", 'info')
-            
-            # Single progress tracking
-            self.update_progress(0, "Memulai verifikasi...")
-            
-            # Simulate verification steps
-            import time
-            verification_steps = [
-                (20, "Memeriksa environment variables..."),
-                (40, "Memverifikasi direktori kerja..."),
-                (60, "Memeriksa koneksi Google Drive..."),
-                (80, "Memverifikasi konfigurasi sistem..."),
-                (100, "Verifikasi selesai!")
-            ]
-            
-            for progress, message in verification_steps:
-                self.update_progress(progress, message)
-                time.sleep(0.3)
-            
-            # Collect verification results
-            verification_results = {
-                'environment_type': 'colab' if self._is_colab_environment else 'local',
-                'environment_detected': self._environment_detected,
-                'drive_mounted': self._environment_manager.is_drive_mounted if self._environment_manager else False,
-                'paths_configured': bool(self._environment_paths)
-            }
-            
-            self.log("✅ Verifikasi pengaturan lingkungan berhasil diselesaikan", 'success')
-            
-            return {
-                'success': True,
-                'message': 'Verifikasi pengaturan berhasil',
-                'verification_results': verification_results
-            }
-        
-        return self._execute_operation_with_wrapper(
+        """Handle setup verification using factory pattern."""
+        return self._execute_factory_operation(
+            factory_func=verify_setup,
             operation_name="Verifikasi Pengaturan",
-            operation_func=execute_verify,
-            button=button,
-            validation_func=validate_environment,
+            start_message="🔍 Memverifikasi pengaturan lingkungan...",
             success_message="Verifikasi pengaturan berhasil diselesaikan",
-            error_message="Kesalahan verifikasi pengaturan"
+            error_message="Kesalahan verifikasi pengaturan",
+            validation_message="Lingkungan belum terdeteksi, silakan coba lagi",
+            button=button
         )
     
     def _handle_detect_environment(self, button=None) -> Dict[str, Any]:  # noqa: ARG002
-        """Handle environment detection using modern BaseUIModule pattern."""
-        def validate_system():
-            return {'valid': True}  # Environment detection always available
-        
-        def execute_detect():
-            self.log("🔍 Mendeteksi lingkungan sistem...", 'info')
-            
-            # Single progress tracking
-            self.update_progress(0, "Memulai deteksi lingkungan...")
+        """Handle environment detection using factory pattern."""
+        def custom_detect():
+            env_result = detect_environment()
+            self._is_colab_environment = env_result.get('is_colab', False)
+            self._environment_detected = True
             
             import sys
-            
-            self.update_progress(30, "Memeriksa platform sistem...")
-            self._detect_environment()
-            
-            self.update_progress(60, "Menganalisis environment...")
-            
             env_info = {
                 'is_colab': self._is_colab_environment,
-                'runtime_type': 'colab' if self._is_colab_environment else 'local',
+                'runtime_type': env_result.get('runtime_type', 'unknown'),
                 'python_version': f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}",
                 'platform': sys.platform
             }
-            
-            self.update_progress(90, "Menyusun hasil deteksi...")
             
             env_type = "Google Colab" if self._is_colab_environment else "Lokal/Jupyter"
             self.log(f"🌍 Lingkungan: {env_type}", 'info')
             self.log(f"🐍 Python: {env_info['python_version']}", 'info')
             self.log(f"💻 Platform: {env_info['platform']}", 'info')
             
-            self.update_progress(100, "Deteksi lingkungan selesai!")
-            
-            return {
-                'success': True,
-                'message': f'Lingkungan terdeteksi: {env_type}',
-                'environment': env_info
-            }
+            return {'success': True, 'message': f'Lingkungan terdeteksi: {env_type}', 'environment': env_info}
         
         return self._execute_operation_with_wrapper(
             operation_name="Deteksi Lingkungan",
-            operation_func=execute_detect,
+            operation_func=custom_detect,
             button=button,
-            validation_func=validate_system,
+            validation_func=lambda: {'valid': True},
             success_message="Deteksi lingkungan berhasil diselesaikan",
             error_message="Kesalahan deteksi lingkungan"
         )
@@ -771,10 +634,13 @@ class ColabUIModule(BaseUIModule):
         return self._is_colab_environment
     
     def get_environment_info(self) -> Dict[str, Any]:
-        """Get detailed environment information using EnvironmentManager."""
+        """Get detailed environment information."""
+        # Use factory method for environment detection
+        env_result = detect_environment()
+        
         base_info = {
-            'is_colab': self._is_colab_environment,
-            'runtime_type': 'colab' if self._is_colab_environment else 'local',
+            'is_colab': env_result.get('is_colab', self._is_colab_environment),
+            'runtime_type': env_result.get('runtime_type', 'unknown'),
             'python_version': f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}",
             'platform': sys.platform,
             'working_directory': os.getcwd(),
@@ -878,12 +744,6 @@ def reset_colab_uimodule() -> None:
             pass
     _colab_module_instance = None
 
-
-def display_colab_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> Dict[str, Any]:
-    """Display Colab UI and return components."""
-    return initialize_colab_ui(config=config, display=True, **kwargs)
-
-
 def detect_colab_environment() -> Dict[str, Any]:
     """Detect if running in Google Colab environment."""
     try:
@@ -896,7 +756,7 @@ def detect_colab_environment() -> Dict[str, Any]:
 def mount_google_drive(drive_path: str = "/content/drive") -> Dict[str, Any]:
     """Mount Google Drive in Colab environment."""
     try:
-        from google.colab import drive
+        from google.colab import drive  # noqa: F401
         drive.mount(drive_path)
         return {"success": True, "path": drive_path}
     except ImportError:
@@ -938,7 +798,6 @@ def register_colab_shared_methods() -> None:
         # Log error but don't raise to avoid breaking module loading
         logger = get_module_logger("smartcash.ui.setup.colab.shared")
         logger.error(f"Failed to register shared methods: {e}")
-
 
 # Auto-register when module is imported
 try:

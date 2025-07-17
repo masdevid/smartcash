@@ -3,13 +3,14 @@ File: smartcash/ui/dataset/visualization/visualization_uimodule.py
 Description: Visualization Module implementation using BaseUIModule mixin pattern.
 """
 
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional, List, Type
 
 # Third-party imports
 import ipywidgets as widgets
 
-# BaseUIModule imports
+# Core imports
 from smartcash.ui.core.base_ui_module import BaseUIModule
+from smartcash.ui.core.enhanced_ui_module_factory import EnhancedUIModuleFactory
 from smartcash.ui.core.decorators import suppress_ui_init_logs
 
 # Local imports
@@ -401,7 +402,7 @@ class VisualizationUIModule(BaseUIModule):
         """Load backend API modules for visualization operations.
         
         This method attempts to load various backend APIs for visualization features.
-        If a module is not available, it will log a warning and continue without it.
+        If a module is not available, it will log a debug message and continue without it.
         """
         # Initialize with empty backend APIs
         self._backend_apis = {}
@@ -427,11 +428,13 @@ class VisualizationUIModule(BaseUIModule):
             try:
                 from smartcash.dataset.preprocessor.utils.file_scanner import scan_directory
                 self._backend_apis['preprocessor_scanner'] = scan_directory
-            except ImportError as e:
-                self.logger.warning(f"Preprocessor file scanner not available: {e}")
+            except (ImportError, ModuleNotFoundError) as e:
+                # This is an optional dependency, so we just log a debug message
+                self.logger.debug("Preprocessor file scanner not available. Some features may be limited.")
                 
-        except ImportError as e:
-            self.logger.warning(f"Preprocessor backend module not available: {e}")
+        except (ImportError, ModuleNotFoundError) as e:
+            # This is an optional dependency, so we just log a debug message
+            self.logger.debug("Preprocessor backend module not available. Some features may be limited.")
         
         # Try to import augmentor scanner if available
         try:
@@ -612,70 +615,17 @@ class VisualizationUIModule(BaseUIModule):
 
 # ==================== FACTORY FUNCTIONS ====================
 
-# Global instance for singleton pattern
-_visualization_module_instance = None
+# Create standardized display function using enhanced factory
+initialize_visualization_ui = EnhancedUIModuleFactory.create_display_function(
+    VisualizationUIModule,
+    function_name='initialize_visualization_ui'
+)
 
+# Create component function for programmatic use
+get_visualization_component = EnhancedUIModuleFactory.create_component_function(
+    VisualizationUIModule,
+    function_name='get_visualization_component'
+)
 
-def create_visualization_uimodule(
-    config: Optional[Dict[str, Any]] = None,
-    auto_initialize: bool = True,
-    **kwargs
-) -> VisualizationUIModule:
-    """
-    Create a new Visualization UIModule instance.
-    
-    Args:
-        config: Optional configuration dictionary
-        auto_initialize: Whether to auto-initialize the module
-        **kwargs: Additional arguments
-        
-    Returns:
-        VisualizationUIModule instance
-    """
-    global _visualization_module_instance
-    
-    if _visualization_module_instance is not None:
-        _visualization_module_instance.reset_config()
-    
-    _visualization_module_instance = VisualizationUIModule()
-    
-    if auto_initialize:
-        _visualization_module_instance.initialize()
-    
-    return _visualization_module_instance
-
-
-def get_visualization_uimodule() -> Optional[VisualizationUIModule]:
-    """Get the current Visualization UIModule instance."""
-    return _visualization_module_instance
-
-
-def reset_visualization_uimodule():
-    """Reset the global Visualization UIModule instance."""
-    global _visualization_module_instance
-    _visualization_module_instance = None
-
-
-def initialize_visualization_ui(
-    config: Optional[Dict[str, Any]] = None,
-    display: bool = True,
-    **kwargs
-):
-    """
-    Initialize and optionally display the Visualization UI.
-    
-    Args:
-        config: Optional configuration dictionary
-        display: Whether to display the UI immediately
-        **kwargs: Additional arguments
-        
-    Returns:
-        VisualizationUIModule instance if display=False, otherwise None
-    """
-    module = create_visualization_uimodule(config=config, **kwargs)
-    
-    if display and hasattr(module, 'display'):
-        module.display()
-        return None
-    
-    return module
+# Alias for backward compatibility
+display_visualization = initialize_visualization_ui

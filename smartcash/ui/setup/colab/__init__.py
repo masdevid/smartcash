@@ -12,7 +12,6 @@ from .colab_uimodule import (
     get_colab_uimodule,
     reset_colab_uimodule,
     initialize_colab_ui,
-    display_colab_ui,
     get_colab_components
 )
 
@@ -23,6 +22,5 @@ __all__ = [
     "get_colab_uimodule",
     "reset_colab_uimodule",
     "initialize_colab_ui",
-    "display_colab_ui",
     "get_colab_components"
 ]

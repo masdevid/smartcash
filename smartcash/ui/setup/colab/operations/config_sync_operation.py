@@ -4,7 +4,6 @@ Description: Sync configuration files using the config manager
 """
 
 import os
-import logging
 from pathlib import Path
 from typing import Dict, Any, Optional, Callable
 from smartcash.ui.components.operation_container import OperationContainer
@@ -16,15 +15,16 @@ from smartcash.common.constants.paths import COLAB_DATA_ROOT
 class ConfigSyncOperation(BaseColabOperation):
     """Sync configuration files using the config manager."""
     
-    def __init__(self, config: Dict[str, Any], operation_container: Optional[OperationContainer] = None, **kwargs):
+    def __init__(self, operation_name: str, config: Dict[str, Any], operation_container: Optional[OperationContainer] = None, **kwargs):
         """Initialize config sync operation.
         
         Args:
+            operation_name: Name of the operation
             config: Configuration dictionary
             operation_container: Optional operation container for UI integration
             **kwargs: Additional arguments
         """
-        super().__init__('config_sync_operation', config, operation_container, **kwargs)
+        super().__init__(operation_name, config, operation_container, **kwargs)
         self.config_manager = get_config_manager(auto_sync=False)
     
     def get_operations(self) -> Dict[str, Callable]:
@@ -138,8 +138,6 @@ class ConfigSyncOperation(BaseColabOperation):
             
             success_count = len([c for c in configs_processed if c['status'] == 'synced'])
             skip_count = len([c for c in configs_processed if c['status'] == 'skipped'])
-            
-            overall_success = len(configs_failed) == 0
             
             return self.create_success_result(
                 f'Synced {success_count} configs, skipped {skip_count}, {len(configs_failed)} errors',

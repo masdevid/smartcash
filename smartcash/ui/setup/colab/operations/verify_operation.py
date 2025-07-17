@@ -14,15 +14,16 @@ from ..utils.env_detector import detect_environment_info
 class VerifyOperation(BaseColabOperation):
     """Comprehensive verification of the setup."""
     
-    def __init__(self, config: Dict[str, Any], operation_container: Optional[OperationContainer] = None, **kwargs):
+    def __init__(self, operation_name: str, config: Dict[str, Any], operation_container: Optional[OperationContainer] = None, **kwargs):
         """Initialize verify operation.
         
         Args:
+            operation_name: Name of the operation
             config: Configuration dictionary
             operation_container: Optional operation container for UI integration
             **kwargs: Additional arguments
         """
-        super().__init__('verify_operation', config, operation_container, **kwargs)
+        super().__init__(operation_name, config, operation_container, **kwargs)
     
     def get_operations(self) -> Dict[str, Callable]:
         """Get available operations."""

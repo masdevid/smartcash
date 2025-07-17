@@ -85,16 +85,24 @@ class AugmentPreviewOperation(AugmentationBaseOperation):
         """Mendapatkan widget gambar preview dari UI components."""
         try:
             # Cari dari berbagai lokasi yang mungkin
-            if hasattr(self._ui_module, '_ui_components') and self._ui_module._ui_components:
-                form_widgets = self._ui_module._ui_components.get('form_container', {}).get('widgets', {})
-                preview_widget = form_widgets.get('preview_widget')
-                
-                if preview_widget and isinstance(preview_widget, dict):
-                    preview_widgets = preview_widget.get('widgets', {})
-                    return preview_widgets.get('preview_image')
+            if hasattr(self._ui_module, '_ui_components'):
+                ui_components = self._ui_module._ui_components
+                if hasattr(ui_components, 'get'):  # Check if it's a dictionary-like object
+                    form_widgets = ui_components.get('form_container', {})
+                    if hasattr(form_widgets, 'get'):
+                        form_widgets = form_widgets.get('widgets', {})
+                        preview_widget = form_widgets.get('preview_widget')
+                        
+                        if preview_widget and hasattr(preview_widget, 'get'):
+                            preview_widgets = preview_widget.get('widgets', {})
+                            if hasattr(preview_widgets, 'get'):
+                                return preview_widgets.get('preview_image')
             
             # Fallback: cari dari self._ui_components
-            return self._ui_components.get('preview_image')
+            if hasattr(self, '_ui_components') and hasattr(self._ui_components, 'get'):
+                return self._ui_components.get('preview_image')
+                
+            return None
             
         except Exception as e:
             self.log_warning(f"Error getting preview image widget: {e}")
@@ -104,16 +112,24 @@ class AugmentPreviewOperation(AugmentationBaseOperation):
         """Mendapatkan widget status preview dari UI components."""
         try:
             # Cari dari berbagai lokasi yang mungkin
-            if hasattr(self._ui_module, '_ui_components') and self._ui_module._ui_components:
-                form_widgets = self._ui_module._ui_components.get('form_container', {}).get('widgets', {})
-                preview_widget = form_widgets.get('preview_widget')
-                
-                if preview_widget and isinstance(preview_widget, dict):
-                    preview_widgets = preview_widget.get('widgets', {})
-                    return preview_widgets.get('preview_status')
+            if hasattr(self._ui_module, '_ui_components'):
+                ui_components = self._ui_module._ui_components
+                if hasattr(ui_components, 'get'):  # Check if it's a dictionary-like object
+                    form_widgets = ui_components.get('form_container', {})
+                    if hasattr(form_widgets, 'get'):
+                        form_widgets = form_widgets.get('widgets', {})
+                        preview_widget = form_widgets.get('preview_widget')
+                        
+                        if preview_widget and hasattr(preview_widget, 'get'):
+                            preview_widgets = preview_widget.get('widgets', {})
+                            if hasattr(preview_widgets, 'get'):
+                                return preview_widgets.get('preview_status')
             
             # Fallback: cari dari self._ui_components
-            return self._ui_components.get('preview_status')
+            if hasattr(self, '_ui_components') and hasattr(self._ui_components, 'get'):
+                return self._ui_components.get('preview_status')
+                
+            return None
             
         except Exception as e:
             self.log_warning(f"Error getting preview status widget: {e}")

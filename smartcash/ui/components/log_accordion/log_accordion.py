@@ -537,12 +537,12 @@ class LogAccordion(BaseUIComponent):
                 border-radius: 3px;
                 transition: all 0.15s ease;
                 display: flex;
-                align-items: center;
+                flex-wrap: wrap;
+                align-items: flex-start;
                 gap: 6px;
-                line-height: 1.3;
+                line-height: 1.4;
                 font-size: 13px;
                 font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
-                white-space: pre-wrap;
             '>
                 <!-- Namespace -->
                 <span style='
@@ -569,10 +569,11 @@ class LogAccordion(BaseUIComponent):
                     flex: 1;
                     color: {style['text_color']};
                     word-break: break-word;
-                    overflow: hidden;
-                    text-overflow: ellipsis;
-                    white-space: {'pre-wrap' if self.log_entry_style == 'default' else 'nowrap'};
+                    overflow-wrap: break-word;
+                    white-space: pre-wrap;
                     line-height: 1.4;
+                    display: inline-block;
+                    min-width: 0; /* Allows text wrapping in flex container */
                 '>{main_message}{duplicate_counter}</span>
                 
                 <!-- Timestamp -->

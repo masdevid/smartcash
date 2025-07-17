@@ -211,6 +211,7 @@ def create_split_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> Dict[s
         
         # Create action container with only save/reset buttons
         action_container = create_action_container(
+            buttons=[],  # No custom buttons, just using save/reset
             show_save_reset=True,
             **kwargs
         )

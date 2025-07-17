@@ -621,7 +621,7 @@ def create_visualization_uimodule(
     global _visualization_module_instance
     
     if _visualization_module_instance is not None:
-        _visualization_module_instance.reset()
+        _visualization_module_instance.reset_config()
     
     _visualization_module_instance = VisualizationUIModule()
     

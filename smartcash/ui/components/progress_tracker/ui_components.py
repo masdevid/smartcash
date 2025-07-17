@@ -26,26 +26,32 @@ class UIComponentsManager:
     
     def _create_widgets(self):
         """Create UI widgets dengan layout vertikal untuk setiap progress bar"""
+        # Header dengan padding dan font yang lebih baik
         self.header_widget = widgets.HTML("", layout=widgets.Layout(
-            width='100%', margin='0 0 10px 0'
+            width='100%', 
+            margin='0 0 12px 0',
+            padding='0 4px'
         ))
         
+        # Status message dengan spacing yang lebih baik
         self.status_widget = widgets.HTML("", layout=widgets.Layout(
-            width='100%', margin='0 0 8px 0'
+            width='100%', 
+            margin='0 0 16px 0',
+            padding='0 4px'
         ))
         
-        # Separate output widgets dengan minimal Y spacing
-        self.overall_output = widgets.Output(layout=widgets.Layout(
-            width='100%', margin='1px 0', min_height='25px', max_height='30px'
-        ))
+        # Progress bars dengan style yang konsisten
+        progress_style = {
+            'width': '100%',
+            'margin': '12px 0',
+            'min_height': '24px',
+            'max_height': '28px',
+            'padding': '0 4px'
+        }
         
-        self.step_output = widgets.Output(layout=widgets.Layout(
-            width='100%', margin='1px 0', min_height='25px', max_height='30px'
-        ))
-        
-        self.current_output = widgets.Output(layout=widgets.Layout(
-            width='100%', margin='1px 0', min_height='25px', max_height='30px'
-        ))
+        self.overall_output = widgets.Output(layout=widgets.Layout(**progress_style))
+        self.step_output = widgets.Output(layout=widgets.Layout(**progress_style))
+        self.current_output = widgets.Output(layout=widgets.Layout(**progress_style))
         
         self._create_container()
     
@@ -65,13 +71,22 @@ class UIComponentsManager:
         elif self.config.level.value == 1:  # SINGLE
             progress_widgets.append(self.overall_output)  # Use overall for single
         
+        # Container dengan shadow dan border yang lebih halus
         self.container = widgets.VBox(
             [self.header_widget, self.status_widget] + progress_widgets,
             layout=widgets.Layout(
-                display='none', width='100%', margin='10px 0', padding='15px',
-                border='1px solid #e0e0e0', border_radius='8px', 
-                background_color='#f8fff8', min_height=self.config.get_container_height(),
-                max_height='400px', overflow='hidden', box_sizing='border-box'
+                display='none',
+                width='100%',
+                margin='12px 0',
+                padding='20px',
+                border='1px solid #e0e0e0',
+                border_radius='10px',
+                background_color='#ffffff',
+                box_shadow='0 2px 8px rgba(0,0,0,0.05)',
+                min_height=self.config.get_container_height(),
+                max_height='none',
+                overflow='visible',
+                box_sizing='border-box'
             )
         )
     
@@ -112,9 +127,13 @@ class UIComponentsManager:
     
     def update_header(self, operation: str):
         """Update header dengan operation name"""
+        # Header dengan typography yang lebih baik
         self.header_widget.value = f"""
-        <h4 style='color: #333; margin: 0; font-size: 16px; font-weight: 600;'>
-        📊 {operation}</h4>
+        <div style='color: #2c3e50; margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;'>
+            <h3 style='font-size: 17px; font-weight: 600; margin: 0 0 4px 0; padding: 0; line-height: 1.4; color: #2c3e50;'>
+                {operation}
+            </h3>
+        </div>
         """
     
     def update_status(self, message: str, style: str = None):
@@ -128,13 +147,33 @@ class UIComponentsManager:
         # Clean message dari emoji duplikat jika ada
         clean_message = self._clean_status_message(message)
         
+        # Status message dengan style yang lebih modern
+        bg_color = {
+            'success': 'rgba(40, 167, 69, 0.08)',
+            'info': 'rgba(0, 123, 255, 0.08)',
+            'warning': 'rgba(255, 193, 7, 0.08)',
+            'error': 'rgba(220, 53, 69, 0.08)'
+        }.get(style, 'rgba(233, 236, 239, 0.5)')
+        
         self.status_widget.value = f"""
-        <div style="display: flex; align-items: center; width: 100%; 
-                    color: {color}; font-size: 13px; font-weight: 500; margin: 0; 
-                    padding: 8px 12px; background: rgba(233, 236, 239, 0.5); 
-                    border-radius: 6px; border-left: 3px solid {color}; 
-                    box-sizing: border-box; word-wrap: break-word; 
-                    overflow-wrap: break-word; line-height: 1.4;">
+        <div style="
+            display: flex; 
+            align-items: center; 
+            width: 100%;
+            color: {color};
+            font-size: 13.5px;
+            font-weight: 500;
+            margin: 0;
+            padding: 12px 16px;
+            background: {bg_color};
+            border-radius: 8px;
+            border-left: 3px solid {color};
+            box-sizing: border-box;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+            line-height: 1.5;
+            transition: all 0.2s ease;
+        ">
             {clean_message}
         </div>
         """

@@ -33,7 +33,10 @@ class TqdmManager:
             
         self.close_all_bars()
         
-        for bar_config in bar_configs:
+        # Sort bars by their intended display order
+        bar_configs = sorted(bar_configs, key=lambda x: x.name)
+        
+        for idx, bar_config in enumerate(bar_configs):
             if not bar_config.visible:
                 continue
                 
@@ -53,11 +56,17 @@ class TqdmManager:
                         colour=bar_config.get_tqdm_color(),
                         leave=True,
                         file=sys.stdout,
-                        dynamic_ncols=True
+                        dynamic_ncols=True,
+                        position=idx  # Assign unique position
                     )
                     self.tqdm_bars[bar_config.name] = tqdm_bar
                 except Exception as e:
                     print(f"Error initializing progress bar {bar_config.name}: {e}")
+                    
+        # Force initial display
+        if hasattr(self.ui_manager, '_last_displayed'):
+            display(self.ui_manager._ui_components['container'], 
+                   display_id=self.ui_manager._last_displayed)
     
     def update_bar(self, level_name: str, progress: int, message: str = "", 
                    bar_configs: list[ProgressBarConfig] = None):
@@ -65,6 +74,13 @@ class TqdmManager:
         try:
             # Ensure progress is within bounds
             progress = max(0, min(100, int(progress)))
+            
+            # Check if we're in a notebook environment
+            try:
+                from IPython.display import display
+                is_notebook = True
+            except ImportError:
+                is_notebook = False
             
             # Initialize bar if it doesn't exist
             if level_name not in self.tqdm_bars:
@@ -74,33 +90,49 @@ class TqdmManager:
                 output_key = f"{level_name}_output"
                 if output_key not in self.ui_manager._ui_components:
                     return
-                    
-                output_widget = self.ui_manager._ui_components[output_key]
-                with output_widget:
+                
+                # In notebook, use the output widget
+                if is_notebook:
+                    output_widget = self.ui_manager._ui_components[output_key]
+                    with output_widget:
+                        clear_output(wait=True)
+                        
+                        # Create a new progress bar
+                        bar = tqdm(
+                            total=100,
+                            desc="",
+                            bar_format='{desc}: {bar}| {percentage:3.0f}%',
+                            colour='#0078D7',
+                            leave=True,
+                            file=sys.stdout,
+                            dynamic_ncols=True,
+                            position=len(self.tqdm_bars)
+                        )
+                        self.tqdm_bars[level_name] = bar
+                else:
+                    # In script mode, create a simple progress bar
                     bar = tqdm(
                         total=100,
-                        desc="",
-                        bar_format='{desc}{bar}| {percentage:3.0f}%',
+                        desc=level_name.capitalize(),
+                        bar_format='{l_bar}{bar}| {n_fmt}/{total_fmt} {desc}',
                         colour='#0078D7',
-                        leave=True,
-                        file=sys.stdout,
-                        dynamic_ncols=True
+                        leave=False,
+                        file=sys.stdout
                     )
                     self.tqdm_bars[level_name] = bar
             
             # Get the progress bar
             bar = self.tqdm_bars[level_name]
             
-            # Update progress
-            bar.n = progress
-            
-            # Update message if provided
+            # Update progress and description
             if message:
                 clean_message = self._clean_message(message)
                 formatted_desc = self._truncate_message(clean_message, 45)
-                bar.set_description_str(formatted_desc)
+                bar.set_description(formatted_desc, refresh=False)
             
-            # Force refresh
+            # Update progress
+            bar.n = progress
+            bar.last_print_n = progress - 1  # Force refresh
             bar.refresh()
             
             # Store values
@@ -108,8 +140,13 @@ class TqdmManager:
             if message:
                 self.progress_messages[level_name] = message
                 
+            # In notebook, force display update
+            if is_notebook and hasattr(self.ui_manager, '_last_displayed'):
+                display(self.ui_manager._ui_components['container'], 
+                       display_id=self.ui_manager._last_displayed)
+                
         except Exception as e:
-            print(f"Error updating progress bar: {e}")
+            print(f"Error updating progress bar {level_name}: {e}")
     
     def set_all_complete(self, message: str, bar_configs: list[ProgressBarConfig] = None):
         """Set all bars ke complete state tanpa emoji duplikat"""

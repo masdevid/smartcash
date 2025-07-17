@@ -214,35 +214,82 @@ class ProgressTracker(BaseUIComponent):
         if level in self._ui_components:
             self._ui_components[level].value = message
     
-    def set_progress(self, progress: int, level: str = "primary", 
-                    message: str = "") -> None:
+    def set_progress(self, progress: int, message: str = "", level: str = "primary") -> None:
         """Update progress for a specific level."""
-        if not hasattr(self, 'tqdm_manager') or not self.tqdm_manager:
-            self.tqdm_manager = TqdmManager(self)
-            self.tqdm_manager.initialize_bars(self._config.get_level_configs())
+        try:
+            # Ensure tqdm_manager is initialized
+            if not hasattr(self, 'tqdm_manager') or not self.tqdm_manager:
+                self.tqdm_manager = TqdmManager(self)
+                self.tqdm_manager.initialize_bars(self._config.get_level_configs())
             
-        if level not in ['overall', 'step', 'current']:
-            level = 'overall'  # Default to overall if invalid level provided
+            # Map level to valid progress bar names
+            level_map = {
+                'primary': 'overall',
+                'secondary': 'step',
+                'tertiary': 'current'
+            }
+            level = level_map.get(level, level)
             
-        # Update the status message
-        if message and 'status' in self._ui_components:
-            self._ui_components['status'].value = message
+            if level not in ['overall', 'step', 'current']:
+                level = 'overall'  # Default to overall if invalid level provided
             
-        # Update the progress bar
-        self.tqdm_manager.update_bar(level, progress, message)
-        
-        # Force a display update
-        if hasattr(self, '_last_displayed') and self._last_displayed:
-            display(self._ui_components['container'], display_id=self._last_displayed)
+            # Update the status message
+            if message and 'status' in self._ui_components:
+                self._ui_components['status'].value = message
+            
+            # Update the progress bar
+            self.tqdm_manager.update_bar(level, progress, message)
+            
+            # Force a display update if in notebook environment
+            if hasattr(self, '_last_displayed') and 'IPython' in globals():
+                try:
+                    from IPython.display import display
+                    display(self._ui_components['container'], 
+                          display_id=getattr(self, '_last_displayed', True))
+                except ImportError:
+                    pass  # Not in a notebook environment
+                
+        except Exception as e:
+            print(f"Progress update error: {e}")
             
     def show(self):
         """Display the progress tracker and return the display ID."""
-        container = self._ui_components.get('container')
-        if container:
-            display_id = id(container)
+        try:
+            container = self._ui_components.get('container')
+            if not container:
+                return None
+                
+            # Create a unique display ID
+            display_id = f"progress_{id(container)}"
             self._last_displayed = display_id
-            return display(container, display_id=display_id)
-        return None
+            
+            # Ensure all UI components are properly initialized
+            if not hasattr(self, 'tqdm_manager') or not self.tqdm_manager:
+                self.tqdm_manager = TqdmManager(self)
+                self.tqdm_manager.initialize_bars(self._config.get_level_configs())
+            
+            # Check if we're in a notebook environment
+            try:
+                from IPython.display import display
+                is_notebook = True
+            except ImportError:
+                is_notebook = False
+            
+            if is_notebook:
+                # In notebook, use IPython display
+                display_handle = display(container, display_id=display_id, display=True)
+                display(container, display_id=display_id)  # Force initial display
+                return display_handle
+            else:
+                # In script mode, just print progress
+                print("\n" + "="*50)
+                print(f"Progress: {self._config.operation}")
+                print("="*50)
+                return None
+                
+        except Exception as e:
+            print(f"Error displaying progress: {e}")
+            return None
     
     def complete(self, message: str = "Completed!") -> None:
         """Mark the operation as complete."""

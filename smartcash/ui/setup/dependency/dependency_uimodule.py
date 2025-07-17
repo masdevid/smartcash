@@ -189,15 +189,21 @@ class DependencyUIModule(BaseUIModule):
             if self.has_environment_support:
                 env_type = "Google Colab" if self.is_colab else "Lokal/Jupyter"
                 self.log(f"🌍 Lingkungan terdeteksi: {env_type}", 'info')
-                if self.environment_paths and 'data_root' in self.environment_paths:
-                    self.log(f"📁 Direktori kerja: {self.environment_paths['data_root']}", 'info')
+                
+                # Safely access environment_paths attributes
+                if hasattr(self, 'environment_paths') and self.environment_paths is not None:
+                    if hasattr(self.environment_paths, 'data_root') and self.environment_paths.data_root:
+                        self.log(f"📁 Direktori kerja: {self.environment_paths.data_root}", 'info')
+                    else:
+                        self.log("ℹ️ Direktori kerja default akan digunakan", 'info')
             
             # Update status panel
             self.log("📊 Status: Siap untuk manajemen paket", 'info')
             
         except Exception as e:
             # Use logger fallback if operation container logging fails
-            self.logger.debug(f"Post-initialization logging failed: {e}")
+            self.logger.error(f"Gagal mencatat inisialisasi selesai: {e}", exc_info=True)
+            self.log(f"⚠️ Terjadi kesalahan saat inisialisasi: {str(e)}", 'error')
     # ==================== OPERATION HANDLERS ====================
     
     def _operation_install_packages(self, button=None) -> Dict[str, Any]:  # noqa: ARG002

@@ -161,7 +161,7 @@ class LogAccordion(BaseUIComponent):
             
             .{self.log_id} > .p-Widget.panel-widgets-box {{
                 overflow-y: auto !important;
-                overflow-x: hidden !important;
+                overflow-x: auto !important;
                 max-height: 100% !important;
                 width: 100% !important;
                 padding: 4px 0 !important;
@@ -169,6 +169,10 @@ class LogAccordion(BaseUIComponent):
                 font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace !important;
                 font-size: 12.5px !important;
                 line-height: 1.4 !important;
+                word-wrap: break-word !important;
+                word-break: break-word !important;
+                white-space: pre-wrap !important;
+                overflow-wrap: anywhere !important;
             }}
             
             /* Log entry styling - original format */
@@ -177,6 +181,7 @@ class LogAccordion(BaseUIComponent):
                 max-width: 100% !important;
                 overflow: visible !important;
                 word-wrap: break-word !important;
+                word-break: break-word !important;
                 white-space: pre-wrap !important;
                 padding: 4px 8px !important;
                 margin: 1px 0 !important;
@@ -184,6 +189,8 @@ class LogAccordion(BaseUIComponent):
                 border-left: 3px solid transparent !important;
                 transition: all 0.15s ease !important;
                 cursor: default !important;
+                overflow-wrap: anywhere !important;
+                hyphens: auto !important;
             }}
             
             /* Compact log entry styling - new format */
@@ -192,12 +199,15 @@ class LogAccordion(BaseUIComponent):
                 max-width: 100% !important;
                 overflow: visible !important;
                 word-wrap: break-word !important;
+                word-break: break-word !important;
                 white-space: pre-wrap !important;
                 padding: 2px 8px !important;
                 margin: 1px 0 !important;
                 border-radius: 3px !important;
                 transition: all 0.15s ease !important;
                 cursor: default !important;
+                overflow-wrap: anywhere !important;
+                hyphens: auto !important;
             }}
             
             /* Hover effect for both log entry types */

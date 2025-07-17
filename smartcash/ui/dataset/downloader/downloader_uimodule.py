@@ -99,7 +99,7 @@ class DownloaderUIModule(BaseUIModule):
         except Exception as e:
             self.logger.error(f"Failed to create UI components: {e}")
             raise
-    
+        
     def _initialize_progress_display(self) -> None:
         """Initialize progress display components."""
         try:
@@ -176,8 +176,8 @@ class DownloaderUIModule(BaseUIModule):
             if self.has_environment_support:
                 env_type = "Google Colab" if self.is_colab else "Lokal/Jupyter"
                 self.log(f"🌍 Lingkungan terdeteksi: {env_type}", 'info')
-                if self.environment_paths and 'data_root' in self.environment_paths:
-                    self.log(f"📁 Direktori kerja: {self.environment_paths['data_root']}", 'info')
+                if self.environment_paths and hasattr(self.environment_paths, 'data_root'):
+                    self.log(f"📁 Direktori kerja: {self.environment_paths.data_root}", 'info')
             
             # Update status panel
             self.log("📊 Status: Siap untuk download dataset", 'info')

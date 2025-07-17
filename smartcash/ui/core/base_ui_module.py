@@ -437,6 +437,69 @@ class BaseUIModule(
         """String representation of the module."""
         return f"{self.full_module_name} UI Module"
     
+    def _initialize_progress_display(self) -> None:
+        """
+        Initialize progress display components.
+        
+        This method ensures that progress tracking components are properly
+        initialized and visible. Subclasses can override this method to
+        implement module-specific progress display logic.
+        """
+        try:
+            # Ensure progress visibility for operations
+            self._ensure_progress_visibility()
+            
+            # Initialize progress bars if available
+            if hasattr(self, '_ui_components') and self._ui_components:
+                # Look for progress tracker in operation container
+                operation_container = self._ui_components.get('operation_container')
+                if operation_container and isinstance(operation_container, dict):
+                    progress_tracker = operation_container.get('progress_tracker')
+                    if progress_tracker and hasattr(progress_tracker, 'initialize'):
+                        progress_tracker.initialize()
+                        self.logger.debug("✅ Progress tracker initialized")
+                
+                # Look for standalone progress components
+                progress_tracker = self._ui_components.get('progress_tracker')
+                if progress_tracker and hasattr(progress_tracker, 'initialize'):
+                    progress_tracker.initialize()
+                    self.logger.debug("✅ Standalone progress tracker initialized")
+                    
+        except Exception as e:
+            if hasattr(self, 'logger'):
+                self.logger.debug(f"Failed to initialize progress display: {e}")
+    
+    def _ensure_progress_visibility(self) -> None:
+        """
+        Ensure progress components are visible and properly configured.
+        
+        This method handles the visibility and configuration of progress
+        tracking components. Subclasses can override this method to
+        implement module-specific progress visibility logic.
+        """
+        try:
+            if hasattr(self, '_ui_components') and self._ui_components:
+                # Ensure operation container progress is visible
+                operation_container = self._ui_components.get('operation_container')
+                if operation_container and isinstance(operation_container, dict):
+                    # Enable progress tracking if available
+                    if 'update_progress' in operation_container:
+                        self.logger.debug("✅ Progress tracking enabled in operation container")
+                    
+                    # Ensure progress tracker is visible
+                    progress_tracker = operation_container.get('progress_tracker')
+                    if progress_tracker:
+                        # Make progress tracker visible if it has visibility controls
+                        if hasattr(progress_tracker, 'layout'):
+                            progress_tracker.layout.visibility = 'visible'
+                        if hasattr(progress_tracker, 'visible'):
+                            progress_tracker.visible = True
+                        self.logger.debug("✅ Progress tracker visibility ensured")
+                
+        except Exception as e:
+            if hasattr(self, 'logger'):
+                self.logger.debug(f"Failed to ensure progress visibility: {e}")
+    
     def _validate_button_handler_integrity(self) -> None:
         """
         Validate button-handler integrity during module setup.

@@ -76,9 +76,34 @@ def _create_augment_ui_components(config: Dict[str, Any]) -> Tuple[Dict[str, Any
     }
     widgets_dict.update(form_widgets['widgets'])
     
+    # Extract generate button from preview widget for proper registration
+    preview_widget = form_widgets['widgets'].get('preview_widget')
+    if preview_widget and isinstance(preview_widget, dict):
+        preview_widgets = preview_widget.get('widgets', {})
+        generate_button = preview_widgets.get('generate_button')
+        if generate_button:
+            ui_components['generate_button'] = generate_button
+            widgets_dict['generate_button'] = generate_button
+    
     # 3. Create action buttons
     action_container = _create_action_buttons()
     ui_components['action_container'] = action_container
+    
+    # Extract button references for proper registration
+    ui_components['primary_button'] = action_container.get('primary_button')
+    
+    # Extract individual operation buttons from the buttons dictionary
+    buttons_dict = action_container.get('buttons', {})
+    ui_components['augment_button'] = buttons_dict.get('augment')
+    ui_components['status_button'] = buttons_dict.get('status') 
+    ui_components['cleanup_button'] = buttons_dict.get('cleanup')
+    
+    # Extract save/reset buttons from action container instance
+    action_container_instance = action_container.get('action_container')
+    if action_container_instance:
+        ui_components['save_button'] = getattr(action_container_instance, 'save_button', None)
+        ui_components['reset_button'] = getattr(action_container_instance, 'reset_button', None)
+    
     
     # 4. Create summary container
     summary_content = "<div style='padding: 10px; width: 100%;'>Augmentation summary will appear here...</div>"
@@ -144,7 +169,7 @@ def _create_action_buttons() -> Dict[str, Any]:
             'tooltip': BUTTON_CONFIG[btn_id]['tooltip'],
             'order': BUTTON_CONFIG[btn_id]['order']
         }
-        for btn_id in ['augment', 'check', 'cleanup']
+        for btn_id in ['augment', 'status', 'cleanup']
     ]
     
     return create_action_container(
@@ -247,8 +272,19 @@ def create_augment_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> Dict
     operation_container = ui_components['operation_container']
     footer_container = ui_components['footer_container']
     
+    # Preserve the button references from the original ui_components
+    button_refs = {
+        'primary_button': ui_components.get('primary_button'),
+        'augment_button': ui_components.get('augment_button'),
+        'status_button': ui_components.get('status_button'),
+        'cleanup_button': ui_components.get('cleanup_button'),
+        'save_button': ui_components.get('save_button'),
+        'reset_button': ui_components.get('reset_button'),
+        'generate_button': ui_components.get('generate_button')
+    }
+    
     # Create UI components dictionary
-    ui_components = {
+    ui_components_final = {
         'module_name': 'augment',
         'parent_module': 'dataset',
         'ui_initialized': True,
@@ -260,6 +296,7 @@ def create_augment_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> Dict
         'footer_container': footer_container,
         'main_container': ui_components.get('main_container'),  # Add main container to top level
         **widgets_dict,
+        **button_refs,  # Include all button references
         # Add ui_components as a flat dictionary with all components
         'ui_components': {
             'header': header_container,
@@ -274,4 +311,4 @@ def create_augment_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> Dict
         }
     }
     
-    return ui_components
+    return ui_components_final

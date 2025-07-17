@@ -17,27 +17,21 @@ UI_CONFIG = {
 BUTTON_CONFIG = {
     'augment': {
         'text': '🎨 Augment Dataset',
-        'style': 'primary',
+        'style': 'success',  # Changed from 'primary' to avoid conflict
         'tooltip': 'Apply augmentation to the dataset',
         'order': 1
     },
-    'preview': {
-        'text': '👁️ Preview',
-        'style': 'info',
-        'tooltip': 'Preview augmentation effects',
-        'order': 2
-    },
-    'check': {
+    'status': {
         'text': '🔍 Check Status',
-        'style': 'secondary',
+        'style': 'info',
         'tooltip': 'Check augmentation status',
-        'order': 3
+        'order': 2
     },
     'cleanup': {
         'text': '🧹 Cleanup',
         'style': 'warning',
         'tooltip': 'Clean up augmented files',
-        'order': 4
+        'order': 3
     }
 }
 

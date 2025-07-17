@@ -118,9 +118,9 @@ class ButtonHandlerValidator:
         result.button_ids = button_ids
         result.handler_ids = handler_ids
         
-        # Find missing and orphaned handlers
-        result.missing_handlers = list(button_ids - handler_ids - self.RESERVED_IDS)
-        result.orphaned_handlers = list(handler_ids - button_ids - self.RESERVED_IDS)
+        # Find missing and orphaned handlers with button naming variant support
+        result.missing_handlers = self._find_missing_handlers(button_ids, handler_ids)
+        result.orphaned_handlers = self._find_orphaned_handlers(button_ids, handler_ids)
         
         # Validate button ID naming conventions
         self._validate_button_naming(button_ids, result)
@@ -138,6 +138,64 @@ class ButtonHandlerValidator:
         result.is_valid = not result.has_errors
         
         return result
+    
+    def _find_missing_handlers(self, button_ids: Set[str], handler_ids: Set[str]) -> List[str]:
+        """Find buttons that don't have corresponding handlers, accounting for naming variants."""
+        missing = []
+        
+        for button_id in button_ids:
+            if button_id in self.RESERVED_IDS:
+                continue
+                
+            # Check for exact match first
+            if button_id in handler_ids:
+                continue
+                
+            # Check for button variant (e.g., 'setup' -> 'setup_button')
+            button_variant = f"{button_id}_button"
+            if button_variant in handler_ids:
+                continue
+                
+            # Check for btn variant (e.g., 'setup' -> 'btn_setup')  
+            btn_variant = f"btn_{button_id}"
+            if btn_variant in handler_ids:
+                continue
+                
+            # If none of the variants exist, it's missing
+            missing.append(button_id)
+            
+        return missing
+    
+    def _find_orphaned_handlers(self, button_ids: Set[str], handler_ids: Set[str]) -> List[str]:
+        """Find handlers that don't have corresponding buttons, accounting for naming variants."""
+        orphaned = []
+        
+        for handler_id in handler_ids:
+            if handler_id in self.RESERVED_IDS:
+                continue
+                
+            # Check for exact match first
+            if handler_id in button_ids:
+                continue
+                
+            # Check if this handler is a variant of a button
+            # e.g., handler 'setup_button' for button 'setup'
+            if handler_id.endswith('_button'):
+                base_name = handler_id[:-7]  # Remove '_button'
+                if base_name in button_ids:
+                    continue
+                    
+            # Check if this handler is a btn variant
+            # e.g., handler 'btn_setup' for button 'setup'
+            if handler_id.startswith('btn_'):
+                base_name = handler_id[4:]  # Remove 'btn_'
+                if base_name in button_ids:
+                    continue
+                    
+            # If no matching button found, it's orphaned
+            orphaned.append(handler_id)
+            
+        return orphaned
     
     def auto_fix_issues(self, ui_module, validation_result: ButtonValidationResult) -> ButtonValidationResult:
         """

@@ -205,13 +205,13 @@ class LoggingMixin:
     
     def _setup_ui_logging_bridge(self, operation_container: Any) -> None:
         """
-        Setup UI logging bridge to capture backend service logs.
+        Setup UI logging bridge to capture backend service logs and configure UILogger.
         
         Args:
             operation_container: Operation container to bridge logs to
         """
         try:
-            if self._ui_logging_bridge_setup:
+            if getattr(self, '_ui_logging_bridge_setup', False):
                 return
                 
             # Setup logging bridge if operation container supports it
@@ -221,6 +221,10 @@ class LoggingMixin:
             # Setup logger handlers to redirect to UI
             if hasattr(self, 'logger') and hasattr(operation_container, 'capture_logs'):
                 operation_container.capture_logs(self.logger)
+            
+            # Configure UILogger to use operation container (universal solution)
+            if hasattr(self, 'logger') and hasattr(self.logger, 'ui_components'):
+                self._configure_uilogger_bridge(operation_container)
                 
             self._ui_logging_bridge_setup = True
             
@@ -230,6 +234,62 @@ class LoggingMixin:
         except Exception as e:
             if hasattr(self, 'logger'):
                 self.logger.error(f"Failed to setup UI logging bridge: {e}")
+    
+    def _configure_uilogger_bridge(self, operation_container: Any) -> None:
+        """
+        Configure UILogger to properly bridge with operation container.
+        
+        Args:
+            operation_container: Operation container to bridge to
+        """
+        try:
+            import logging
+            
+            # Add operation container as log_output for UILogger
+            if not self.logger.ui_components:
+                self.logger.ui_components = {}
+            
+            # Create adapter for operation container log method to match UILogger interface
+            if isinstance(operation_container, dict) and 'log' in operation_container:
+                class LogOutputAdapter:
+                    def __init__(self, log_func):
+                        self.log_func = log_func
+                    
+                    def append_stdout(self, message):
+                        # Parse emoji and level from message
+                        if message.startswith('✅'):
+                            level = 'success'
+                        elif message.startswith('❌'):
+                            level = 'error'
+                        elif message.startswith('⚠️'):
+                            level = 'warning'
+                        elif message.startswith('🔍'):
+                            level = 'debug'
+                        else:
+                            level = 'info'
+                        
+                        # Clean message (remove emoji and newlines)
+                        clean_message = message.strip()
+                        if clean_message.startswith(('✅', '❌', '⚠️', '🔍', 'ℹ️')):
+                            clean_message = clean_message[2:].strip()
+                        
+                        self.log_func(clean_message, level)
+                
+                self.logger.ui_components['log_output'] = LogOutputAdapter(operation_container['log'])
+                
+                # Suppress console logging when operation container is available
+                if hasattr(self.logger, 'logger') and self.logger.logger.handlers:
+                    for handler in self.logger.logger.handlers[:]:
+                        if hasattr(handler, 'stream'):
+                            # Disable console handler when operation container is active
+                            handler.setLevel(logging.CRITICAL + 1)  # Effectively disable
+                            
+                if hasattr(self, 'logger'):
+                    self.logger.debug("✅ UILogger bridge configured for operation container")
+                    
+        except Exception as e:
+            if hasattr(self, 'logger'):
+                self.logger.error(f"Failed to configure UILogger bridge: {e}")
     
     def log_info(self, message: str) -> None:
         """Log info message."""

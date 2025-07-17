@@ -266,9 +266,8 @@ class ColabUIModule(BaseUIModule):
         # Call parent method to get base handlers (save, reset)
         handlers = super()._get_module_button_handlers()
         
-        # Add Colab-specific handlers - map all possible button names to setup handler
+        # Add Colab-specific handlers - only for buttons that actually exist in UI
         colab_handlers = {
-            'setup': self._handle_setup_button,
             'setup_button': self._handle_setup_button,
             'primary_button': self._handle_setup_button,
             'colab_setup': self._handle_setup_button

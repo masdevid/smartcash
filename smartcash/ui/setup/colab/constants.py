@@ -165,3 +165,16 @@ VALIDATION_RULES = {
     'project_name': {'required': True, 'min_length': 1},
     'environment_type': {'required': True, 'allowed_values': ['colab', 'kaggle', 'local']}
 }
+
+# Colab setup phases for UI display
+COLAB_PHASES = {
+    'init': {'text': 'Menginisialisasi...', 'style': 'primary'},
+    'drive': {'text': 'Mounting Google Drive...', 'style': 'primary'},
+    'symlink': {'text': 'Menyiapkan symlink...', 'style': 'primary'},
+    'folders': {'text': 'Membuat folder...', 'style': 'primary'},
+    'config': {'text': 'Menyiapkan konfigurasi...', 'style': 'primary'},
+    'env': {'text': 'Menyiapkan environment...', 'style': 'primary'},
+    'verify': {'text': 'Memverifikasi setup...', 'style': 'primary'},
+    'complete': {'text': 'Setup Selesai!', 'style': 'success'},
+    'error': {'text': 'Terjadi Kesalahan', 'style': 'danger'}
+}

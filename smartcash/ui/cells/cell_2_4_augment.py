@@ -5,5 +5,5 @@ NOTE: Cell Code should remain minimal (import and run initializer only).
       Initializer should handle all the logic.
 """
 
-from smartcash.ui.dataset.augment.augment_uimodule import initialize_augment_ui
-initialize_augment_ui(display=True)
+from smartcash.ui.dataset.augmentation.augmentation_uimodule import initialize_augmentation_ui
+initialize_augmentation_ui(display=True)

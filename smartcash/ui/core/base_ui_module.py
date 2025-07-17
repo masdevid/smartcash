@@ -98,7 +98,7 @@ class BaseUIModule(
         self._ui_components = None
         self._required_components = []
         
-        self.logger.debug(f"✅ BaseUIModule initialized: {self.full_module_name}")
+        self.logger.debug(f"✅ BaseUIModule diinisialisasi: {self.full_module_name}")
     
     # === Config Orchestration Methods ===
     
@@ -135,7 +135,7 @@ class BaseUIModule(
             Result dictionary with success status
         """
         if not hasattr(self, '_config_handler') or not self._config_handler:
-            return {'success': False, 'message': 'Config handler not initialized'}
+            return {'success': False, 'message': 'Config handler belum diinisialisasi'}
         
         try:
             if hasattr(self._config_handler, 'update_config'):
@@ -144,9 +144,9 @@ class BaseUIModule(
                 # Fallback update
                 if hasattr(self._config_handler, 'config'):
                     self._config_handler.config.update(updates)
-                return {'success': True, 'message': 'Configuration updated'}
+                return {'success': True, 'message': 'Konfigurasi berhasil diperbarui'}
         except Exception as e:
-            return {'success': False, 'message': f'Config update failed: {e}'}
+            return {'success': False, 'message': f'Pembaruan konfigurasi gagal: {e}'}
     
     def save_config(self) -> Dict[str, Any]:
         """
@@ -159,15 +159,15 @@ class BaseUIModule(
             Result dictionary with success status
         """
         if not hasattr(self, '_config_handler') or not self._config_handler:
-            return {'success': False, 'message': 'Config handler not initialized'}
+            return {'success': False, 'message': 'Config handler belum diinisialisasi'}
         
         try:
             if hasattr(self._config_handler, 'save_config'):
                 return self._config_handler.save_config()
             else:
-                return {'success': True, 'message': 'Configuration saved (no-op)'}
+                return {'success': True, 'message': 'Konfigurasi disimpan (tidak ada operasi)'}
         except Exception as e:
-            return {'success': False, 'message': f'Config save failed: {e}'}
+            return {'success': False, 'message': f'Penyimpanan konfigurasi gagal: {e}'}
     
     def reset_config(self) -> Dict[str, Any]:
         """
@@ -180,7 +180,7 @@ class BaseUIModule(
             Result dictionary with success status
         """
         if not hasattr(self, '_config_handler') or not self._config_handler:
-            return {'success': False, 'message': 'Config handler not initialized'}
+            return {'success': False, 'message': 'Config handler belum diinisialisasi'}
         
         try:
             if hasattr(self._config_handler, 'reset_config'):
@@ -189,9 +189,9 @@ class BaseUIModule(
                 # Fallback reset
                 if hasattr(self._config_handler, 'config'):
                     self._config_handler.config = self.get_default_config()
-                return {'success': True, 'message': 'Configuration reset to defaults'}
+                return {'success': True, 'message': 'Konfigurasi berhasil direset ke pengaturan awal'}
         except Exception as e:
-            return {'success': False, 'message': f'Config reset failed: {e}'}
+            return {'success': False, 'message': f'Reset konfigurasi gagal: {e}'}
     
     def _initialize_config_handler(self) -> None:
         """
@@ -213,10 +213,10 @@ class BaseUIModule(
             if hasattr(self._config_handler, 'initialize'):
                 self._config_handler.initialize()
             
-            self.logger.debug(f"✅ Config handler initialized for {self.full_module_name}")
+            self.logger.debug(f"✅ Config handler diinisialisasi untuk {self.full_module_name}")
             
         except Exception as e:
-            self.logger.error(f"❌ Failed to initialize config handler: {e}")
+            self.logger.error(f"❌ Gagal menginisialisasi config handler: {e}")
             raise
     
     def get_config_handler(self) -> Any:
@@ -288,7 +288,7 @@ class BaseUIModule(
             if self._is_initialized:
                 return True
             
-            self.logger.debug(f"🔄 Initializing {self.full_module_name}")
+            self.logger.debug(f"🔄 Menginisialisasi {self.full_module_name}")
             
             # Initialize configuration handler (delegates to config_handler)
             self._initialize_config_handler()
@@ -327,12 +327,12 @@ class BaseUIModule(
             
             self._is_initialized = True
             
-            self.logger.info(f"✅ {self.full_module_name} initialized successfully")
+            self.logger.info(f"✅ {self.full_module_name} berhasil diinisialisasi")
             
             return True
             
         except Exception as e:
-            self.logger.error(f"❌ Failed to initialize {self.full_module_name}: {e}")
+            self.logger.error(f"❌ Gagal menginisialisasi {self.full_module_name}: {e}")
             return False
     
     def _register_default_operations(self) -> None:
@@ -353,18 +353,18 @@ class BaseUIModule(
         try:
             result = self.save_config()
             if result.get('success'):
-                success_msg = result.get('message', 'Configuration saved successfully')
+                success_msg = result.get('message', 'Konfigurasi berhasil disimpan')
                 self._update_header_status(f"💾 {success_msg}", "success")
                 self.log(f"💾 {success_msg}", 'success')
             else:
-                error_msg = result.get('message', 'Save failed')
-                self._update_header_status(f"❌ Save failed: {error_msg}", "error")
-                self.log(f"❌ Save failed: {error_msg}", 'error')
+                error_msg = result.get('message', 'Penyimpanan gagal')
+                self._update_header_status(f"❌ Penyimpanan gagal: {error_msg}", "error")
+                self.log(f"❌ Penyimpanan gagal: {error_msg}", 'error')
                 
             return result
             
         except Exception as e:
-            error_msg = f"Save config error: {e}"
+            error_msg = f"Kesalahan penyimpanan konfigurasi: {e}"
             self._update_header_status(f"❌ {error_msg}", "error")
             self.log(f"❌ {error_msg}", 'error')
             return {'success': False, 'message': error_msg}
@@ -374,18 +374,18 @@ class BaseUIModule(
         try:
             result = self.reset_config()
             if result.get('success'):
-                success_msg = result.get('message', 'Configuration reset to defaults')
+                success_msg = result.get('message', 'Konfigurasi berhasil direset ke pengaturan awal')
                 self._update_header_status(f"🔄 {success_msg}", "success")
                 self.log(f"🔄 {success_msg}", 'success')
             else:
-                error_msg = result.get('message', 'Reset failed')
-                self._update_header_status(f"❌ Reset failed: {error_msg}", "error")
-                self.log(f"❌ Reset failed: {error_msg}", 'error')
+                error_msg = result.get('message', 'Reset gagal')
+                self._update_header_status(f"❌ Reset gagal: {error_msg}", "error")
+                self.log(f"❌ Reset gagal: {error_msg}", 'error')
                 
             return result
             
         except Exception as e:
-            error_msg = f"Reset config error: {e}"
+            error_msg = f"Kesalahan reset konfigurasi: {e}"
             self._update_header_status(f"❌ {error_msg}", "error")
             self.log(f"❌ {error_msg}", 'error')
             return {'success': False, 'message': error_msg}

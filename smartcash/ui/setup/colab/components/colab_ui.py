@@ -42,22 +42,21 @@ from .colab_ui_helpers import (
 # Error handling import
 from smartcash.ui.core.decorators import handle_ui_errors
 
-# UI Configuration
+# Import configurations from constants to reduce redundancy
+from ..constants import UI_CONFIG as BASE_UI_CONFIG, BUTTON_CONFIG as BASE_BUTTON_CONFIG, COLAB_PHASES
+
+# Override specific localized strings
 UI_CONFIG = {
+    **BASE_UI_CONFIG,
     'title': 'Pengaturan Google Colab',
     'description': 'Konfigurasi lingkungan Google Colab untuk SmartCash',
-    'module_name': 'colab',
-    'parent_module': 'setup',
-    'version': '1.0.0',
-    'icon': '⚙️'  # Font Awesome icon name
 }
 
-# Button configuration
+# Use button configuration from constants with localized text
 BUTTON_CONFIG = {
     'primary': {
-        'description': 'Inisialisasi Lingkungan',
-        'button_style': 'success',
-        'icon': 'check'
+        **BASE_BUTTON_CONFIG['primary'],
+        'text': '🚀 Inisialisasi Lingkungan'
     },
     'secondary': {
         'description': 'Reset',
@@ -81,7 +80,7 @@ create_module_tips_box = _create_module_tips_box
 
 
 @handle_ui_errors(error_component_title="Colab UI Creation Error")
-def create_colab_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> Dict[str, Any]:
+def create_colab_ui(config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     """
     Create Colab UI using standardized container architecture.
     
@@ -134,18 +133,7 @@ def create_colab_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> Dict[s
     # Create module-specific form widgets first
     form_widgets = _create_module_form_widgets(config)
     
-    # Define colab phases
-    colab_phases = {
-        'init': {'text': 'Menginisialisasi...', 'style': 'primary'},
-        'drive': {'text': 'Mounting Google Drive...', 'style': 'primary'},
-        'symlink': {'text': 'Menyiapkan symlink...', 'style': 'primary'},
-        'folders': {'text': 'Membuat folder...', 'style': 'primary'},
-        'config': {'text': 'Menyiapkan konfigurasi...', 'style': 'primary'},
-        'env': {'text': 'Menyiapkan environment...', 'style': 'primary'},
-        'verify': {'text': 'Memverifikasi setup...', 'style': 'primary'},
-        'complete': {'text': 'Setup Selesai!', 'style': 'success'},
-        'error': {'text': 'Terjadi Kesalahan', 'style': 'danger'}
-    }
+    # Use colab phases from constants to reduce redundancy
     
     # Create action container with primary button and phases
     action_container = create_action_container(
@@ -162,7 +150,7 @@ def create_colab_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> Dict[s
         title="<h3>Setup Environment</h3>",
         container_margin="24px 0 12px 0",
         show_save_reset=False,
-        phases=colab_phases  # Pass phases during initialization
+        phases=COLAB_PHASES  # Pass phases during initialization
     )
     
     # Create form container with consistent styling
@@ -317,7 +305,7 @@ def create_colab_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> Dict[s
         layout=widgets.Layout(width='auto', margin='5px 0')
     )
     
-    def on_refresh_clicked(button):
+    def on_refresh_clicked(_):
         with environment_container.hold_trait_notifications():
             environment_container.children = [widgets.HTML(
                 value='<div style="text-align: center; padding: 10px;">Refreshing environment information...</div>',

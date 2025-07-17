@@ -18,7 +18,6 @@ class AugmentationOperation(Enum):
     AUGMENT = "augment"
     CHECK = "check"
     CLEANUP = "cleanup"
-    PREVIEW = "preview"
 
 class AugmentationTypes(Enum):
     """Available augmentation types."""
@@ -75,12 +74,7 @@ BUTTON_CONFIG = {
         'tooltip': 'Clean up augmented or sample files',
         'order': 3
     },
-    'preview': {
-        'text': '👁️ Live Preview',
-        'style': 'warning',
-        'tooltip': 'Preview augmentation results in real-time',
-        'order': 4
-    }
+
 }
 
 # =============================================================================
@@ -208,7 +202,7 @@ ERROR_MESSAGES = {
     'augmentation_failed': '❌ Augmentation process failed',
     'check_failed': '❌ Status check failed',
     'cleanup_failed': '❌ Cleanup operation failed',
-    'preview_failed': '❌ Preview generation failed',
+
     'invalid_config': '❌ Invalid configuration provided',
     'no_data_found': '❌ No data found for augmentation'
 }

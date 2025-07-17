@@ -85,11 +85,11 @@ class ConfigurationMixin(ABC):
             self._merged_config = merged_config
             
             if hasattr(self, 'logger'):
-                self.logger.debug("✅ Config handler initialized")
+                self.logger.debug("✅ Config handler diinisialisasi")
                 
         except Exception as e:
             if hasattr(self, 'logger'):
-                self.logger.error(f"Failed to initialize config handler: {e}")
+                self.logger.error(f"Gagal menginisialisasi config handler: {e}")
             raise
     
     def save_config(self, skip_ui_extraction: bool = False) -> Dict[str, Any]:
@@ -132,7 +132,7 @@ class ConfigurationMixin(ABC):
             # Skip save if config handler doesn't implement it
             if not hasattr(self._config_handler, 'save_config'):
                 if hasattr(self, 'logger'):
-                    self.logger.info("✅ Configuration updated in memory (no save required)")
+                    self.logger.info("✅ Konfigurasi diperbarui di memori (tidak perlu disimpan)")
                 return {'success': True, 'message': 'Configuration updated in memory'}
             
             # Perform the save operation
@@ -141,7 +141,7 @@ class ConfigurationMixin(ABC):
                 raise RuntimeError(save_result.get('message', 'Configuration save failed'))
             
             if hasattr(self, 'logger'):
-                self.logger.info("✅ Configuration saved successfully")
+                self.logger.info("✅ Konfigurasi berhasil disimpan")
                 
             return {
                 'success': True, 
@@ -263,7 +263,7 @@ class ConfigurationMixin(ABC):
                     self._config_handler.sync_to_ui(self._ui_components, merged_config)
             
             if hasattr(self, 'logger'):
-                self.logger.info(f"✅ Configuration loaded from {config_path}")
+                self.logger.info(f"✅ Konfigurasi dimuat dari {config_path}")
                 
             return {'success': True, 'message': f'Configuration loaded from {config_path}'}
             

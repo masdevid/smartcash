@@ -209,7 +209,9 @@ class ButtonHandlerValidator:
                 if hasattr(action_container, 'buttons') and isinstance(action_container.buttons, dict):
                     for btn_id, btn in action_container.buttons.items():
                         if hasattr(btn, 'on_click'):
-                            button_ids.add(btn_id)
+                            # Only add base button IDs, ignore any variants
+                            base_btn_id = btn_id.replace('_button', '').replace('btn_', '')
+                            button_ids.add(base_btn_id)
                 
                 # Get buttons from container children if available
                 if hasattr(action_container, 'container') and hasattr(action_container.container, 'children'):
@@ -220,7 +222,9 @@ class ButtonHandlerValidator:
                             if not btn_id and hasattr(child, 'description'):
                                 btn_id = child.description.lower().replace(' ', '_')
                             if btn_id:
-                                button_ids.add(btn_id)
+                                # Only add base button IDs, ignore any variants
+                                base_btn_id = btn_id.replace('_button', '').replace('btn_', '')
+                                button_ids.add(base_btn_id)
             
             # Also check for buttons directly in ui_components
             for key, widget in ui_module._ui_components.items():
@@ -230,8 +234,11 @@ class ButtonHandlerValidator:
                 
                 # Get button ID from _button_id attribute or key
                 button_id = getattr(widget, '_button_id', key)
-                if button_id and button_id not in button_ids:  # Avoid duplicates
-                    button_ids.add(button_id)
+                if button_id:  # Avoid duplicates
+                    # Only add base button IDs, ignore any variants
+                    base_btn_id = button_id.replace('_button', '').replace('btn_', '')
+                    if base_btn_id not in button_ids:
+                        button_ids.add(base_btn_id)
             
             # Log extracted button IDs for debugging
             if hasattr(ui_module, 'logger'):
@@ -251,13 +258,19 @@ class ButtonHandlerValidator:
         try:
             # Get handlers from _button_handlers if available
             if hasattr(ui_module, '_button_handlers') and ui_module._button_handlers:
+                # Only add exact matches, no variants
                 handler_ids.update(ui_module._button_handlers.keys())
             
             # Also check for handlers registered directly on the module
             if hasattr(ui_module, 'handlers') and callable(getattr(ui_module, 'handlers', None)):
                 handler_func = getattr(ui_module, 'handlers')
                 if hasattr(handler_func, 'handlers'):
+                    # Only add exact matches, no variants
                     handler_ids.update(handler_func.handlers.keys())
+                    
+            # Log extracted handler IDs for debugging
+            if hasattr(ui_module, 'logger') and handler_ids:
+                ui_module.logger.debug(f"Extracted handler IDs: {sorted(handler_ids)}")
                     
         except Exception as e:
             if hasattr(ui_module, 'logger'):
@@ -278,16 +291,6 @@ class ButtonHandlerValidator:
                     button_id=button_id,
                     suggestion="Use snake_case format (e.g., 'start_training', 'check_status')"
                 )
-            
-            # Check for common naming anti-patterns
-            if button_id.endswith('_button'):
-                result.add_issue(
-                    ValidationLevel.WARNING,
-                    f"Button ID '{button_id}' has redundant '_button' suffix",
-                    button_id=button_id,
-                    suggestion=f"Consider using '{button_id[:-7]}' instead",
-                    auto_fixable=True
-                )
     
     def _validate_handler_sync(self, result: ButtonValidationResult) -> None:
         """Validate handler-button synchronization.
@@ -305,10 +308,6 @@ class ButtonHandlerValidator:
             if button_id in self.RESERVED_IDS:
                 continue
                 
-            # Skip if this is a base ID and we have a suffixed handler
-            if f"{button_id}_button" in result.handler_ids:
-                continue
-                
             # If we get here, the button has no handler
             result.add_issue(
                 ValidationLevel.ERROR,
@@ -322,10 +321,6 @@ class ButtonHandlerValidator:
         for handler_id in result.orphaned_handlers:
             # Skip reserved handlers
             if handler_id in self.RESERVED_IDS:
-                continue
-                
-            # Skip if this is a suffixed handler and we have a base button
-            if handler_id.endswith('_button') and handler_id[:-7] in result.button_ids:
                 continue
                 
             # If we get here, the handler has no corresponding button

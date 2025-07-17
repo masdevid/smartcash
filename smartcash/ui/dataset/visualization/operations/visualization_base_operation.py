@@ -219,35 +219,50 @@ class VisualizationBaseOperation(OperationMixin, LoggingMixin):
         """
         backend_apis = {}
         
+        # Try to import preprocessor samples API if available
         try:
-            # Try to import preprocessor samples API
-            from smartcash.dataset.preprocessor.api.samples_api import (
-                get_samples,
-                generate_sample_previews,
-                get_class_samples,
-                get_samples_summary
-            )
-            from smartcash.dataset.preprocessor.utils.file_scanner import scan_directory
+            from smartcash.dataset.preprocessor.api import samples_api
             
-            backend_apis.update({
-                'samples_service': {
-                    'get_samples': get_samples,
-                    'generate_sample_previews': generate_sample_previews,
-                    'get_class_samples': get_class_samples,
-                    'get_samples_summary': get_samples_summary
-                },
-                'preprocessor_scanner': scan_directory
-            })
-            
+            # Only add the service if the module has the required functions
+            if all(hasattr(samples_api, func) for func in ['get_samples', 'generate_sample_previews', 
+                                                         'get_class_samples', 'get_samples_summary']):
+                backend_apis['samples_service'] = {
+                    'get_samples': samples_api.get_samples,
+                    'generate_sample_previews': samples_api.generate_sample_previews,
+                    'get_class_samples': samples_api.get_class_samples,
+                    'get_samples_summary': samples_api.get_samples_summary
+                }
+            else:
+                self.logger.warning("Preprocessor samples API is missing required functions")
+                
+            # Try to import file scanner separately
+            try:
+                from smartcash.dataset.preprocessor.utils import file_scanner
+                if hasattr(file_scanner, 'scan_directory'):
+                    backend_apis['preprocessor_scanner'] = file_scanner.scan_directory
+            except ImportError as e:
+                self.logger.debug("Preprocessor file scanner not available: %s", str(e))
+                
         except ImportError as e:
-            self.logger.warning("Preprocessor backend module not available: %s", str(e))
+            self.logger.debug("Preprocessor backend module not available: %s", str(e))
         
+        # Try to import augmentor scanner if available
         try:
-            # Try to import augmentor scanner
-            from smartcash.dataset.augmentor.utils.file_scanner import scan_augmentation_directory
-            backend_apis['augmentor_scanner'] = scan_augmentation_directory
+            from smartcash.dataset.augmentor.utils import file_scanner as aug_file_scanner
+            
+            # Create a wrapper function that matches the expected interface
+            def scan_augmentation_wrapper(directory):
+                scanner = aug_file_scanner.FileScanner()
+                if hasattr(scanner, 'scan_augmented_files'):
+                    return scanner.scan_augmented_files(directory)
+                return {'success': False, 'message': 'scan_augmented_files method not found', 'files': []}
+                
+            backend_apis['augmentor_scanner'] = scan_augmentation_wrapper
+            
         except ImportError as e:
-            self.logger.warning("Augmentor backend module not available: %s", str(e))
+            self.logger.debug("Augmentor backend module not available: %s", str(e))
+        except Exception as e:
+            self.logger.debug("Error initializing augmentor scanner: %s", str(e))
         
         return backend_apis
     

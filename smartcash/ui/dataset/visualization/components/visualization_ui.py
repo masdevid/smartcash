@@ -165,28 +165,25 @@ def create_visualization_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -
         alignment="left"
     )
     
-    # Simpan container aksi dan tombol
+    # Simpan container aksi
     ui_components['containers']['actions'] = action_container
     
-    # Simpan referensi tombol dengan beberapa format yang mungkin
+    # Simpan referensi tombol dengan ID dasar saja
     if hasattr(action_container, 'get_button'):
         # Jika action container memiliki method get_button
-        ui_components['refresh_button'] = action_container.get_button('refresh')
-        ui_components['preprocessed_button'] = action_container.get_button('preprocessed')
-        ui_components['augmented_button'] = action_container.get_button('augmented')
+        ui_components['refresh'] = action_container.get_button('refresh')
+        ui_components['preprocessed'] = action_container.get_button('preprocessed')
+        ui_components['augmented'] = action_container.get_button('augmented')
     elif hasattr(action_container, 'buttons') and isinstance(action_container.buttons, dict):
         # Jika action container memiliki atribut buttons yang berupa dictionary
-        ui_components['refresh_button'] = action_container.buttons.get('refresh')
-        ui_components['preprocessed_button'] = action_container.buttons.get('preprocessed')
-        ui_components['augmented_button'] = action_container.buttons.get('augmented')
-    
-    # Juga simpan dengan format btn_* untuk kompatibilitas
-    if 'refresh_button' in ui_components:
-        ui_components['btn_refresh'] = ui_components['refresh_button']
-    if 'preprocessed_button' in ui_components:
-        ui_components['btn_preprocessed'] = ui_components['preprocessed_button']
-    if 'augmented_button' in ui_components:
-        ui_components['btn_augmented'] = ui_components['augmented_button']
+        buttons = action_container.buttons
+        
+        # Gunakan ID dasar saja tanpa menambahkan _button
+        for btn_id in ['refresh', 'preprocessed', 'augmented']:
+            # Coba dapatin button dengan ID dasar
+            button = buttons.get(btn_id)
+            if button is not None:
+                ui_components[btn_id] = button
     
     # === 4. Buat Summary Container ===
     summary_content = _create_module_summary_content(current_config)

@@ -587,7 +587,7 @@ class BaseUIModule(
             registered_handlers = set()
             
             for button_id, handler in button_handlers.items():
-                # Try to register base ID handler
+                # Only try exact match
                 if button_id in button_widgets:
                     try:
                         widget = button_widgets[button_id]
@@ -596,21 +596,8 @@ class BaseUIModule(
                         self.logger.info(f"✅ Registered handler for button: {button_id}")
                     except Exception as e:
                         self.logger.error(f"❌ Failed to register handler for button '{button_id}': {e}")
-                
-                # Try to register _button suffixed handler
-                button_id_suffixed = f"{button_id}_button"
-                if button_id_suffixed in button_widgets and button_id_suffixed not in registered_handlers:
-                    try:
-                        widget = button_widgets[button_id_suffixed]
-                        self.register_button_handler(button_id_suffixed, handler)
-                        registered_handlers.add(button_id_suffixed)
-                        self.logger.info(f"✅ Registered handler for button: {button_id_suffixed}")
-                    except Exception as e:
-                        self.logger.error(f"❌ Failed to register handler for button '{button_id_suffixed}': {e}")
-                
-                # If neither variant was found, log a warning
-                if button_id not in registered_handlers and button_id_suffixed not in registered_handlers:
-                    self.logger.warning(f"⚠️ No button widget found for '{button_id}' or '{button_id_suffixed}'")
+                else:
+                    self.logger.warning(f"⚠️ No button widget found for '{button_id}'")
             
             # Summary
             self.logger.info(f"🎯 Successfully registered {len(registered_handlers)} dynamic button handlers")

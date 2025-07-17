@@ -317,15 +317,7 @@ class VisualizationUIModule(BaseUIModule):
             # Action buttons
             'refresh': self._on_refresh_click,
             'preprocessed': self._on_preprocessed_click,
-            'augmented': self._on_augmented_click,
-            'refresh_button': self._on_refresh_click,
-            'preprocessed_button': self._on_preprocessed_click,
-            'augmented_button': self._on_augmented_click,
-            
-            # Alternative button names
-            'btn_refresh': self._on_refresh_click,
-            'btn_preprocessed': self._on_preprocessed_click,
-            'btn_augmented': self._on_augmented_click
+            'augmented': self._on_augmented_click
         }
         
         handlers.update(visualization_handlers)
@@ -406,36 +398,58 @@ class VisualizationUIModule(BaseUIModule):
         return self._backend_apis.get(api_name)
     
     def _load_backend_apis(self) -> None:
-        """Load backend API modules for visualization operations."""
+        """Load backend API modules for visualization operations.
+        
+        This method attempts to load various backend APIs for visualization features.
+        If a module is not available, it will log a warning and continue without it.
+        """
+        # Initialize with empty backend APIs
+        self._backend_apis = {}
+        
+        # Try to import preprocessor samples API if available
         try:
-            # Try to import preprocessor samples API
             from smartcash.dataset.preprocessor.api.samples_api import (
                 get_samples,
                 generate_sample_previews,
                 get_class_samples,
                 get_samples_summary
             )
-            from smartcash.dataset.preprocessor.utils.file_scanner import scan_directory
             
-            self._backend_apis.update({
-                'samples_service': {
-                    'get_samples': get_samples,
-                    'generate_sample_previews': generate_sample_previews,
-                    'get_class_samples': get_class_samples,
-                    'get_samples_summary': get_samples_summary
-                },
-                'preprocessor_scanner': scan_directory
-            })
+            # Add preprocessor API functions if import was successful
+            self._backend_apis['samples_service'] = {
+                'get_samples': get_samples,
+                'generate_sample_previews': generate_sample_previews,
+                'get_class_samples': get_class_samples,
+                'get_samples_summary': get_samples_summary
+            }
             
+            # Try to import file scanner separately to handle its own potential import errors
+            try:
+                from smartcash.dataset.preprocessor.utils.file_scanner import scan_directory
+                self._backend_apis['preprocessor_scanner'] = scan_directory
+            except ImportError as e:
+                self.logger.warning(f"Preprocessor file scanner not available: {e}")
+                
         except ImportError as e:
             self.logger.warning(f"Preprocessor backend module not available: {e}")
         
+        # Try to import augmentor scanner if available
         try:
-            # Try to import augmentor scanner
-            from smartcash.dataset.augmentor.utils.file_scanner import scan_augmentation_directory
-            self._backend_apis['augmentor_scanner'] = scan_augmentation_directory
+            from smartcash.dataset.augmentor.utils.file_scanner import FileScanner
+            
+            # Create an instance of FileScanner and use its methods
+            file_scanner = FileScanner()
+            
+            # Map the scanner methods to the expected API
+            self._backend_apis['augmentor_scanner'] = {
+                'scan_augmented_files': file_scanner.scan_augmented_files,
+                'scan_preprocessed_files': file_scanner.scan_preprocessed_files
+            }
+            
         except ImportError as e:
             self.logger.warning(f"Augmentor backend module not available: {e}")
+        except Exception as e:
+            self.logger.warning(f"Error initializing augmentor scanner: {e}")
     
     def update_visualization(self, viz_type: str) -> None:
         """Update the current visualization.

@@ -244,7 +244,7 @@ def create_downloader_ui_components(
         # Add form widgets - accessed as attributes of input_options
         'workspace_input': input_options.workspace_input,
         'project_input': input_options.project_input,
-        'version_input': input_options.version_inpu t,
+        'version_input': input_options.version_input,
         'api_key_input': input_options.api_key_input,
         'validate_checkbox': input_options.validate_checkbox,
         'backup_checkbox': input_options.backup_checkbox,

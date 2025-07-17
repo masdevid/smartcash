@@ -1,17 +1,17 @@
 """
 File: smartcash/ui/dataset/visualization/components/visualization_ui.py
-Description: Dataset visualization UI following SmartCash standardized template.
+Deskripsi: Antarmuka pengguna visualisasi dataset mengikuti template standar SmartCash.
 
-This module provides the user interface for visualizing dataset statistics,
-class distributions, and generating various charts for dataset analysis.
+Modul ini menyediakan antarmuka untuk memvisualisasikan statistik dataset,
+distribusi kelas, dan menghasilkan berbagai chart untuk analisis dataset.
 
-Container Order:
-1. Header Container (Title, Status)
-2. Form Container (Visualization Options)
-3. Action Container (Analyze/Refresh/Export/Compare Buttons)
-4. Summary Container (Statistics Overview)
-5. Operation Container (Progress + Logs)
-6. Footer Container (Tips and Info)
+Urutan Kontainer:
+1. Header Container (Judul, Status)
+2. Form Container (Opsi Visualisasi)
+3. Action Container (Tombol Analisis/Refresh/Ekspor/Bandingkan)
+4. Summary Container (Ringkasan Statistik)
+5. Operation Container (Progres + Log)
+6. Footer Container (Tips dan Informasi)
 """
 
 from typing import Optional, Dict, Any, List
@@ -36,15 +36,15 @@ BUTTON_CONFIG = BUTTON_CONFIG
 
 
 def create_data_card(title: str, content: widgets.Widget, width: str = "100%") -> widgets.VBox:
-    """Create a styled card container for data visualization.
+    """Membuat container kartu bergaya untuk visualisasi data.
     
     Args:
-        title: Title of the card
-        content: Widget to be placed inside the card
-        width: Width of the card (default: "100%")
+        title: Judul kartu
+        content: Widget yang akan ditempatkan di dalam kartu
+        width: Lebar kartu (default: "100%")
         
     Returns:
-        A VBox widget containing the card
+        Widget VBox yang berisi kartu
     """
     card_header = widgets.HTML(
         value=f'<div style="padding: 10px; background-color: #f8f9fa; border-bottom: 1px solid #dee2e6; border-radius: 5px 5px 0 0; font-weight: bold;">{title}</div>',
@@ -73,30 +73,19 @@ def create_data_card(title: str, content: widgets.Widget, width: str = "100%") -
     )
 
 
-@handle_ui_errors(error_component_title="Visualization UI Error")
+@handle_ui_errors(error_component_title="Kesalahan UI Visualisasi")
 def create_visualization_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> Dict[str, Any]:
     """
-    Create the dataset visualization UI following SmartCash standards.
+    Membuat antarmuka pengguna visualisasi dataset mengikuti standar SmartCash.
     
-    This function creates a complete UI for visualizing dataset statistics
-    with the following sections:
-    - Chart type and data split selection
-    - Analysis and export options
-    - Statistical summaries
-    - Interactive charts and visualizations
-    
-    Args:
-        config: Optional configuration dictionary for the UI
-        **kwargs: Additional keyword arguments passed to UI components
-        
-    Returns:
-        Dictionary containing all UI components and their references with 'ui_components' key
-        
-    Example:
-        >>> ui = create_visualization_ui()
-        >>> display(ui['ui'])  # Display the UI
+    Fungsi ini membuat UI lengkap untuk memvisualisasikan statistik dataset
+    dengan bagian-bagian berikut:
+    - Pemilihan tipe chart dan pembagian data
+    - Opsi analisis dan ekspor
+    - Ringkasan statistik
+    - Chart dan visualisasi interaktif
     """
-    # Initialize configuration and components dictionary
+    # Inisialisasi konfigurasi dan kamus komponen
     current_config = config or {}
     ui_components = {
         'config': current_config,
@@ -104,11 +93,11 @@ def create_visualization_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -
         'widgets': {}
     }
     
-    # === 1. Create Header Container ===
+    # === 1. Buat Header Container ===
     header_container = create_header_container(
         title=f"{UI_CONFIG['icon']} {UI_CONFIG['title']}",
         subtitle=UI_CONFIG['subtitle'],
-        status_message="Ready to analyze dataset",
+        status_message="Siap menganalisis dataset",
         status_type="info"
     )
     # Store both the container object and its widget
@@ -117,11 +106,11 @@ def create_visualization_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -
         'widget': header_container
     }
     
-    # === 2. Create Form Container ===
-    # Create form widgets with two-column layout
+    # === 2. Buat Form Container ===
+    # Buat widget form dengan tata letak dua kolom
     form_widgets = _create_module_form_widgets(current_config)
     
-    # Create form container with the widgets
+    # Buat container form dengan widget
     form_container = create_form_container(
         form_rows=form_widgets['form_rows'],
         layout_type=LayoutType.COLUMN,
@@ -138,38 +127,56 @@ def create_visualization_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -
         }
     )
     
-    # Store references
+    # Simpan referensi
     ui_components['containers']['form'] = form_container
     ui_components['widgets'].update(form_widgets['widgets'])
     
-    # === 3. Create Action Container ===
-    # Create action buttons from BUTTON_CONFIG
-    action_buttons = []
-    for button_id, btn_config in BUTTON_CONFIG.items():
-        action_buttons.append({
-            'name': button_id,
-            'label': btn_config['text'],
-            'button_style': btn_config['style'],
-            'tooltip': btn_config['tooltip'],
-            'icon': 'chart-bar' if button_id == 'analyze' else 'refresh' if button_id == 'refresh' else 'download' if button_id == 'export' else 'compare'
-        })
+    # === 3. Buat Action Container ===
+    # Tentukan tombol aksi dengan ikon dan tooltip
+    action_buttons = [
+        {
+            'id': 'refresh',
+            'text': 'Segarkan',
+            'style': 'success',
+            'tooltip': 'Segarkan visualisasi dengan pengaturan saat ini',
+            'icon': 'refresh'
+        },
+        {
+            'id': 'preprocessed',
+            'text': 'Contoh Praproses',
+            'style': 'info',
+            'tooltip': 'Lihat contoh data yang telah diproses',
+            'icon': 'filter'
+        },
+        {
+            'id': 'augmented',
+            'text': 'Contoh Augmentasi',
+            'style': 'info',
+            'tooltip': 'Lihat contoh data yang telah diaugmentasi',
+            'icon': 'magic'
+        },
+    ]
     
+    # Buat container aksi dengan tombol
     action_container = create_action_container(
+        show_save_reset=False,
         buttons=action_buttons,
-        title="📊 Visualization Actions",
+        title="📊 Aksi Visualisasi",
         alignment="left"
     )
     
-    # Store references
+    # Simpan container aksi dan tombol
     ui_components['containers']['actions'] = action_container
     if hasattr(action_container, 'get'):
-        for btn in action_buttons:
-            ui_components['widgets'][f'{btn["name"]}_button'] = action_container.get(btn['name'])
+        # Simpan widget tombol dengan akhiran _button
+        ui_components['refresh_button'] = action_container.get('refresh')
+        ui_components['preprocessed_button'] = action_container.get('preprocessed')
+        ui_components['augmented_button'] = action_container.get('augmented')
     
-    # === 4. Create Summary Container ===
+    # === 4. Buat Summary Container ===
     summary_content = _create_module_summary_content(current_config)
     summary_container = create_summary_container(
-        title="📋 Dataset Statistics",
+        title="📋 Statistik Dataset",
         theme="info",
         icon="📊"
     )
@@ -177,74 +184,97 @@ def create_visualization_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -
     
     ui_components['containers']['summary'] = summary_container
     
-    # === 5. Create Operation Container ===
+    # === 5. Buat Operation Container ===
     operation_container = create_operation_container(
-        show_progress=True,
+        show_progress=False,
         show_logs=True,
         log_module_name=UI_CONFIG['module_name'],
         log_height="200px",
-        log_entry_style='compact',  # Ensure consistent hover behavior
+        log_entry_style='compact',  # Memastikan perilaku hover konsisten
         collapsible=True,
         collapsed=False
     )
     ui_components['containers']['operation'] = operation_container
     
-    # === 6. Create Footer Container ===
+    # === 6. Buat Footer Container ===
     footer_container = create_footer_container(
         info_box=_create_module_info_box(),
         show_tips=True,
         show_version=True
     )
-    # Store both the container object and its widget
+    # Simpan container dan widget-nya
     ui_components['containers']['footer'] = {
         'container': footer_container.container,
         'widget': footer_container
     }
     
-    # === 7. Create Main Container ===
-    # Prepare components for main container
+    # === 5.1 Buat Dashboard Container ===
+    # Buat container untuk dashboard cards
+    dashboard_container = widgets.VBox(
+        layout=widgets.Layout(
+            width='100%',
+            padding='10px',
+            margin='10px 0',
+            border='1px solid #e0e0e0',
+            border_radius='5px',
+            display='flex',
+            flex_flow='row wrap',
+            justify_content='space-between',
+            align_items='stretch',
+            align_content='stretch',
+            overflow='hidden'
+        )
+    )
+    
+    # Simpan dashboard container
+    ui_components['containers']['dashboard'] = dashboard_container
+    
+    # === 7. Buat Main Container ===
+    # Siapkan komponen untuk container utama
     components = [
-        # Header container (object with .container attribute)
+        # Header container (objek dengan atribut .container)
         {'type': 'header', 'component': header_container.container, 'order': 0},
-        # Form container (dictionary with 'container' key)
-        {'type': 'form', 'component': form_container['container'], 'order': 1},
-        # Action container (dictionary with 'container' key)
-        {'type': 'action', 'component': action_container['container'], 'order': 2},
-        # Summary container (object with .container attribute)
-        {'type': 'summary', 'component': summary_container.container, 'order': 3},
-        # Operation container (dictionary with 'container' key)
-        {'type': 'operation', 'component': operation_container['container'], 'order': 4},
-        # Footer container (object with .container attribute)
-        {'type': 'footer', 'component': footer_container.container, 'order': 5}
+        # Form container (dictionary dengan kunci 'container')
+        {'type': 'form', 'component': form_container['container'], 'order': 2},
+        # Action container (dictionary dengan kunci 'container')
+        {'type': 'action', 'component': action_container['container'], 'order': 3},
+        # Dashboard container
+        {'type': 'dashboard', 'component': dashboard_container, 'order': 1},
+        # Summary container (objek dengan atribut .container)
+        {'type': 'summary', 'component': summary_container.container, 'order': 4},
+        # Operation container (dictionary dengan kunci 'container')
+        {'type': 'operation', 'component': operation_container['container'], 'order': 5},
+        # Footer container (objek dengan atribut .container)
+        {'type': 'footer', 'component': footer_container.container, 'order': 6}
     ]
     
-    # Create main container with all components
+    # Buat container utama dengan semua komponen
     main_container = create_main_container(
         components=components,
         **kwargs
     )
     
-    # Store main UI references
+    # Simpan referensi UI utama
     ui_components['ui'] = main_container
     ui_components['main_container'] = main_container
     
-    # Add all containers to the ui_components for easy access
+    # Tambahkan semua container ke ui_components untuk akses mudah
     ui_components['containers']['main'] = main_container
     
-    # Create the result dictionary with all components
+    # Buat kamus hasil dengan semua komponen
     result = {
         'ui_components': ui_components,
-        'ui': main_container.container,  # Use the actual widget, not the MainContainer object
+        'ui': main_container.container,  # Gunakan widget sebenarnya, bukan objek MainContainer
         'main_container': main_container.container,
         'containers': ui_components['containers'],
         'widgets': ui_components['widgets']
     }
     
-    # Add all components to the root for backward compatibility
+    # Tambahkan semua komponen ke root untuk kompatibilitas ke belakang
     result.update(ui_components['containers'])
     result.update(ui_components['widgets'])
     
-    # Add direct references to all containers for easier access
+    # Tambahkan referensi langsung ke semua container untuk akses lebih mudah
     for container_name, container in ui_components['containers'].items():
         result[container_name] = container
     
@@ -253,13 +283,13 @@ def create_visualization_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -
 
 def _create_module_form_widgets(config: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Create module-specific form widgets for visualization options with a two-column layout.
+    Buat widget form khusus modul untuk opsi visualisasi dengan tata letak dua kolom.
     
     Args:
-        config: Configuration dictionary for the form widgets
+        config: Kamus konfigurasi untuk widget form
         
     Returns:
-        Dictionary containing the form UI and widget references
+        Kamus yang berisi UI form dan referensi widget
     """
     from ..constants import CHART_TYPE_OPTIONS, DATA_SPLIT_OPTIONS, EXPORT_FORMAT_OPTIONS
     
@@ -375,23 +405,23 @@ def _create_module_form_widgets(config: Dict[str, Any]) -> Dict[str, Any]:
 
 def _create_module_summary_content(config: Dict[str, Any]) -> str:
     """
-    Create summary content for the module.
+    Buat konten ringkasan untuk modul.
     
     Args:
-        config: Configuration dictionary
+        config: Kamus konfigurasi
         
     Returns:
-        HTML string containing the summary content
+        String HTML yang berisi konten ringkasan
     """
     return """
     <div style="padding: 10px;">
-        <h5>📊 Dataset Overview</h5>
-        <p>Dataset statistics and visualizations will be displayed here after analysis.</p>
+        <h5>📊 Ringkasan Dataset</h5>
+        <p>Statistik dan visualisasi dataset akan ditampilkan di sini setelah analisis.</p>
         <ul>
-            <li>Total samples: <span id="total-samples">-</span></li>
-            <li>Class distribution: <span id="class-distribution">-</span></li>
-            <li>Data splits: <span id="data-splits">-</span></li>
-            <li>Augmentation status: <span id="augmentation-status">-</span></li>
+            <li>Total sampel: <span id="total-samples">-</span></li>
+            <li>Distribusi kelas: <span id="class-distribution">-</span></li>
+            <li>Pembagian data: <span id="data-splits">-</span></li>
+            <li>Status augmentasi: <span id="augmentation-status">-</span></li>
         </ul>
     </div>
     """
@@ -399,21 +429,21 @@ def _create_module_summary_content(config: Dict[str, Any]) -> str:
 
 def _create_module_info_box() -> widgets.Widget:
     """
-    Create the info box content for the footer.
+    Buat konten kotak info untuk footer.
     
     Returns:
-        Widget containing the info box content
+        Widget yang berisi konten kotak info
     """
     return widgets.HTML(
         value="""
         <div style="padding: 12px; background: #e3f2fd; border-radius: 4px; margin: 8px 0;">
-            <h4 style="margin-top: 0; color: #0d47a1;">📊 Visualization Guide</h4>
-            <p>This module helps you analyze and visualize your dataset statistics.</p>
+            <h4 style="margin-top: 0; color: #0d47a1;">📊 Panduan Visualisasi</h4>
+            <p>Modul ini membantu Anda menganalisis dan memvisualisasikan statistik dataset.</p>
             <ol style="margin: 8px 0 0 16px; padding-left: 8px;">
-                <li>Select chart type and data split</li>
-                <li>Configure display options</li>
-                <li>Click 'Analyze Dataset' to generate visualizations</li>
-                <li>Use 'Export Charts' to save results</li>
+                <li>Pilih tipe chart dan pembagian data</li>
+                <li>Konfigurasi opsi tampilan</li>
+                <li>Klik 'Analisis Dataset' untuk menghasilkan visualisasi</li>
+                <li>Gunakan 'Ekspor Chart' untuk menyimpan hasil</li>
             </ol>
         </div>
         """

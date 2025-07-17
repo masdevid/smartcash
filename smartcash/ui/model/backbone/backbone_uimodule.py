@@ -14,16 +14,16 @@ from datetime import datetime
 
 class BackboneUIModule(UIModule):
     """
-    UIModule implementation for backbone configuration.
+    Implementasi UIModule untuk konfigurasi backbone model.
     
-    Features:
-    - 🧬 Backbone model selection and configuration
-    - 🏗️ Early training pipeline integration
-    - 📊 Current model summary display  
-    - 🔧 Configuration validation and management
-    - 🎯 Backend model builder integration
-    - 📋 Config summary panel in summary_container
-    - 🔄 Progress tracking for all operations
+    Fitur:
+    - 🧬 Pemilihan dan konfigurasi backbone model
+    - 🏗️ Integrasi pipeline pelatihan dini
+    - 📊 Tampilan ringkasan model terkini  
+    - 🔧 Manajemen dan validasi konfigurasi
+    - 🎯 Integrasi dengan backend model builder
+    - 📋 Panel ringkasan konfigurasi di summary_container
+    - 🔄 Pelacakan progres untuk semua operasi
     """
     
     def __init__(self):
@@ -40,7 +40,7 @@ class BackboneUIModule(UIModule):
         self._operation_manager = None
         self._ui_components = None
         
-        self.logger.debug("✅ BackboneUIModule initialized")
+        self.logger.debug("✅ BackboneUIModule diinisialisasi")
     
     def _initialize_config_handler(self, config: Optional[Dict[str, Any]] = None) -> None:
         """Initialize configuration handler."""
@@ -57,21 +57,21 @@ class BackboneUIModule(UIModule):
             
             # Update config using keyword arguments
             self.update_config(**merged_config)
-            self.logger.debug("✅ Config handler initialized")
+            self.logger.debug("✅ Handler konfigurasi diinisialisasi")
             
         except Exception as e:
-            self.logger.error(f"Failed to initialize config handler: {e}")
+            self.logger.error(f"Gagal menginisialisasi handler konfigurasi: {e}")
             raise
     
     def _initialize_operation_manager(self) -> None:
         """Initialize operation manager."""
         try:
             if not self._ui_components:
-                raise RuntimeError("UI components must be created before operation manager")
+                raise RuntimeError("Komponen UI harus dibuat terlebih dahulu sebelum operation manager")
             
             operation_container = self._ui_components.get('operation_container')
             if not operation_container:
-                raise RuntimeError("Operation container not found in UI components")
+                raise RuntimeError("Container operasi tidak ditemukan dalam komponen UI")
             
             self._operation_manager = BackboneOperationManager(
                 config=self.get_config(),
@@ -86,22 +86,22 @@ class BackboneUIModule(UIModule):
             # Initialize progress tracker display
             self._initialize_progress_display()
             
-            self.logger.debug("✅ Operation manager initialized")
+            self.logger.debug("✅ Manajer operasi diinisialisasi")
             
         except Exception as e:
-            self.logger.error(f"Failed to initialize operation manager: {e}")
+            self.logger.error(f"Gagal menginisialisasi manajer operasi: {e}")
             raise
     
     def _setup_button_handlers(self) -> None:
         """Setup button click handlers for UI operations."""
         try:
             if not self._ui_components or not self._operation_manager:
-                self.logger.warning("Cannot setup button handlers - components not initialized")
+                self.logger.warning("Tidak dapat menyiapkan tombol - komponen belum diinisialisasi")
                 return
             
             action_container = self._ui_components.get('containers', {}).get('action')
             if not action_container:
-                self.logger.warning("Action container not found for button handlers")
+                self.logger.warning("Container aksi tidak ditemukan untuk pengaturan tombol")
                 return
             
             # Setup button click handlers with synchronous wrappers
@@ -120,10 +120,10 @@ class BackboneUIModule(UIModule):
             if 'reset' in buttons:
                 buttons['reset'].on_click(self._handle_reset_config)
             
-            self.logger.debug("✅ Button handlers setup completed")
+            self.logger.debug("✅ Pengaturan penangan tombol selesai")
             
         except Exception as e:
-            self.logger.error(f"Failed to setup button handlers: {e}")
+            self.logger.error(f"Gagal menyiapkan penangan tombol: {e}")
     
     
     def _handle_validate(self, button) -> None:
@@ -141,7 +141,7 @@ class BackboneUIModule(UIModule):
             # Check prerequisites before validation
             prereq_check = self._check_data_prerequisites_sync()
             if not prereq_check['success']:
-                self._operation_manager.log(f"⚠️ Prerequisites check: {prereq_check['message']}", 'warning')
+                self._operation_manager.log(f"⚠️ Pemeriksaan prasyarat: {prereq_check['message']}", 'warning')
                 # Continue with validation even if data is missing - just warn user
             
             # Get current configuration from UI
@@ -155,9 +155,9 @@ class BackboneUIModule(UIModule):
                 self._update_summary_display_sync()
                 
         except Exception as e:
-            self.logger.error(f"Validate handler error: {e}")
+            self.logger.error(f"Kesalahan pada penangan validasi: {e}")
             if self._operation_manager:
-                self._operation_manager.log(f"❌ Validation error: {e}", 'error')
+                self._operation_manager.log(f"❌ Kesalahan validasi: {e}", 'error')
         finally:
             # Re-enable validate button
             self._enable_validate_button()

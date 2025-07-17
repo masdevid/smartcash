@@ -18,6 +18,17 @@ def __getattr__(name):
         return FooterContainer
     elif name == 'create_footer_container':
         from smartcash.ui.components.footer_container import create_footer_container
+    elif name == 'VisualizationContainer':
+        from smartcash.ui.components.visualization_container import VisualizationContainer
+        return VisualizationContainer
+    elif name == 'StatsCard':
+        from smartcash.ui.components.stats_card import StatsCard, create_dashboard_cards
+        return StatsCard
+    elif name == 'create_dashboard_cards':
+        from smartcash.ui.components.stats_card import create_dashboard_cards
+        return create_dashboard_cards
+    elif name == 'create_footer_container':
+        from smartcash.ui.components.footer_container import create_footer_container
         return create_footer_container
     elif name == 'FormContainer':
         # FormContainer is not a class but a function that creates a form container

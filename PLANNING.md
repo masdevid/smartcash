@@ -235,6 +235,22 @@ def initialize_ui(display: bool = True, **kwargs) -> YourUIModule:
         module.display()
     return module
 ```
+# Low Priority Plan:
+- Fixing inconsistent button keys and registration:
+  - Downloader: 8 buttons registered (download,
+  check, cleanup, save, reset + variants)
+  - Dependency: 12 buttons registered (install,
+  uninstall, update, check_status, save, reset +
+  variants)
+  - Augmentation: 11 buttons registered (augment,
+  status, cleanup, generate, save, reset + variants)
+  - Colab: 7 buttons registered (setup, save,
+  reset + variants)
+  - Split: 4 buttons registered (save, reset +
+  variants) - removed unimplemented split_dataset
+  handler
+  - Preprocess: 7 buttons registered (preprocess,
+  check, cleanup, save, reset + variants)
 
 ## Cell entry
 All cells are created minimalistic with single execution `initialize_[module]_ui(display=True)`, delegating all logics to modules:

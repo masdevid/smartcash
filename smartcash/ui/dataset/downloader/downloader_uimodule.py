@@ -108,9 +108,12 @@ class DownloaderUIModule(BaseUIModule):
             
             # Initialize progress bars if needed
             if hasattr(self, '_ui_components') and self._ui_components:
-                progress_tracker = self._ui_components.get('progress_tracker')
-                if progress_tracker and hasattr(progress_tracker, 'initialize'):
-                    progress_tracker.initialize()
+                # Get progress tracker from operation container
+                operation_container = self._ui_components.get('operation_container')
+                if operation_container and isinstance(operation_container, dict):
+                    progress_tracker = operation_container.get('progress_tracker')
+                    if progress_tracker and hasattr(progress_tracker, 'initialize'):
+                        progress_tracker.initialize()
                     
         except Exception as e:
             if hasattr(self, 'logger'):
@@ -137,16 +140,23 @@ class DownloaderUIModule(BaseUIModule):
         Returns:
             bool: True if all components are ready, False otherwise
         """
-        required_components = ['operation_container', 'progress_tracker']
-        
+        # Check if UI components are initialized
         if not hasattr(self, '_ui_components') or not self._ui_components:
             self.log("⚠️ Komponen UI belum diinisialisasi", 'warning')
             return False
             
-        missing = [comp for comp in required_components if comp not in self._ui_components]
-        if missing:
-            self.log(f"⚠️ Komponen UI yang diperlukan belum tersedia: {', '.join(missing)}", 'warning')
+        # Check if operation container is available
+        if 'operation_container' not in self._ui_components:
+            self.log("⚠️ Komponen UI yang diperlukan belum tersedia: operation_container", 'warning')
             return False
+            
+        # Check if progress tracker is available within operation container
+        operation_container = self._ui_components.get('operation_container')
+        if operation_container and isinstance(operation_container, dict):
+            progress_tracker = operation_container.get('progress_tracker')
+            if not progress_tracker:
+                self.log("⚠️ Progress tracker belum tersedia dalam operation container", 'warning')
+                return False
             
         # Ensure progress tracker is ready
         if not self.ensure_progress_ready():

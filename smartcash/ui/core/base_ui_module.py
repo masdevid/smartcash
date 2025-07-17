@@ -553,6 +553,23 @@ class BaseUIModule(
                         for key, value in component.items():
                             if 'button' in key.lower() and hasattr(value, 'on_click'):
                                 button_widgets[key] = value
+                        
+                        # Special handling for action_container buttons
+                        if 'buttons' in component and isinstance(component['buttons'], dict):
+                            for button_id, button_widget in component['buttons'].items():
+                                if button_widget and hasattr(button_widget, 'on_click'):
+                                    button_widgets[button_id] = button_widget
+                                    
+                    # Special handling for ActionContainer objects (direct instances)
+                    if hasattr(component, 'buttons') and isinstance(component.buttons, dict):
+                        for button_id, button_widget in component.buttons.items():
+                            if button_widget and hasattr(button_widget, 'on_click'):
+                                button_widgets[button_id] = button_widget
+                            # Also check if this is an action button dictionary
+                            elif button_id == 'action' and isinstance(button_widget, dict):
+                                for action_id, action_widget in button_widget.items():
+                                    if action_widget and hasattr(action_widget, 'on_click'):
+                                        button_widgets[action_id] = action_widget
             
             # Log found button widgets
             self.logger.info(f"🔧 Found {len(button_widgets)} button widgets: {list(button_widgets.keys())}")

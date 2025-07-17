@@ -81,12 +81,12 @@ class SplitUIModule(BaseUIModule):
         
         # Register split-specific operations
         self.register_operation_handler('get_split_status', self.get_split_status)
-        self.register_operation_handler('split_dataset', self._handle_split_dataset)
+        # self.register_operation_handler('split_dataset', self._handle_split_dataset)  # Disabled until implementation is complete
         
         # Register custom button handlers
         self.register_button_handler('save', self._handle_save_config)
         self.register_button_handler('reset', self._handle_reset_config)
-        self.register_button_handler('split_dataset', self._handle_split_dataset)
+        # self.register_button_handler('split_dataset', self._handle_split_dataset)  # Disabled until implementation is complete
     
     def _handle_save_config(self, button=None):
         """Handle save config button click."""

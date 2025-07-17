@@ -24,6 +24,39 @@ class LoggingMixin:
         self._ui_logging_bridge_setup: bool = False
         self._log_buffer: list = []  # Buffer logs until operation container is ready
     
+    def _get_module_namespace(self) -> str:
+        """
+        Get the appropriate namespace for this module's logs.
+        
+        Returns:
+            Namespace string that matches the log_namespace_filter
+        """
+        # Check if module has explicit namespace info
+        if hasattr(self, 'module_name'):
+            return self.module_name
+        
+        # Check if this is a BaseUIModule with module_name
+        if hasattr(self, 'full_module_name'):
+            return self.full_module_name
+        
+        # Try to infer from class name
+        class_name = self.__class__.__name__.lower()
+        if 'colab' in class_name:
+            return 'colab'
+        elif 'downloader' in class_name:
+            return 'downloader'
+        elif 'split' in class_name:
+            return 'split'
+        elif 'preprocess' in class_name:
+            return 'preprocess'
+        elif 'dependency' in class_name:
+            return 'dependency'
+        elif 'augment' in class_name:
+            return 'augment'
+        
+        # Default fallback
+        return 'smartcash.ui.core'
+    
     def log(self, message: str, level: str = 'info') -> None:
         """
         Log message to operation container or fallback to logger.
@@ -46,6 +79,9 @@ class LoggingMixin:
                     self._log_buffer.append((message, level))
                     return
             
+            # Determine namespace for this module
+            namespace = self._get_module_namespace()
+            
             # Try operation container directly
             if hasattr(self, '_ui_components') and self._ui_components:
                 operation_container = self._ui_components.get('operation_container')
@@ -53,17 +89,17 @@ class LoggingMixin:
                     # Handle dict-style operation container
                     if isinstance(operation_container, dict):
                         if 'log_message' in operation_container:
-                            operation_container['log_message'](message, level)
+                            operation_container['log_message'](message, level, namespace)
                             return
                         elif 'log' in operation_container:  # For backward compatibility
-                            operation_container['log'](message, level)
+                            operation_container['log'](message, level, namespace)
                             return
                     # Handle object-style operation container
                     elif hasattr(operation_container, 'log_message'):
-                        operation_container.log_message(message, level)
+                        operation_container.log_message(message, level, namespace)
                         return
                     elif hasattr(operation_container, 'log'):  # For backward compatibility
-                        operation_container.log(message, level)
+                        operation_container.log(message, level, namespace)
                         return
             
             # Fallback to standard logger (use debug to minimize console output)
@@ -237,12 +273,15 @@ class LoggingMixin:
                     operation_container = self._ui_components.get('operation_container')
                 
                 if operation_container:
+                    # Get namespace for this module
+                    namespace = self._get_module_namespace()
+                    
                     # Flush all buffered logs
                     for message, level in self._log_buffer:
                         if isinstance(operation_container, dict) and 'log' in operation_container:
-                            operation_container['log'](message, level)
+                            operation_container['log'](message, level, namespace)
                         elif hasattr(operation_container, 'log'):
-                            operation_container.log(message, level)
+                            operation_container.log(message, level, namespace)
                     
                     # Clear buffer after flushing
                     self._log_buffer.clear()

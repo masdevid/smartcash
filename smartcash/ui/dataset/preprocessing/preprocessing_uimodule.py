@@ -7,6 +7,7 @@ Description: Final implementation of the Preprocessing Module using the modern B
 from typing import Dict, Any, Optional, Tuple
 
 from smartcash.ui.core.base_ui_module import BaseUIModule
+from smartcash.ui.core.enhanced_ui_module_factory import EnhancedUIModuleFactory
 
 from .components.preprocessing_ui import create_preprocessing_ui_components
 from .configs.preprocessing_config_handler import PreprocessingConfigHandler
@@ -73,6 +74,36 @@ class PreprocessingUIModule(BaseUIModule):
         
         handlers.update(preprocessing_handlers)
         return handlers
+        
+    def _setup_operation_container(self) -> bool:
+        """
+        Set up the operation container for the module.
+        
+        Returns:
+            bool: True if setup was successful, False otherwise
+        """
+        try:
+            # Get the operation container from UI components
+            if not hasattr(self, '_ui_components') or not self._ui_components:
+                self.logger.error("UI components not available for operation container setup")
+                return False
+                
+            # Store reference to operation container
+            self._operation_container = self._ui_components.get('operation_container')
+            
+            if not self._operation_container:
+                self.logger.warning("Operation container not found in UI components")
+                return False
+                
+            # Flush any buffered logs to the operation container
+            self._flush_log_buffer()
+            
+            self.logger.debug("✅ Operation container setup complete")
+            return True
+            
+        except Exception as e:
+            self.logger.error(f"Failed to setup operation container: {e}", exc_info=True)
+            return False
     
     def initialize(self, config: Optional[Dict[str, Any]] = None, **kwargs) -> bool:
         """
@@ -120,29 +151,6 @@ class PreprocessingUIModule(BaseUIModule):
         except Exception as e:
             self.logger.error(f"Failed to initialize Preprocessing module: {e}")
             return False
-    
-
-    def _initialize_progress_display(self) -> None:
-        """Initialize progress display components."""
-        try:
-            operation_container = self.get_component("operation_container")
-            if operation_container:
-                # Try to get progress_display directly from operation_container if it's a widget
-                if hasattr(operation_container, 'progress_display'):
-                    self.progress_display = operation_container.progress_display
-                # If not found, try to get it from the UI components
-                elif hasattr(self, '_ui_components') and 'progress_display' in self._ui_components:
-                    self.progress_display = self._ui_components['progress_display']
-                
-                # Set visibility if progress_display was found and has the method
-                if hasattr(self, 'progress_display') and hasattr(self.progress_display, 'set_visibility'):
-                    self.progress_display.set_visibility(False)
-                else:
-                    self.progress_display = None
-                    self.logger.debug("Progress display not available or doesn't support visibility control")
-        except Exception as e:
-            self.logger.warning(f"Could not initialize progress display: {e}")
-            self.progress_display = None
 
     def _operation_preprocess(self, button=None) -> Dict[str, Any]:  # noqa: ARG002
         """Handle preprocessing operation with confirmation dialog and backend integration."""
@@ -398,34 +406,6 @@ class PreprocessingUIModule(BaseUIModule):
         except Exception as e:
             return {'success': False, 'message': f"Error in cleanup operation: {e}"}
 
-    def _setup_operation_container(self) -> None:
-        """Setup operation container reference for backwards compatibility."""
-        try:
-            if hasattr(self, '_ui_components') and self._ui_components:
-                operation_container = self._ui_components.get('operation_container')
-                self._operation_container = operation_container
-                
-                # Set up proper logging bridge for the operation container
-                if operation_container:
-                    # If it's a dict, extract the actual container object
-                    if isinstance(operation_container, dict):
-                        container_obj = operation_container.get('container')
-                        if container_obj:
-                            self._operation_container = container_obj
-                            self.logger.debug("✅ Operation container reference set up from dict")
-                        else:
-                            self.logger.debug("✅ Operation container reference set up as dict")
-                    else:
-                        self.logger.debug("✅ Operation container reference set up as object")
-                else:
-                    self.logger.warning("⚠️ Operation container not found in UI components")
-            else:
-                self.logger.warning("⚠️ UI components not available for operation container setup")
-                
-        except Exception as e:
-            self.logger.error(f"Failed to setup operation container: {e}")
-
-
     def _flush_log_buffer(self) -> None:
         """Flush buffered logs to operation container."""
         try:
@@ -442,51 +422,27 @@ class PreprocessingUIModule(BaseUIModule):
                 message, level = log_entry
                 self.log(message, level)
             
-            # Clear the buffer
+            # Clear the buffer after flushing
+            buffered_logs = len(self._log_buffer)
             self._log_buffer.clear()
-            self.logger.debug(f"✅ Flushed {len(self._log_buffer)} logs to operation container")
+            self.logger.debug(f"✅ Flushed {buffered_logs} logs to operation container")
             
         except Exception as e:
             self.logger.error(f"Failed to flush log buffer: {e}")
 
-    def log(self, message: str, level: str = 'info') -> None:
-        """
-        Log message with buffer handling for timing issues.
-        
-        Args:
-            message: Message to log
-            level: Log level (info, warning, error, debug)
-        """
+
+# ==================== MODULE INITIALIZATION ====================
+
+def reset_preprocessing_uimodule() -> None:
+    """Reset the global Preprocessing UIModule instance."""
+    global _preprocessing_module_instance
+    if _preprocessing_module_instance:
         try:
-            # If operation container is not ready, buffer the log
-            if not hasattr(self, '_operation_container') or not self._operation_container:
-                if not hasattr(self, '_log_buffer'):
-                    self._log_buffer = []
-                self._log_buffer.append((message, level))
-                return
-            
-            # Use the mixin log method
-            super().log(message, level)
-            
-        except Exception as e:
-            # Fallback to logger
-            if hasattr(self, 'logger'):
-                self.logger.debug(f"[{level.upper()}] {message}")
+            _preprocessing_module_instance.cleanup()
+        except Exception:
+            pass
+    _preprocessing_module_instance = None
 
 
-def initialize_preprocessing_ui(display: bool = True, **kwargs: Any) -> PreprocessingUIModule:
-    """
-    Initializes and optionally displays the Preprocessing UI Module.
-
-    Args:
-        display: If True, the UI will be displayed in the output.
-        **kwargs: Additional arguments to pass to the module.
-
-    Returns:
-        An instance of the PreprocessingUIModule.
-    """
-    module = PreprocessingUIModule(**kwargs)
-    module.initialize()
-    if display:
-        module.display_ui()
-    return module
+# Create the initialize function using enhanced factory pattern
+initialize_preprocessing_ui = EnhancedUIModuleFactory.create_display_function(PreprocessingUIModule)

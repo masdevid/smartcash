@@ -3,6 +3,7 @@ File: smartcash/ui/model/train/components/config_summary.py
 Description: Configuration summary component for training UI.
 """
 
+import html
 import ipywidgets as widgets
 from typing import Dict, Any
 from smartcash.ui.logger import get_module_logger
@@ -21,8 +22,20 @@ def create_config_summary(config: Dict[str, Any]) -> widgets.Widget:
     logger = get_module_logger("smartcash.ui.model.train.components")
     
     try:
+        if not isinstance(config, dict):
+            raise ValueError(f"Expected config to be a dictionary, got {type(config).__name__}")
+            
+        logger.debug(f"Creating config summary with config keys: {list(config.keys())}")
+        
         training_config = config.get('training', {})
+        if not isinstance(training_config, dict):
+            logger.warning(f"Expected training_config to be a dictionary, got {type(training_config).__name__}")
+            training_config = {}
+            
         backbone_integration = config.get('backbone_integration', {})
+        if not isinstance(backbone_integration, dict):
+            logger.warning(f"Expected backbone_integration to be a dictionary, got {type(backbone_integration).__name__}")
+            backbone_integration = {}
         
         # Generate model name preview
         backbone_type = backbone_integration.get('backbone_type', 'efficientnet_b4')
@@ -83,9 +96,23 @@ def create_config_summary(config: Dict[str, Any]) -> widgets.Widget:
         return summary_container
         
     except Exception as e:
-        logger.error(f"Failed to create configuration summary: {e}")
-        # Return simple fallback
-        return widgets.HTML("<p>Configuration summary unavailable</p>")
+        import traceback
+        error_details = traceback.format_exc()
+        logger.error(f"Failed to create configuration summary: {e}\n{error_details}")
+        
+        # Return a more detailed error message for debugging
+        error_html = """
+        <div style="background: #fff5f5; padding: 15px; border-radius: 8px; border-left: 4px solid #ff4d4f;">
+            <h4 style="margin-top: 0; color: #cf1322;">⚠️ Configuration Summary Unavailable</h4>
+            <p>Failed to generate configuration summary due to an error:</p>
+            <pre style="background: #f8f8f8; padding: 10px; border-radius: 4px; overflow-x: auto;">
+{error}
+            </pre>
+            <p>Please check the logs for more details.</p>
+        </div>
+        """.format(error=html.escape(str(e)))
+        
+        return widgets.HTML(error_html)
 
 
 # For backward compatibility

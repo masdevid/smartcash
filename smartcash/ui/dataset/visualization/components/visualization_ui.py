@@ -160,8 +160,7 @@ def create_visualization_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -
     action_container = create_action_container(
         show_save_reset=False,
         buttons=action_buttons,
-        title="📊 Aksi Visualisasi",
-        alignment="left"
+        title="📊 Aksi Visualisasi"
     )
     
     # Simpan container aksi

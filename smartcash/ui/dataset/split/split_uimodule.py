@@ -56,8 +56,25 @@ class SplitUIModule(BaseUIModule):
         self.logger.debug("✅ SplitUIModule initialized")
     
     def get_default_config(self) -> Dict[str, Any]:
-        """Get default configuration for split module."""
+        """Get default configuration for this module."""
         return get_default_split_config()
+        
+    def get_config(self) -> Dict[str, Any]:
+        """
+        Get the current configuration from the config handler.
+        
+        Returns:
+            Dict containing the current configuration
+        """
+        if not hasattr(self, '_config_handler') or self._config_handler is None:
+            self.logger.warning("Config handler not initialized, returning default config")
+            return self.get_default_config()
+            
+        try:
+            return self._config_handler.get_config()
+        except Exception as e:
+            self.logger.error(f"Failed to get config: {e}")
+            return self.get_default_config()
     
     def create_config_handler(self, config: Dict[str, Any]) -> SplitConfigHandler:
         """Create config handler instance for split module."""

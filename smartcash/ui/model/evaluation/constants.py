@@ -43,6 +43,7 @@ UI_CONFIG = {
     'module_name': 'evaluation',
     'parent_module': 'model',
     'title': '🎯 Model Evaluation',
+    'subtitle': 'Evaluate model performance across different scenarios and configurations',
     'description': 'Evaluate model performance across 4 research scenarios',
     'icon': '🎯',
     'version': '2.0.0'

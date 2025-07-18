@@ -53,15 +53,34 @@ class DependencyUIModule(BaseUIModule):
     
     def _register_default_operations(self) -> None:
         """Register default operation handlers including dependency-specific operations."""
+        self.logger.debug("🔄 Registering default operations for dependency module...")
+        
         # Call parent method to register base operations
         super()._register_default_operations()
         
-        # Note: Dynamic button handler registration is now handled by BaseUIModule
+        # Log all registered button handlers
+        if hasattr(self, '_button_handlers'):
+            self.logger.debug(f"✅ Registered button handlers: {list(self._button_handlers.keys())}")
+        
+        # Log all available UI components that can be used for button binding
+        if hasattr(self, 'ui_components'):
+            button_components = [name for name in dir(self) if name.endswith(('_button', 'button_'))]
+            self.logger.debug(f"🔘 Available button components: {button_components}")
+            
+            # Log button references in UI components
+            for comp_name, comp in self.ui_components.items():
+                if isinstance(comp, dict) and 'widgets' in comp:
+                    buttons = {k: v for k, v in comp['widgets'].items() if 'button' in k.lower()}
+                    if buttons:
+                        self.logger.debug(f"  - {comp_name} buttons: {list(buttons.keys())}")
     
     def _get_module_button_handlers(self) -> Dict[str, Any]:
         """Get Dependency module-specific button handlers."""
+        self.logger.debug("🔍 Getting module-specific button handlers...")
+        
         # Call parent method to get base handlers (save, reset)
-        handlers = super()._get_module_button_handlers()
+        base_handlers = super()._get_module_button_handlers()
+        self.logger.debug(f"🔄 Base button handlers: {list(base_handlers.keys())}")
         
         # Add Dependency-specific handlers
         dependency_handlers = {
@@ -69,11 +88,18 @@ class DependencyUIModule(BaseUIModule):
             'uninstall': self._operation_uninstall_packages,
             'update': self._operation_update_packages,
             'check_status': self._operation_check_status,
-            'check': self._operation_check_status
+            'check': self._operation_check_status  # Alias for check_status
         }
         
-        handlers.update(dependency_handlers)
-        return handlers
+        # Log the handlers being registered
+        for handler_name, handler_func in dependency_handlers.items():
+            self.logger.debug(f"  - Registered handler: {handler_name} -> {handler_func.__name__}")
+        
+        # Merge with base handlers
+        all_handlers = {**base_handlers, **dependency_handlers}
+        self.logger.debug(f"✅ Total registered handlers: {list(all_handlers.keys())}")
+        
+        return all_handlers
     
     def get_default_config(self) -> Dict[str, Any]:
         """Get default configuration for Dependency module (BaseUIModule requirement)."""
@@ -206,92 +232,72 @@ class DependencyUIModule(BaseUIModule):
             self.log(f"⚠️ Terjadi kesalahan saat inisialisasi: {str(e)}", 'error')
     # ==================== OPERATION HANDLERS ====================
     
-    def _operation_install_packages(self, button=None) -> Dict[str, Any]:  # noqa: ARG002
+    def _operation_install_packages(self, button=None) -> Dict[str, Any]:
         """Handle package installation operation using common wrapper."""
-        def validate_packages():
-            selected_packages = self._get_selected_packages()
-            if not selected_packages:
-                return {'valid': False, 'message': "Tidak ada paket yang dipilih untuk diinstal"}
-            return {'valid': True, 'packages': selected_packages}
+        self.logger.debug(f"🔄 Install button clicked. Button: {button}")
         
-        def execute_install():
-            validation = validate_packages()
-            selected_packages = validation.get('packages', [])
-            return self._execute_install_operation(selected_packages)
-        
-        return self._execute_operation_with_wrapper(
-            operation_name="Instalasi Paket",
-            operation_func=execute_install,
-            button=button,
-            validation_func=validate_packages,
-            success_message="Instalasi paket berhasil diselesaikan",
-            error_message="Kesalahan instalasi paket"
+        def log_validation(result):
+            self.logger.debug(f"✅ Package validation result: {result}")
+            return result
+            
+        def log_execution(result):
+            self.logger.debug(f"✅ Install operation completed. Result: {result}")
+            return result
+            
+        self._execute_operation(
+            operation_name="install",
+            validate_callback=lambda: log_validation(self._validate_packages()),
+            execute_callback=lambda: log_execution(
+                self._execute_install_operation(self._get_selected_packages())
+            )
         )
     
     def _operation_uninstall_packages(self, button=None) -> Dict[str, Any]:
         """Handle package uninstallation operation using common wrapper."""
-        def validate_packages():
-            # Ensure UI components are ready first
-            if not self.ensure_components_ready():
-                return {'valid': False, 'message': "Komponen UI belum siap, silakan coba lagi"}
+        self.logger.debug(f"🔄 Uninstall button clicked. Button: {button}")
+        
+        def log_validation(result):
+            self.logger.debug(f"✅ Package validation result: {result}")
+            return result
             
-            selected_packages = self._get_selected_packages()
-            if not selected_packages:
-                return {'valid': False, 'message': "Tidak ada paket yang dipilih untuk diuninstal"}
-            return {'valid': True, 'packages': selected_packages}
-        
-        def execute_uninstall():
-            validation = validate_packages()
-            selected_packages = validation.get('packages', [])
-            self.log(f"📦 Paket yang akan diuninstal: {', '.join(selected_packages)}", 'info')
-            return self._execute_uninstall_operation(selected_packages)
-        
-        return self._execute_operation_with_wrapper(
-            operation_name="Uninstal Paket",
-            operation_func=execute_uninstall,
-            button=button,
-            validation_func=validate_packages,
-            success_message="Uninstal paket berhasil diselesaikan",
-            error_message="Kesalahan uninstal paket"
+        def log_execution(result):
+            self.logger.debug(f"✅ Uninstall operation completed. Result: {result}")
+            return result
+            
+        self._execute_operation(
+            operation_name="uninstall",
+            validate_callback=lambda: log_validation(self._validate_packages()),
+            execute_callback=lambda: log_execution(
+                self._execute_uninstall_operation(self._get_selected_packages())
+            )
         )
     
     def _operation_update_packages(self, button=None) -> Dict[str, Any]:
         """Handle package update operation using common wrapper."""
-        def validate_packages():
-            # Ensure UI components are ready first
-            if not self.ensure_components_ready():
-                return {'valid': False, 'message': "Komponen UI belum siap, silakan coba lagi"}
+        self.logger.debug(f"🔄 Update button clicked. Button: {button}")
+        
+        def log_validation(result):
+            self.logger.debug(f"✅ Package validation result: {result}")
+            return result
             
-            selected_packages = self._get_selected_packages()
-            if not selected_packages:
-                return {'valid': False, 'message': "Tidak ada paket yang dipilih untuk diperbarui"}
-            return {'valid': True, 'packages': selected_packages}
-        
-        def execute_update():
-            validation = validate_packages()
-            selected_packages = validation.get('packages', [])
-            self.log(f"📦 Paket yang akan diperbarui: {', '.join(selected_packages)}", 'info')
-            return self._execute_update_operation(selected_packages)
-        
-        return self._execute_operation_with_wrapper(
-            operation_name="Perbarui Paket",
-            operation_func=execute_update,
-            button=button,
-            validation_func=validate_packages,
-            success_message="Perbarui paket berhasil diselesaikan",
-            error_message="Kesalahan perbarui paket"
+        def log_execution(result):
+            self.logger.debug(f"✅ Update operation completed. Result: {result}")
+            return result
+            
+        self._execute_operation(
+            operation_name="update",
+            validate_callback=lambda: log_validation(self._validate_packages()),
+            execute_callback=lambda: log_execution(
+                self._execute_update_operation(self._get_selected_packages())
+            )
         )
     
-    def _operation_check_status(self, button=None) -> Dict[str, Any]:  # noqa: ARG002
+    def _operation_check_status(self, button=None) -> Dict[str, Any]:
         """Handle package status check operation using common wrapper."""
-        def validate_components():
-            if not self.ensure_components_ready():
-                return {'valid': False, 'message': "Komponen UI belum siap, silakan coba lagi"}
-            return {'valid': True}
+        self.logger.debug(f"🔄 Check Status button clicked. Button: {button}")
         
-        def execute_check_status():
-            result = self._execute_check_status_operation()
-            
+        def log_validation(result):
+            self.logger.debug(f"✅ Component validation result: {result}")
             # Log status summary if successful
             if result.get('success'):
                 status_summary = result.get('summary', {})

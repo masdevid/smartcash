@@ -154,8 +154,7 @@ class ColabUIModule(BaseUIModule):
                 # Setup button phases for sequential operations
                 self._setup_button_phases()
                 
-                # Re-setup button handlers after UI components are fully initialized
-                self._setup_colab_button_handlers()
+                # Button handlers are already set up by the base class
                 
                 # Flush any buffered logs to operation container
                 self._flush_log_buffer()
@@ -201,99 +200,6 @@ class ColabUIModule(BaseUIModule):
         except Exception as e:
             self.logger.error(f"Failed to setup operation container: {e}")
     
-    def _setup_colab_button_handlers(self) -> None:
-        """Setup Colab-specific button handlers after UI components are initialized."""
-        try:
-            if not hasattr(self, '_ui_components') or not self._ui_components:
-                self.logger.warning("⚠️ UI components not available for button handler setup")
-                return
-            
-            # Get the setup button from UI components 
-            setup_button = None
-            button_candidates = [
-                'setup_button',
-                'primary_button', 
-                'colab_setup'
-            ]
-            
-            for button_id in button_candidates:
-                button = self._ui_components.get(button_id)
-                if button and hasattr(button, 'on_click'):
-                    setup_button = button
-                    self.logger.debug(f"✅ Found setup button: {button_id}")
-                    break
-            
-            if not setup_button:
-                self.logger.warning("⚠️ No setup button found in UI components")
-                # Try to find it in action container
-                action_container = self._ui_components.get('action_container')
-                if action_container and isinstance(action_container, dict):
-                    buttons = action_container.get('buttons', {})
-                    setup_button = buttons.get('colab_setup')
-                    if setup_button:
-                        self.logger.debug("✅ Found setup button in action container")
-            
-            if setup_button and hasattr(setup_button, 'on_click'):
-                # Register the handler with debug wrapper
-                def debug_handler(button):
-                    self.logger.info("🔥 BUTTON CLICKED! Processing setup button...")
-                    try:
-                        result = self._handle_setup_button(button)
-                        return result
-                    except Exception as e:
-                        self.logger.error(f"❌ Button handler failed: {e}", exc_info=True)
-                        raise
-                
-                # Use on_click to register the handler
-                setup_button.on_click(debug_handler)
-                self.logger.info("✅ Colab setup button handler registered successfully with debug wrapper")
-                
-                # Verify registration by checking if we can call the handler
-                try:
-                    # Test if the handler was registered by checking widget attributes
-                    if hasattr(setup_button, '_click_handlers'):
-                        # Handle different types of click handlers
-                        click_handlers = setup_button._click_handlers
-                        if hasattr(click_handlers, '__len__'):
-                            handler_count = len(click_handlers)
-                            self.logger.info(f"📊 Button now has {handler_count} click handlers")
-                        elif hasattr(click_handlers, '_callbacks'):
-                            # CallbackDispatcher case
-                            callback_count = len(click_handlers._callbacks) if hasattr(click_handlers._callbacks, '__len__') else 'unknown'
-                            self.logger.info(f"📊 Button has CallbackDispatcher with {callback_count} callbacks")
-                        else:
-                            self.logger.info(f"📊 Button has click handlers of type: {type(click_handlers)}")
-                    elif hasattr(setup_button, '_model_id'):
-                        self.logger.info(f"📊 Button widget model ID: {setup_button._model_id}")
-                    else:
-                        self.logger.info("📊 Button widget registered (no _click_handlers attribute)")
-                except Exception as e:
-                    self.logger.debug(f"Could not check handler registration: {e}")
-                
-                # Update button state
-                if hasattr(setup_button, 'description'):
-                    self.logger.debug(f"Setup button description: {setup_button.description}")
-                    
-            else:
-                self.logger.error("❌ Setup button not found or missing on_click method")
-                
-                # Debug: List all available UI components
-                ui_keys = list(self._ui_components.keys())
-                self.logger.debug(f"Available UI components: {ui_keys}")
-                
-                # Check for buttons with on_click methods
-                buttons_with_onclick = []
-                for key, component in self._ui_components.items():
-                    if hasattr(component, 'on_click'):
-                        buttons_with_onclick.append(key)
-                
-                if buttons_with_onclick:
-                    self.logger.debug(f"Components with on_click: {buttons_with_onclick}")
-                else:
-                    self.logger.warning("No components with on_click method found")
-                    
-        except Exception as e:
-            self.logger.error(f"Failed to setup Colab button handlers: {e}", exc_info=True)
     
     def _initialize_operation_factory(self) -> None:
         """Initialize the operation factory with current config."""
@@ -374,10 +280,8 @@ class ColabUIModule(BaseUIModule):
         # Call parent method to get base handlers (save, reset)
         handlers = super()._get_module_button_handlers()
         
-        # Add Colab-specific handlers - only for buttons that actually exist in UI
+        # Add only the colab_setup button handler
         colab_handlers = {
-            'setup_button': self._handle_setup_button,
-            'primary_button': self._handle_setup_button,
             'colab_setup': self._handle_setup_button
         }
         
@@ -491,9 +395,9 @@ class ColabUIModule(BaseUIModule):
         """Get current phase from button state."""
         try:
             if hasattr(self, '_ui_components') and self._ui_components:
-                setup_button = self._ui_components.get('setup_button')
-                if setup_button and hasattr(setup_button, 'current_phase'):
-                    return setup_button.current_phase
+                colab_setup_button = self._ui_components.get('colab_setup')
+                if colab_setup_button and hasattr(colab_setup_button, 'current_phase'):
+                    return colab_setup_button.current_phase
             return 'init'  # Default starting phase
         except Exception:
             return 'init'

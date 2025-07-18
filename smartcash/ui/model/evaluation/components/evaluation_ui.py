@@ -34,16 +34,11 @@ def create_evaluation_ui(config: Dict[str, Any]) -> Dict[str, Any]:
     try:
         logger = get_module_logger("smartcash.ui.model.evaluation.components")
         
-        # Create header container with evaluation statistics
+        # Create header with title and subtitle
         header_container = create_header_container(
             title=UI_CONFIG['title'],
-            description=UI_CONFIG['description'],
-            stats=[
-                {'label': 'Scenarios', 'value': str(len(RESEARCH_SCENARIOS)), 'icon': '📊'},
-                {'label': 'Model Types', 'value': str(len(MODEL_COMBINATIONS)), 'icon': '🤖'},
-                {'label': 'Total Tests', 'value': str(len(EVALUATION_MATRIX)), 'icon': '🎯'},
-                {'label': 'Metrics', 'value': str(len(EVALUATION_METRICS)), 'icon': '📈'}
-            ]
+            subtitle=UI_CONFIG['subtitle'],
+            icon='📊'  # Chart emoji for evaluation
         )
         
         # Create compact form sections - Row 1: 2 columns (Execution + Model options)
@@ -69,11 +64,15 @@ def create_evaluation_ui(config: Dict[str, Any]) -> Dict[str, Any]:
         # Create operation container for progress and logging (following backbone pattern)
         operation_container = create_operation_container(
             show_progress=True,
+            show_dialog=True,
             show_logs=True,
-            log_module_name=UI_CONFIG['title'],
-            log_height="200px",
+            progress_levels='dual',
+            log_module_name=UI_CONFIG['module_name'],
+            # log_namespace_filter='evaluation',  # Temporarily disabled
+            log_height="150px",
             log_entry_style='compact',
-            log_namespace_filter="evaluation"
+            collapsible=True,
+            collapsed=False
         )
         
         # Create summary container for results

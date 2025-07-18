@@ -10,18 +10,28 @@ UIModule architecture while preserving all model management functionality.
 
 from .pretrained_uimodule import (
     PretrainedUIModule,
-    create_pretrained_uimodule,
-    get_pretrained_uimodule,
-    reset_pretrained_uimodule,
     initialize_pretrained_ui,
-    get_pretrained_components
+    _pretrained_module_instance as get_pretrained_uimodule
 )
+
+# For backward compatibility
+def create_pretrained_uimodule():
+    return initialize_pretrained_ui()
+
+def reset_pretrained_uimodule():
+    global _pretrained_module_instance
+    _pretrained_module_instance = None
+    return True
+
+def get_pretrained_components():
+    instance = get_pretrained_uimodule()
+    return instance.get_ui_components() if instance else {}
 
 # ==================== CORE COMPONENTS ====================
 
 from .components.pretrained_ui import create_pretrained_ui
 from .configs.pretrained_config_handler import PretrainedConfigHandler
-from .operations.pretrained_operation_manager import PretrainedOperationManager
+from .operations.pretrained_factory import PretrainedOperationFactory as PretrainedOperationManager
 
 # ==================== CONVENIENCE FUNCTIONS ====================
 

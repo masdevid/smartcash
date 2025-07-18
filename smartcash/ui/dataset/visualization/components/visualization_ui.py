@@ -95,10 +95,9 @@ def create_visualization_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -
     
     # === 1. Buat Header Container ===
     header_container = create_header_container(
-        title=f"{UI_CONFIG['icon']} {UI_CONFIG['title']}",
+        title=UI_CONFIG['title'],
         subtitle=UI_CONFIG['subtitle'],
-        status_message="Siap menganalisis dataset",
-        status_type="info"
+        icon='📊'  # Chart emoji for visualization
     )
     # Store both the container object and its widget
     ui_components['containers']['header'] = {
@@ -198,11 +197,14 @@ def create_visualization_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -
     
     # === 5. Buat Operation Container ===
     operation_container = create_operation_container(
-        show_progress=False,
+        show_progress=True,
+        show_dialog=True,
         show_logs=True,
+        progress_levels='single',
         log_module_name=UI_CONFIG['module_name'],
-        log_height="200px",
-        log_entry_style='compact',  # Memastikan perilaku hover konsisten
+        # log_namespace_filter='visualization',  # Temporarily disabled
+        log_height="150px",
+        log_entry_style='compact',
         collapsible=True,
         collapsed=False
     )

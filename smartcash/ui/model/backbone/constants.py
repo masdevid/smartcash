@@ -63,7 +63,7 @@ PROGRESS_STEPS = {
 UI_CONFIG = {
     'module_name': 'backbone',
     'parent_module': 'model',
-    'title': '🧬 Model Backbone',
+    'title': 'Model Backbone',
     'subtitle': 'Configure backbone architecture for feature extraction',
     'description': 'Select and configure the backbone model for currency detection',
     'icon': '🧬',
@@ -73,7 +73,7 @@ UI_CONFIG = {
 # Module Metadata
 MODULE_METADATA = {
     'name': 'backbone',
-    'title': '🧬 Model Backbone',
+    'title': 'Model Backbone',
     'description': 'Backbone model configuration module with early training pipeline integration',
     'version': '2.0.0',
     'category': 'model',

@@ -680,4 +680,5 @@ class LogAccordion(BaseUIComponent):
     
     def _ipython_display_(self):
         """IPython display integration."""
-        return self.display()._ipython_display_()
+        from IPython.display import display
+        display(self.display())

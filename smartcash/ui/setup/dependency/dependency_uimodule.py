@@ -91,8 +91,7 @@ class DependencyUIModule(BaseUIModule):
             'install': self._operation_install_packages,
             'uninstall': self._operation_uninstall_packages,
             'update': self._operation_update_packages,
-            'check_status': self._operation_check_status,
-            'check': self._operation_check_status  # Alias for check_status
+            'check_status': self._operation_check_status
         }
         
         # Log the handlers being registered
@@ -300,22 +299,11 @@ class DependencyUIModule(BaseUIModule):
         """Handle package status check operation using common wrapper."""
         self.logger.debug(f"🔄 Check Status button clicked. Button: {button}")
         
-        def log_validation(result):
-            self.logger.debug(f"✅ Component validation result: {result}")
-            # Log status summary if successful
-            if result.get('success'):
-                status_summary = result.get('summary', {})
-                installed = status_summary.get('installed', 0)
-                missing = status_summary.get('missing', 0)
-                total = status_summary.get('total', 0)
-                
-                status_msg = f"Status: {installed}/{total} terinstal, {missing} hilang"
-                self.log(f"📊 {status_msg}", 'info')
-                
-                # Update internal package status
-                self._package_status = result.get('package_status', {})
-                
-            return result
+        def validate_components():
+            return {'valid': True}
+        
+        def execute_check_status():
+            return self._execute_check_status_operation()
         
         return self._execute_operation_with_wrapper(
             operation_name="Cek Status Paket",

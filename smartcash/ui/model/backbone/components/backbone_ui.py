@@ -70,12 +70,9 @@ def create_backbone_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> Dic
     
     # === 1. Create Header Container ===
     header_container = create_header_container(
-        title=UI_CONFIG['title'],  # Title without icon to prevent duplication
+        title=UI_CONFIG['title'],
         subtitle=UI_CONFIG['subtitle'],
-        icon=UI_CONFIG['icon'],  # Icon set separately
-        initial_status='idle',
-        status_text='Siap mengkonfigurasi model backbone',
-        status_type="info"
+        icon='🧠'  # Brain icon for backbone models
     )
     ui_components['header_container'] = header_container.container
     ui_components['containers']['header'] = header_container
@@ -139,10 +136,13 @@ def create_backbone_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> Dic
     # === 5. Create Operation Container ===
     operation_container = create_operation_container(
         show_progress=True,
+        show_dialog=True,
         show_logs=True,
+        progress_levels='dual',
         log_module_name=UI_CONFIG['module_name'],
-        log_height="200px",
-        log_entry_style='compact',  # Ensure consistent hover behavior
+        # log_namespace_filter='backbone',  # Temporarily disabled
+        log_height="150px",
+        log_entry_style='compact',
         collapsible=True,
         collapsed=False
     )

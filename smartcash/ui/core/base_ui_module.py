@@ -322,10 +322,7 @@ class BaseUIModule(
             # Register default operation handlers FIRST
             self._register_default_operations()
             
-            # Setup button handlers AFTER registration
-            self._setup_button_handlers()
-            
-            # Register dynamic button handlers for consistency
+            # Register dynamic button handlers (includes setup)
             self._register_dynamic_button_handlers()
             
             # Validate button-handler integrity AFTER setup
@@ -589,10 +586,11 @@ class BaseUIModule(
             self.logger.error(f"❌ Error during cleanup: {e}")
     
     def _register_dynamic_button_handlers(self) -> None:
-        """Register button handlers with dynamic mapping and error handling.
+        """Register module-specific button handlers using the mixin's functionality.
         
-        This method provides a standardized way to register button handlers across all modules,
-        supporting both base button IDs and _button suffixed variants for maximum compatibility.
+        This method delegates button discovery and registration to the ButtonHandlerMixin,
+        maintaining clear separation of concerns. The module only provides its specific
+        button handler mappings.
         """
         try:
             # Get module-specific button handlers
@@ -602,68 +600,14 @@ class BaseUIModule(
                 self.logger.debug("No module-specific button handlers defined")
                 return
             
-            # Get available button widgets from UI components
-            button_widgets = {}
-            if hasattr(self, '_ui_components') and self._ui_components:
-                # First, check for buttons stored directly in UI components
-                for component_name, component in self._ui_components.items():
-                    if 'button' in component_name.lower() and component and hasattr(component, 'on_click'):
-                        button_widgets[component_name] = component
-                
-                # Then scan component attributes for additional buttons
-                for component in self._ui_components.values():
-                    if component and hasattr(component, '__dict__'):
-                        # Check direct attributes
-                        for attr_name in dir(component):
-                            if 'button' in attr_name.lower() and not attr_name.startswith('_'):
-                                widget = getattr(component, attr_name, None)
-                                if widget and hasattr(widget, 'on_click'):
-                                    button_widgets[attr_name] = widget
-                    
-                    # Check if component is a dict with button entries
-                    if isinstance(component, dict):
-                        for key, value in component.items():
-                            if 'button' in key.lower() and hasattr(value, 'on_click'):
-                                button_widgets[key] = value
-                        
-                        # Special handling for action_container buttons
-                        if 'buttons' in component and isinstance(component['buttons'], dict):
-                            for button_id, button_widget in component['buttons'].items():
-                                if button_widget and hasattr(button_widget, 'on_click'):
-                                    button_widgets[button_id] = button_widget
-                                    
-                    # Special handling for ActionContainer objects (direct instances)
-                    if hasattr(component, 'buttons') and isinstance(component.buttons, dict):
-                        for button_id, button_widget in component.buttons.items():
-                            if button_widget and hasattr(button_widget, 'on_click'):
-                                button_widgets[button_id] = button_widget
-                            # Also check if this is an action button dictionary
-                            elif button_id == 'action' and isinstance(button_widget, dict):
-                                for action_id, action_widget in button_widget.items():
-                                    if action_widget and hasattr(action_widget, 'on_click'):
-                                        button_widgets[action_id] = action_widget
-            
-            # Log found button widgets
-            self.logger.info(f"🔧 Found {len(button_widgets)} button widgets: {list(button_widgets.keys())}")
-            
-            # Register handlers for each button variant that exists
-            registered_handlers = set()
-            
+            # Register each module-specific handler with the mixin
             for button_id, handler in button_handlers.items():
-                # Only try exact match
-                if button_id in button_widgets:
-                    try:
-                        widget = button_widgets[button_id]
-                        self.register_button_handler(button_id, handler)
-                        registered_handlers.add(button_id)
-                        self.logger.info(f"✅ Registered handler for button: {button_id}")
-                    except Exception as e:
-                        self.logger.error(f"❌ Failed to register handler for button '{button_id}': {e}")
-                else:
-                    self.logger.warning(f"⚠️ No button widget found for '{button_id}'")
+                self.register_button_handler(button_id, handler)
+                self.logger.debug(f"🔘 Registered module handler: {button_id}")
             
-            # Summary
-            self.logger.info(f"🎯 Successfully registered {len(registered_handlers)} dynamic button handlers")
+            # Let the mixin handle the actual button discovery and setup
+            # This eliminates duplication and uses the mixin's comprehensive logic
+            self._setup_button_handlers()
             
         except Exception as e:
             self.logger.error(f"❌ Failed to register dynamic button handlers: {e}")

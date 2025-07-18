@@ -59,6 +59,8 @@ MODULE_VERSION: str = "1.0.0"
 
 # UI configuration
 UI_CONFIG: Dict[str, Any] = {
+    'title': MODULE_TITLE,  # Required by UI components
+    'subtitle': MODULE_DESCRIPTION,  # Required by UI components
     'module_title': MODULE_TITLE,
     'module_description': MODULE_DESCRIPTION,
     'module_icon': MODULE_ICON,

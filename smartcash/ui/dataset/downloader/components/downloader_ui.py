@@ -50,14 +50,11 @@ def create_downloader_ui_components(
         'config': config.copy()
     }
     
-    # 1. Create Header Container
+    # 1. Create header with title and subtitle
     header_container = create_header_container(
-        title=UI_CONFIG['module_title'],
-        description=UI_CONFIG['module_description'],
-        icon='📥',
-        initial_status='idle',
-        status_text='Siap mengunduh dataset',
-        status_type="info"
+        title=UI_CONFIG['title'],
+        subtitle=UI_CONFIG['subtitle'],
+        icon='📥'  # Download emoji for downloader
     )
     
     # 2. Create Form Container
@@ -108,11 +105,15 @@ def create_downloader_ui_components(
     # 4. Create Operation Container with dual progress tracker for download operations
     operation_container = create_operation_container(
         show_progress=True,
+        show_dialog=True,
         show_logs=True,
-        progress_levels='dual',  # Enable dual progress for download operations
-        log_module_name=UI_CONFIG['module_title'],
-        log_height="200px",
-        log_entry_style='compact'  # Ensure consistent hover behavior
+        progress_levels='dual',
+        log_module_name=UI_CONFIG['module_name'],
+        # log_namespace_filter='downloader',  # Temporarily disabled
+        log_height="150px",
+        log_entry_style='compact',
+        collapsible=True,
+        collapsed=False
     )
     
     # Get progress tracker and log accordion from operation container
@@ -237,10 +238,6 @@ def create_downloader_ui_components(
         'download': action_buttons.get('download'),
         'check': action_buttons.get('check'),
         'cleanup': action_buttons.get('cleanup'),
-        # Keep legacy names for backward compatibility
-        # 'download_button': action_buttons.get('download'),
-        # 'check_button': action_buttons.get('check'),
-        # 'cleanup_button': action_buttons.get('cleanup'),
         
         # Add form widgets - accessed as attributes of input_options
         'workspace_input': input_options.workspace_input,

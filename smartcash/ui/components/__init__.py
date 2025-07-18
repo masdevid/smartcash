@@ -105,11 +105,6 @@ from smartcash.ui.components.summary_panel import create_summary_panel, update_s
 
 
 # Import log_accordion components from the new module structure
-from smartcash.ui.components.log_accordion.legacy import (
-    create_log_accordion, 
-    update_log,
-    log as log_message
-)
 from smartcash.ui.components.tabs import create_tab_widget, create_tabs
 from smartcash.ui.components.save_reset_buttons import create_save_reset_buttons
 

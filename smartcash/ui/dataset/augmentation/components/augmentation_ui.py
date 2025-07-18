@@ -89,30 +89,19 @@ def _create_augment_ui_components(config: Dict[str, Any]) -> Tuple[Dict[str, Any
     action_container = _create_action_buttons()
     ui_components['action_container'] = action_container
     
-    # Extract button references for proper registration
-    # ui_components['primary_button'] = action_container.get('primary_button')
-    
     # Extract individual operation buttons from the buttons dictionary
-    # Store both with and without _button suffix for handler compatibility
     buttons_dict = action_container.get('buttons', {})
     ui_components['augment'] = buttons_dict.get('augment')
     ui_components['status'] = buttons_dict.get('status')
     ui_components['cleanup'] = buttons_dict.get('cleanup')
-    # Legacy names for backward compatibility
-    # ui_components['augment_button'] = buttons_dict.get('augment')
-    # ui_components['status_button'] = buttons_dict.get('status') 
-    # ui_components['cleanup_button'] = buttons_dict.get('cleanup')
     
     # Extract save/reset buttons from action container instance
-    # Store both with and without _button suffix for handler compatibility
     action_container_instance = action_container.get('action_container')
     if action_container_instance:
         save_btn = getattr(action_container_instance, 'save_button', None)
         reset_btn = getattr(action_container_instance, 'reset_button', None)
         ui_components['save'] = save_btn
         ui_components['reset'] = reset_btn
-        ui_components['save_button'] = save_btn
-        ui_components['reset_button'] = reset_btn
     
     
     # 4. Create summary container
@@ -165,7 +154,7 @@ def _create_header() -> Any:
     return create_header_container(
         title=UI_CONFIG['title'],
         subtitle=UI_CONFIG['subtitle'],
-        icon=UI_CONFIG['icon']
+        icon='🔄'  # Refresh emoji for augmentation
     )
 
 
@@ -196,8 +185,13 @@ def _create_operation_container() -> Dict[str, Any]:
         show_progress=True,
         show_dialog=True,
         show_logs=True,
-        progress_levels='dual',  # Enable dual progress for augmentation operations
-        log_module_name="Augmentation"
+        progress_levels='dual',
+        log_module_name="Augmentation",
+        # log_namespace_filter='augmentation',  # Temporarily disabled
+        log_height="150px",
+        log_entry_style='compact',
+        collapsible=True,
+        collapsed=False
     )
 
 
@@ -284,21 +278,13 @@ def create_augment_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> Dict
     footer_container = ui_components['footer_container']
     
     # Preserve the button references from the original ui_components
-    # Include both with and without _button suffix for handler compatibility
     button_refs = {
-        # 'primary_button': ui_components.get('primary_button'),
         'augment': ui_components.get('augment'),
         'status': ui_components.get('status'),
         'cleanup': ui_components.get('cleanup'),
         'save': ui_components.get('save'),
         'reset': ui_components.get('reset'),
-        'generate': ui_components.get('generate'),
-        # Legacy names for backward compatibility
-        # 'augment_button': ui_components.get('augment_button'),
-        # 'status_button': ui_components.get('status_button'),
-        # 'cleanup_button': ui_components.get('cleanup_button'),
-        # 'save_button': ui_components.get('save_button'),
-        # 'reset_button': ui_components.get('reset_button')
+        'generate': ui_components.get('generate')
     }
     
     # Create UI components dictionary

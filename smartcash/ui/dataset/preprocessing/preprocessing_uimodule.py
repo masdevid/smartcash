@@ -64,11 +64,11 @@ class PreprocessingUIModule(BaseUIModule):
         # Call parent method to get base handlers (save, reset)
         handlers = super()._get_module_button_handlers()
         
-        # Add Preprocessing-specific handlers
+        # Add Preprocessing-specific handlers 
         preprocessing_handlers = {
             'preprocess': self._operation_preprocess,
             'check': self._operation_check,
-            'cleanup': self._operation_cleanup
+            'cleanup': self._operation_cleanup,
         }
         
         handlers.update(preprocessing_handlers)
@@ -101,8 +101,7 @@ class PreprocessingUIModule(BaseUIModule):
                 # Setup operation container reference for logging
                 self._setup_operation_container()
                 
-                # Re-setup button handlers after UI components are fully initialized
-                self._setup_preprocessing_button_handlers()
+                # Button handlers are already set up by the base class
                 
                 # Flush any buffered logs to operation container
                 self._flush_log_buffer()
@@ -122,25 +121,28 @@ class PreprocessingUIModule(BaseUIModule):
             self.logger.error(f"Failed to initialize Preprocessing module: {e}")
             return False
     
-    def _handle_button_click(self, handler, button_id):
-        """Handle button click events with error handling."""
-        try:
-            self.logger.debug(f"Button clicked: {button_id}")
-            handler(None)  # Pass None as the button parameter
-        except Exception as e:
-            self.logger.error(f"Error in button '{button_id}' handler: {str(e)}")
-            # You might want to show an error message to the user here
 
     def _initialize_progress_display(self) -> None:
         """Initialize progress display components."""
         try:
             operation_container = self.get_component("operation_container")
             if operation_container:
-                self.progress_display = operation_container.get_widget('progress_display')
-                if self.progress_display:
+                # Try to get progress_display directly from operation_container if it's a widget
+                if hasattr(operation_container, 'progress_display'):
+                    self.progress_display = operation_container.progress_display
+                # If not found, try to get it from the UI components
+                elif hasattr(self, '_ui_components') and 'progress_display' in self._ui_components:
+                    self.progress_display = self._ui_components['progress_display']
+                
+                # Set visibility if progress_display was found and has the method
+                if hasattr(self, 'progress_display') and hasattr(self.progress_display, 'set_visibility'):
                     self.progress_display.set_visibility(False)
-        except (KeyError, AttributeError) as e:
+                else:
+                    self.progress_display = None
+                    self.logger.debug("Progress display not available or doesn't support visibility control")
+        except Exception as e:
             self.logger.warning(f"Could not initialize progress display: {e}")
+            self.progress_display = None
 
     def _operation_preprocess(self, button=None) -> Dict[str, Any]:  # noqa: ARG002
         """Handle preprocessing operation with confirmation dialog and backend integration."""
@@ -423,65 +425,6 @@ class PreprocessingUIModule(BaseUIModule):
         except Exception as e:
             self.logger.error(f"Failed to setup operation container: {e}")
 
-    def _setup_preprocessing_button_handlers(self) -> None:
-        """Setup Preprocessing-specific button handlers after UI components are initialized."""
-        try:
-            if not hasattr(self, '_ui_components') or not self._ui_components:
-                self.logger.warning("⚠️ UI components not available for button handler setup")
-                return
-            
-            # Get preprocessing buttons from UI components
-            button_candidates = [
-                'preprocess',
-                'check', 
-                'cleanup',
-                'save',
-                'reset'
-            ]
-            
-            handlers_registered = 0
-            
-            for button_id in button_candidates:
-                button = self._ui_components.get(button_id)
-                if button and hasattr(button, 'on_click'):
-                    # Get the handler method
-                    handler_method = getattr(self, f'_operation_{button_id}', None)
-                    if not handler_method:
-                        # Try the base class handlers
-                        handler_method = getattr(self, f'_handle_{button_id}', None)
-                    
-                    if handler_method:
-                        # Clear existing handlers
-                        button.on_click(None)
-                        
-                        # Create debug wrapper for the handler
-                        def create_debug_handler(btn_id, handler):
-                            def debug_handler(btn):
-                                self.logger.debug(f"🔘 Button '{btn_id}' clicked")
-                                try:
-                                    result = handler(btn)
-                                    self.logger.debug(f"✅ Button '{btn_id}' handler executed successfully")
-                                    return result
-                                except Exception as e:
-                                    self.logger.error(f"❌ Button '{btn_id}' handler failed: {e}")
-                                    raise
-                            return debug_handler
-                        
-                        # Register the handler with debug wrapper
-                        debug_handler = create_debug_handler(button_id, handler_method)
-                        button.on_click(debug_handler)
-                        handlers_registered += 1
-                        
-                        self.logger.debug(f"✅ Handler registered for button '{button_id}'")
-                    else:
-                        self.logger.warning(f"⚠️ No handler method found for button '{button_id}'")
-                else:
-                    self.logger.debug(f"🔍 Button '{button_id}' not found or not clickable")
-            
-            self.logger.debug(f"✅ Total button handlers registered: {handlers_registered}")
-            
-        except Exception as e:
-            self.logger.error(f"Failed to setup preprocessing button handlers: {e}")
 
     def _flush_log_buffer(self) -> None:
         """Flush buffered logs to operation container."""

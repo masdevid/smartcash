@@ -49,11 +49,11 @@ def create_training_ui(config: Dict[str, Any]) -> Dict[str, Any]:
         training_config = config.get('training', {})
         ui_config = config.get('ui', {})
         
-        # 1. Create header container with title
+        # Create header with title and subtitle
         header_container = create_header_container(
-            title=UI_CONFIG['title'].replace('🚀 ', ''),  # Remove emoji from title
+            title=UI_CONFIG['title'],
             subtitle=UI_CONFIG['subtitle'],
-            icon="🚀"  # Set icon separately
+            icon='🏋️'  # Weightlifter emoji for training
         )
         
         # 2. Create form container for training configuration
@@ -106,11 +106,15 @@ def create_training_ui(config: Dict[str, Any]) -> Dict[str, Any]:
         # 6. Create operation container for progress tracking and logs
         operation_container_result = create_operation_container(
             show_progress=True,
+            show_dialog=True,
             show_logs=True,
-            log_module_name="Training",
-            log_namespace_filter="smartcash.ui.model.train",
-            log_height="200px",
-            log_entry_style='compact'  # Ensure consistent hover behavior
+            progress_levels='dual',
+            log_module_name=UI_CONFIG['module_name'],
+            # log_namespace_filter='training',  # Temporarily disabled
+            log_height="150px",
+            log_entry_style='compact',
+            collapsible=True,
+            collapsed=False
         )
         operation_container = operation_container_result.get('container', operation_container_result)
         

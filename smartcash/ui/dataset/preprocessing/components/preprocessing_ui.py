@@ -7,32 +7,30 @@ Description: Main UI components for the preprocessing module using standard cont
 import ipywidgets as widgets
 from typing import Dict, Any, Optional
 
+# Standard library imports
+from typing import Dict, Any, Optional
+
+# Third-party imports
+import ipywidgets as widgets
+
+# Core UI components
+from smartcash.ui.components import (
+    create_main_container,
+    create_header_container,
+    ActionContainer,
+    create_footer_container,
+    create_operation_container,
+    create_summary_container
+)
+
+# Core UI utilities
 from smartcash.ui.core.decorators import handle_ui_errors
 from smartcash.ui.core.errors.enums import ErrorLevel
-from smartcash.ui.components.main_container import create_main_container
-from smartcash.ui.components.header_container import create_header_container
-from smartcash.ui.components.action_container import ActionContainer, create_action_container
-from smartcash.ui.components.footer_container import create_footer_container
-from smartcash.ui.components.info_accordion import create_info_accordion
-from smartcash.ui.components.operation_container import create_operation_container
-from smartcash.ui.components.summary_container import create_summary_container
+
+# Module-specific imports
 from smartcash.ui.dataset.preprocessing.components.input_options import create_preprocessing_input_options
-from smartcash.ui.dataset.preprocessing.constants import UI_CONFIG, BUTTON_CONFIG, PREPROCESSING_TIPS
+from smartcash.ui.dataset.preprocessing.constants import UI_CONFIG, PREPROCESSING_TIPS
 
-
-def _create_module_form_widgets(config: Dict[str, Any]) -> Dict[str, Any]:
-    """Create form widgets for the preprocessing module."""
-    input_options = create_preprocessing_input_options(config)
-    return {
-        'components': {
-            'input_options': input_options
-        },
-        'input_options': input_options
-    }
-
-def _create_module_summary_content(components: Dict[str, Any]) -> str:
-    """Create summary content for the module."""
-    return "<p>Pengaturan pra-pemrosesan saat ini dan konfigurasi preset YOLO akan ditampilkan di sini.</p>"
 
 def _create_module_info_box() -> widgets.Widget:
     """Create an info box with module documentation."""
@@ -59,7 +57,7 @@ def _create_module_info_box() -> widgets.Widget:
     level=ErrorLevel.ERROR,
     show_dialog=True
 )
-def _create_action_buttons() -> Dict[str, Any]:
+def create_action_buttons() -> Dict[str, Any]:
     """Create action buttons for preprocessing operations using ActionContainer.
     
     Returns:
@@ -105,112 +103,70 @@ def _create_action_buttons() -> Dict[str, Any]:
         'reset': action_container.reset_button
     }
     
-    
     return {
-        'action_container': action_container,
+        'container': action_container.container,
         'buttons': buttons
     }
 
+
 def create_preprocessing_ui_components(config: Optional[Dict[str, Any]] = None, **kwargs) -> Dict[str, Any]:
-    """Create preprocessing UI using standard container components."""
+    """Create preprocessing UI using standard container components.
+    
+    Returns:
+        Dictionary containing all UI components and their references
+    """
     config = config or {}
     ui_components = {}
 
     # 1. Header
-    header_obj = create_header_container(
+    header = create_header_container(
         title=UI_CONFIG['title'],
-        logo_path=UI_CONFIG['logo_path'],
         subtitle=UI_CONFIG['subtitle'],
-        icon='🧹',  # Add icon for preprocessing
-        initial_status='idle',  # Set initial operation status
-        status_text='Siap memproses dataset'
+        icon='🧹'  # Broom emoji for preprocessing
     )
-    header_widget = header_obj.container
+    header_container = header.container
 
     # 2. Form
-    form_widget = create_preprocessing_input_options()
+    form_container = create_preprocessing_input_options()
 
-    # 3. Action Buttons
-    action_components = _create_action_buttons()
-    action_container = action_components['action_container']
-    action_widget = action_container.container
-    
-    # Get the action container and buttons
-    button_widgets = action_components.get('buttons', {})
-    
-    # Log the buttons we found
-    button_ids = list(button_widgets.keys())
-    
-    # Define button configurations
-    button_configs = [
-        {'id': 'preprocess', 'text': '🚀 Mulai Preprocessing', 'style': 'primary'},
-        {'id': 'check', 'text': '🔍 Check Dataset', 'style': 'info'},
-        {'id': 'cleanup', 'text': '🗑️ Cleanup', 'style': 'warning'},
-        {'id': 'save', 'text': '💾 Simpan', 'style': 'success'},
-        {'id': 'reset', 'text': '🔄 Reset', 'style': 'danger'}
-    ]
-    
-    # Register all buttons
-    for btn_cfg in button_configs:
-        button_id = btn_cfg['id']
-        widget = button_widgets.get(button_id)
-        
-        if widget is not None:
-            # Update button properties
-            if hasattr(widget, 'description'):
-                widget.description = btn_cfg['text']
-            
-            # Set button style if available
-            if hasattr(widget, 'button_style') and hasattr(widget, 'style'):
-                widget.button_style = btn_cfg['style']
-            
-            # Register the button with its base ID
-            ui_components[button_id] = widget
-            
-            # Set a custom attribute to store the button ID
-            setattr(widget, '_button_id', button_id)
-    
-    # Add the action container to UI components
-    ui_components['action_container'] = action_container
-    
-    # Explicitly expose all buttons in the action container
-    if hasattr(action_container, 'buttons') and action_container.buttons:
-        for btn_id, btn in action_container.buttons.items():
-            if btn_id not in ui_components:
-                ui_components[btn_id] = btn
-    
-    # Log all registered buttons for debugging
-    registered_buttons = []
-    button_details = {}
-    
-    for k, v in ui_components.items():
-        is_button = (hasattr(v, 'on_click') or 
-                    isinstance(v, widgets.Button) or 
-                    k in button_widgets or
-                    (hasattr(v, 'button_style') and hasattr(v, 'description')))
-        
-        if is_button:
-            registered_buttons.append(k)
-            button_details[k] = {
-                'description': getattr(v, 'description', 'N/A'),
-                'type': type(v).__name__,
-                'has_on_click': hasattr(v, 'on_click'),
-                'button_id': getattr(v, '_button_id', 'N/A')
-            }
+    # Create action buttons
+    action_components = create_action_buttons()
+    action_container = action_components['container']
+    action_buttons = action_components['buttons']
+    ui_components['check_button'] = action_buttons['check']
+    ui_components['preprocess_button'] = action_buttons['preprocess']
+    ui_components['cleanup_button'] = action_buttons['cleanup']
+    ui_components['save_button'] = action_buttons['save']
+    ui_components['reset_button'] = action_buttons['reset']
     
     # 4. Operation Container with dual progress for preprocessing operations
     operation_dict = create_operation_container(
         show_progress=True,
         show_dialog=True,
         show_logs=True,
-        progress_levels='dual',  # Enable dual progress for preprocessing operations
+        progress_levels='dual',
         log_module_name=UI_CONFIG['module_name'],
-        log_namespace_filter='preprocessing'  # Allow preprocessing logs to be displayed
+        # log_namespace_filter='preprocessing',  # Temporarily disabled
+        log_height="150px",
+        log_entry_style='compact',
+        collapsible=True,
+        collapsed=False
     )
-    operation_widget = operation_dict.pop('container', None)
-    ui_components.update(operation_dict)
+    
+    # Get the operation container and update UI components
+    operation_container = operation_dict.pop('container', None)
+    
+    # Add operation container and its components to ui_components
+    if operation_container is not None:
+        ui_components['operation_container'] = operation_container
+    
+    # Update with operation dictionary components
+    if operation_dict:
+        for key, value in operation_dict.items():
+            if value is not None and key not in ui_components:
+                ui_components[key] = value
 
-    # 5. Operation Summary (initially hidden, to be placed inside operation_widget)
+    # 5. Operation Summary (initially hidden, to be placed inside operation_container)
     operation_summary_obj = create_summary_container(title="Ringkasan Operasi", icon="📊")
     operation_summary_widget = operation_summary_obj.container
     operation_summary_widget.layout.display = 'none'
@@ -218,25 +174,34 @@ def create_preprocessing_ui_components(config: Optional[Dict[str, Any]] = None, 
     ui_components['operation_summary_updater'] = operation_summary_obj.set_content
     
     # Add summary to the operation container's children
-    if operation_widget and isinstance(operation_widget, widgets.Box):
-        operation_widget.children = (*operation_widget.children, operation_summary_widget)
+    if operation_container and isinstance(operation_container, widgets.Box):
+        operation_container.children = (*operation_container.children, operation_summary_widget)
 
     # 6. Footer
     info_box = _create_module_info_box()
-    footer_obj = create_footer_container(info_box=info_box)
-    footer_widget = footer_obj.container
+    footer = create_footer_container(info_box=info_box)
+    footer_container = footer.container
 
     # 7. Assemble Main Container using the flexible component list
     component_list = [
-        {'name': 'header', 'component': header_widget, 'order': 0},
-        {'name': 'form', 'component': form_widget, 'order': 1},
-        {'name': 'action', 'component': action_widget, 'order': 2},
-        {'name': 'operation', 'component': operation_widget, 'order': 3},
-        {'name': 'footer', 'component': footer_widget, 'order': 4},
+        {'name': 'header', 'component': header_container, 'order': 0},
+        {'name': 'form', 'component': form_container, 'order': 1},
+        {'name': 'action', 'component': action_container, 'order': 2},
+        {'name': 'operation', 'component': operation_container, 'order': 3},
+        {'name': 'footer', 'component': footer_container, 'order': 4},
     ]
     
-    main_container_obj = create_main_container(components=component_list)
-    ui_components['main_container'] = main_container_obj.container
-    ui_components['ui'] = main_container_obj.container  # Alias for display
+    main_container = create_main_container(components=component_list)
+    
+    # Ensure all main container components are properly exposed
+    ui_components['main_container'] = main_container.container
+    ui_components['main_layout'] = main_container.container
+    ui_components['ui'] = main_container.container  # Alias for display
+    
+    # Make sure all components are properly exposed
+    if hasattr(main_container, 'components'):
+        for comp in main_container.components:
+            if 'name' in comp and 'component' in comp:
+                ui_components[comp['name']] = comp['component']
 
     return ui_components

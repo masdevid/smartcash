@@ -561,6 +561,7 @@ class ActionContainer:
         button_style = widgets.ButtonStyle()
         button_style.button_color = self._get_button_color(style)
         button_style.font_weight = 'bold'
+        button_style.text_color = '#ffffff'  # Ensure white text on all buttons
         
         # Set up layout based on button type
         if style == 'primary':

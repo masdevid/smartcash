@@ -45,91 +45,17 @@ class ButtonHandlerMixin:
                     self.logger.debug("UI components not initialized yet")
                 return
             
-            # Try different container sources for buttons
-            buttons = {}
+            # Discover available button widgets
+            buttons = self._discover_button_widgets()
             
-            # Method 1: Get from action container (try both 'actions' and 'action_container')
-            for container_key in ['actions', 'action_container']:
-                action_container = self._ui_components.get(container_key)
-                if action_container:
-                    # If action_container is a dictionary with a 'buttons' key
-                    if isinstance(action_container, dict) and 'buttons' in action_container:
-                        if isinstance(action_container['buttons'], dict):
-                            buttons.update(action_container['buttons'])
-                    # If action_container is an object with a 'buttons' attribute
-                    elif hasattr(action_container, 'buttons') and isinstance(action_container.buttons, dict):
-                        buttons.update(action_container.buttons)
-                    # If action_container has a get_buttons method
-                    elif hasattr(action_container, 'get_buttons'):
-                        container_buttons = action_container.get_buttons()
-                        if container_buttons and isinstance(container_buttons, dict):
-                            buttons.update(container_buttons)
-            
-            # Method 2: Look for buttons in components
-            if 'components' in self._ui_components and hasattr(self._ui_components['components'], 'get'):
-                components = self._ui_components['components']
-                for key, widget in components.items():
-                    if hasattr(widget, 'on_click'):
-                        buttons[key] = widget
-            
-            # Method 3: Look for direct button widgets in _ui_components
-            for key, widget in self._ui_components.items():
-                if key in ['action_container', 'actions'] or not hasattr(widget, 'on_click'):
-                    continue
-                buttons[key] = widget
-            
-            # Log the buttons we found for debugging
-            if hasattr(self, 'logger'):
-                if buttons:
-                    self.logger.info(f"🔧 Found {len(buttons)} button(s) in UI components: {list(buttons.keys())}")
-                    # Log button widget types for debugging
-                    for btn_id, btn_widget in buttons.items():
-                        widget_type = type(btn_widget).__name__ if btn_widget else "None"
-                        has_onclick = hasattr(btn_widget, 'on_click') if btn_widget else False
-                        self.logger.debug(f"  - {btn_id}: {widget_type} (has_on_click: {has_onclick})")
-                else:
-                    self.logger.warning("⚠️ No buttons found in UI components")
-                    # Debug: Log available UI component keys
-                    ui_keys = list(self._ui_components.keys())
-                    self.logger.debug(f"Available UI component keys: {ui_keys}")
-                    
             if not buttons:
+                if hasattr(self, 'logger'):
+                    self.logger.warning("⚠️ No buttons found in UI components")
                 return
             
             # Setup registered handlers
-            for button_id, handler in self._button_handlers.items():
-                if hasattr(self, 'logger'):
-                    self.logger.debug(f"🔍 Looking for button widget for handler '{button_id}'")
-                
-                # Try exact match first
-                button = buttons.get(button_id)
-                
-                # If not found, try with _button suffix
-                if button is None and f"{button_id}_button" in buttons:
-                    button = buttons[f"{button_id}_button"]
-                    if hasattr(self, 'logger'):
-                        self.logger.debug(f"  - Found with _button suffix: {button_id}_button")
-                
-                # If still not found, try with btn_ prefix
-                if button is None and f"btn_{button_id}" in buttons:
-                    button = buttons[f"btn_{button_id}"]
-                    if hasattr(self, 'logger'):
-                        self.logger.debug(f"  - Found with btn_ prefix: btn_{button_id}")
-                
-                if button and hasattr(button, 'on_click'):
-                    # Wrap handler with error handling
-                    wrapped_handler = self._wrap_button_handler(button_id, handler)
-                    button.on_click(wrapped_handler)
-                    
-                    if hasattr(self, 'logger'):
-                        self.logger.info(f"✅ Registered handler for button: {button_id}")
-                else:
-                    if hasattr(self, 'logger'):
-                        if button is None:
-                            self.logger.warning(f"⚠️ No button widget found for handler '{button_id}'")
-                        else:
-                            self.logger.warning(f"⚠️ Button widget for '{button_id}' has no on_click method")
-                
+            self._setup_registered_handlers(buttons)
+            
             # Setup default handlers if not already registered
             self._setup_default_button_handlers(buttons)
             
@@ -139,6 +65,99 @@ class ButtonHandlerMixin:
         except Exception as e:
             if hasattr(self, 'logger'):
                 self.logger.error(f"Failed to setup button handlers: {e}", exc_info=True)
+    
+    def _discover_button_widgets(self) -> Dict[str, Any]:
+        """Discover available button widgets from UI components.
+        
+        Returns:
+            Dictionary mapping button IDs to button widgets
+        """
+        buttons = {}
+        
+        # Method 1: Get from action container (try both 'actions' and 'action_container')
+        for container_key in ['actions', 'action_container']:
+            action_container = self._ui_components.get(container_key)
+            if action_container:
+                # If action_container is a dictionary with a 'buttons' key
+                if isinstance(action_container, dict) and 'buttons' in action_container:
+                    if isinstance(action_container['buttons'], dict):
+                        buttons.update(action_container['buttons'])
+                # If action_container is an object with a 'buttons' attribute
+                elif hasattr(action_container, 'buttons') and isinstance(action_container.buttons, dict):
+                    buttons.update(action_container.buttons)
+                # If action_container has a get_buttons method
+                elif hasattr(action_container, 'get_buttons'):
+                    container_buttons = action_container.get_buttons()
+                    if container_buttons and isinstance(container_buttons, dict):
+                        buttons.update(container_buttons)
+        
+        # Method 2: Look for buttons in components
+        if 'components' in self._ui_components and hasattr(self._ui_components['components'], 'get'):
+            components = self._ui_components['components']
+            for key, widget in components.items():
+                if hasattr(widget, 'on_click'):
+                    buttons[key] = widget
+        
+        # Method 3: Look for direct button widgets in _ui_components
+        for key, widget in self._ui_components.items():
+            if key in ['action_container', 'actions'] or not hasattr(widget, 'on_click'):
+                continue
+            buttons[key] = widget
+        
+        # Log the buttons we found for debugging
+        if hasattr(self, 'logger'):
+            if buttons:
+                self.logger.info(f"🔧 Found {len(buttons)} button(s) in UI components: {list(buttons.keys())}")
+                # Log button widget types for debugging
+                for btn_id, btn_widget in buttons.items():
+                    widget_type = type(btn_widget).__name__ if btn_widget else "None"
+                    has_onclick = hasattr(btn_widget, 'on_click') if btn_widget else False
+                    self.logger.debug(f"  - {btn_id}: {widget_type} (has_on_click: {has_onclick})")
+            else:
+                # Debug: Log available UI component keys
+                ui_keys = list(self._ui_components.keys())
+                self.logger.debug(f"Available UI component keys: {ui_keys}")
+        
+        return buttons
+    
+    def _setup_registered_handlers(self, buttons: Dict[str, Any]) -> None:
+        """Setup handlers that were explicitly registered.
+        
+        Args:
+            buttons: Dictionary of discovered button widgets
+        """
+        for button_id, handler in self._button_handlers.items():
+            if hasattr(self, 'logger'):
+                self.logger.debug(f"🔍 Looking for button widget for handler '{button_id}'")
+            
+            # Try exact match first
+            button = buttons.get(button_id)
+            
+            # If not found, try with _button suffix
+            if button is None and f"{button_id}_button" in buttons:
+                button = buttons[f"{button_id}_button"]
+                if hasattr(self, 'logger'):
+                    self.logger.debug(f"  - Found with _button suffix: {button_id}_button")
+            
+            # If still not found, try with btn_ prefix
+            if button is None and f"btn_{button_id}" in buttons:
+                button = buttons[f"btn_{button_id}"]
+                if hasattr(self, 'logger'):
+                    self.logger.debug(f"  - Found with btn_ prefix: btn_{button_id}")
+            
+            if button and hasattr(button, 'on_click'):
+                # Wrap handler with error handling
+                wrapped_handler = self._wrap_button_handler(button_id, handler)
+                button.on_click(wrapped_handler)
+                
+                if hasattr(self, 'logger'):
+                    self.logger.info(f"✅ Registered handler for button: {button_id}")
+            else:
+                if hasattr(self, 'logger'):
+                    if button is None:
+                        self.logger.warning(f"⚠️ No button widget found for handler '{button_id}'")
+                    else:
+                        self.logger.warning(f"⚠️ Button widget for '{button_id}' has no on_click method")
     
     def _wrap_button_handler(self, button_id: str, handler: Callable) -> Callable:
         """

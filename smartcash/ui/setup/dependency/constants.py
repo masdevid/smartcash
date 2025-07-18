@@ -22,7 +22,7 @@ BUTTON_ACTIONS = {
     'INSTALL': 'install',
     'UPDATE': 'update',
     'UNINSTALL': 'uninstall',
-    'CHECK': 'check'
+    'CHECK': 'check_status'
 }
 
 # UI settings constants

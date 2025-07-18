@@ -366,8 +366,8 @@ def get_button_actions() -> Dict[str, Dict[str, Any]]:
             'color': '#F44336',
             'disabled_color': '#CCCCCC'
         },
-        'check': {
-            'text': 'Check',
+        'check_status': {
+            'text': 'Check Status',
             'icon': '🔍',
             'color': '#2196F3',
             'disabled_color': '#CCCCCC'

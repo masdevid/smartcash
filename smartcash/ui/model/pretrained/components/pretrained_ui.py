@@ -1,224 +1,185 @@
 """
-File: smartcash/ui/model/pretrained/components/pretrained_ui.py
-Description: Pretrained models UI following SmartCash standardized template.
+Pretrained UI Components Creation
 
-This module provides the user interface for downloading and managing
-pretrained models (YOLOv5s and EfficientNet-B4) for the SmartCash system.
-
-Container Order:
-1. Header Container (Title, Status)
-2. Form Container (Download Configuration)
-3. Action Container (Download/Validate/Refresh/Cleanup Buttons)
-4. Summary Container (Models Status)
-5. Operation Container (Progress + Logs)
-6. Footer Container (Tips and Info)
+This module contains the UI component creation logic for the pretrained models interface.
 """
 
-from typing import Optional, Dict, Any
+from typing import Dict, Any
 import ipywidgets as widgets
+from smartcash.ui.logger import get_module_logger
 
-# Core container imports - standardized across all modules
-from smartcash.ui.components.header_container import create_header_container
-from smartcash.ui.components.form_container import create_form_container, LayoutType
-from smartcash.ui.components.action_container import create_action_container
-from smartcash.ui.components.summary_container import create_summary_container
-from smartcash.ui.components.operation_container import create_operation_container
-from smartcash.ui.components.footer_container import create_footer_container
-from smartcash.ui.components.main_container import create_main_container
-from smartcash.ui.core.decorators import handle_ui_errors
-
-# Module imports
-from ..constants import UI_CONFIG, BUTTON_CONFIG, DEFAULT_CONFIG, PretrainedModelType
-
-# Module constants (for validator compliance)
-UI_CONFIG = UI_CONFIG
-BUTTON_CONFIG = BUTTON_CONFIG
-
-
-@handle_ui_errors(error_component_title="Pretrained Models UI Error")
-def create_pretrained_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> Dict[str, Any]:
-    """
-    Create the pretrained models UI following SmartCash standards.
-    
-    This function creates a complete UI for managing pretrained models
-    with the following sections:
-    - Download configuration options
-    - Model management operations
-    - Status and progress tracking
-    - Detailed model information
+def create_pretrained_ui_components(module_config: Dict[str, Any]) -> Dict[str, Any]:
+    """Create all UI components for pretrained models management.
     
     Args:
-        config: Optional configuration dictionary for the UI
-        **kwargs: Additional keyword arguments passed to UI components
+        module_config: Module configuration containing model settings
         
     Returns:
-        Dictionary containing all UI components and their references with 'ui_components' key
-        
-    Example:
-        >>> ui = create_pretrained_ui()
-        >>> display(ui['ui'])  # Display the UI
+        Dictionary containing all UI components
     """
-    # Initialize configuration and components dictionary
-    current_config = config or DEFAULT_CONFIG.copy()
-    ui_components = {
-        'config': current_config,
-        'containers': {},
-        'widgets': {}
-    }
-    
-    # === 1. Create Header Container ===
-    header_container = create_header_container(
-        title=UI_CONFIG['title'],  # Title without icon to prevent duplication
-        subtitle=UI_CONFIG['subtitle'],
-        icon=UI_CONFIG['icon'],  # Icon set separately
-        initial_status='idle',
-        status_text='Siap mengelola model pretrained',
-        status_type="info"
-    )
-    # Store both the container object and its widget
-    ui_components['containers']['header'] = {
-        'container': header_container.container,
-        'widget': header_container
-    }
-    
-    # === 2. Create Form Container ===
-    # Create form widgets with the new layout
-    form_widgets = _create_module_form_widgets(current_config)
-    
-    # Create form container with consistent styling
-    form_container = create_form_container(
-        layout_type=LayoutType.COLUMN,
-        container_margin="0 0 20px 0",
-        container_padding="0",
-        gap="15px",
-        layout_kwargs={
-            'width': '100%',
-            'max_width': '100%',
-            'margin': '0',
-            'padding': '0',
-            'justify_content': 'flex-start',
-            'align_items': 'flex-start'
+    try:
+        from smartcash.ui.components.header_container import create_header_container
+        from smartcash.ui.components.form_container import create_form_container, LayoutType
+        from smartcash.ui.components.action_container import create_action_container
+        from smartcash.ui.components.operation_container import create_operation_container
+        from smartcash.ui.components.footer_container import create_footer_container, PanelConfig, PanelType
+        from smartcash.ui.components.main_container import create_main_container
+        
+        # 1. Header Container
+        header_container = create_header_container(
+            title="🤖 Pretrained Models",
+            subtitle="Download and manage YOLOv5s and EfficientNet-B4 models",
+            status_message="Ready for model management",
+            status_type="info"
+        )
+        
+        # 2. Form Container with Model Configuration
+        form_container = create_form_container(
+            layout_type=LayoutType.COLUMN,
+            container_margin="0",
+            container_padding="10px",
+            gap="10px"
+        )
+        
+        # Create form widgets
+        form_widgets = _create_model_form_widgets(module_config)
+        
+        # Add items to form
+        config_label = widgets.HTML("<h3 style='margin: 10px 0;'>📁 Model Configuration</h3>")
+        options_label = widgets.HTML("<h4>⚙️ Download Options</h4>")
+        
+        form_items = [config_label, form_widgets['config_section'], options_label, form_widgets['options_section']]
+        
+        for item in form_items:
+            form_container['add_item'](item, height="auto")
+        
+        # 3. Action Container with model operation buttons
+        action_container = create_action_container(
+            buttons=[
+                {
+                    'id': 'download',
+                    'text': '📥 Download Models',
+                    'style': 'success',
+                    'tooltip': 'Download YOLOv5s and EfficientNet-B4 models'
+                },
+                {
+                    'id': 'validate', 
+                    'text': '🔍 Validate Models',
+                    'style': 'info',
+                    'tooltip': 'Validate downloaded models and check integrity'
+                },
+                {
+                    'id': 'refresh',
+                    'text': '🔄 Refresh Status',
+                    'style': 'warning',
+                    'tooltip': 'Refresh model status and directory contents'
+                },
+                {
+                    'id': 'cleanup',
+                    'text': '🗑️ Clean Up',
+                    'style': 'danger', 
+                    'tooltip': 'Remove corrupted or invalid model files'
+                }
+            ],
+            title="🤖 Model Operations",
+            show_save_reset=True
+        )
+        
+        # 4. Operation Container with dual progress tracking
+        operation_container = create_operation_container(
+            show_progress=True,
+            show_dialog=False,  # Disable dialog to reduce clutter
+            show_logs=True,
+            log_module_name="Pretrained Models",
+            log_height="200px",
+            log_entry_style='compact',  # Ensure consistent hover behavior
+            progress_style="prominent",  # Make progress more visible
+            progress_levels='dual'  # Enable dual progress tracking
+        )
+        
+        # 5. Footer Container
+        footer_container = create_footer_container(
+            panels=[
+                PanelConfig(
+                    panel_type=PanelType.INFO_ACCORDION,
+                    title="💡 Pretrained Models Guide",
+                    content="""
+                    <div style="padding: 10px;">
+                        <ul>
+                            <li><strong>Download Models:</strong> Download YOLOv5s and EfficientNet-B4 models</li>
+                            <li><strong>Validate Models:</strong> Check model integrity and file sizes</li>
+                            <li><strong>Refresh Status:</strong> Update model status and directory contents</li>
+                            <li><strong>Clean Up:</strong> Remove corrupted or invalid model files</li>
+                        </ul>
+                    </div>
+                    """,
+                    style="info",
+                    open_by_default=False
+                )
+            ]
+        )
+        
+        # 6. Main Container
+        components = [
+            {'type': 'header', 'component': header_container.container, 'order': 0},
+            {'type': 'form', 'component': form_container['container'], 'order': 1},
+            {'type': 'action', 'component': action_container['container'], 'order': 2},
+            {'type': 'operation', 'component': operation_container['container'], 'order': 3},
+            {'type': 'footer', 'component': footer_container.container, 'order': 4}
+        ]
+        
+        main_container = create_main_container(components=components)
+        
+        # Return UI components dictionary
+        return {
+            # Container components
+            'main_container': main_container.container,
+            'ui': main_container.container,
+            'header_container': header_container,
+            'form_container': form_container,
+            'action_container': action_container,
+            'footer_container': footer_container,
+            'operation_container': operation_container,
+            
+            # Form elements
+            'models_dir_input': form_widgets['models_dir_input'],
+            'yolo_url_input': form_widgets['yolo_url_input'],
+            'efficientnet_url_input': form_widgets['efficientnet_url_input'],
+            'auto_download_checkbox': form_widgets['auto_download_checkbox'],
+            'validate_checkbox': form_widgets['validate_checkbox'],
+            
+            # Buttons - clean naming without duplicates
+            'download': action_container['buttons'].get('download'),
+            'validate': action_container['buttons'].get('validate'),
+            'refresh': action_container['buttons'].get('refresh'),
+            'cleanup': action_container['buttons'].get('cleanup'),
+            
+            # Save/Reset buttons (from action container instance)
+            'save': getattr(action_container.get('action_container'), 'save_button', None) if action_container.get('action_container') else None,
+            'reset': getattr(action_container.get('action_container'), 'reset_button', None) if action_container.get('action_container') else None,
+            
+            # Operation components (widgets for direct access)
+            'operation_container_widget': operation_container.get('container'),
+            'progress_tracker': operation_container.get('progress_tracker'),
+            'log_accordion': operation_container.get('log_accordion')
         }
-    )
-    
-    # Add form rows to the container
-    for row in form_widgets['form_rows']:
-        for widget in row:
-            form_container['add_item'](widget, width='100%')
-    
-    # Store references
-    ui_components['containers']['form'] = form_container
-    ui_components['widgets'].update(form_widgets['widgets'])
-    
-    # === 3. Create Action Container ===
-    # Create action buttons from BUTTON_CONFIG (matching backbone module format)
-    action_buttons = []
-    for button_id, btn_config in BUTTON_CONFIG.items():
-        action_buttons.append({
-            'id': button_id,
-            'text': btn_config['text'],
-            'style': btn_config['style'],
-            'tooltip': btn_config['tooltip'],
-            'disabled': False
-        })
-    
-    action_container = create_action_container(
-        buttons=action_buttons,
-        show_save_reset=True
-    )
-    
-    # Store references (matching backbone module format)
-    ui_components['action_container'] = action_container
-    ui_components['containers']['action'] = action_container
-    
-    # === 4. Create Summary Container ===
-    summary_content = _create_module_summary_content(current_config)
-    summary_container = create_summary_container(
-        title="📊 Models Status",
-        theme="info",
-        icon="🤖"
-    )
-    summary_container.set_content(summary_content)
-    
-    ui_components['containers']['summary'] = summary_container
-    
-    # === 5. Create Operation Container ===
-    operation_container = create_operation_container(
-        show_progress=True,
-        show_logs=True,
-        log_module_name=UI_CONFIG['title'],
-        log_height="200px",
-        log_entry_style='compact'  # Ensure consistent hover behavior with downloader
-    )
-    ui_components['containers']['operation'] = operation_container
-    
-    # === 6. Create Footer Container ===
-    footer_container = create_footer_container(
-        info_box=_create_module_info_box(),
-        show_tips=True,
-        show_version=True
-    )
-    # Store both the container object and its widget
-    ui_components['containers']['footer'] = {
-        'container': footer_container.container,
-        'widget': footer_container
-    }
-    
-    # === 7. Create Main Container ===
-    # Combine form, action, summary, and operation into the form container slot
-    combined_body = widgets.VBox([
-        ui_components['containers']['form']['container'],
-        ui_components['action_container']['container'],
-        ui_components['containers']['summary'].container,
-        ui_components['containers']['operation']['container']
-    ])
-    
-    main_container = create_main_container(
-        header_container=ui_components['containers']['header']['container'],
-        form_container=combined_body,
-        footer_container=ui_components['containers']['footer']['container'],
-        margin='0 auto',
-        max_width='1200px',
-        padding='10px',
-        border='1px solid #e0e0e0',
-        border_radius='5px',
-        box_shadow='0 1px 3px rgba(0,0,0,0.1)'
-    )
-    
-    # Store main UI references
-    ui_components['ui'] = main_container.container
-    ui_components['main_container'] = main_container
-    
-    result = {
-        'ui_components': ui_components,
-        'ui': ui_components['ui']
-    }
-    
-    # Add all components to the root for backward compatibility
-    result.update(ui_components['containers'])
-    result.update(ui_components['widgets'])
-    
-    # Add legacy compatibility
-    result.update({
-        'ui_initialized': True,
-        'module_name': 'pretrained',
-        'parent_module': 'model'
-    })
-    
-    return result
+        
+    except Exception as e:
+        get_module_logger("smartcash.ui.model.pretrained.components.pretrained_ui").error(f"❌ Failed to create pretrained UI components: {e}")
+        raise
 
 
-def _create_module_form_widgets(config: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    Create module-specific form widgets for pretrained models configuration.
-    Matches the preprocess UI style with consistent layout and removes redundant notes.
+def _create_model_form_widgets(module_config: Dict[str, Any]) -> Dict[str, Any]:
+    """Create model form widgets for configuration.
     
     Args:
-        config: Configuration dictionary for the form widgets
+        module_config: Module configuration containing model settings
         
     Returns:
-        Dictionary containing the form UI and widget references
+        Dictionary containing form widgets
     """
+    from smartcash.ui.model.pretrained.constants import DEFAULT_CONFIG, PretrainedModelType
+    
     # Common layout settings
     input_layout = widgets.Layout(
         width='90%',
@@ -234,7 +195,7 @@ def _create_module_form_widgets(config: Dict[str, Any]) -> Dict[str, Any]:
     
     # Models directory input
     models_dir_input = widgets.Text(
-        value=config.get('models_dir', DEFAULT_CONFIG['models_dir']),
+        value=module_config.get('models_dir', DEFAULT_CONFIG['models_dir']),
         description='Models Directory:',
         placeholder='/data/pretrained',
         style={'description_width': '140px'},
@@ -243,7 +204,7 @@ def _create_module_form_widgets(config: Dict[str, Any]) -> Dict[str, Any]:
     
     # YOLOv5s URL input  
     yolo_url_input = widgets.Text(
-        value=config.get('model_urls', {}).get(PretrainedModelType.YOLOV5S.value, ''),
+        value=module_config.get('model_urls', {}).get(PretrainedModelType.YOLOV5S.value, ''),
         description='YOLOv5s URL:',
         placeholder='Leave empty for default GitHub URL',
         style={'description_width': '140px'},
@@ -252,7 +213,7 @@ def _create_module_form_widgets(config: Dict[str, Any]) -> Dict[str, Any]:
     
     # EfficientNet-B4 URL input
     efficientnet_url_input = widgets.Text(
-        value=config.get('model_urls', {}).get(PretrainedModelType.EFFICIENTNET_B4.value, ''),
+        value=module_config.get('model_urls', {}).get(PretrainedModelType.EFFICIENTNET_B4.value, ''),
         description='EfficientNet URL:',
         placeholder='Leave empty to use timm library',
         style={'description_width': '140px'},
@@ -261,7 +222,7 @@ def _create_module_form_widgets(config: Dict[str, Any]) -> Dict[str, Any]:
     
     # Auto download checkbox
     auto_download_checkbox = widgets.Checkbox(
-        value=config.get('auto_download', False),
+        value=module_config.get('auto_download', False),
         description='Auto Download Missing Models',
         layout=checkbox_layout,
         style={'description_width': 'initial'}
@@ -269,7 +230,7 @@ def _create_module_form_widgets(config: Dict[str, Any]) -> Dict[str, Any]:
     
     # Validate downloads checkbox
     validate_checkbox = widgets.Checkbox(
-        value=config.get('validate_downloads', True),
+        value=module_config.get('validate_downloads', True),
         description='Validate Downloaded Models',
         layout=checkbox_layout,
         style={'description_width': 'initial'}
@@ -277,99 +238,34 @@ def _create_module_form_widgets(config: Dict[str, Any]) -> Dict[str, Any]:
     
     # Create form sections
     config_section = widgets.VBox([
-        widgets.HTML("<h4 style='margin: 10px 0 5px 0;'>📁 Download Configuration</h4>"),
         models_dir_input,
-        widgets.HTML("<div style='margin: 15px 0 5px 0; border-top: 1px solid #eee;'></div>"),
-        widgets.HTML("<h4 style='margin: 5px 0;'>⚙️ Download Options</h4>"),
-        auto_download_checkbox,
-        validate_checkbox
-    ], layout=widgets.Layout(width='100%', margin='0 0 15px 0'))
-    
-    urls_section = widgets.VBox([
         widgets.HTML("<h4 style='margin: 5px 0;'>🔗 Custom Download URLs</h4>"),
         yolo_url_input,
         efficientnet_url_input,
         widgets.HTML("<div style='font-size: 0.85em; color: #666; margin: 5px 0;'>Leave URLs empty to use default sources</div>")
+    ], layout=widgets.Layout(width='100%', margin='0 0 15px 0'))
+    
+    options_section = widgets.VBox([
+        auto_download_checkbox,
+        validate_checkbox
     ], layout=widgets.Layout(width='100%', margin='0 0 10px 0'))
     
-    # Combine sections into a single form
-    form_ui = widgets.VBox([
-        config_section,
-        urls_section
-    ], layout=widgets.Layout(
-        width='100%',
-        padding='10px 15px',
-        border='1px solid #e0e0e0',
-        border_radius='4px',
-        margin='5px 0'
-    ))
-    
     return {
-        'form_rows': [[form_ui]],  # Single row with the combined form
-        'widgets': {
-            'models_dir_input': models_dir_input,
-            'yolo_url_input': yolo_url_input,
-            'efficientnet_url_input': efficientnet_url_input,
-            'auto_download_checkbox': auto_download_checkbox,
-            'validate_checkbox': validate_checkbox
-        }
+        'config_section': config_section,
+        'options_section': options_section,
+        'models_dir_input': models_dir_input,
+        'yolo_url_input': yolo_url_input,
+        'efficientnet_url_input': efficientnet_url_input,
+        'auto_download_checkbox': auto_download_checkbox,
+        'validate_checkbox': validate_checkbox
     }
 
 
-def _create_module_summary_content(config: Dict[str, Any]) -> str:
-    """
-    Create summary content for the module.
-    
-    Args:
-        config: Configuration dictionary
-        
-    Returns:
-        HTML string containing the summary content
-    """
-    models_dir = config.get('models_dir', DEFAULT_CONFIG['models_dir'])
-    
-    return f"""
-    <div style="padding: 10px;">
-        <h5>🤖 Pretrained Models Overview</h5>
-        <div style="margin-bottom: 10px;">
-            <strong>📁 Directory:</strong> <code>{models_dir}</code>
-        </div>
-        <div style="margin-bottom: 10px;">
-            <strong>🎯 Target Models:</strong>
-        </div>
-        <ul style="margin-left: 15px;">
-            <li><strong>YOLOv5s:</strong> Fast object detection (~14MB)</li>
-            <li><strong>EfficientNet-B4:</strong> Efficient CNN backbone (~75MB)</li>
-        </ul>
-        <div style="margin-top: 10px; padding: 8px; background: #e3f2fd; border-radius: 4px; font-size: 0.9em;">
-            <strong>ℹ️ Status:</strong> Use the buttons above to download and manage models
-        </div>
-    </div>
-    """
-
-
-def _create_module_info_box() -> widgets.Widget:
-    """
-    Create the info box content for the footer.
-    
-    Returns:
-        Widget containing the info box content
-    """
-    return widgets.HTML(
-        value="""
-        <div style="padding: 12px; background: #e3f2fd; border-radius: 4px; margin: 8px 0;">
-            <h4 style="margin-top: 0; color: #0d47a1;">🤖 Pretrained Models Guide</h4>
-            <p>This module helps you download and manage pretrained models for SmartCash.</p>
-            <ol style="margin: 8px 0 0 16px; padding-left: 8px;">
-                <li>Configure download directory and options</li>
-                <li>Click 'Download Models' to get YOLOv5s and EfficientNet-B4</li>
-                <li>Use 'Validate Models' to check model integrity</li>
-                <li>Use 'Refresh Status' to update model information</li>
-                <li>Use 'Clean Up' to remove corrupted files</li>
-            </ol>
-            <div style="margin-top: 8px; padding: 6px; background: rgba(0,0,0,0.05); border-radius: 3px;">
-                <strong>💡 Tip:</strong> Download models once and reuse them across multiple training sessions
-            </div>
-        </div>
-        """
-    )
+# Legacy compatibility function (if needed)
+def create_pretrained_ui(config=None, **kwargs):
+    """Legacy compatibility function."""
+    # Merge kwargs into config if provided
+    final_config = config or {}
+    if kwargs:
+        final_config.update(kwargs)
+    return create_pretrained_ui_components(final_config)

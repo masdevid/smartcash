@@ -171,22 +171,13 @@ def create_split_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> Dict[s
         form_widgets = _create_module_form_widgets(config)
         components = form_widgets['components']
         
-        # Create log accordion for operation feedback
-        log_output = widgets.Output()
-        log_accordion = widgets.Accordion(
-            children=[log_output],
-            selected_index=None,
-            layout=widgets.Layout(width='100%', margin='10px 0')
-        )
-        log_accordion.set_title(0, '📝 Log Messages')
+        
         
         # Create header with title and subtitle
         header = create_header_container(
             title=UI_CONFIG['title'],
-            description=UI_CONFIG['description'],
-            logo_path=UI_CONFIG.get('logo_path'),
-            icon='📊',  # Set the icon here
-            **kwargs
+            subtitle=UI_CONFIG['subtitle'],
+            icon='✂️'  # Scissors icon for split operation
         )
         
         # Get the form container from the form widgets
@@ -218,18 +209,17 @@ def create_split_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> Dict[s
             show_logs=True,
             show_dialog=True,
             log_module_name=UI_CONFIG['module_name'],
-            log_height="200px",
-            logs_initially_open=False,  # Close the log by default
-            log_entry_style='compact',  # Ensure consistent hover behavior
-            log_namespace_filter='split',  # Filter logs for split namespace only
+            # log_namespace_filter='split',  # Temporarily disabled
+            log_height="150px",
+            log_entry_style='compact',
+            collapsible=True,
+            collapsed=True,  # Start with logs collapsed
             hide_progress=True,  # Hide progress tracker as requested
             **kwargs
         )
         
         # Create footer with log accordion
         footer_container = create_footer_container(
-            log_accordion=log_accordion,
-            show_progress=True,
             **kwargs
         )
         
@@ -261,49 +251,6 @@ def create_split_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> Dict[s
             'save': action_container.get('save_button'),
             'reset': action_container.get('reset_button')
         }
-        
-        # Helper function to log to operation container
-        def log_to_operation_container(message: str, level: str = 'info'):
-            """Log message to operation container with proper level."""
-            try:
-                if hasattr(operation_container, 'log_message'):
-                    operation_container['log_message'](message, level)
-                elif hasattr(operation_container, 'log'):
-                    from smartcash.ui.components.log_accordion import LogLevel
-                    level_map = {
-                        'info': LogLevel.INFO,
-                        'success': LogLevel.INFO,
-                        'warning': LogLevel.WARNING,
-                        'error': LogLevel.ERROR
-                    }
-                    log_level = level_map.get(level, LogLevel.INFO)
-                    operation_container['log'](message, log_level)
-                else:
-                    # Fallback to output widget
-                    if 'log_output' in operation_container:
-                        with operation_container['log_output']:
-                            print(message)
-            except Exception:
-                # Fallback to print if all else fails
-                print(message)
-        
-        # Setup event handlers only for save/reset buttons
-        def on_save_button_clicked(button):
-            log_to_operation_container("💾 Menyimpan konfigurasi...", 'info')
-            try:
-                # This will be handled by the module's save handler
-                log_to_operation_container("✅ Konfigurasi berhasil disimpan", 'info')
-            except Exception as e:
-                log_to_operation_container(f"❌ Gagal menyimpan konfigurasi: {str(e)}", 'error')
-        
-        def on_reset_button_clicked(button):
-            log_to_operation_container("🔄 Mereset ke nilai default...", 'info')
-            try:
-                # This will be handled by the module's reset handler
-                log_to_operation_container("✅ Berhasil mereset ke nilai default", 'info')
-            except Exception as e:
-                log_to_operation_container(f"❌ Gagal mereset: {str(e)}", 'error')
-        
         # Connect button click handlers (only save/reset)
         if buttons.get('save'):
             buttons['save'].on_click(on_save_button_clicked)
@@ -329,8 +276,6 @@ def create_split_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> Dict[s
             # UI Components
             'summary_content': summary_content,
             'info_box': info_box,
-            'log_accordion': log_accordion,
-            'log_output': log_output,
             
             # Buttons (only save/reset as requested)
             'buttons': buttons,

@@ -4,7 +4,7 @@ Constants for pretrained models module following UI module structure standard.
 """
 
 from enum import Enum
-from typing import Dict, List, Any
+from typing import Dict
 
 # ==================== Enums ====================
 
@@ -44,16 +44,26 @@ PROGRESS_STEPS = {
     ]
 }
 
+# ==================== Module Information ====================
+
+MODULE_GROUP: str = "model"
+MODULE_NAME: str = "pretrained"
+MODULE_TITLE: str = "Pretrained Models"
+MODULE_DESCRIPTION: str = "Download and manage YOLOv5s and EfficientNet-B4 models"
+MODULE_ICON: str = "🤖"
+MODULE_VERSION: str = "2.0.0"
+
 # ==================== UI Configuration ====================
 
 UI_CONFIG = {
-    'module_name': 'pretrained',
-    'parent_module': 'model',
-    'title': 'Pretrained Models',
-    'subtitle': 'Download and manage YOLOv5s and EfficientNet-B4 models',
-    'description': 'Download and manage pretrained models for currency detection',
-    'icon': '🤖',
-    'version': '2.0.0'
+    'title': MODULE_TITLE,  # Required by UI components
+    'subtitle': MODULE_DESCRIPTION,  # Required by UI components
+    'module_title': MODULE_TITLE,
+    'module_description': MODULE_DESCRIPTION,
+    'module_icon': MODULE_ICON,
+    'module_name': MODULE_NAME,
+    'parent_module': MODULE_GROUP,
+    'version': MODULE_VERSION
 }
 
 # Module Metadata

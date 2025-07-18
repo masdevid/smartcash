@@ -154,7 +154,7 @@ def create_dependency_ui_components(module_config: Dict[str, Any]) -> Dict[str, 
             'uninstall': action_container['buttons'].get('uninstall'),
             # Legacy names for backward compatibility
             'install_button': action_container['buttons'].get('install'),
-            'check_button': action_container['buttons'].get('check_status'),
+            'check_status_button': action_container['buttons'].get('check_status'),
             'update_button': action_container['buttons'].get('update'),
             'uninstall_button': action_container['buttons'].get('uninstall'),
             

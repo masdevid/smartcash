@@ -524,8 +524,8 @@ class LogAccordion(BaseUIComponent):
             # Add duplicate counter if needed
             duplicate_counter = f" <span class='duplicate-counter'>{entry.count}</span>" if entry.show_duplicate_indicator else ""
             
-            # Get and format namespace
-            full_namespace = self._shorten_namespace(entry.namespace) if entry.namespace else ''
+            # Use the full namespace
+            full_namespace = entry.namespace or ''
                 
             # Handle multi-line messages (e.g., tracebacks)
             message_lines = entry.message.split('\n')

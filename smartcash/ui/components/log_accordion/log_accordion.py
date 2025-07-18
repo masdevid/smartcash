@@ -578,7 +578,7 @@ class LogAccordion(BaseUIComponent):
                         word-break: break-word;
                         white-space: pre-wrap;
                         line-height: 1.4;'>
-                        {f'<span style="color: #6c757d; font-size: 0.9em;">{full_namespace}\n</span>' if full_namespace else ''}
+                        {f'<span style="color: #6c757d; font-size: 0.9em;">{full_namespace}</span><br/>' if full_namespace else ''}
                         {main_message}{duplicate_counter}
                     </div>
                     

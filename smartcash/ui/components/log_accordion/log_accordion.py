@@ -538,11 +538,12 @@ class LogAccordion(BaseUIComponent):
                 additional_content = '\n'.join(message_lines[1:]).strip()
                 
                 expandable_html = f"""
-                <div class='toggle-traceback' onclick='document.getElementById("{traceback_id}").classList.toggle("show-traceback")'>
+                <div style='cursor: pointer; color: #6c757d; font-size: 0.85em; padding: 2px 0 2px 22px;'
+                     onclick='this.nextElementSibling.classList.toggle("show-traceback"); this.textContent = this.textContent.includes("Show") ? "▲ Hide details" : "▼ Show details"'>
                     ▼ Show details
                 </div>
-                <div class='error-traceback' id='{traceback_id}'>
-                    <pre style='margin:0; white-space:pre-wrap; font-size: 11px;'>{additional_content}</pre>
+                <div class='error-traceback' id='{traceback_id}' style='display: none; margin-top: 4px; padding-left: 22px;'>
+                    <pre style='margin: 0; padding: 8px; background: rgba(0,0,0,0.05); border-radius: 4px; white-space: pre-wrap; font-size: 11px; font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;'>{additional_content}</pre>
                 </div>
                 """
             else:

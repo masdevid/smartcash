@@ -570,8 +570,27 @@ class LogAccordion(BaseUIComponent):
                     <!-- Message Content -->
                     <div style='flex: 1; min-width: 0;'>
                         <div style='display: flex; flex-wrap: wrap; gap: 4px; align-items: baseline;'>
-                            <!-- Namespace -->
-                            {f'<span style="color: #6c757d; font-size: 0.85em; flex-shrink: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 40%;" title="{full_namespace}">{full_namespace}</span>' if full_namespace else ''}
+                            <!-- Namespace Badge -->
+                            {f"""
+                            <span style='
+                                display: inline-block;
+                                background: #e9ecef;
+                                color: #495057;
+                                font-size: 0.75em;
+                                font-weight: 500;
+                                padding: 1px 6px;
+                                border-radius: 10px;
+                                margin-right: 6px;
+                                white-space: nowrap;
+                                overflow: hidden;
+                                text-overflow: ellipsis;
+                                max-width: 200px;
+                                border: 1px solid #dee2e6;
+                                line-height: 1.3;'
+                                title='{full_namespace}'>
+                                {full_namespace.split('.')[-1]}
+                            </span>
+                            """ if full_namespace else ''}
                             
                             <!-- Message -->
                             <div style='color: {style['text_color']}; word-break: break-word; flex: 1; min-width: 100px;'>{main_message}{duplicate_counter}</div>

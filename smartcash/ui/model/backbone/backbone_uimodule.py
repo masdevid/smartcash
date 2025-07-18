@@ -274,8 +274,7 @@ class BackboneUIModule(UIModule):
             if self._operation_manager:
                 self._operation_manager.log("💾 Configuration saved successfully", 'success')
             
-            # Update status panel
-            self._update_header_status("Configuration saved", "success")
+            # Status updates are now handled via logging
             
             self.logger.info("Configuration saved successfully")
             
@@ -308,8 +307,7 @@ class BackboneUIModule(UIModule):
             if self._operation_manager:
                 self._operation_manager.log("🔄 Configuration reset to defaults", 'info')
             
-            # Update status panel
-            self._update_header_status("Configuration reset", "info")
+            # Status updates are now handled via logging
             
             self.logger.info("Configuration reset to defaults")
             
@@ -542,15 +540,8 @@ class BackboneUIModule(UIModule):
         except Exception as e:
             self.logger.error(f"Error enabling build button: {e}")
     
-    def _update_header_status(self, message: str, status_type: str) -> None:
-        """Update header status panel."""
-        try:
-            header_container = self._ui_components.get('containers', {}).get('header')
-            if header_container and hasattr(header_container, 'update_status'):
-                header_container.update_status(message, status_type)
-                
-        except Exception as e:
-            self.logger.error(f"Error updating header status: {e}")
+    # Header status panel functionality has been removed
+    # Use self.logger or self._operation_manager.log for status updates instead
     
     def _update_ui_widgets_from_config(self, config: Dict[str, Any]) -> None:
         """Update UI widgets with values from config."""

@@ -1,35 +1,28 @@
 """
 Header container component for consistent UI headers across the application.
 
-This module provides a flexible header container component that combines
-a title header and status panel with methods to update their content.
-It reuses the existing header and status panel components for consistency.
+This module provides a flexible header container component that provides
+a consistent header with title and optional subtitle and icon.
 """
 
-from typing import Dict, Any, Optional, List, Union, Callable
+from typing import Dict, Any, Optional
 import ipywidgets as widgets
-from IPython.display import HTML
 
 # Import shared components
 from smartcash.ui.components.header.header import create_header
-from smartcash.ui.components.status_panel import create_status_panel, update_status_panel
 
 class HeaderContainer:
-    """Flexible header container with title and status panel.
+    """Flexible header container with title and optional subtitle.
     
-    This class provides a header container with a title section and status panel
-    that can be updated dynamically. It provides methods to update the title,
-    subtitle, and status message. It reuses the existing header and status panel
-    components for consistency.
+    This class provides a consistent header component that can display
+    a title, optional subtitle, and icon. It's used across the application
+    to maintain a consistent look and feel for section headers.
     """
     
     def __init__(self, 
                  title: str = "",
                  subtitle: str = "",
                  icon: str = "",
-                 status_message: str = "",
-                 status_type: str = "info",
-                 show_status_panel: bool = True,
                  **style_options):
         """Initialize the header container.
         
@@ -37,17 +30,11 @@ class HeaderContainer:
             title: Main title text
             subtitle: Subtitle text
             icon: Optional emoji or icon for the header
-            status_message: Initial status message
-            status_type: Status type (info, success, warning, error)
-            show_status_panel: Whether to show the status panel
             **style_options: Additional styling options
         """
         self.title = title
         self.subtitle = subtitle
         self.icon = icon
-        self.status_message = status_message
-        self.status_type = status_type
-        self.show_status_panel = show_status_panel
         
         # Default style options
         self.style = {
@@ -59,11 +46,10 @@ class HeaderContainer:
         # Update with custom style options
         self.style.update(style_options)
         
-        # Create the components
+        # Create the header
         self._create_header()
-        self._create_status_panel()
         
-        # Create the container
+        # Create the container with just the header
         self._create_container()
     
     def _create_header(self):
@@ -75,19 +61,10 @@ class HeaderContainer:
             icon=self.icon
         )
     
-    def _create_status_panel(self):
-        """Create the status panel component using the shared status panel component."""
-        # Use the shared status panel component
-        self.status_panel = create_status_panel(
-            message=self.status_message,
-            status_type=self.status_type,
-            layout={'display': 'block' if self.show_status_panel else 'none'}
-        )
-    
     def _create_container(self):
-        """Create the main container with header and status panel."""
+        """Create the main container with just the header."""
         self.container = widgets.VBox(
-            [self.header, self.status_panel],
+            [self.header],
             layout=widgets.Layout(
                 margin_bottom=self.style.get('margin_bottom', '16px'),
                 padding_bottom=self.style.get('padding_bottom', '8px'),
@@ -113,33 +90,6 @@ class HeaderContainer:
         self._create_header()
         self._create_container()
     
-    def update_status(self, message: str, status_type: str = "info", show: bool = True) -> None:
-        """Update the status panel message and type.
-        
-        Args:
-            message: New status message
-            status_type: Status type (info, success, warning, error)
-            show: Whether to show the status panel
-        """
-        self.status_message = message
-        self.status_type = status_type
-        self.show_status_panel = show
-        
-        # Update the existing status panel using the shared update function
-        update_status_panel(self.status_panel, message, status_type)
-        
-        # Update visibility
-        self.status_panel.layout.display = 'block' if show else 'none'
-    
-    def show_status(self, show: bool = True) -> None:
-        """Show or hide the status panel.
-        
-        Args:
-            show: Whether to show the status panel
-        """
-        self.show_status_panel = show
-        self.status_panel.layout.display = 'block' if show else 'none'
-    
     def add_class(self, class_name: str) -> None:
         """Add a CSS class to the container.
         
@@ -160,20 +110,14 @@ def create_header_container(
     title: str = "",
     subtitle: str = "",
     icon: str = "",
-    status_message: str = "",
-    status_type: str = "info",
-    show_status_panel: bool = True,
     **style_options
 ) -> HeaderContainer:
-    """Create a header container with title and status panel.
+    """Create a header container with title.
     
     Args:
         title: Main title text
         subtitle: Subtitle text
         icon: Optional emoji or icon for the header
-        status_message: Initial status message
-        status_type: Status type (info, success, warning, error)
-        show_status_panel: Whether to show the status panel
         **style_options: Additional styling options
         
     Returns:
@@ -183,8 +127,5 @@ def create_header_container(
         title=title,
         subtitle=subtitle,
         icon=icon,
-        status_message=status_message,
-        status_type=status_type,
-        show_status_panel=show_status_panel,
         **style_options
     )

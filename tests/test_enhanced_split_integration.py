@@ -146,35 +146,7 @@ def test_ui_logging_bridge(module):
         traceback.print_exc()
         raise
 
-def test_status_panel_integration(module):
-    """Test status panel integration and updates."""
-    print("\n🧪 Test 4: Status Panel Integration")
-    print("-" * 50)
-    
-    try:
-        # Test status panel updates
-        print("📊 Testing status panel updates...")
-        
-        status_updates = [
-            ("Initializing split configuration...", "info"),
-            ("Loading configuration parameters", "info"),
-            ("Configuration validated successfully", "success"),
-            ("Ready for dataset split", "info")
-        ]
-        
-        for message, level in status_updates:
-            if hasattr(module, '_update_status'):
-                module._update_status(message, level)
-                module.log(f"📊 Status: {message}", level)
-                time.sleep(0.2)  # Small delay for visualization
-        
-        print("✅ Status panel integration test completed")
-        
-    except Exception as e:
-        print(f"❌ Test failed: {e}")
-        import traceback
-        traceback.print_exc()
-        raise
+# Status panel test removed - deprecated functionality
 
 def test_save_reset_operations(module):
     """Test save and reset operations with logging."""
@@ -459,10 +431,7 @@ def run_comprehensive_split_tests():
         # Test 3: UI logging bridge
         test_ui_logging_bridge(module)
         
-        # Test 4: Status panel integration
-        test_status_panel_integration(module)
-        
-        # Test 5: Save/Reset operations
+        # Test 4: Save/Reset operations
         test_save_reset_operations(module)
         
         # Test 6: All UI forms functionality
@@ -485,8 +454,7 @@ def run_comprehensive_split_tests():
         print("=" * 80)
         print("✅ Split UI module initialization: PASSED")
         print("✅ Display parameter support: PASSED")
-        print("✅ UI logging bridge functionality: PASSED") 
-        print("✅ Status panel integration: PASSED")
+        print("✅ UI logging bridge functionality: PASSED")
         print("✅ Save/Reset operations: PASSED")
         print("✅ All UI forms functionality: PASSED")
         print("✅ Operation container validation: PASSED")

@@ -49,15 +49,11 @@ def create_training_ui(config: Dict[str, Any]) -> Dict[str, Any]:
         training_config = config.get('training', {})
         ui_config = config.get('ui', {})
         
-        # 1. Create header container with title and status panel
+        # 1. Create header container with title
         header_container = create_header_container(
             title=UI_CONFIG['title'].replace('🚀 ', ''),  # Remove emoji from title
             subtitle=UI_CONFIG['subtitle'],
-            icon="🚀",  # Set icon separately
-            initial_status='idle',
-            status_text='Siap untuk melatih model',
-            status_type="info",
-            show_status_panel=True
+            icon="🚀"  # Set icon separately
         )
         
         # 2. Create form container for training configuration

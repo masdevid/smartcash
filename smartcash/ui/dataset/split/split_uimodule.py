@@ -231,14 +231,8 @@ class SplitUIModule(BaseUIModule):
     
     # _setup_ui_logging_bridge method is now provided by LoggingMixin - removed duplicate
     
-    def _initialize_status_panel(self) -> None:
-        """Initialize status panel display."""
-        try:
-            self.update_operation_status("Ready for dataset split configuration", "info")
-            self.logger.debug("📊 Status panel initialized")
-            
-        except Exception as e:
-            self.logger.debug(f"Status panel initialization failed: {e}")
+    # Status panel functionality has been removed
+    # Use update_operation_status for status updates instead
     
     def _initialize_progress_display(self) -> None:
         """Initialize operation container and show initial logs like backbone."""

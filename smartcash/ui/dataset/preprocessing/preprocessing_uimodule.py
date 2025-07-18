@@ -111,9 +111,8 @@ class PreprocessingUIModule(BaseUIModule):
                 self.log("🧹 Preprocessing module siap digunakan", 'info')
                 self.log("✅ Semua fitur preprocessing tersedia", 'success')
                 
-                # Update status panel (Operation Checklist 7.1)
-                self.log("📊 Status: Siap untuk preprocessing dataset", 'info')
-                self.update_operation_status("Siap untuk preprocessing dataset", "info")
+                # Log module readiness
+                self.log("📊 Modul preprocessing siap digunakan", 'info')
                 
                 self.logger.debug("✅ Preprocessing module initialization completed")
             

@@ -101,7 +101,6 @@ from smartcash.ui.components.layout.layout_components import (
 # Import other components that might depend on layout components
 from smartcash.ui.components.action_buttons import create_action_buttons
 from smartcash.ui.components.action_section import create_action_section
-from smartcash.ui.components.status_panel import create_status_panel, update_status_panel
 from smartcash.ui.components.summary_panel import create_summary_panel, update_summary_panel
 
 
@@ -127,9 +126,7 @@ from smartcash.ui.components.alerts import (
     create_alert,
     create_alert_html,
     create_status_indicator,
-    update_status_panel,
     create_info_box,
-    update_status,
     constants as alerts_constants
 )
 
@@ -180,8 +177,6 @@ __all__ = [
     'create_warning_card',
     'create_error_card',
     'create_card_row',
-    'create_status_panel',
-    'update_status_panel',
     'create_log_accordion',
     'update_log',
     'create_tab_widget',
@@ -195,7 +190,6 @@ __all__ = [
     'create_alert',
     'create_alert_html',
     'create_status_indicator',
-    'update_status',
     'create_info_box',
     'alerts_constants',
     

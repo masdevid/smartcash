@@ -48,8 +48,7 @@ class TestBackboneUIModule(unittest.TestCase):
         # Create a mock UI components dictionary
         self.mock_ui_components = {
             'main_container': MagicMock(),
-            'config_panel': MagicMock(),
-            'status_panel': MagicMock()
+            'config_panel': MagicMock()
         }
         
         # Configure the mock UI components

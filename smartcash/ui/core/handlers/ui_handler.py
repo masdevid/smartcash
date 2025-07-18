@@ -62,7 +62,7 @@ class UIHandler(BaseHandler):
         
         return None
     
-    def update_status(self, message: str, status_type: str = 'info') -> None:
+    def update_status(self, message: str, status_type: str = 'info'):
         """Update status display in UI and log the message.
         
         Args:
@@ -73,11 +73,6 @@ class UIHandler(BaseHandler):
             return
             
         try:
-            # Update status panel if available
-            status_panel = self._find_component('status_panel', 'status_panel')
-            if status_panel and hasattr(status_panel, 'update'):
-                status_panel.update(message, status_type)
-            
             # Log the message with appropriate log level
             log_method = getattr(self.logger, status_type, self.logger.info)
             log_method(f"[Status] {message}")
@@ -220,7 +215,7 @@ class UIHandler(BaseHandler):
     def clear_all_components(self):
         """Clear all UI components safely."""
         try:
-            components_to_clear = ['progress_tracker', 'status_panel', 'log_accordion', 'confirmation_area']
+            components_to_clear = ['progress_tracker', 'log_accordion', 'confirmation_area']
             
             for component_type in components_to_clear:
                 self.reset_component(component_type)
@@ -400,7 +395,7 @@ class ModuleUIHandler(UIHandler):
             'progress_history': self.get_progress_history(),
             'components_status': {
                 component_type: self.get_component_status(component_type)
-                for component_type in ['progress_tracker', 'status_panel', 'log_accordion', 'confirmation_area']
+                for component_type in ['progress_tracker', 'log_accordion', 'confirmation_area']
             }
         }
     

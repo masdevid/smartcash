@@ -186,10 +186,6 @@ def create_split_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> Dict[s
             description=UI_CONFIG['description'],
             logo_path=UI_CONFIG.get('logo_path'),
             icon='📊',  # Set the icon here
-            initial_status='idle',
-            status_text='Siap mengatur pembagian dataset',
-            status_type="info",
-            show_status_panel=True,
             **kwargs
         )
         

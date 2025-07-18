@@ -166,12 +166,10 @@ class ColabUIModule(BaseUIModule):
                 
                 if self._is_colab_environment:
                     self.log("✅ Berjalan di Google Colab - semua fitur tersedia", 'success')
+                    self.log("📊 Modul Colab siap digunakan", 'info')
                 else:
                     self.log("⚠️ Tidak berjalan di Google Colab - beberapa fitur mungkin terbatas", 'warning')
-                
-                # Update status panel (Operation Checklist 7.1) - use direct log to avoid console output
-                self.log("📊 Status: Siap untuk pengaturan lingkungan Colab", 'info')
-                self.update_operation_status("Siap untuk pengaturan lingkungan Colab", "info")
+                    self.log("📊 Modul Colab berjalan dalam mode terbatas", 'info')
             
             return success
             

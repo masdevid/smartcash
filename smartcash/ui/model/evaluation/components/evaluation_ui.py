@@ -34,7 +34,7 @@ def create_evaluation_ui(config: Dict[str, Any]) -> Dict[str, Any]:
     try:
         logger = get_module_logger("smartcash.ui.model.evaluation.components")
         
-        # Create header container with integrated status panel (no duplicate icons)
+        # Create header container with evaluation statistics
         header_container = create_header_container(
             title=UI_CONFIG['title'],
             description=UI_CONFIG['description'],
@@ -43,15 +43,7 @@ def create_evaluation_ui(config: Dict[str, Any]) -> Dict[str, Any]:
                 {'label': 'Model Types', 'value': str(len(MODEL_COMBINATIONS)), 'icon': '🤖'},
                 {'label': 'Total Tests', 'value': str(len(EVALUATION_MATRIX)), 'icon': '🎯'},
                 {'label': 'Metrics', 'value': str(len(EVALUATION_METRICS)), 'icon': '📈'}
-            ],
-            show_status_panel=True,
-            status_title="Evaluation Status",
-            status_items={
-                'Current Mode': 'Ready to Start',
-                'Progress': '0%',
-                'Last Run': 'None',
-                'Backend': 'Connected'
-            }
+            ]
         )
         
         # Create compact form sections - Row 1: 2 columns (Execution + Model options)

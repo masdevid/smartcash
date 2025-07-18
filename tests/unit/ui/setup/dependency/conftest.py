@@ -54,7 +54,6 @@ def mock_ui_handler():
     handler.show_success = MagicMock()
     handler.initialize_ui_components = MagicMock(return_value={
         'main_container': MagicMock(),
-        'status_panel': MagicMock(),
         'progress_bar': MagicMock()
     })
     return handler

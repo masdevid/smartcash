@@ -7,7 +7,7 @@ from typing import Optional
 import ipywidgets as widgets
 from IPython.display import HTML
 
-from .constants import ALERT_STYLES, COLORS
+from .constants import ALERT_STYLES
 
 def create_alert(
     message: str, 

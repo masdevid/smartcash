@@ -16,25 +16,21 @@ class TestHeaderContainer(unittest.TestCase):
         self.header = HeaderContainer(
             title="Test Title",
             subtitle="Test Subtitle",
-            status_message="Initial status",
-            status_type="info"
+            icon="📝"
         )
     
     def test_initialization(self):
         """Test that the header initializes with correct properties."""
         self.assertEqual(self.header.title, "Test Title")
         self.assertEqual(self.header.subtitle, "Test Subtitle")
-        self.assertEqual(self.header.status_message, "Initial status")
-        self.assertEqual(self.header.status_type, "info")
-        self.assertTrue(self.header.show_status_panel)
+        self.assertEqual(self.header.icon, "📝")
         
         # Check that the container was created
         self.assertIsNotNone(self.header.container)
         self.assertIsInstance(self.header.container, widgets.VBox)
         
-        # Check that the header and status panel were created
+        # Check that the header was created
         self.assertIsNotNone(self.header.header)
-        self.assertIsNotNone(self.header.status_panel)
     
     def test_update_title(self):
         """Test updating the header title, subtitle, and icon."""
@@ -53,44 +49,6 @@ class TestHeaderContainer(unittest.TestCase):
             # Check that the methods were called
             mock_create_header.assert_called_once()
             mock_create_container.assert_called_once()
-    
-    def test_update_status(self):
-        """Test updating the status message and type."""
-        # Create a mock for the status panel
-        mock_status_panel = MagicMock()
-        mock_status_panel.layout = MagicMock()
-        self.header.status_panel = mock_status_panel
-        
-        # Update the status
-        self.header.update_status("New status", "success", False)
-        
-        # Check that the properties were updated
-        self.assertEqual(self.header.status_message, "New status")
-        self.assertEqual(self.header.status_type, "success")
-        self.assertFalse(self.header.show_status_panel)
-        
-        # Check that the status panel visibility was updated
-        self.assertEqual(mock_status_panel.layout.display, 'none')
-    
-    def test_show_status(self):
-        """Test showing and hiding the status panel."""
-        # Create a mock for the status panel
-        mock_status_panel = MagicMock()
-        mock_status_panel.layout = MagicMock(display='block')
-        self.header.status_panel = mock_status_panel
-        
-        # Initially visible
-        self.assertEqual(mock_status_panel.layout.display, 'block')
-        
-        # Hide the status panel
-        self.header.show_status(False)
-        self.assertEqual(mock_status_panel.layout.display, 'none')
-        self.assertFalse(self.header.show_status_panel)
-        
-        # Show the status panel
-        self.header.show_status(True)
-        self.assertEqual(mock_status_panel.layout.display, 'block')
-        self.assertTrue(self.header.show_status_panel)
     
     def test_add_remove_class(self):
         """Test adding and removing CSS classes."""
@@ -115,15 +73,13 @@ class TestCreateHeaderContainer(unittest.TestCase):
         header = create_header_container(
             title="Test Title",
             subtitle="Test Subtitle",
-            status_message="Initial status",
-            status_type="info"
+            icon="📝"
         )
         
         # Check that the header was created with the correct properties
         self.assertEqual(header.title, "Test Title")
         self.assertEqual(header.subtitle, "Test Subtitle")
-        self.assertEqual(header.status_message, "Initial status")
-        self.assertEqual(header.status_type, "info")
+        self.assertEqual(header.icon, "📝")
         
         # Check that the container was created
         self.assertIsNotNone(header.container)

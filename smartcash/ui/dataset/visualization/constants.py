@@ -58,7 +58,7 @@ DEFAULT_CONFIG = {
 UI_CONFIG = {
     'module_name': 'visualization',
     'parent_module': 'dataset',
-    'title': '📊 Dataset Visualization',
+    'title': 'Dataset Visualization',
     'subtitle': 'Analyze and visualize your dataset statistics',
     'icon': '📊',
     'version': '2.0.0'

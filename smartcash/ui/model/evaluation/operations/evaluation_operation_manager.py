@@ -86,11 +86,9 @@ class EvaluationOperationManager(OperationHandler):
                         message = progress_data.get('message', 'Processing...')
                         self.update_progress(percentage, message)
                         
-                        # Also update parent UI status
+                        # Log progress update
                         if hasattr(self, '_parent_ui_module'):
-                            self._parent_ui_module._update_status_panel(
-                                "In Progress", f"{percentage}%", message
-                            )
+                            self.log(f"Progress: {percentage}% - {message}", 'info')
                     
                     if 'log_message' in progress_data:
                         self.log(progress_data['log_message'], progress_data.get('log_level', 'info'))

@@ -444,7 +444,7 @@ class EvaluationUIModule(UIModule):
             
             if run_mode == 'all_scenarios':
                 self.log("🚀 Starting comprehensive evaluation (8 tests)...", 'info')
-                self._update_status_panel("Running All Scenarios", "0%", "In Progress")
+                self.log("Running All Scenarios", 'info')
                 
                 result = await self._operation_manager.execute_all_scenarios()
                 
@@ -452,17 +452,17 @@ class EvaluationUIModule(UIModule):
                     successful = result.get('successful_tests', 0)
                     total = result.get('total_tests', 0)
                     self.log(f"🎉 Comprehensive evaluation completed: {successful}/{total} tests successful", 'success')
-                    self._update_status_panel("Completed", "100%", f"{successful}/{total} tests successful")
+                    self.log(f"Completed: {successful}/{total} tests successful", 'success')
                     self._update_summary_panel(result)
                 else:
                     error_msg = result.get('error', 'Unknown error')
                     self.log(f"❌ Comprehensive evaluation failed: {error_msg}", 'error')
-                    self._update_status_panel("Failed", "0%", f"Error: {error_msg}")
+                    self.log(f"Error: {error_msg}", 'error')
                     self._update_summary_panel({})
                     
             elif run_mode == 'position_only':
                 self.log("📐 Starting position variation scenario (4 models)...", 'info')
-                self._update_status_panel("Running Position Scenario", "0%", "In Progress")
+                self.log("Running Position Scenario", 'info')
                 
                 result = await self._operation_manager.execute_position_scenario()
                 
@@ -470,17 +470,17 @@ class EvaluationUIModule(UIModule):
                     successful = result.get('successful_tests', 0) 
                     total = result.get('total_tests', 0)
                     self.log(f"✅ Position scenario completed: {successful}/{total} models successful", 'success')
-                    self._update_status_panel("Completed", "100%", f"{successful}/{total} models successful")
+                    self.log(f"Completed: {successful}/{total} models successful", 'success')
                     self._update_summary_panel(result)
                 else:
                     error_msg = result.get('error', 'Unknown error')
                     self.log(f"❌ Position scenario failed: {error_msg}", 'error')
-                    self._update_status_panel("Failed", "0%", f"Error: {error_msg}")
+                    self.log(f"Error: {error_msg}", 'error')
                     self._update_summary_panel({})
                     
             elif run_mode == 'lighting_only':
                 self.log("💡 Starting lighting variation scenario (4 models)...", 'info')
-                self._update_status_panel("Running Lighting Scenario", "0%", "In Progress")
+                self.log("Running Lighting Scenario", 'info')
                 
                 result = await self._operation_manager.execute_lighting_scenario()
                 
@@ -488,12 +488,12 @@ class EvaluationUIModule(UIModule):
                     successful = result.get('successful_tests', 0)
                     total = result.get('total_tests', 0)
                     self.log(f"✅ Lighting scenario completed: {successful}/{total} models successful", 'success')
-                    self._update_status_panel("Completed", "100%", f"{successful}/{total} models successful")
+                    self.log(f"Completed: {successful}/{total} models successful", 'success')
                     self._update_summary_panel(result)
                 else:
                     error_msg = result.get('error', 'Unknown error')
                     self.log(f"❌ Lighting scenario failed: {error_msg}", 'error')
-                    self._update_status_panel("Failed", "0%", f"Error: {error_msg}")
+                    self.log(f"Error: {error_msg}", 'error')
                     self._update_summary_panel({})
                     
         except Exception as e:
@@ -526,7 +526,7 @@ class EvaluationUIModule(UIModule):
             return {'run_mode': 'all_scenarios'}
     
     def _clear_ui_state(self) -> None:
-        """Clear logs, progress, and status panel before starting new evaluation."""
+        """Clear logs and progress before starting new evaluation."""
         try:
             operation_container = self._ui_components.get('operation_container')
             if operation_container and isinstance(operation_container, dict):
@@ -538,18 +538,18 @@ class EvaluationUIModule(UIModule):
                     elif hasattr(log_accordion, 'clear'):
                         log_accordion.clear()
                 
-                # Reset progress tracker using backbone pattern
-                if 'progress_tracker' in operation_container:
-                    progress_tracker = operation_container['progress_tracker']
-                    if hasattr(progress_tracker, 'reset'):
-                        progress_tracker.reset()
-                
-                # Also use update_progress method if available
-                if 'update_progress' in operation_container:
-                    operation_container['update_progress'](0, "Ready to start...")
+                # Log the UI state reset
+                self.log("🧹 Clearing UI state...", 'info')
             
-            # Update status panel
-            self._update_status_panel("Ready to Start", "0%", "None")
+            # Clear logs
+            log_accordion = self._ui_components.get('log_accordion')
+            if log_accordion and hasattr(log_accordion, 'clear_logs'):
+                log_accordion.clear_logs()
+            
+            # Reset progress
+            progress_tracker = self._ui_components.get('progress_tracker')
+            if progress_tracker and hasattr(progress_tracker, 'update'):
+                progress_tracker.update(0, "Ready")
             
             # Clear summary panel
             self._update_summary_panel({})
@@ -558,21 +558,6 @@ class EvaluationUIModule(UIModule):
             
         except Exception as e:
             self.logger.error(f"Failed to clear UI state: {e}")
-    
-    def _update_status_panel(self, mode: str, progress: str, last_run: str) -> None:
-        """Update status panel in header container."""
-        try:
-            header_container = self._ui_components.get('header_container')
-            if header_container and hasattr(header_container, 'update_status'):
-                status_items = {
-                    'Current Mode': mode,
-                    'Progress': progress,
-                    'Last Run': last_run,
-                    'Backend': 'Connected'
-                }
-                header_container.update_status(status_items)
-        except Exception as e:
-            self.logger.error(f"Failed to update status panel: {e}")
     
     def _update_summary_panel(self, results: dict) -> None:
         """Update summary panel with evaluation results."""

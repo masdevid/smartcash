@@ -162,10 +162,7 @@ def _create_header() -> Any:
     return create_header_container(
         title=UI_CONFIG['title'],
         subtitle=UI_CONFIG['subtitle'],
-        icon=UI_CONFIG['icon'],
-        status_message="Siap untuk pengaturan lingkungan",
-        status_type="info",
-        show_status_panel=True
+        icon=UI_CONFIG['icon']
     )
 
 

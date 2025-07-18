@@ -16,7 +16,6 @@ class TestDependencyIntegration:
         # Setup UI components mock
         mock_ui_components = {
             'main_container': MagicMock(),
-            'status_panel': MagicMock(),
             'progress_bar': MagicMock()
         }
         mock_create_ui.return_value = mock_ui_components
@@ -80,7 +79,6 @@ class TestDependencyIntegration:
         # Setup UI components mock
         mock_ui_components = {
             'main_container': MagicMock(),
-            'status_panel': MagicMock(),
             'progress_bar': MagicMock()
         }
         mock_create_ui.return_value = mock_ui_components

@@ -31,24 +31,3 @@ def create_status_indicator(status: str, message: str, icon: Optional[str] = Non
         f'</span></div>'
     )
     return HTML(html_content)
-
-def update_status_panel(panel: widgets.HTML, message: str, status_type: str = "info") -> None:
-    """Perbarui panel status yang sudah ada.
-    
-    Args:
-        panel: Widget HTML panel status
-        message: Pesan baru
-        status_type: Tipe status baru ('info', 'success', 'warning', 'error')
-    """
-    style = ALERT_STYLES.get(status_type.lower(), ALERT_STYLES['info'])
-    icon = style['icon']
-    
-    html_content = (
-        f'<div style="padding: 10px; margin: 5px 0; border-radius: 4px; '
-        f'background-color: {style["bg_color"]}; '
-        f'color: {style["text_color"]}; '
-        f'border-left: 4px solid {style["border_color"]};">'
-        f'<strong>{icon} {message}</strong>'
-        f'</div>'
-    )
-    panel.value = html_content

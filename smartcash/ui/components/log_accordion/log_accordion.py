@@ -594,8 +594,8 @@ class LogAccordion(BaseUIComponent):
                 </div>
                 
                 <!-- Second row: Namespace -->
-                {f"""
-                <div class='log-namespace' title='{entry.namespace}' style='
+                {f'''
+                <div class="log-namespace" title="{entry.namespace}" style="
                     color: #6c757d;
                     font-size: 10px;
                     line-height: 1.2;
@@ -603,10 +603,10 @@ class LogAccordion(BaseUIComponent):
                     padding-left: 26px;
                     white-space: nowrap;
                     overflow: hidden;
-                    text-overflow: ellipsis;'>
+                    text-overflow: ellipsis;">
                     {full_namespace}
                 </div>
-                """ if full_namespace else ''}
+                ''' if full_namespace else ''}
                 
                 {expandable_html}
             </div>

@@ -74,7 +74,7 @@ class AugmentOperation(AugmentationBaseOperation):
             Dictionary containing operation results
         """
         self.log_operation_start("Augmenting Dataset")
-        self.update_operation_status('Memulai proses augmentasi...', 'info')
+        self.log('Memulai proses augmentasi...', 'info')
         
         try:
             # Get backend API
@@ -83,7 +83,7 @@ class AugmentOperation(AugmentationBaseOperation):
                 return self._handle_error("Backend augmentation service not available")
             
             # Execute augmentation pipeline
-            self.update_operation_status('Menjalankan pipeline augmentasi...', 'info')
+            self.log('Menjalankan pipeline augmentasi...', 'info')
             
             try:
                 result = run_pipeline(
@@ -96,7 +96,7 @@ class AugmentOperation(AugmentationBaseOperation):
                     return self._handle_error(error_msg, result.get('error'))
                 
                 # Update operation status
-                self.update_operation_status('Augmentasi selesai', 'success')
+                self.log('✅ Augmentasi selesai', 'info')
                 
                 return {
                     'status': 'success',

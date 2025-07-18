@@ -105,12 +105,7 @@ class AugmentationConfigHandler(LoggingMixin, ConfigurationMixin):
             current_config = self.get_current_config()
             
             # Here you would typically save to persistent storage
-            self.log_with_status(
-                message=f"Augmentation configuration saved successfully with {len(current_config)} keys",
-                status_message="Konfigurasi augmentasi berhasil disimpan",
-                log_level='info',
-                status_level='success'
-            )
+            self.log("✅ Konfigurasi augmentasi berhasil disimpan", 'info')
             
             return {
                 'success': True,
@@ -120,12 +115,7 @@ class AugmentationConfigHandler(LoggingMixin, ConfigurationMixin):
             
         except Exception as e:
             error_msg = f"Gagal menyimpan konfigurasi augmentasi: {str(e)}"
-            self.log_with_status(
-                message=error_msg,
-                status_message=error_msg,
-                log_level='error',
-                status_level='error'
-            )
+            self.log(f"❌ {error_msg}", 'error')
             return {
                 'success': False,
                 'message': error_msg,
@@ -151,12 +141,7 @@ class AugmentationConfigHandler(LoggingMixin, ConfigurationMixin):
                 # TODO: Add UI sync logic if needed
                 pass
             
-            self.log_with_status(
-                message=f"Augmentation configuration reset to defaults with {len(self._merged_config)} keys",
-                status_message="Konfigurasi augmentasi direset ke pengaturan awal",
-                log_level='info',
-                status_level='success'
-            )
+            self.log("✅ Konfigurasi augmentasi direset ke pengaturan awal", 'info')
             
             return {
                 'success': True, 
@@ -166,12 +151,7 @@ class AugmentationConfigHandler(LoggingMixin, ConfigurationMixin):
             
         except Exception as e:
             error_msg = f"Gagal mereset konfigurasi augmentasi: {str(e)}"
-            self.log_with_status(
-                message=error_msg,
-                status_message=error_msg,
-                log_level='error',
-                status_level='error'
-            )
+            self.log(f"❌ {error_msg}", 'error')
             return {
                 'success': False, 
                 'message': error_msg,

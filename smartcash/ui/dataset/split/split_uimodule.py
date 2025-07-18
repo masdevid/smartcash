@@ -133,17 +133,17 @@ class SplitUIModule(BaseUIModule):
     def _handle_save_config(self, button=None):
         """Handle save config button click."""
         try:
-            self.update_operation_status("Saving configuration...", "info")
+            self.log("Menyimpan konfigurasi...", "info")
             self.log("💾 Save config button clicked", 'info')
             
             result = self.save_config()
             if result.get('success'):
                 success_msg = f"Configuration saved: {result.get('message', '')}"
-                self.update_operation_status(success_msg, "info")
+                self.log(success_msg, "info")
                 self.log(f"✅ {success_msg}", 'info')
             else:
                 error_msg = f"Save failed: {result.get('message', '')}"
-                self.update_operation_status(error_msg, "error")
+                self.log(f"❌ {error_msg}", "error")
                 self.log(f"❌ {error_msg}", 'error')
         except Exception as e:
             error_msg = f"Save config error: {e}"
@@ -153,17 +153,17 @@ class SplitUIModule(BaseUIModule):
     def _handle_reset_config(self, button=None):
         """Handle reset config button click."""
         try:
-            self.update_operation_status("Resetting configuration...", "info")
+            self.log("Mereset konfigurasi...", "info")
             self.log("🔄 Reset config button clicked", 'info')
             
             result = self.reset_config()
             if result.get('success'):
                 success_msg = f"Configuration reset: {result.get('message', '')}"
-                self.update_operation_status(success_msg, "info")
+                self.log(success_msg, "info")
                 self.log(f"✅ {success_msg}", 'info')
             else:
                 error_msg = f"Reset failed: {result.get('message', '')}"
-                self.update_operation_status(error_msg, "error")
+                self.log(f"❌ {error_msg}", "error")
                 self.log(f"❌ {error_msg}", 'error')
         except Exception as e:
             error_msg = f"Reset config error: {e}"
@@ -173,20 +173,20 @@ class SplitUIModule(BaseUIModule):
     def _handle_split_dataset(self, button=None):
         """Handle split dataset button click."""
         try:
-            self.update_operation_status("Starting dataset split...", "info")
+            self.log("Memulai pemisahan dataset...", "info")
             self.log("🚀 Split dataset button clicked", 'info')
             
             # First save current config
             save_result = self.save_config()
             if not save_result.get('success'):
                 error_msg = f"Cannot split: {save_result.get('message', 'Config save failed')}"
-                self.update_operation_status(error_msg, "error")
+                self.log(f"❌ {error_msg}", "error")
                 self.log(f"❌ {error_msg}", 'error')
                 return
             
             # TODO: Implement actual dataset splitting logic
             self.log("📊 Dataset split functionality not yet implemented", 'warning')
-            self.update_operation_status("Dataset split functionality coming soon", "warning")
+            self.log("⚠️ Fitur pemisahan dataset akan segera hadir", "warning")
             
         except Exception as e:
             error_msg = f"Split dataset error: {e}"

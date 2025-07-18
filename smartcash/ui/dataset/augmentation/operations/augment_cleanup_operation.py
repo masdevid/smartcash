@@ -69,7 +69,7 @@ class AugmentCleanupOperation(AugmentationBaseOperation):
             Dictionary containing cleanup results
         """
         self.log_operation_start("Cleaning Up")
-        self.update_operation_status('Memulai pembersihan...', 'info')
+        self.log('Memulai pembersihan...', 'info')
         
         try:
             # Get cleanup configuration
@@ -102,14 +102,9 @@ class AugmentCleanupOperation(AugmentationBaseOperation):
             
             # Update status
             if results['errors']:
-                self.update_operation_status(
-                    f"Pembersihan selesai dengan {len(results['errors'])} kesalahan", 
-                    'warning'
-                )
-                self.log_warning(f"Pembersihan selesai dengan {len(results['errors'])} kesalahan")
+                self.log(f"⚠️ Pembersihan selesai dengan {len(results['errors'])} kesalahan", 'warning')
             else:
-                self.update_operation_status('Pembersihan selesai', 'success')
-                self.log_success("Pembersihan berhasil")
+                self.log('✅ Pembersihan selesai', 'info')
             
             results['status'] = 'success' if not results['errors'] else 'warning'
             return results

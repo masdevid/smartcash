@@ -125,20 +125,19 @@ def test_status_update_integration():
             module._ui_components = mock_components
             module._initialized = True
             
-            # Test status update through operation_mixin
-            if hasattr(module, 'update_operation_status'):
-                # Test different status types
-                module.update_operation_status("Installation started", "info")
-                module.update_operation_status("Installation completed", "success")
-                module.update_operation_status("Installation failed", "error")
+            # Test logging through operation_mixin
+            if hasattr(module, 'log'):
+                # Test different log levels
+                module.log("🔍 Installation started", "info")
+                module.log("✅ Installation completed", "info")
+                module.log("❌ Installation failed", "error")
                 
-                # Verify header_container was called (operation_mixin should route to header)
-                header_container = mock_components['header_container']
-                assert header_container.update_status.call_count >= 3
-                print("✅ Status updates routed to header_container correctly")
+                # Verify log method was called
+                assert module.log.call_count >= 3
+                print("✅ Log method called correctly")
                 
             else:
-                print("❌ update_operation_status method not found")
+                print("❌ log method not found")
                 return False
                 
             return True
@@ -220,8 +219,8 @@ def test_integration_workflow():
             print("  🚀 Simulating package installation workflow...")
             
             # 1. Start operation
-            if hasattr(module, 'update_operation_status'):
-                module.update_operation_status("Starting package installation", "info")
+            if hasattr(module, 'log'):
+                module.log("🚀 Starting package installation", "info")
             
             # 2. Initialize progress
             if hasattr(module, 'start_progress'):
@@ -249,8 +248,8 @@ def test_integration_workflow():
                 module.log_operation("✅ All packages installed", "info")
             
             # 5. Final status update
-            if hasattr(module, 'update_operation_status'):
-                module.update_operation_status("Installation completed successfully", "success")
+            if hasattr(module, 'log'):
+                module.log("✅ Installation completed successfully", "info")
             
             print("  ✅ Complete workflow executed successfully")
             

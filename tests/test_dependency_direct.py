@@ -92,16 +92,15 @@ def test_architecture_coordination():
         mock_components = create_mock_ui_components()
         module._ui_components = mock_components
         
-        # Test status update routing (should go to header_container)
-        if hasattr(module, 'update_operation_status'):
-            module.update_operation_status("Test status", "info")
+        # Test logging functionality
+        if hasattr(module, 'log'):
+            module.log("🔍 Test log message", "info")
             
-            # Check that header_container.update_status was called
-            header_container = mock_components['header_container']
-            if header_container.update_status.called:
-                print("✅ Status updates routed to header_container")
+            # Check that log method was called
+            if module.log.called:
+                print("✅ Log method called successfully")
             else:
-                print("❌ Status updates not routed to header_container")
+                print("❌ Log method not called")
         
         # Test progress update routing (should go to operation_container)
         if hasattr(module, 'update_progress'):

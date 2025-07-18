@@ -245,10 +245,8 @@ class OperationMixin:
             if hasattr(self, 'logger'):
                 self.logger.error(f"Error during cleanup: {e}")
     
-    # Note: update_operation_status has been moved to LoggingMixin as it's more
-    # closely related to logging functionality. Use self.log_with_status() for
-    # combined logging and status updates, or access the method directly through
-    # LoggingMixin if you've inherited from it.
+    # Logging functionality is now handled through the standard log method
+    # which provides consistent logging behavior across the application.
     
     def update_progress(self, progress: int, message: str = "", level: str = "primary", 
                        secondary_progress: Optional[int] = None, secondary_message: str = "") -> None:

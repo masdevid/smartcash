@@ -302,9 +302,9 @@ class VisualizationUIModule(BaseUIModule):
         
         if not result['success']:
             self.logger.error(result['message'])
-            self.update_operation_status(result['message'], "error")
+            self.log(f"❌ {result['message']}", "error")
         else:
-            self.update_operation_status(result['message'], "success")
+            self.log(f"✅ {result['message']}", "info")
     
     def _on_preprocessed_click(self, button=None):
         """Handle preprocessed sample button click."""
@@ -315,9 +315,9 @@ class VisualizationUIModule(BaseUIModule):
         
         if not result['success']:
             self.logger.error(result['message'])
-            self.update_operation_status(result['message'], "error")
+            self.log(f"❌ {result['message']}", "error")
         else:
-            self.update_operation_status(result['message'], "success")
+            self.log(f"✅ {result['message']}", "info")
             # Update dashboard stats after loading preprocessed data
             self._update_dashboard_stats()
     
@@ -330,9 +330,9 @@ class VisualizationUIModule(BaseUIModule):
         
         if not result['success']:
             self.logger.error(result['message'])
-            self.update_operation_status(result['message'], "error")
+            self.log(f"❌ {result['message']}", "error")
         else:
-            self.update_operation_status(result['message'], "success")
+            self.log(f"✅ {result['message']}", "info")
             # Update dashboard stats after loading augmented data
             self._update_dashboard_stats()
         

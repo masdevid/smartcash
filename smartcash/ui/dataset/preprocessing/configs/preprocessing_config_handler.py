@@ -74,12 +74,7 @@ class PreprocessingConfigHandler(LoggingMixin, ConfigurationMixin):
     def extract_config_from_ui(self) -> Dict[str, Any]:
         """Extracts the current configuration from the UI components."""
         if not self._ui_components:
-            self.log_with_status(
-                message="No UI components available for extraction",
-                status_message="Tidak ada komponen UI yang tersedia",
-                log_level='warning',
-                status_level='warning'
-            )
+            self.log("Tidak ada komponen UI yang tersedia", 'warning')
             return self.get_current_config()
 
         config = self.get_current_config()
@@ -106,12 +101,7 @@ class PreprocessingConfigHandler(LoggingMixin, ConfigurationMixin):
     def update_ui_from_config(self, config: Dict[str, Any]) -> None:
         """Updates the UI components with values from the configuration."""
         if not self._ui_components:
-            self.log_with_status(
-                message="No UI components available to update",
-                status_message="Tidak ada komponen UI yang tersedia untuk diperbarui",
-                log_level='warning',
-                status_level='warning'
-            )
+            self.log("Tidak ada komponen UI yang tersedia untuk diperbarui", 'warning')
             return
 
         prep_cfg = config.get('preprocessing', {})

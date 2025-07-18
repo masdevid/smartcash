@@ -230,12 +230,7 @@ class DependencyConfigHandler(LoggingMixin, ConfigurationMixin):
             current_config = self.get_current_config()
             
             # Here you would typically save to persistent storage
-            self.log_with_status(
-                message=f"Configuration saved successfully with {len(current_config)} keys",
-                status_message="Konfigurasi berhasil disimpan",
-                log_level='info',
-                status_level='success'
-            )
+            self.log("✅ Konfigurasi berhasil disimpan", 'info')
             
             return {
                 'success': True,
@@ -245,12 +240,7 @@ class DependencyConfigHandler(LoggingMixin, ConfigurationMixin):
             
         except Exception as e:
             error_msg = f"Failed to save configuration: {str(e)}"
-            self.log_with_status(
-                message=f"{error_msg} (error type: {type(e).__name__})",
-                status_message="Gagal menyimpan konfigurasi",
-                log_level='error',
-                status_level='error'
-            )
+            self.log(f"❌ Gagal menyimpan konfigurasi: {error_msg} (tipe error: {type(e).__name__})", 'error')
             return {
                 'success': False,
                 'message': error_msg,
@@ -279,12 +269,7 @@ class DependencyConfigHandler(LoggingMixin, ConfigurationMixin):
                 if hasattr(self, 'sync_to_ui'):
                     self.sync_to_ui(self._ui_components, self._merged_config)
             
-            self.log_with_status(
-                message=f"Configuration reset to defaults with {len(self._merged_config)} keys",
-                status_message="Konfigurasi direset ke pengaturan awal",
-                log_level='info',
-                status_level='success'
-            )
+            self.log("✅ Konfigurasi direset ke pengaturan awal", 'info')
             return {
                 'success': True, 
                 'message': 'Configuration reset to defaults',
@@ -292,13 +277,8 @@ class DependencyConfigHandler(LoggingMixin, ConfigurationMixin):
             }
             
         except Exception as e:
-            error_msg = f"Failed to reset configuration: {str(e)}"
-            self.log_with_status(
-                message=f"{error_msg} (error type: {type(e).__name__})",
-                status_message="Gagal mereset konfigurasi",
-                log_level='error',
-                status_level='error'
-            )
+            error_msg = f"Gagal mereset konfigurasi: {str(e)}"
+            self.log(f"❌ {error_msg}", 'error')
             return {
                 'success': False, 
                 'message': error_msg,

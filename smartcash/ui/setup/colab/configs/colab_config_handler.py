@@ -98,23 +98,13 @@ class ColabConfigHandler(LoggingMixin, ConfigurationMixin):
                 'message': 'Konfigurasi disimpan dalam memori (tidak perlu persistensi untuk Colab)'
             }
             
-            self.log_with_status(
-                message="Colab configuration saved in memory",
-                status_message="Konfigurasi Colab disimpan",
-                log_level='info',
-                status_level='success'
-            )
+            self.log("✅ Konfigurasi Colab disimpan", 'info')
             
             return result
             
         except Exception as e:
             error_msg = f"Gagal menyimpan konfigurasi Colab: {str(e)}"
-            self.log_with_status(
-                message=error_msg,
-                status_message=error_msg,
-                log_level='error',
-                status_level='error'
-            )
+            self.log(f"❌ {error_msg}", 'error')
             return {
                 'success': False,
                 'message': error_msg
@@ -212,12 +202,7 @@ class ColabConfigHandler(LoggingMixin, ConfigurationMixin):
             
         except Exception as e:
             error_msg = f"Gagal mereset konfigurasi Colab: {str(e)}"
-            self.log_with_status(
-                message=error_msg,
-                status_message=error_msg,
-                log_level='error',
-                status_level='error'
-            )
+            self.log(f"❌ {error_msg}", 'error')
             return {
                 'success': False,
                 'message': error_msg,

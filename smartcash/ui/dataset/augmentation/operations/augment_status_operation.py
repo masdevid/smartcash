@@ -77,7 +77,7 @@ class AugmentStatusOperation(AugmentationBaseOperation):
             Dictionary containing status information
         """
         self.log_operation_start("Checking Augmentation Status")
-        self.update_operation_status('Memeriksa status augmentasi...', 'info')
+        self.log('Memeriksa status augmentasi...', 'info')
         
         try:
             # Get status from backend
@@ -97,20 +97,11 @@ class AugmentStatusOperation(AugmentationBaseOperation):
             
             # Update status based on response
             if status_data['status'] == 'running':
-                self.update_operation_status(
-                    self._format_running_status(status_data), 
-                    'info'
-                )
+                self.log(f"Status: {self._format_running_status(status_data)}", 'info')
             elif status_data['status'] == 'completed':
-                self.update_operation_status(
-                    'Augmentasi selesai', 
-                    'success'
-                )
+                self.log('✅ Augmentasi selesai', 'info')
             elif status_data['status'] == 'failed':
-                self.update_operation_status(
-                    status_data.get('message', 'Augmentasi gagal'), 
-                    'error'
-                )
+                self.log(f"❌ {status_data.get('message', 'Augmentasi gagal')}", 'error')
             
             # Log completion
             self.log_info("Pemeriksaan status selesai")

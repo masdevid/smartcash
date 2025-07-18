@@ -730,7 +730,7 @@ class BaseUIModule(
             # Start operation logging and progress tracking
             self.log_operation_start(operation_name)
             self.start_progress(f"Memulai {operation_name.lower()}...", 0)
-            self.update_operation_status(f"Memulai {operation_name.lower()}...", "info")
+            self.log(f"Memulai {operation_name.lower()}...", "info")
             
             # Only disable the clicked button, not all buttons
             self.disable_all_buttons(f"⏳ {operation_name}...", button_id=button_id)
@@ -741,7 +741,6 @@ class BaseUIModule(
                 if not validation_result.get('valid', True):
                     warning_msg = validation_result.get('message', f'Validasi {operation_name.lower()} gagal')
                     self.log(f"⚠️ {warning_msg}", 'warning')
-                    self.update_operation_status(warning_msg, "warning")
                     self.error_progress(warning_msg)
                     return {'success': False, 'message': warning_msg}
             
@@ -755,7 +754,7 @@ class BaseUIModule(
             if result.get('success'):
                 success_msg = success_message or result.get('message', f'{operation_name} berhasil diselesaikan')
                 self.log_operation_complete(operation_name)
-                self.update_operation_status(success_msg, "success")
+                self.log(f"✅ {success_msg}", "info")
                 self.log(f"✅ {success_msg}", 'success')
                 self.complete_progress(f"{operation_name} selesai")
             else:
@@ -763,7 +762,7 @@ class BaseUIModule(
                 error_msg = result.get('message', 'Operasi gagal')
                 full_error = f"{error_prefix}: {error_msg}"
                 self.log_operation_error(operation_name, error_msg)
-                self.update_operation_status(full_error, "error")
+                self.log(f"❌ {full_error}", "error")
                 self.error_progress(full_error)
                 
             return result

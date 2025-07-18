@@ -170,7 +170,6 @@ def test_operation_wrapper():
             # Mock necessary methods
             module.log_operation_start = Mock()
             module.start_progress = Mock()
-            module.update_operation_status = Mock()
             module.disable_all_buttons = Mock()
             module.update_progress = Mock()
             module.log_operation_complete = Mock()

@@ -220,7 +220,7 @@ def test_integration_workflow():
         print("  🚀 Simulating enhanced operation workflow...")
         
         # 1. Start operation with status update
-        module.update_operation_status("Starting enhanced operation", "info")
+        module.log("🚀 Starting enhanced operation", "info")
         
         # 2. Update summary with initial info
         module.update_summary("<p>Operation initialized</p>", "info")
@@ -259,7 +259,7 @@ def test_integration_workflow():
         module.show_summary_message("Operation Complete", "All files processed successfully", "success", "✅")
         
         # 11. Final status update
-        module.update_operation_status("Operation completed successfully", "success")
+        module.log("✅ Operation completed successfully", "info")
         
         # 12. Clear dialog
         module.clear_operation_dialog()

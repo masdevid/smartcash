@@ -150,7 +150,7 @@ class DownloaderUIModule(BaseUIModule):
             # Disable all operation buttons
             self.disable_all_buttons()
             
-            self.update_operation_status("Memulai download dataset...", "info")
+            self.log("📥 Memulai download dataset...", "info")
             self.log("📥 Memulai operasi download dataset", "info")
             
             # Create download operation with merged config
@@ -163,16 +163,16 @@ class DownloaderUIModule(BaseUIModule):
             if result.get("success", False):
                 file_count = result.get("file_count", 0)
                 total_size = result.get("total_size", "0B")
-                self.update_operation_status(f"Download selesai: {file_count} file ({total_size})", "success")
+                self.log(f"✅ Download selesai: {file_count} file ({total_size})", "info")
                 self.log("✅ Download dataset berhasil diselesaikan", "success")
             else:
                 error_msg = result.get("error", "Download gagal")
-                self.update_operation_status(f"Download gagal: {error_msg}", "error")
+                self.log(f"❌ Download gagal: {error_msg}", "error")
                 self.log(f"❌ Download gagal: {error_msg}", "error")
                 
         except Exception as e:
             self.logger.error(f"Download failed: {e}")
-            self.update_operation_status(f"Error download: {e}", "error")
+            self.log(f"❌ Error download: {e}", "error")
             self.log(f"❌ Error download: {e}", "error")
         finally:
             # Re-enable buttons
@@ -184,7 +184,7 @@ class DownloaderUIModule(BaseUIModule):
             # Disable all operation buttons
             self.disable_all_buttons()
             
-            self.update_operation_status("Memeriksa status dataset...", "info")
+            self.log("🔍 Memeriksa status dataset...", "info")
             self.log("🔍 Memulai operasi pengecekan dataset", "info")
             
             # Create check operation
@@ -194,16 +194,16 @@ class DownloaderUIModule(BaseUIModule):
             if result.get("success", False):
                 file_count = result.get("file_count", 0)
                 total_size = result.get("total_size", "0B")
-                self.update_operation_status(f"Pengecekan selesai: {file_count} file ({total_size})", "success")
+                self.log(f"✅ Pengecekan selesai: {file_count} file ({total_size})", "info")
                 self.log("✅ Pengecekan dataset berhasil diselesaikan", "success")
             else:
                 error_msg = result.get("error", "Pengecekan gagal")
-                self.update_operation_status(f"Pengecekan gagal: {error_msg}", "error")
+                self.log(f"❌ Pengecekan gagal: {error_msg}", "error")
                 self.log(f"❌ Pengecekan gagal: {error_msg}", "error")
                 
         except Exception as e:
             self.logger.error(f"Check failed: {e}")
-            self.update_operation_status(f"Error pengecekan: {e}", "error")
+            self.log(f"❌ Error pengecekan: {e}", "error")
             self.log(f"❌ Error pengecekan: {e}", "error")
         finally:
             # Re-enable buttons
@@ -215,7 +215,7 @@ class DownloaderUIModule(BaseUIModule):
             # Disable all operation buttons
             self.disable_all_buttons()
             
-            self.update_operation_status("Memulai pembersihan dataset...", "info")
+            self.log("🧹 Memulai pembersihan dataset...", "info")
             self.log("🧹 Memulai operasi pembersihan dataset", "info")
             
             # Create cleanup operation
@@ -231,7 +231,7 @@ class DownloaderUIModule(BaseUIModule):
                 return
             
             if targets_result.get("total_files", 0) == 0:
-                self.update_operation_status("Tidak ada file untuk dibersihkan", "info")
+                self.log("ℹ️ Tidak ada file untuk dibersihkan", "info")
                 self.log("✅ Tidak ada file untuk dibersihkan", "info")
                 return
                 
@@ -243,15 +243,15 @@ class DownloaderUIModule(BaseUIModule):
                     if result.get("success", False):
                         deleted_files = result.get("deleted_files", 0)
                         freed_space = result.get("freed_space", "0B")
-                        self.update_operation_status(f"Pembersihan selesai: {deleted_files} file dihapus ({freed_space})", "success")
+                        self.log(f"✅ Pembersihan selesai: {deleted_files} file dihapus ({freed_space})", "info")
                         self.log("✅ Pembersihan berhasil diselesaikan", "success")
                     else:
                         error_msg = result.get("error", "Pembersihan gagal")
-                        self.update_operation_status(f"Pembersihan gagal: {error_msg}", "error")
+                        self.log(f"❌ Pembersihan gagal: {error_msg}", "error")
                         self.log(f"❌ Pembersihan gagal: {error_msg}", "error")
                 except Exception as e:
                     self.logger.error(f"Cleanup execution failed: {e}")
-                    self.update_operation_status(f"Error pembersihan: {e}", "error")
+                    self.log(f"❌ Error pembersihan: {e}", "error")
                     self.log(f"❌ Error pembersihan: {e}", "error")
                 finally:
                     # Re-enable buttons

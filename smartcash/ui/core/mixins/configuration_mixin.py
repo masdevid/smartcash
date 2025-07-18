@@ -171,8 +171,6 @@ class ConfigurationMixin(ABC):
                 error_msg = "Configuration handler not available"
                 if hasattr(self, 'logger'):
                     self.logger.error(f"❌ {error_msg}")
-                if hasattr(self, 'update_operation_status'):
-                    self.update_operation_status(error_msg, 'error')
                 return {'success': False, 'message': error_msg}
                 
             # Get default config directly
@@ -198,9 +196,7 @@ class ConfigurationMixin(ABC):
             success_msg = 'Configuration reset to defaults'
             if hasattr(self, 'logger'):
                 self.logger.info(f"✅ {success_msg}")
-            if hasattr(self, 'update_operation_status'):
-                self.update_operation_status(success_msg, 'success')
-                
+            
             return {
                 'success': True,
                 'message': success_msg,
@@ -211,8 +207,6 @@ class ConfigurationMixin(ABC):
             error_msg = f"Failed to reset configuration: {str(e)}"
             if hasattr(self, 'logger'):
                 self.logger.error(f"❌ {error_msg}")
-            if hasattr(self, 'update_operation_status'):
-                self.update_operation_status(error_msg, 'error')
             return {
                 'success': False,
                 'message': error_msg,

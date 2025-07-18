@@ -74,32 +74,47 @@ class BaseColabOperation(LoggingMixin, OperationMixin):
             **kwargs: Keyword arguments for the function
             
         Returns:
-            Dictionary with operation results
+            Dictionary with operation results including error details and traceback if any
         """
         try:
             return operation_func(*args, **kwargs)
         except Exception as e:
             import traceback
+            import sys
             
+            # Format operation name for display
             operation_name = self.module_name.replace('_', ' ').title()
-            error_msg = f"{operation_name} failed: {str(e)}"
             
-            # Get full traceback
-            tb_str = traceback.format_exc()
+            # Get exception details
+            exc_type, exc_value, exc_traceback = sys.exc_info()
+            error_msg = str(exc_value) or "Unknown error occurred"
             
-            # Log with traceback using the new method
-            if hasattr(self, 'log_exception'):
-                self.log_exception(f"Operasi gagal: {operation_name}", e)
-            else:
-                # Fallback to enhanced error logging
-                error_with_traceback = f"{error_msg}\n\n{tb_str}"
-                self.log(error_with_traceback, 'error')
+            # Format full error message with operation context
+            full_error_msg = f"{operation_name} failed: {error_msg}"
             
-            return {
-                'success': False,
-                'error': error_msg,
-                'traceback': tb_str
-            }
+            # Get full traceback with chained exceptions
+            tb_str = "".join(traceback.format_exception(exc_type, exc_value, exc_traceback))
+            
+            # Log the error with traceback using available logging methods
+            if hasattr(self, 'log_error'):
+                # Format error message with traceback for logging
+                error_log = f"❌ {full_error_msg}\n\nTraceback (paling baru terakhir):\n{tb_str}"
+                self.log_error(error_log)
+            elif hasattr(self, 'log'):
+                # Fallback to standard log method if log_error is not available
+                self.log(f"❌ {full_error_msg}\n\n{tb_str}", 'error')
+            
+            # Also log to the standard logger
+            if hasattr(self, 'logger'):
+                self.logger.error(full_error_msg, exc_info=True)
+            
+            # Return detailed error information
+            return self.create_error_result(
+                full_error_msg,
+                traceback=tb_str,
+                exception_type=exc_type.__name__ if exc_type else 'UnknownError',
+                operation=self.module_name
+            )
     
     def update_progress_safe(self, progress_callback: Optional[Callable], 
                            progress: int, message: str, phase_progress: Optional[int] = None) -> None:
@@ -110,22 +125,55 @@ class BaseColabOperation(LoggingMixin, OperationMixin):
             progress: Overall progress percentage (0-100)
             message: Progress message
             phase_progress: Optional phase progress percentage (0-100)
+            
+        Note:
+            When phase_progress is provided, this will update both the overall progress bar
+            and the phase progress bar. The progress_callback should accept either:
+            - progress, message (for single progress bar)
+            - progress, message, phase_progress (for dual progress bars)
         """
-        if progress_callback:
-            try:
-                if phase_progress is not None:
-                    # Update both overall and phase progress
-                    progress_callback(progress, message, phase_progress)
+        if not progress_callback:
+            return
+            
+        try:
+            if phase_progress is not None:
+                # Update both overall and phase progress with proper level information
+                if hasattr(progress_callback, 'update_progress'):
+                    # If it's an OperationContainer or similar with update_progress method
+                    progress_callback.update_progress(
+                        progress=progress,
+                        message=message,
+                        level='primary'
+                    )
+                    progress_callback.update_progress(
+                        progress=phase_progress,
+                        message=f"{message} (Phase Progress)",
+                        level='secondary'
+                    )
                 else:
-                    # Backward compatibility: update only overall progress
+                    # Fallback to direct callback with three arguments
+                    try:
+                        progress_callback(progress, message, phase_progress)
+                    except TypeError:
+                        # If callback doesn't accept three arguments, try with just overall progress
+                        progress_callback(progress, message)
+            else:
+                # Update only overall progress
+                if hasattr(progress_callback, 'update_progress'):
+                    progress_callback.update_progress(
+                        progress=progress,
+                        message=message,
+                        level='primary'
+                    )
+                else:
                     progress_callback(progress, message)
-            except Exception as e:
-                self.logger.warning(f"Progress callback failed: {e}")
-                # Try with just the original signature if the new one fails
-                try:
-                    progress_callback(progress, message)
-                except Exception as e2:
-                    self.logger.warning(f"Fallback progress callback also failed: {e2}")
+        except Exception as e:
+            self.logger.warning(f"Progress update failed: {e}")
+            # Try with just the basic callback as last resort
+            try:
+                progress_callback(progress, message)
+            except Exception as e2:
+                self.logger.warning(f"Fallback progress update also failed: {e2}")
     
     def create_success_result(self, message: str, **additional_data) -> Dict[str, Any]:
         """Create standardized success result.
@@ -152,19 +200,33 @@ class BaseColabOperation(LoggingMixin, OperationMixin):
             **additional_data: Additional data to include in result
             
         Returns:
-            Error result dictionary
+            Error result dictionary with error details and traceback
         """
+        # Create base result with error information
         result = {
             'success': False,
-            'error': error
+            'error': error,
+            'traceback': additional_data.get('traceback')
         }
-        result.update(additional_data)
+        
+        # Include any additional data in the result
+        result.update({k: v for k, v in additional_data.items() if k != 'traceback'})
         
         # Log the error with traceback if available
-        if hasattr(self, 'log_exception') and 'traceback' in additional_data:
-            self.log_error(f"Operasi gagal: {error}", additional_data['traceback'])
-        else:
-            self.log_error(f"Operasi gagal: {error}")
+        if hasattr(self, 'log_error'):
+            if 'traceback' in additional_data:
+                # Format error message with traceback for logging
+                error_msg = f"Operasi gagal: {error}\n\nTraceback (paling baru terakhir):\n{additional_data['traceback']}"
+                self.log_error(error_msg)
+            else:
+                self.log_error(f"Operasi gagal: {error}")
+        
+        # Also log to the standard logger
+        if hasattr(self, 'logger'):
+            if 'traceback' in additional_data:
+                self.logger.error(f"Operasi gagal: {error}\n{additional_data['traceback']}")
+            else:
+                self.logger.error(f"Operasi gagal: {error}")
         
         return result
     

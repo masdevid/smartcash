@@ -37,6 +37,15 @@ class DependencyUIModule(BaseUIModule):
             enable_environment=True  # Enable environment management features
         )
         
+        # Ensure the logger is properly initialized with the module namespace
+        self._update_logging_context()
+        
+        # Set the module namespace explicitly
+        self._module_namespace = 'smartcash.ui.setup.dependency'
+        
+        # Log initialization with the explicit namespace
+        self.logger.debug(f"🔄 Initializing DependencyUIModule (namespace: {self._module_namespace})")
+        
         # Set required components for validation
         self._required_components = [
             'main_container',
@@ -46,10 +55,22 @@ class DependencyUIModule(BaseUIModule):
             'operation_container'
         ]
         
+        # Log successful initialization
+        self.logger.debug("✅ DependencyUIModule initialized")
+        
         # Dependency-specific attributes
         self._package_status = {}
+    
+    def _get_module_namespace(self) -> str:
+        """
+        Override to provide a consistent namespace for this module.
         
-        self.logger.debug("✅ DependencyUIModule initialized")
+        Returns:
+            The module's namespace string
+        """
+        if hasattr(self, '_module_namespace') and self._module_namespace:
+            return self._module_namespace
+        return 'smartcash.ui.setup.dependency'
     
     def _register_default_operations(self) -> None:
         """Register default operation handlers including dependency-specific operations."""

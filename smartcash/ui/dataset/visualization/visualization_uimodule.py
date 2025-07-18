@@ -261,7 +261,6 @@ class VisualizationUIModule(BaseUIModule):
         self._ui_components = create_visualization_ui()
         
         # Set up event handlers
-        self._setup_event_handlers()
     
     def _get_module_button_handlers(self) -> Dict[str, Any]:
         """Get Visualization module-specific button handlers.
@@ -277,7 +276,9 @@ class VisualizationUIModule(BaseUIModule):
             # Action buttons
             'refresh': self._on_refresh_click,
             'preprocessed': self._on_preprocessed_click,
-            'augmented': self._on_augmented_click
+            'augmented': self._on_augmented_click,
+            'save': self._handle_save_config,
+            'reset': self._handle_reset_config
         }
         
         handlers.update(visualization_handlers)

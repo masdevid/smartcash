@@ -37,11 +37,29 @@ def create_config_summary(config: Dict[str, Any]) -> widgets.Widget:
             logger.warning(f"Expected backbone_integration to be a dictionary, got {type(backbone_integration).__name__}")
             backbone_integration = {}
         
-        # Generate model name preview
+        # Helper function to safely get nested config values
+        def get_nested_value(d, keys, default=None):
+            if not isinstance(d, dict):
+                return default
+                
+            for key in keys:
+                if isinstance(d, dict) and key in d:
+                    d = d[key]
+                else:
+                    return default
+            return d
+            
+        # Safely get config values with proper defaults
         backbone_type = backbone_integration.get('backbone_type', 'efficientnet_b4')
-        layer_mode = training_config.get('layer_mode', 'single')
-        optimization_type = training_config.get('optimization_type', 'default')
+        layer_mode = str(training_config.get('layer_mode', 'single')).title()
+        optimization_type = str(training_config.get('optimization_type', 'default')).title()
         model_name = generate_model_name(backbone_type, layer_mode, optimization_type)
+        epochs = int(training_config.get('epochs', 100))
+        batch_size = int(training_config.get('batch_size', 16))
+        learning_rate = float(training_config.get('learning_rate', 0.001))
+        optimization = str(training_config.get('optimization_type', 'default')).title()
+        mixed_precision = bool(training_config.get('mixed_precision', True))
+        early_stopping_enabled = bool(get_nested_value(training_config, ['early_stopping', 'enabled'], True))
         
         # Create summary content
         summary_html = f"""
@@ -51,19 +69,19 @@ def create_config_summary(config: Dict[str, Any]) -> widgets.Widget:
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 15px;">
                 <div>
                     <h5 style="color: #6c757d; margin-bottom: 8px;">📋 Training Settings</h5>
-                    <p><strong>Mode:</strong> {training_config.get('layer_mode', 'single').title()}</p>
-                    <p><strong>Epochs:</strong> {training_config.get('epochs', 100)}</p>
-                    <p><strong>Batch Size:</strong> {training_config.get('batch_size', 16)}</p>
-                    <p><strong>Learning Rate:</strong> {training_config.get('learning_rate', 0.001)}</p>
-                    <p><strong>Optimization:</strong> {training_config.get('optimization_type', 'default').title()}</p>
+                    <p><strong>Mode:</strong> {layer_mode}</p>
+                    <p><strong>Epochs:</strong> {epochs}</p>
+                    <p><strong>Batch Size:</strong> {batch_size}</p>
+                    <p><strong>Learning Rate:</strong> {learning_rate:.6f}</p>
+                    <p><strong>Optimization:</strong> {optimization}</p>
                 </div>
                 
                 <div>
                     <h5 style="color: #6c757d; margin-bottom: 8px;">🧬 Model Information</h5>
                     <p><strong>Backbone:</strong> {backbone_type}</p>
                     <p><strong>Model Name:</strong> <code>{model_name}</code></p>
-                    <p><strong>Mixed Precision:</strong> {'✅' if training_config.get('mixed_precision', True) else '❌'}</p>
-                    <p><strong>Early Stopping:</strong> {'✅' if training_config.get('early_stopping', {{}}).get('enabled', True) else '❌'}</p>
+                    <p><strong>Mixed Precision:</strong> {'✅' if mixed_precision else '❌'}</p>
+                    <p><strong>Early Stopping:</strong> {'✅' if early_stopping_enabled else '❌'}</p>
                 </div>
             </div>
             

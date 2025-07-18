@@ -154,7 +154,7 @@ def create_visualization_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -
     
     # Buat container aksi dengan tombol
     action_container = create_action_container(
-        show_save_reset=False,
+        show_save_reset=True,
         buttons=action_buttons,
         title="📊 Aksi Visualisasi"
     )
@@ -167,7 +167,9 @@ def create_visualization_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -
     ui_components['refresh'] = buttons.get('refresh')
     ui_components['preprocessed'] = buttons.get('preprocessed')
     ui_components['augmented'] = buttons.get('augmented')
-   
+    ui_components['save'] = buttons.get('save')
+    ui_components['reset'] = buttons.get('reset')
+    
     # === 4. Buat Summary Container ===
     summary_content = _create_module_summary_content(current_config)
     summary_container = create_summary_container(

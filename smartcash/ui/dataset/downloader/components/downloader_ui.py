@@ -105,10 +105,11 @@ def create_downloader_ui_components(
         show_save_reset=True
     )
     
-    # 4. Create Operation Container with progress tracker
+    # 4. Create Operation Container with dual progress tracker for download operations
     operation_container = create_operation_container(
         show_progress=True,
         show_logs=True,
+        progress_levels='dual',  # Enable dual progress for download operations
         log_module_name=UI_CONFIG['module_title'],
         log_height="200px",
         log_entry_style='compact'  # Ensure consistent hover behavior

@@ -181,11 +181,12 @@ def _create_action_buttons() -> Dict[str, Any]:
 
 
 def _create_operation_container() -> Dict[str, Any]:
-    """Create operation container for logs and progress."""
+    """Create operation container for logs and progress with dual progress tracking."""
     return create_operation_container(
         show_progress=True,
         show_dialog=True,
         show_logs=True,
+        progress_levels='dual',  # Enable dual progress for augmentation operations
         log_module_name="Augmentation"
     )
 

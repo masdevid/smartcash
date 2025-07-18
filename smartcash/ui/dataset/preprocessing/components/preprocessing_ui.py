@@ -198,11 +198,12 @@ def create_preprocessing_ui_components(config: Optional[Dict[str, Any]] = None, 
                 'button_id': getattr(v, '_button_id', 'N/A')
             }
     
-    # 4. Operation Container
+    # 4. Operation Container with dual progress for preprocessing operations
     operation_dict = create_operation_container(
         show_progress=True,
         show_dialog=True,
         show_logs=True,
+        progress_levels='dual',  # Enable dual progress for preprocessing operations
         log_module_name=UI_CONFIG['module_name']
     )
     operation_widget = operation_dict.pop('container', None)

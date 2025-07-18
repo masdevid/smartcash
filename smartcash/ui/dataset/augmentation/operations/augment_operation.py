@@ -39,15 +39,32 @@ class AugmentOperation(AugmentationBaseOperation):
         self._processed_count = 0
         self._total_to_process = 0
 
-    def _progress_adapter(self, progress: float, message: str = '') -> None:
+    def _progress_adapter(self, progress: float, message: str = '', level: str = 'overall', secondary_progress: Optional[float] = None, secondary_message: str = '') -> None:
         """
-        Adapter for progress callbacks from the backend.
+        Adapter for progress callbacks from the backend with dual progress support.
         
         Args:
-            progress: Progress value between 0 and 1
-            message: Optional progress message
+            progress: Progress value between 0 and 1 for main progress
+            message: Optional progress message for main progress
+            level: Progress level ('overall' or 'current')
+            secondary_progress: Optional secondary progress value between 0 and 1
+            secondary_message: Optional secondary progress message
         """
-        self.update_progress(progress * 100, message)
+        # Convert progress to percentage
+        main_progress_pct = int(progress * 100)
+        
+        # Handle dual progress if secondary_progress is provided
+        if secondary_progress is not None:
+            secondary_progress_pct = int(secondary_progress * 100)
+            self.update_progress(
+                progress=main_progress_pct,
+                message=message,
+                secondary_progress=secondary_progress_pct,
+                secondary_message=secondary_message
+            )
+        else:
+            # Single progress mode (backward compatibility)
+            self.update_progress(main_progress_pct, message)
     
     def execute(self) -> Dict[str, Any]:
         """

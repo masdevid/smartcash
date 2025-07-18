@@ -250,16 +250,20 @@ class OperationMixin:
     # combined logging and status updates, or access the method directly through
     # LoggingMixin if you've inherited from it.
     
-    def update_progress(self, progress: int, message: str = "", level: str = "primary") -> None:
+    def update_progress(self, progress: int, message: str = "", level: str = "primary", 
+                       secondary_progress: Optional[int] = None, secondary_message: str = "") -> None:
         """
         Update progress display - delegates to operation_container.
         
         Progress updates go to operation_container for centralized handling.
+        Supports both single and dual progress tracking.
         
         Args:
             progress: Progress value (0-100)
             message: Progress message
             level: Progress level (primary, secondary, tertiary)
+            secondary_progress: Optional secondary progress value (0-100) for dual progress
+            secondary_message: Optional secondary progress message for dual progress
         """
         try:
             # Try operation manager first
@@ -274,15 +278,23 @@ class OperationMixin:
                     # Handle operation_container as OperationContainer object
                     if hasattr(operation_container, 'update_progress'):
                         operation_container.update_progress(progress, message, level)
+                        # Handle secondary progress if provided
+                        if secondary_progress is not None:
+                            operation_container.update_progress(secondary_progress, secondary_message, 'secondary')
                         return
                     # Handle operation_container as dict (returned by create_operation_container)
                     elif isinstance(operation_container, dict) and 'update_progress' in operation_container:
                         operation_container['update_progress'](progress, message, level)
+                        # Handle secondary progress if provided
+                        if secondary_progress is not None:
+                            operation_container['update_progress'](secondary_progress, secondary_message, 'secondary')
                         return
             
             # Fallback logging
             if hasattr(self, 'logger'):
                 self.logger.debug(f"[Progress] {progress}% - {message}")
+                if secondary_progress is not None:
+                    self.logger.debug(f"[Secondary Progress] {secondary_progress}% - {secondary_message}")
                 
         except Exception as e:
             if hasattr(self, 'logger'):

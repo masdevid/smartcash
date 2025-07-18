@@ -50,11 +50,36 @@ class BasePreprocessingOperation(OperationMixin, ABC):
             except Exception as e:
                 self.logger.error(f"Error executing callback '{name}': {e}")
 
-    def _progress_adapter(self, level: str, current: int, total: int, message: str):
-        """Adapts a backend progress callback to the UI's ProgressTracker."""
-        progress_level = ProgressLevel.OVERALL if level == 'overall' else ProgressLevel.CURRENT
+    def _progress_adapter(self, level: str, current: int, total: int, message: str, secondary_current: Optional[int] = None, secondary_total: Optional[int] = None, secondary_message: str = ''):
+        """Adapts a backend progress callback to the UI's ProgressTracker with dual progress support."""
+        # Calculate main progress percentage
         percentage = (current / total) * 100 if total > 0 else 0
-        self.update_progress(progress_level, percentage, message)
+        
+        # Handle dual progress if secondary parameters are provided
+        if secondary_current is not None and secondary_total is not None and secondary_total > 0:
+            secondary_percentage = (secondary_current / secondary_total) * 100
+            
+            # For dual progress: main progress for overall, secondary for current step
+            if level == 'overall':
+                # Overall progress as main, current step as secondary
+                self.update_progress(
+                    progress=int(percentage),
+                    message=message,
+                    secondary_progress=int(secondary_percentage), 
+                    secondary_message=secondary_message
+                )
+            else:
+                # Current progress as main, overall as secondary (alternative layout)
+                self.update_progress(
+                    progress=int(secondary_percentage),
+                    message=secondary_message,
+                    secondary_progress=int(percentage),
+                    secondary_message=message
+                )
+        else:
+            # Single progress mode (backward compatibility)
+            progress_level = ProgressLevel.OVERALL if level == 'overall' else ProgressLevel.CURRENT
+            self.update_progress(progress_level, percentage, message)
 
     @abstractmethod
     def execute(self) -> None:

@@ -554,69 +554,59 @@ class LogAccordion(BaseUIComponent):
             # Create single row format HTML with dynamic class and styles
             html = f"""
             <div class='{entry_class}' style='
-                padding: {'2px 8px' if self.log_entry_style == 'compact' else '4px 8px'}; 
+                padding: 4px 8px; 
                 margin: 2px 0; 
                 border-left: 3px solid {style['color']}; 
                 background: {style['bg']}; 
                 border-radius: 3px;
-                transition: all 0.15s ease;
-                display: flex;
-                flex-wrap: nowrap;
-                align-items: flex-start;
-                gap: 6px;
-                line-height: 1.4;
-                font-size: 13px;
-                font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;'>
+                transition: all 0.15s ease;'>
                 
-                <!-- Icon -->
-                <span style='
-                    font-size: 14px;
-                    flex-shrink: 0;
-                    width: 20px;
-                    text-align: center;
-                    margin-top: 2px;'>
-                    {level_emoji}
-                </span>
-                
-                <!-- Message Container -->
-                <div style='
-                    flex: 1;
-                    min-width: 0;
-                    overflow: hidden;'>
-                    
-                    <!-- Namespace (above message) -->
-                    <div class='log-namespace' title='{entry.namespace or ""}' style='
-                        color: #6c757d;
-                        font-size: 10px;
-                        line-height: 1.2;
-                        margin-bottom: 1px;
-                        white-space: nowrap;
-                        overflow: hidden;
-                        text-overflow: ellipsis;
-                        display: {'block' if full_namespace else 'none'};'>
-                        {full_namespace}
-                    </div>
+                <!-- First row: Icon + Message + Timestamp -->
+                <div style='display: flex; align-items: flex-start; gap: 6px;'>
+                    <!-- Icon -->
+                    <span style='
+                        font-size: 14px;
+                        flex-shrink: 0;
+                        width: 20px;
+                        text-align: center;'>
+                        {level_emoji}
+                    </span>
                     
                     <!-- Message -->
                     <div style='
+                        flex: 1;
                         color: {style['text_color']};
                         word-break: break-word;
                         white-space: pre-wrap;
                         line-height: 1.4;'>
                         {main_message}{duplicate_counter}
                     </div>
+                    
+                    <!-- Timestamp -->
+                    <span style='
+                        color: #6c757d;
+                        font-size: 11px;
+                        flex-shrink: 0;
+                        margin-left: 4px;
+                        white-space: nowrap;'>
+                        {timestamp}
+                    </span>
                 </div>
                 
-                <!-- Timestamp -->
-                <span style='
+                <!-- Second row: Namespace -->
+                {f"""
+                <div class='log-namespace' title='{entry.namespace}' style='
                     color: #6c757d;
-                    font-size: 11px;
-                    flex-shrink: 0;
-                    margin-left: 8px;
+                    font-size: 10px;
+                    line-height: 1.2;
+                    margin-top: -2px;
+                    padding-left: 26px;
                     white-space: nowrap;
-                    margin-top: 2px;'>
-                    {timestamp}
-                </span>
+                    overflow: hidden;
+                    text-overflow: ellipsis;'>
+                    {full_namespace}
+                </div>
+                """ if full_namespace else ''}
                 
                 {expandable_html}
             </div>

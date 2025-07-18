@@ -212,6 +212,9 @@ class BaseColabOperation(LoggingMixin, OperationMixin):
         # Include any additional data in the result
         result.update({k: v for k, v in additional_data.items() if k != 'traceback'})
         
+        # Format error message for display
+        error_display = f"❌ {error}"
+        
         # Log the error with traceback if available
         if hasattr(self, 'log_error'):
             if 'traceback' in additional_data:
@@ -227,6 +230,24 @@ class BaseColabOperation(LoggingMixin, OperationMixin):
                 self.logger.error(f"Operasi gagal: {error}\n{additional_data['traceback']}")
             else:
                 self.logger.error(f"Operasi gagal: {error}")
+                
+        # Update progress tracker error state if available
+        if hasattr(self, 'operation_container') and self.operation_container:
+            try:
+                # Get progress tracker from container
+                progress_tracker = self.operation_container.get('progress_tracker')
+                if progress_tracker and hasattr(progress_tracker, 'error'):
+                    # Call error method if available (newer versions)
+                    progress_tracker.error(error_display)
+                elif hasattr(progress_tracker, 'set_all_error'):
+                    # Fallback to set_all_error if available
+                    progress_tracker.set_all_error(error_display)
+                # Also update progress to show error state
+                if hasattr(self, 'update_progress_safe'):
+                    self.update_progress_safe(self.operation_container.get('update_progress'), 
+                                          100, error_display)
+            except Exception as e:
+                self.logger.warning(f"Failed to update progress tracker error state: {e}")
         
         return result
     

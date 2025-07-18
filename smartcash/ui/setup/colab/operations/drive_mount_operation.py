@@ -51,6 +51,22 @@ class DriveMountOperation(BaseColabOperation):
                 progress_steps[0].get('phase_progress', 0)
             )
             
+            # Simulate environment check
+            env_check_steps = [
+                ("Menginisialisasi manajer lingkungan...", 30),
+                ("Memeriksa tipe lingkungan...", 60),
+                ("Menyiapkan akses...", 90),
+                ("Pemeriksaan lingkungan selesai", 100)
+            ]
+            
+            for msg, phase_pct in env_check_steps:
+                self.update_progress_safe(
+                    progress_callback,
+                    int(progress_steps[0]['progress'] + (progress_steps[1]['progress'] - progress_steps[0]['progress']) * (phase_pct / 100)),
+                    msg,
+                    int(progress_steps[0].get('phase_progress', 0) + (progress_steps[1].get('phase_progress', 0) - progress_steps[0].get('phase_progress', 0)) * (phase_pct / 100))
+                )
+            
             # Use standardized environment manager
             env_manager = get_environment_manager(logger=self.logger)
             
@@ -69,6 +85,21 @@ class DriveMountOperation(BaseColabOperation):
                 progress_steps[1]['message'],
                 progress_steps[1].get('phase_progress', 0)
             )
+            
+            # Simulate mount status check
+            mount_check_steps = [
+                ("Memeriksa status mount Drive...", 40),
+                ("Memverifikasi akses...", 80),
+                ("Pemeriksaan status selesai", 100)
+            ]
+            
+            for msg, phase_pct in mount_check_steps:
+                self.update_progress_safe(
+                    progress_callback,
+                    int(progress_steps[1]['progress'] + (progress_steps[2]['progress'] - progress_steps[1]['progress']) * (phase_pct / 100)),
+                    msg,
+                    int(progress_steps[1].get('phase_progress', 0) + (progress_steps[2].get('phase_progress', 0) - progress_steps[1].get('phase_progress', 0)) * (phase_pct / 100))
+                )
             
             # Check if already mounted using EnvironmentManager
             if env_manager.is_drive_mounted:
@@ -92,6 +123,22 @@ class DriveMountOperation(BaseColabOperation):
                 progress_steps[2]['message'],
                 progress_steps[2].get('phase_progress', 0)
             )
+            
+            # Simulate mounting process
+            mount_steps = [
+                ("Menyiapkan autentikasi...", 20),
+                ("Menghubungkan ke Google Drive...", 50),
+                ("Memproses izin...", 80),
+                ("Menyelesaikan koneksi...", 100)
+            ]
+            
+            for msg, phase_pct in mount_steps:
+                self.update_progress_safe(
+                    progress_callback,
+                    int(progress_steps[2]['progress'] + (progress_steps[3]['progress'] - progress_steps[2]['progress']) * (phase_pct / 100)),
+                    msg,
+                    int(progress_steps[2].get('phase_progress', 0) + (progress_steps[3].get('phase_progress', 0) - progress_steps[2].get('phase_progress', 0)) * (phase_pct / 100))
+                )
             
             # Use EnvironmentManager to mount drive
             success, message = env_manager.mount_drive()

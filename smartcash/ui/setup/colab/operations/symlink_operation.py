@@ -51,10 +51,31 @@ class SymlinkOperation(BaseColabOperation):
                 progress_steps[0].get('phase_progress', 0)
             )
             
+            # Get environment info from config or detect it
             env_config = self.config.get('environment', {})
+            env_type = env_config.get('type')
             
-            if env_config.get('type') != 'colab':
-                return self.create_error_result('Symbolic links are only created in Colab environment')
+            # If environment type is not in config, try to detect it
+            if not env_type:
+                try:
+                    from ..utils.env_detector import detect_environment_info
+                    env_info = detect_environment_info()
+                    env_type = 'colab' if env_info.get('is_colab') else 'local'
+                    self.log(f"Detected environment type: {env_type}", 'debug')
+                except Exception as e:
+                    self.log(f"Failed to detect environment: {str(e)}", 'error')
+                    return self.create_error_result(
+                        'Failed to detect environment type. Please ensure you are running in Google Colab.',
+                        exception_type='EnvironmentError'
+                    )
+            
+            # Check if running in Colab
+            if env_type.lower() != 'colab':
+                return self.create_error_result(
+                    'Symbolic links can only be created in Google Colab environment. '
+                    f'Current environment type: {env_type}',
+                    exception_type='EnvironmentError'
+                )
             
             # Check if Drive is mounted
             if not os.path.exists('/content/drive/MyDrive'):
@@ -79,18 +100,24 @@ class SymlinkOperation(BaseColabOperation):
             symlinks_failed = []
             total_symlinks = len(SYMLINK_MAP)
             
+            # Calculate progress ranges for this step
+            step_start_progress = progress_steps[1]['progress']
+            step_end_progress = progress_steps[2]['progress']
+            step_phase_start = progress_steps[1].get('phase_progress', 0)
+            step_phase_end = progress_steps[2].get('phase_progress', 100)
+            
             for idx, (source, target) in enumerate(SYMLINK_MAP.items(), 1):
                 try:
-                    # Calculate phase progress within the current step (50-75% of overall progress)
-                    phase_progress = int(progress_steps[1]['phase_progress'] + 
-                                      (progress_steps[2]['phase_progress'] - progress_steps[1]['phase_progress']) * 
-                                      (idx / total_symlinks))
+                    # Calculate progress within the current step (0-100% for this phase)
+                    phase_progress = int(step_phase_start + (step_phase_end - step_phase_start) * (idx / total_symlinks))
                     
-                    # Update progress for current symlink
+                    # Calculate overall progress (smooth transition between steps)
+                    overall_progress = int(step_start_progress + (step_end_progress - step_start_progress) * (idx / total_symlinks))
+                    
+                    # Update progress for current symlink - both overall and phase progress
                     self.update_progress_safe(
                         progress_callback,
-                        progress_steps[1]['progress'] + 
-                        int((progress_steps[2]['progress'] - progress_steps[1]['progress']) * (idx / total_symlinks)),
+                        overall_progress,
                         f"🔗 Creating symlink {idx}/{total_symlinks}: {os.path.basename(target)}",
                         phase_progress
                     )

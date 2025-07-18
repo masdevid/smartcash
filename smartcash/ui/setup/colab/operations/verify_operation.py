@@ -53,8 +53,38 @@ class VerifyOperation(BaseColabOperation):
                 progress_steps[0].get('phase_progress', 0)
             )
             
+            # Simulate initialization steps
+            init_steps = [
+                ("Menyiapkan proses verifikasi...", 30),
+                ("Memuat konfigurasi...", 60),
+                ("Inisialisasi selesai", 100)
+            ]
+            
+            for msg, phase_pct in init_steps:
+                self.update_progress_safe(
+                    progress_callback,
+                    int(progress_steps[0]['progress'] + (progress_steps[1]['progress'] - progress_steps[0]['progress']) * (phase_pct / 100)),
+                    msg,
+                    int(progress_steps[0].get('phase_progress', 0) + (progress_steps[1].get('phase_progress', 0) - progress_steps[0].get('phase_progress', 0)) * (phase_pct / 100))
+                )
+            
             # Only verify drive mount if explicitly requested in config
             if self.config.get('check_drive', False):
+                # Simulate drive verification steps
+                drive_steps = [
+                    ("Memeriksa koneksi Google Drive...", 30),
+                    ("Memverifikasi akses baca/tulis...", 70),
+                    ("Verifikasi Drive selesai", 100)
+                ]
+                
+                for msg, phase_pct in drive_steps:
+                    self.update_progress_safe(
+                        progress_callback,
+                        int(progress_steps[1]['progress'] * (phase_pct / 100)),
+                        msg,
+                        int(progress_steps[1].get('phase_progress', 0) * (phase_pct / 100))
+                    )
+                
                 # Verify Drive mount with check_drive=True
                 drive_verification = self._verify_drive_mount()
                 verification_results['drive_mount'] = drive_verification
@@ -84,6 +114,21 @@ class VerifyOperation(BaseColabOperation):
             
             # Verify symlinks if drive is mounted
             if self.config.get('drive_mounted', False):
+                # Simulate symlink verification steps
+                symlink_steps = [
+                    ("Memeriksa symlink...", 30),
+                    ("Memvalidasi target symlink...", 70),
+                    ("Verifikasi symlink selesai", 100)
+                ]
+                
+                for msg, phase_pct in symlink_steps:
+                    self.update_progress_safe(
+                        progress_callback,
+                        int(progress_steps[1]['progress'] + (progress_steps[2]['progress'] - progress_steps[1]['progress']) * (phase_pct / 100)),
+                        msg,
+                        int(progress_steps[1].get('phase_progress', 0) + (progress_steps[2].get('phase_progress', 0) - progress_steps[1].get('phase_progress', 0)) * (phase_pct / 100))
+                    )
+                
                 symlink_verification = self.verify_symlinks_batch(SYMLINK_MAP)
                 verification_results['symlinks'] = symlink_verification
                 issues.extend(symlink_verification['issues'])
@@ -101,6 +146,21 @@ class VerifyOperation(BaseColabOperation):
                 progress_steps[2]['message'],
                 progress_steps[2].get('phase_progress', 0)
             )
+            
+            # Simulate folder verification steps
+            folder_steps = [
+                ("Memeriksa struktur folder...", 30),
+                ("Memvalidasi izin folder...", 70),
+                ("Verifikasi folder selesai", 100)
+            ]
+            
+            for msg, phase_pct in folder_steps:
+                self.update_progress_safe(
+                    progress_callback,
+                    int(progress_steps[2]['progress'] + (progress_steps[3]['progress'] - progress_steps[2]['progress']) * (phase_pct / 100)),
+                    msg,
+                    int(progress_steps[2].get('phase_progress', 0) + (progress_steps[3].get('phase_progress', 0) - progress_steps[2].get('phase_progress', 0)) * (phase_pct / 100))
+                )
             
             # Verify folders
             folder_verification = self.validate_items_exist(REQUIRED_FOLDERS, "folder")

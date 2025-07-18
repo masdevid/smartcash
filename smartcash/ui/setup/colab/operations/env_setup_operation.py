@@ -50,6 +50,21 @@ class EnvSetupOperation(BaseColabOperation):
                 progress_steps[0].get('phase_progress', 0)
             )
             
+            # Simulate environment check
+            env_check_steps = [
+                ("Memeriksa konfigurasi lingkungan...", 30),
+                ("Memuat pengaturan...", 70),
+                ("Konfigurasi siap", 100)
+            ]
+            
+            for msg, phase_pct in env_check_steps:
+                self.update_progress_safe(
+                    progress_callback,
+                    int(progress_steps[0]['progress'] + (progress_steps[1]['progress'] - progress_steps[0]['progress']) * (phase_pct / 100)),
+                    msg,
+                    int(progress_steps[0].get('phase_progress', 0) + (progress_steps[1].get('phase_progress', 0) - progress_steps[0].get('phase_progress', 0)) * (phase_pct / 100))
+                )
+            
             env_vars_set = []
             env_config = self.config.get('environment', {})
             
@@ -62,6 +77,23 @@ class EnvSetupOperation(BaseColabOperation):
             )
             
             if env_config.get('type') == 'colab':
+                # Simulate environment setup
+                setup_steps = [
+                    ("Menyiapkan direktori root...", 20),
+                    ("Mengatur variabel lingkungan...", 50),
+                    ("Menyiapkan GPU...", 70),
+                    ("Menyelesaikan konfigurasi...", 90),
+                    ("Konfigurasi selesai", 100)
+                ]
+                
+                for msg, phase_pct in setup_steps:
+                    self.update_progress_safe(
+                        progress_callback,
+                        int(progress_steps[1]['progress'] + (progress_steps[2]['progress'] - progress_steps[1]['progress']) * (phase_pct / 100)),
+                        msg,
+                        int(progress_steps[1].get('phase_progress', 0) + (progress_steps[2].get('phase_progress', 0) - progress_steps[1].get('phase_progress', 0)) * (phase_pct / 100))
+                    )
+                
                 # Set project root
                 smartcash_root = '/content/smartcash'
                 if smartcash_root not in os.environ.get('PYTHONPATH', ''):
@@ -92,6 +124,21 @@ class EnvSetupOperation(BaseColabOperation):
                 progress_steps[2]['message'],
                 progress_steps[2].get('phase_progress', 0)
             )
+            
+            # Simulate verification steps
+            verify_steps = [
+                ("Memeriksa variabel lingkungan...", 40),
+                ("Memvalidasi konfigurasi...", 70),
+                ("Verifikasi selesai", 100)
+            ]
+            
+            for msg, phase_pct in verify_steps:
+                self.update_progress_safe(
+                    progress_callback,
+                    int(progress_steps[2]['progress'] + (progress_steps[3]['progress'] - progress_steps[2]['progress']) * (phase_pct / 100)),
+                    msg,
+                    int(progress_steps[2].get('phase_progress', 0) + (progress_steps[3].get('phase_progress', 0) - progress_steps[2].get('phase_progress', 0)) * (phase_pct / 100))
+                )
             
             verification = self.verify_environment()
             

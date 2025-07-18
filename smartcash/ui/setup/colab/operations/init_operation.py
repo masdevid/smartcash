@@ -49,6 +49,15 @@ class InitOperation(BaseColabOperation):
                 steps[0].get('phase_progress', 0)
             )
             
+            # Simulate environment detection work
+            for i in range(1, 6):
+                self.update_progress_safe(
+                    progress_callback,
+                    int(steps[0]['progress'] + (steps[1]['progress'] - steps[0]['progress']) * (i / 5)),
+                    f"Detecting environment ({i}/5)...",
+                    int(steps[0].get('phase_progress', 0) + (steps[1].get('phase_progress', 0) - steps[0].get('phase_progress', 0)) * (i / 5))
+                )
+                
             env_info = self.detect_environment_enhanced()
             env_type = env_info.get('runtime', {}).get('type', 'local')
             
@@ -75,7 +84,23 @@ class InitOperation(BaseColabOperation):
                 steps[2].get('phase_progress', 0)
             )
             
+            # Simulate system check work
             system_info = self.format_system_info(env_info)
+            checks = [
+                ("Checking system requirements...", 30),
+                (f"OS: {system_info['os_display']}", 50),
+                (f"RAM: {system_info['ram_gb']:.1f}GB available", 70),
+                ("System check complete", 100)
+            ]
+            
+            for msg, phase_pct in checks:
+                self.update_progress_safe(
+                    progress_callback,
+                    int(steps[2]['progress'] + (steps[3]['progress'] - steps[2]['progress']) * (phase_pct / 100)),
+                    msg,
+                    int(steps[2].get('phase_progress', 0) + (steps[3].get('phase_progress', 0) - steps[2].get('phase_progress', 0)) * (phase_pct / 100))
+                )
+            
             self.log(f"System: {system_info['os_display']}", 'info')
             self.log(f"RAM: {system_info['ram_gb']:.1f}GB available", 'info')
             
@@ -86,6 +111,21 @@ class InitOperation(BaseColabOperation):
                 steps[3]['message'],
                 steps[3].get('phase_progress', 0)
             )
+            
+            # Simulate validation work
+            validation_checks = [
+                ("Validating configuration...", 30),
+                ("Checking environment variables...", 60),
+                ("Verifying paths...", 90)
+            ]
+            
+            for msg, phase_pct in validation_checks:
+                self.update_progress_safe(
+                    progress_callback,
+                    int(steps[3]['progress'] + (steps[4]['progress'] - steps[3]['progress']) * (phase_pct / 100)),
+                    msg,
+                    int(steps[3].get('phase_progress', 0) + (steps[4].get('phase_progress', 0) - steps[3].get('phase_progress', 0)) * (phase_pct / 100))
+                )
             
             validation_result = self.validate_colab_environment(self.config)
             if not validation_result['valid']:

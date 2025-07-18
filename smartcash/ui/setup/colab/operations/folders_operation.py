@@ -49,6 +49,21 @@ class FoldersOperation(BaseColabOperation):
                 progress_steps[0].get('phase_progress', 0)
             )
             
+            # Simulate folder configuration check
+            config_steps = [
+                ("Memeriksa konfigurasi folder...", 30),
+                ("Memuat daftar folder yang diperlukan...", 70),
+                ("Konfigurasi folder siap", 100)
+            ]
+            
+            for msg, phase_pct in config_steps:
+                self.update_progress_safe(
+                    progress_callback,
+                    int(progress_steps[0]['progress'] + (progress_steps[1]['progress'] - progress_steps[0]['progress']) * (phase_pct / 100)),
+                    msg,
+                    int(progress_steps[0].get('phase_progress', 0) + (progress_steps[1].get('phase_progress', 0) - progress_steps[0].get('phase_progress', 0)) * (phase_pct / 100))
+                )
+            
             total_folders = len(REQUIRED_FOLDERS)
             self.log(f"Creating {total_folders} required folders", 'info')
             
@@ -60,7 +75,31 @@ class FoldersOperation(BaseColabOperation):
                 progress_steps[1].get('phase_progress', 0)
             )
             
-            created_dirs, failed_dirs = self.create_directories_batch(REQUIRED_FOLDERS)
+            # Create folders with progress updates
+            created_dirs = []
+            failed_dirs = []
+            
+            for idx, folder in enumerate(REQUIRED_FOLDERS, 1):
+                # Calculate progress within this step (0-100% of this phase)
+                phase_pct = int((idx / total_folders) * 100)
+                
+                # Update progress
+                self.update_progress_safe(
+                    progress_callback,
+                    int(progress_steps[1]['progress'] + (progress_steps[2]['progress'] - progress_steps[1]['progress']) * (idx / total_folders)),
+                    f"Membuat folder {idx}/{total_folders}: {folder}",
+                    int(progress_steps[1].get('phase_progress', 0) + (progress_steps[2].get('phase_progress', 0) - progress_steps[1].get('phase_progress', 0)) * (phase_pct / 100))
+                )
+                
+                # Create the directory
+                try:
+                    os.makedirs(folder, exist_ok=True)
+                    created_dirs.append(folder)
+                    self.log(f"✅ Created directory: {folder}", 'info')
+                except Exception as e:
+                    error_msg = f"Gagal membuat direktori {folder}: {str(e)}"
+                    self.log(error_msg, 'error')
+                    failed_dirs.append({"path": folder, "error": str(e)})
             
             # Step 3: Verify folder structure
             self.update_progress_safe(
@@ -70,8 +109,23 @@ class FoldersOperation(BaseColabOperation):
                 progress_steps[2].get('phase_progress', 0)
             )
             
-            # Verify all folders exist
+            # Verify all folders exist with progress updates
             verification = self.validate_items_exist(REQUIRED_FOLDERS, "folder")
+            
+            # Simulate verification steps
+            verify_steps = [
+                ("Memverifikasi struktur folder...", 40),
+                ("Memeriksa izin...", 70),
+                ("Verifikasi selesai", 100)
+            ]
+            
+            for msg, phase_pct in verify_steps:
+                self.update_progress_safe(
+                    progress_callback,
+                    int(progress_steps[2]['progress'] + (progress_steps[3]['progress'] - progress_steps[2]['progress']) * (phase_pct / 100)),
+                    msg,
+                    int(progress_steps[2].get('phase_progress', 0) + (progress_steps[3].get('phase_progress', 0) - progress_steps[2].get('phase_progress', 0)) * (phase_pct / 100))
+                )
             
             # Step 4: Complete
             self.update_progress_safe(

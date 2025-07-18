@@ -183,13 +183,21 @@ class TqdmManager:
             bar.set_description(clean_message)
     
     def set_all_error(self, message: str):
-        """Set all bars ke error state tanpa emoji duplikat"""
+        """Set all bars ke error state dengan indikator visual yang jelas"""
         for level_name, bar in self.tqdm_bars.items():
             current_value = self.progress_values.get(level_name, 0)
             bar.n = current_value
-            bar.refresh()
-            clean_message = self._truncate_message(message, 40)
+            
+            # Update bar color to red for error state
+            bar.colour = 'red'
+            
+            # Update bar format to show error indicator
+            bar.bar_format = '{desc}: {bar}| {percentage:3.0f}% [ERROR]'
+            
+            # Update description with error indicator
+            clean_message = f"❌ {self._truncate_message(message, 36)}"
             bar.set_description(clean_message)
+            bar.refresh()
     
     def close_all_bars(self):
         """Close semua tqdm bars dengan enhanced cleanup untuk prevent duplicates"""

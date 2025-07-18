@@ -237,6 +237,16 @@ def execute_full_setup(config: Dict[str, Any],
     """
     logger = get_module_logger("smartcash.ui.setup.colab.operations.factory.full_setup")
     
+    # Reset progress tracker if available
+    if operation_container and hasattr(operation_container, 'get') and callable(operation_container.get):
+        progress_tracker = operation_container.get('progress_tracker')
+        if progress_tracker and hasattr(progress_tracker, 'reset'):
+            try:
+                progress_tracker.reset()
+                logger.debug("Progress tracker reset successfully")
+            except Exception as e:
+                logger.warning(f"Failed to reset progress tracker: {e}")
+    
     try:
         logger.info("🚀 Starting full Colab setup sequence...")
         
@@ -258,34 +268,67 @@ def execute_full_setup(config: Dict[str, Any],
             base_progress = (i / total_stages) * 100
             
             if progress_callback:
-                progress_callback(base_progress, stage_message)
+                try:
+                    progress_callback(base_progress, stage_message)
+                except Exception as e:
+                    logger.warning(f"Error updating progress: {e}")
             
             logger.info(f"Executing stage {i+1}/{total_stages}: {stage_name}")
             
             # Create stage-specific progress callback
-            def stage_progress(progress, message):
+            def stage_progress(progress, message, stage_name=stage_name):  # Capture stage_name in closure
                 if progress_callback:
-                    stage_weight = 100 / total_stages
-                    overall_progress = base_progress + (progress / 100) * stage_weight
-                    progress_callback(overall_progress, f"{stage_name.upper()}: {message}")
+                    try:
+                        stage_weight = 100 / total_stages
+                        overall_progress = base_progress + (progress / 100) * stage_weight
+                        progress_callback(overall_progress, f"{stage_name.upper()}: {message}")
+                    except Exception as e:
+                        logger.warning(f"Error in stage progress callback: {e}")
             
-            result = stage_func(config, operation_container, stage_progress)
-            stage_results[stage_name] = result
-            
-            if not result.get('success', False):
-                error_msg = f"Setup failed at stage '{stage_name}': {result.get('error', 'Unknown error')}"
+            try:
+                result = stage_func(config, operation_container, stage_progress)
+                stage_results[stage_name] = result
                 
-                # Include traceback in logs if available
-                if 'traceback' in result:
-                    logger.error(f"{error_msg}\n\nTraceback:\n{result['traceback']}")
-                else:
-                    logger.error(error_msg)
+                if not result.get('success', False):
+                    error_msg = f"Setup failed at stage '{stage_name}': {result.get('error', 'Unknown error')}"
                     
+                    # Include traceback in logs if available
+                    if 'traceback' in result:
+                        logger.error(f"{error_msg}\n\nTraceback:\n{result['traceback']}")
+                    else:
+                        logger.error(error_msg)
+                        
+                    # Update progress tracker with error state
+                    if operation_container and hasattr(operation_container, 'get'):
+                        progress_tracker = operation_container.get('progress_tracker')
+                        if progress_tracker and hasattr(progress_tracker, 'set_all_error'):
+                            progress_tracker.set_all_error(error_msg)
+                    
+                    return {
+                        'success': False,
+                        'failed_stage': stage_name,
+                        'stage_results': stage_results,
+                        'error': error_msg
+                    }
+                    
+            except Exception as e:
+                import traceback
+                error_msg = f"Unexpected error in stage '{stage_name}': {str(e)}"
+                tb = traceback.format_exc()
+                logger.error(f"{error_msg}\n\nTraceback:\n{tb}")
+                
+                # Update progress tracker with error state
+                if operation_container and hasattr(operation_container, 'get'):
+                    progress_tracker = operation_container.get('progress_tracker')
+                    if progress_tracker and hasattr(progress_tracker, 'set_all_error'):
+                        progress_tracker.set_all_error(error_msg)
+                
                 return {
                     'success': False,
                     'failed_stage': stage_name,
                     'stage_results': stage_results,
-                    'error': error_msg
+                    'error': error_msg,
+                    'traceback': tb
                 }
         
         if progress_callback:

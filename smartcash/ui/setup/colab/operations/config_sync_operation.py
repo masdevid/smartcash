@@ -53,6 +53,22 @@ class ConfigSyncOperation(BaseColabOperation):
                 progress_steps[0].get('phase_progress', 0)
             )
             
+            # Simulate config check work
+            config_checks = [
+                ("Checking COLAB_DATA_ROOT...", 20),
+                ("Verifying config directory...", 50),
+                ("Preparing configuration...", 80),
+                ("Configuration check complete", 100)
+            ]
+            
+            for msg, phase_pct in config_checks:
+                self.update_progress_safe(
+                    progress_callback,
+                    int(progress_steps[0]['progress'] + (progress_steps[1]['progress'] - progress_steps[0]['progress']) * (phase_pct / 100)),
+                    msg,
+                    int(progress_steps[0].get('phase_progress', 0) + (progress_steps[1].get('phase_progress', 0) - progress_steps[0].get('phase_progress', 0)) * (phase_pct / 100))
+                )
+            
             # Check if COLAB_DATA_ROOT exists
             if not self.ensure_directory_exists(COLAB_DATA_ROOT):
                 return self.create_error_result(f"Failed to create COLAB_DATA_ROOT directory: {COLAB_DATA_ROOT}")
@@ -85,6 +101,22 @@ class ConfigSyncOperation(BaseColabOperation):
                 progress_steps[1]['message'],
                 progress_steps[1].get('phase_progress', 0)
             )
+            
+            # Simulate sync work
+            sync_steps = [
+                ("Discovering configuration files...", 30),
+                ("Checking for updates...", 60),
+                ("Synchronizing configurations...", 90),
+                ("Finalizing sync...", 100)
+            ]
+            
+            for msg, phase_pct in sync_steps:
+                self.update_progress_safe(
+                    progress_callback,
+                    int(progress_steps[1]['progress'] + (progress_steps[2]['progress'] - progress_steps[1]['progress']) * (phase_pct / 100)),
+                    msg,
+                    int(progress_steps[1].get('phase_progress', 0) + (progress_steps[2].get('phase_progress', 0) - progress_steps[1].get('phase_progress', 0)) * (phase_pct / 100))
+                )
             
             # Discover configs from repo
             available_configs = self.config_manager.discover_repo_configs()

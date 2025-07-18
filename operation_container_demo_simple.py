@@ -208,7 +208,7 @@ class SimplifiedOperationDemo:
                 if self.current_level == 'triple':
                     self.container['update_progress'](100, "All details complete", 'tertiary')
                 
-                self.container['show_dialog']("Success", f"Linear process completed with {steps} steps!", "success")
+                self.container['show_info']("Success", f"Linear process completed with {steps} steps!", None, "OK", "success")
                 
             except Exception as e:
                 self.container['log'](f"Error: {str(e)}", 'error')
@@ -263,7 +263,7 @@ class SimplifiedOperationDemo:
                 
                 # Complete all
                 self.container['update_progress'](100, "Nested process complete!", 'primary')
-                self.container['show_dialog']("Success", f"Nested process completed with {stages} stages!", "success")
+                self.container['show_info']("Success", f"Nested process completed with {stages} stages!", None, "OK", "success")
                 
             except Exception as e:
                 self.container['log'](f"Error: {str(e)}", 'error')
@@ -318,7 +318,7 @@ class SimplifiedOperationDemo:
                 
                 # Complete all
                 self.container['update_progress'](100, "Complex process complete!", 'primary')
-                self.container['show_dialog']("Success", f"Complex process completed with {projects} projects!", "success")
+                self.container['show_info']("Success", f"Complex process completed with {projects} projects!", None, "OK", "success")
                 
             except Exception as e:
                 self.container['log'](f"Error: {str(e)}", 'error')
@@ -354,7 +354,7 @@ class SimplifiedOperationDemo:
                 
             except Exception as e:
                 self.container['log'](f"Error occurred: {str(e)}", 'error')
-                self.container['show_dialog']("Error", f"Operation failed: {str(e)}", "error")
+                self.container['show_info']("Error", f"Operation failed: {str(e)}", None, "OK", "error")
             finally:
                 self.is_running = False
         
@@ -362,19 +362,19 @@ class SimplifiedOperationDemo:
     
     def test_success_dialog(self) -> None:
         """Test success dialog."""
-        self.container['show_dialog'](
+        self.container['show_info'](
             "Success Test", 
             "This is a test of the success dialog functionality. Everything is working correctly!", 
-            "success"
+            None, "OK", "success"
         )
         self.container['log']("Success dialog displayed", 'success')
     
     def test_error_dialog(self) -> None:
         """Test error dialog."""
-        self.container['show_dialog'](
+        self.container['show_info'](
             "Error Test", 
             "This is a test of the error dialog functionality. This simulates an error condition.", 
-            "error"
+            None, "OK", "error"
         )
         self.container['log']("Error dialog displayed", 'error')
     

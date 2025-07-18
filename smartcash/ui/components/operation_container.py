@@ -51,6 +51,7 @@ def create_operation_container(
         'dialog': container.dialog if container._show_dialog_enabled else None,
         'log_accordion': container.log_accordion if show_logs else None,
         'show_dialog': container.show_dialog,
+        'show_info': container.show_info,
         'clear_dialog': container.clear_dialog,
         'update_progress': container.update_progress,
         'log': container.log

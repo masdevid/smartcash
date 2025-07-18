@@ -463,29 +463,37 @@ class OperationMixin:
             if hasattr(self, 'logger'):
                 self.logger.debug(f"Failed to clear summary: {e}")
     
-    def show_operation_dialog(self, message: str, title: str = "Operation", dialog_type: str = "info", buttons: Optional[Dict[str, Any]] = None, callback: Optional[callable] = None) -> None:
+    def show_operation_dialog(self, title: str, message: str, on_confirm: Optional[Callable] = None, on_cancel: Optional[Callable] = None, confirm_text: str = "Confirm", cancel_text: str = "Cancel", danger_mode: bool = False) -> None:
         """
-        Show an operation dialog.
+        Show an operation dialog (confirmation dialog).
         
         Args:
-            message: Dialog message
             title: Dialog title
-            dialog_type: Dialog type (info, confirmation, warning, error)
-            buttons: Optional custom buttons configuration
-            callback: Optional callback function for dialog actions
+            message: Dialog message
+            on_confirm: Callback when user confirms
+            on_cancel: Callback when user cancels  
+            confirm_text: Text for confirm button
+            cancel_text: Text for cancel button
+            danger_mode: If True, shows the confirm button in danger color
         """
         try:
             # Try operation manager first
             if self._operation_manager and hasattr(self._operation_manager, 'show_operation_dialog'):
-                self._operation_manager.show_operation_dialog(message, title, dialog_type, buttons, callback)
+                self._operation_manager.show_operation_dialog(title, message, on_confirm, on_cancel, confirm_text, cancel_text, danger_mode)
                 return
             
             # Delegate to operation_container for dialog display
             if hasattr(self, '_ui_components') and self._ui_components:
                 operation_container = self._ui_components.get('operation_container')
-                if operation_container and hasattr(operation_container, 'show_dialog'):
-                    operation_container.show_dialog(message, title, dialog_type, buttons, callback)
-                    return
+                if operation_container:
+                    # Handle operation_container as OperationContainer object
+                    if hasattr(operation_container, 'show_dialog'):
+                        operation_container.show_dialog(title, message, on_confirm, on_cancel, confirm_text, cancel_text, danger_mode)
+                        return
+                    # Handle operation_container as dict (returned by create_operation_container)
+                    elif isinstance(operation_container, dict) and 'show_dialog' in operation_container:
+                        operation_container['show_dialog'](title, message, on_confirm, on_cancel, confirm_text, cancel_text, danger_mode)
+                        return
             
             # Fallback logging
             if hasattr(self, 'logger'):
@@ -494,6 +502,44 @@ class OperationMixin:
         except Exception as e:
             if hasattr(self, 'logger'):
                 self.logger.debug(f"Failed to show operation dialog: {e}")
+    
+    def show_info_dialog(self, title: str, message: str, on_ok: Optional[Callable] = None, ok_text: str = "OK", info_type: str = "info") -> None:
+        """
+        Show an info dialog.
+        
+        Args:
+            title: Dialog title
+            message: Dialog message
+            on_ok: Callback when user clicks OK
+            ok_text: Text for OK button
+            info_type: Type of info dialog (info, success, warning, error)
+        """
+        try:
+            # Try operation manager first
+            if self._operation_manager and hasattr(self._operation_manager, 'show_info_dialog'):
+                self._operation_manager.show_info_dialog(title, message, on_ok, ok_text, info_type)
+                return
+            
+            # Delegate to operation_container for info dialog display
+            if hasattr(self, '_ui_components') and self._ui_components:
+                operation_container = self._ui_components.get('operation_container')
+                if operation_container:
+                    # Handle operation_container as OperationContainer object
+                    if hasattr(operation_container, 'show_info'):
+                        operation_container.show_info(title, message, on_ok, ok_text, info_type)
+                        return
+                    # Handle operation_container as dict (returned by create_operation_container)
+                    elif isinstance(operation_container, dict) and 'show_info' in operation_container:
+                        operation_container['show_info'](title, message, on_ok, ok_text, info_type)
+                        return
+            
+            # Fallback logging
+            if hasattr(self, 'logger'):
+                self.logger.info(f"[Info Dialog] {title}: {message}")
+                
+        except Exception as e:
+            if hasattr(self, 'logger'):
+                self.logger.debug(f"Failed to show info dialog: {e}")
     
     def clear_operation_dialog(self) -> None:
         """Clear the operation dialog."""

@@ -23,19 +23,22 @@ def create_path_section(config: Dict[str, Any]) -> Dict[str, Any]:
     # Create form container for the section
     section = widgets.VBox([
         widgets.HTML("<h3>Output Paths</h3>")
-    ], layout=widgets.Layout(width='100%'))
+    ], layout=widgets.Layout(
+        width='100%',
+        overflow='hidden'  # Prevent content from overflowing
+    ))
     
     # Create form widgets
     train_dir = widgets.Text(
         value=output_config.get('train_dir', 'data/train'),
         description='Train Dir:',
-        layout=widgets.Layout(width='100%')
+        layout=widgets.Layout(width='auto')
     )
     
     val_dir = widgets.Text(
         value=output_config.get('val_dir', 'data/val'),
         description='Val Dir:',
-        layout=widgets.Layout(width='100%')
+        layout=widgets.Layout(width='auto')
     )
     
     test_dir = widgets.Text(

@@ -24,7 +24,10 @@ def create_advanced_section(config: Dict[str, Any]) -> Dict[str, Any]:
     # Create form container for the section
     section = widgets.VBox([
         widgets.HTML("<h3>Advanced Settings</h3>")
-    ], layout=widgets.Layout(width='100%'))
+    ], layout=widgets.Layout(
+        width='100%',
+        overflow='hidden'  # Prevent content from overflowing
+    ))
     
     # Data splitting section
     splitting_group = widgets.VBox([

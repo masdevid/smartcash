@@ -28,7 +28,10 @@ def create_ratio_section(config: Dict[str, Any]) -> Dict[str, Any]:
     # Create form container for the section
     section = widgets.VBox([
         widgets.HTML("<h3>Split Ratios</h3>")
-    ], layout=widgets.Layout(width='100%'))
+    ], layout=widgets.Layout(
+        width='100%',
+        overflow='hidden'  # Prevent content from overflowing
+    ))
     
     # Create form widgets
     train_ratio = widgets.FloatSlider(
@@ -38,7 +41,7 @@ def create_ratio_section(config: Dict[str, Any]) -> Dict[str, Any]:
         step=0.05,
         description='Train:',
         continuous_update=False,
-        layout=widgets.Layout(width='100%')
+        layout=widgets.Layout(width='auto')
     )
     
     val_ratio = widgets.FloatSlider(
@@ -48,7 +51,7 @@ def create_ratio_section(config: Dict[str, Any]) -> Dict[str, Any]:
         step=0.05,
         description='Validation:',
         continuous_update=False,
-        layout=widgets.Layout(width='100%')
+        layout=widgets.Layout(width='auto')
     )
     
     test_ratio = widgets.FloatSlider(
@@ -58,7 +61,7 @@ def create_ratio_section(config: Dict[str, Any]) -> Dict[str, Any]:
         step=0.05,
         description='Test:',
         continuous_update=False,
-        layout=widgets.Layout(width='100%')
+        layout=widgets.Layout(width='auto')
     )
     
     # Create info text

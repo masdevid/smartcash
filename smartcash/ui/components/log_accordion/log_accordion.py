@@ -471,9 +471,9 @@ class LogAccordion(BaseUIComponent):
         # Common prefixes to shorten
         replacements = [
             ('smartcash.', ''),
-            ('smartcash.common.', 'common.'),
-            ('smartcash.dataset.', 'dataset.'),
-            ('smartcash.model.', 'model.'),
+            ('smartcash.common.', 'sc.common.'),
+            ('smartcash.dataset.', 'sc.dataset.'),
+            ('smartcash.model.', 'sc.model.'),
             ('smartcash.ui.', 'ui.'),
             ('smartcash.ui.core.', 'core.'),
             ('smartcash.ui.core.shared.', 'core.'),
@@ -561,54 +561,60 @@ class LogAccordion(BaseUIComponent):
                 border-radius: 3px;
                 transition: all 0.15s ease;
                 display: flex;
-                flex-wrap: wrap;
+                flex-wrap: nowrap;
                 align-items: flex-start;
                 gap: 6px;
                 line-height: 1.4;
                 font-size: 13px;
                 font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;'>
-                <!-- Namespace -->
-                <span class='log-namespace' title='{entry.namespace or ""}' style='
-                    color: #6c757d;
-                    font-size: 11px;
-                    display: {'inline-block' if full_namespace else 'none'};
-                    max-width: {'200px' if self.log_entry_style == 'compact' else 'none'};
-                    overflow: hidden;
-                    text-overflow: ellipsis;
-                    white-space: nowrap;
-                    margin-right: 8px;
-                    vertical-align: middle;
-                    line-height: 1.4;'>
-                    {full_namespace}
-                </span>
+                
                 <!-- Icon -->
                 <span style='
                     font-size: 14px;
                     flex-shrink: 0;
                     width: 20px;
-                    text-align: center;'>
+                    text-align: center;
+                    margin-top: 2px;'>
                     {level_emoji}
                 </span>
                 
-                <!-- Message -->
-                <span style='
+                <!-- Message Container -->
+                <div style='
                     flex: 1;
-                    color: {style['text_color']};
-                    word-break: break-word;
-                    overflow-wrap: break-word;
-                    white-space: pre-wrap;
-                    line-height: 1.4;
-                    display: inline-block;
-                    min-width: 0;'>
-                    {main_message}{duplicate_counter}
-                </span>
+                    min-width: 0;
+                    overflow: hidden;'>
+                    
+                    <!-- Namespace (above message) -->
+                    <div class='log-namespace' title='{entry.namespace or ""}' style='
+                        color: #6c757d;
+                        font-size: 10px;
+                        line-height: 1.2;
+                        margin-bottom: 1px;
+                        white-space: nowrap;
+                        overflow: hidden;
+                        text-overflow: ellipsis;
+                        display: {'block' if full_namespace else 'none'};'>
+                        {full_namespace}
+                    </div>
+                    
+                    <!-- Message -->
+                    <div style='
+                        color: {style['text_color']};
+                        word-break: break-word;
+                        white-space: pre-wrap;
+                        line-height: 1.4;'>
+                        {main_message}{duplicate_counter}
+                    </div>
+                </div>
                 
                 <!-- Timestamp -->
                 <span style='
                     color: #6c757d;
                     font-size: 11px;
                     flex-shrink: 0;
-                    margin-left: 8px;'>
+                    margin-left: 8px;
+                    white-space: nowrap;
+                    margin-top: 2px;'>
                     {timestamp}
                 </span>
                 

@@ -551,7 +551,7 @@ class LogAccordion(BaseUIComponent):
             # Determine which CSS class to use based on log_entry_style
             entry_class = 'log-entry-compact' if self.log_entry_style == 'compact' else 'log-entry'
             
-            # Create single row format HTML with dynamic class and styles
+            # Create single row format with namespace in a span
             html = f"""
             <div class='{entry_class}' style='
                 padding: 4px 8px; 
@@ -561,7 +561,6 @@ class LogAccordion(BaseUIComponent):
                 border-radius: 3px;
                 transition: all 0.15s ease;'>
                 
-                <!-- First row: Icon + Message + Timestamp -->
                 <div style='display: flex; align-items: flex-start; gap: 6px;'>
                     <!-- Icon -->
                     <span style='
@@ -572,13 +571,14 @@ class LogAccordion(BaseUIComponent):
                         {level_emoji}
                     </span>
                     
-                    <!-- Message -->
+                    <!-- Message with Namespace -->
                     <div style='
                         flex: 1;
                         color: {style['text_color']};
                         word-break: break-word;
                         white-space: pre-wrap;
                         line-height: 1.4;'>
+                        {f'<span style="color: #6c757d; font-size: 0.9em;">{full_namespace}\n</span>' if full_namespace else ''}
                         {main_message}{duplicate_counter}
                     </div>
                     
@@ -592,21 +592,6 @@ class LogAccordion(BaseUIComponent):
                         {timestamp}
                     </span>
                 </div>
-                
-                <!-- Second row: Namespace -->
-                {f'''
-                <div class="log-namespace" title="{entry.namespace}" style="
-                    color: #6c757d;
-                    font-size: 10px;
-                    line-height: 1.2;
-                    margin-top: -2px;
-                    padding-left: 26px;
-                    white-space: nowrap;
-                    overflow: hidden;
-                    text-overflow: ellipsis;">
-                    {full_namespace}
-                </div>
-                ''' if full_namespace else ''}
                 
                 {expandable_html}
             </div>

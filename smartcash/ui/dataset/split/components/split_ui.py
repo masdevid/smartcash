@@ -166,143 +166,120 @@ def create_split_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> Dict[s
     # Create UI components dictionary with error handling
     ui_components = {}
     
-    try:
-        # Create form widgets using the form container
-        form_widgets = _create_module_form_widgets(config)
-        components = form_widgets['components']
-        
-        
-        
-        # Create header with title and subtitle
-        header = create_header_container(
-            title=UI_CONFIG['title'],
-            subtitle=UI_CONFIG['subtitle'],
-            icon='✂️'  # Scissors icon for split operation
-        )
-        
-        # Get the form container from the form widgets
-        form_container = form_widgets.get('form_container')
-        if form_container is None:
-            # Fallback to creating a new form container if not provided
-            form_container = create_form_container(
-                layout_type=LayoutType.COLUMN,
-                gap='16px',
-                container_padding='16px',
-                width='100%'
-            )
-            
-            # Add form rows to container if available
-            for row in form_widgets.get('form_rows', []):
-                form_container['add_item'](row)
-        
-        
-        # Create action container with only save/reset buttons
-        action_container = create_action_container(
-            buttons=[],  # No custom buttons, just using save/reset
-            show_save_reset=True,
-            **kwargs
-        )
-        
-        # Create operation container with consistent logging and status panel
-        operation_container = create_operation_container(
-            show_progress=False,  # No progress tracking needed for config only
-            show_logs=True,
-            show_dialog=True,
-            log_module_name=UI_CONFIG['module_name'],
-            # log_namespace_filter='split',  # Temporarily disabled
-            log_height="150px",
-            log_entry_style='compact',
-            collapsible=True,
-            collapsed=True,  # Start with logs collapsed
-            hide_progress=True,  # Hide progress tracker as requested
-            **kwargs
-        )
-        
-        # Create footer with log accordion
-        footer_container = create_footer_container(
-            **kwargs
-        )
-        
-        # Create main container using the new container API
-        container_components = [
-            # Header is a HeaderContainer object with .container attribute
-            {'type': 'header', 'component': header.container, 'order': 0},
-            # Form container is a dict with 'container' key
-            {'type': 'form', 'component': form_container['container'], 'order': 1},
-            # Action container is a dict with 'container' key
-            {'type': 'action', 'component': action_container['container'], 'order': 2},
-            # Operation container is a dict with 'container' key
-            {'type': 'operation', 'component': operation_container['container'], 'order': 3},
-            # Footer is a FooterContainer object with .container attribute
-            {'type': 'footer', 'component': footer_container.container, 'order': 4}
-        ]
-        
-        main_container = create_main_container(
-            components=container_components,
-            **kwargs
-        )
-        
-        # Create summary and info box
-        summary_content = _create_module_summary_content(components)
-        info_box = _create_module_info_box()
-        
-        # Get save/reset buttons from action container
-        buttons = {
-            'save': action_container.get('save_button'),
-            'reset': action_container.get('reset_button')
-        }
-        # Connect button click handlers (only save/reset)
-        if buttons.get('save'):
-            buttons['save'].on_click(on_save_button_clicked)
-        if buttons.get('reset'):
-            buttons['reset'].on_click(on_reset_button_clicked)
-        
-        # Make sure action container includes buttons for access
-        if isinstance(action_container, dict):
-            action_container['buttons'] = buttons
-        
-        # Update components dictionary with all UI elements
-        ui_components.update({
-            # Containers
-            'form_components': components,
-            'form_container': form_container,
-            'action_container': action_container,
-            'operation_container': operation_container,
-            'footer_container': footer_container,
-            'header_container': header,
-            'main_container': main_container.container,  # Use the actual widget, not the MainContainer object
-            'container': main_container.container,  # For backward compatibility
-            
-            # UI Components
-            'summary_content': summary_content,
-            'info_box': info_box,
-            
-            # Buttons (only save/reset as requested)
-            'buttons': buttons,
-            'save_button': buttons.get('save'),
-            'reset_button': buttons.get('reset'),
-            
-            # Form Controls
-            'train_ratio': components.get('train_ratio'),
-            'val_ratio': components.get('val_ratio'),
-            'test_ratio': components.get('test_ratio'),
-            'train_dir': components.get('train_dir'),
-            'val_dir': components.get('val_dir'),
-            'test_dir': components.get('test_dir'),
-            'create_subdirs': components.get('create_subdirs'),
-            'overwrite': components.get('overwrite'),
-            'seed': components.get('seed'),
-            'shuffle': components.get('shuffle'),
-            'stratify': components.get('stratify'),
-            'use_relative_paths': components.get('use_relative_paths'),
-            'preserve_structure': components.get('preserve_structure'),
-            'symlink': components.get('symlink'),
-            'backup': components.get('backup'),
-            'backup_dir': components.get('backup_dir')
-        })
-        
-        return ui_components
+    # Create form widgets using the form container
+    form_widgets = _create_module_form_widgets(config)
+    components = form_widgets['components']
     
-    except Exception as e:
-        # The error will be handled by the @handle_ui_errors decorator
-        raise
+    # Create header with title and subtitle
+    header = create_header_container(
+        title=UI_CONFIG['title'],
+        subtitle=UI_CONFIG['subtitle'],
+        icon='✂️'  # Scissors icon for split operation
+    )
+    
+    # Get the form container from the form widgets
+    form_container = form_widgets.get('form_container')
+    if form_container is None:
+        # Fallback to creating a new form container if not provided
+        form_container = create_form_container(
+            layout_type=LayoutType.COLUMN,
+            gap='16px',
+            container_padding='16px',
+            width='100%'
+        )
+        
+        # Add form rows to container if available
+        for row in form_widgets.get('form_rows', []):
+            form_container['add_item'](row)
+    
+    
+    # Create action container with only save/reset buttons
+    action_container = create_action_container(
+        buttons=[],  # No custom buttons, just using save/reset
+        show_save_reset=True,
+    )
+    action_buttons = action_container['buttons']
+    
+    # Create operation container with consistent logging and status panel
+    operation_container = create_operation_container(
+        show_progress=False,  # No progress tracking needed for config only
+        show_logs=True,
+        show_dialog=True,
+        log_module_name=UI_CONFIG['module_name'],
+        # log_namespace_filter='split',  # Temporarily disabled
+        log_height="150px",
+        log_entry_style='compact',
+        collapsible=True,
+        collapsed=True,  # Start with logs collapsed
+        hide_progress=True,  # Hide progress tracker as requested
+        **kwargs
+    )
+    
+    # Create footer with log accordion
+    footer_container = create_footer_container(
+        **kwargs
+    )
+    
+    # Create main container using the new container API
+    container_components = [
+        # Header is a HeaderContainer object with .container attribute
+        {'type': 'header', 'component': header.container, 'order': 0},
+        # Form container is a dict with 'container' key
+        {'type': 'form', 'component': form_container['container'], 'order': 1},
+        # Action container is a dict with 'container' key
+        {'type': 'action', 'component': action_container['container'], 'order': 2},
+        # Operation container is a dict with 'container' key
+        {'type': 'operation', 'component': operation_container['container'], 'order': 3},
+        # Footer is a FooterContainer object with .container attribute
+        {'type': 'footer', 'component': footer_container.container, 'order': 4}
+    ]
+    
+    main_container = create_main_container(
+        components=container_components,
+        **kwargs
+    )
+    
+    # Create summary and info box
+    summary_content = _create_module_summary_content(components)
+    info_box = _create_module_info_box()
+    # Update components dictionary with all UI elements
+    ui_components.update({
+        # Containers
+        'form_components': components,
+        'form_container': form_container,
+        'action_container': action_container,
+        'operation_container': operation_container,
+        'footer_container': footer_container,
+        'header_container': header,
+        'main_container': main_container.container,  # Use the actual widget, not the MainContainer object
+        'container': main_container.container,  # For backward compatibility
+        
+        # UI Components
+        'summary_content': summary_content,
+        'info_box': info_box,
+        
+        # Buttons (only save/reset as requested)
+        'save': action_buttons.get('save'),
+        'reset': action_buttons.get('reset'),
+        
+        # Form Controls
+        'train_ratio': components.get('train_ratio'),
+        'val_ratio': components.get('val_ratio'),
+        'test_ratio': components.get('test_ratio'),
+        'train_dir': components.get('train_dir'),
+        'val_dir': components.get('val_dir'),
+        'test_dir': components.get('test_dir'),
+        'create_subdirs': components.get('create_subdirs'),
+        'overwrite': components.get('overwrite'),
+        'seed': components.get('seed'),
+        'shuffle': components.get('shuffle'),
+        'stratify': components.get('stratify'),
+        'use_relative_paths': components.get('use_relative_paths'),
+        'preserve_structure': components.get('preserve_structure'),
+        'symlink': components.get('symlink'),
+        'backup': components.get('backup'),
+        'backup_dir': components.get('backup_dir')
+    })
+    
+    return ui_components
+    

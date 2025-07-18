@@ -34,6 +34,7 @@ class SplitUIModule(BaseUIModule):
     
     def __init__(self):
         """Initialize split UI module."""
+        # Initialize base classes with proper module info
         super().__init__(
             module_name='split',
             parent_module='dataset'
@@ -46,6 +47,12 @@ class SplitUIModule(BaseUIModule):
             'operation_container'
         ]
         
+        # Initialize button handlers if not already done by parent
+        if not hasattr(self, '_button_handlers'):
+            self._button_handlers = {}
+        if not hasattr(self, '_button_states'):
+            self._button_states = {}
+            
         self.logger.debug("✅ SplitUIModule initialized")
     
     def get_default_config(self) -> Dict[str, Any]:
@@ -57,23 +64,47 @@ class SplitUIModule(BaseUIModule):
         return SplitConfigHandler(config)
     
     def create_ui_components(self, config: Dict[str, Any]) -> Dict[str, Any]:
-        """Create UI components for split module."""
+        """Create UI components for split module.
+        
+        Returns:
+            Dictionary containing all UI components from create_split_ui
+        """
         try:
             from .components.split_ui import create_split_ui
             
             self.logger.debug("Creating split UI components...")
+            
+            # Create and return the UI components directly
             ui_components = create_split_ui(config=config)
             
             if not ui_components:
                 raise RuntimeError("Failed to create UI components")
-            
+                
             self.logger.debug(f"✅ Created {len(ui_components)} UI components")
             return ui_components
-            
+                
         except Exception as e:
             self.logger.error(f"Failed to create UI components: {e}")
             raise
     
+    def _get_module_button_handlers(self) -> Dict[str, Any]:
+        """Get Split module-specific button handlers.
+        
+        Returns:
+            Dictionary mapping button IDs to handler methods
+        """
+        # Call parent method to get base handlers (save, reset)
+        base_handlers = super()._get_module_button_handlers()
+        
+        # Add Split-specific handlers
+        split_handlers = {
+            'save': self._handle_save_config,
+            'reset': self._handle_reset_config
+        }
+        
+        # Merge with base handlers
+        return {**base_handlers, **split_handlers}
+        
     def _register_default_operations(self) -> None:
         """Register default operations for split module."""
         # Call parent method first
@@ -81,12 +112,6 @@ class SplitUIModule(BaseUIModule):
         
         # Register split-specific operations
         self.register_operation_handler('get_split_status', self.get_split_status)
-        # self.register_operation_handler('split_dataset', self._handle_split_dataset)  # Disabled until implementation is complete
-        
-        # Register custom button handlers
-        self.register_button_handler('save', self._handle_save_config)
-        self.register_button_handler('reset', self._handle_reset_config)
-        # self.register_button_handler('split_dataset', self._handle_split_dataset)  # Disabled until implementation is complete
     
     def _handle_save_config(self, button=None):
         """Handle save config button click."""
@@ -179,20 +204,6 @@ class SplitUIModule(BaseUIModule):
             self.logger.error(f"Failed to initialize split module: {e}")
             return False
     
-    # get_config method is now provided by ConfigurationMixin - removed duplicate
-    
-    # get_ui_components method is now provided by DisplayMixin - removed duplicate
-    
-    # get_main_widget method is now provided by DisplayMixin - removed duplicate
-    
-    
-    
-    # ==================== CONFIGURATION OPERATIONS ====================
-    
-    # save_config method is now provided by ConfigurationMixin - removed duplicate
-    
-    # reset_config method is now provided by ConfigurationMixin - removed duplicate
-    
     def get_split_status(self) -> Dict[str, Any]:
         """
         Get current split configuration status.
@@ -229,11 +240,6 @@ class SplitUIModule(BaseUIModule):
         except Exception as e:
             return {'error': f'Status check failed: {str(e)}'}
     
-    # _setup_ui_logging_bridge method is now provided by LoggingMixin - removed duplicate
-    
-    # Status panel functionality has been removed
-    # Use update_operation_status for status updates instead
-    
     def _initialize_progress_display(self) -> None:
         """Initialize operation container and show initial logs like backbone."""
         try:
@@ -260,12 +266,6 @@ class SplitUIModule(BaseUIModule):
             
         except Exception as e:
             self.logger.debug(f"Operation container initialization failed: {e}")
-    
-    # _update_status method is now provided by OperationMixin as update_operation_status - removed duplicate
-    
-    # _cleanup_ui_logging_bridge method is now handled by LoggingMixin - removed duplicate
-
-    # cleanup method is now provided by base classes - removed duplicate
 
 
 # ==================== FACTORY FUNCTIONS ====================

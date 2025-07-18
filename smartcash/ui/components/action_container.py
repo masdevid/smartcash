@@ -94,7 +94,6 @@ def create_action_container(
     title: str = None,
     container_margin: str = "12px 0",
     show_save_reset: bool = True,
-    alignment: Literal['left', 'center', 'right'] = None,  # Deprecated, kept for compatibility
     phases: Dict[str, dict] = None,
     **kwargs
 ) -> Dict[str, Any]:
@@ -113,7 +112,6 @@ def create_action_container(
         title: Optional title for the container
         container_margin: Margin around the container (e.g., '12px 0')
         show_save_reset: Whether to show save/reset buttons (default: True)
-        alignment: [DEPRECATED] This parameter is ignored - layout is now fixed
         phases: Dictionary of phase configurations for the primary button
         **kwargs: Additional arguments to pass to ActionContainer
         

@@ -9,6 +9,7 @@ UI_CONFIG = {
     'module_name': 'split',
     'parent_module': 'dataset',
     'title': 'Dataset Split',
+    'subtitle': 'Configure how to split your dataset into train/validation/test sets',
     'description': 'Configure how to split your dataset into train/validation/test sets',
     'version': '1.0.0'
 }

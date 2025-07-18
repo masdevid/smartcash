@@ -191,7 +191,7 @@ def create_backbone_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> Dic
     
     # Store main UI references
     ui_components['ui'] = main_container.container
-    ui_components['main_container'] = main_container
+    ui_components['main_container'] = main_container.container
     
     ui_components['main_layout'] = main_container.container
     return ui_components

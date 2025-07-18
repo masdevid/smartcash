@@ -263,15 +263,15 @@ class ActionContainer:
         bg_color = '#007bff'  # Default blue
         text_color = '#ffffff'  # White text
         
-        # Map style to colors
+        # Map style to colors - all buttons use white text for better visibility
         style_colors = {
             'primary': ('#007bff', '#ffffff'),
             'success': ('#28a745', '#ffffff'),
             'info': ('#17a2b8', '#ffffff'),
-            'warning': ('#ffc107', '#212529'),
+            'warning': ('#ffc107', '#ffffff'),  # Changed from #212529 to #ffffff
             'danger': ('#dc3545', '#ffffff'),
             'secondary': ('#6c757d', '#ffffff'),
-            'light': ('#f8f9fa', '#212529'),
+            'light': ('#f8f9fa', '#ffffff'),   # Changed from #212529 to #ffffff
             'dark': ('#343a40', '#ffffff'),
         }
         

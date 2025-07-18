@@ -49,7 +49,7 @@ PROGRESS_STEPS = {
 UI_CONFIG = {
     'module_name': 'pretrained',
     'parent_module': 'model',
-    'title': '🤖 Pretrained Models',
+    'title': 'Pretrained Models',
     'subtitle': 'Download and manage YOLOv5s and EfficientNet-B4 models',
     'description': 'Download and manage pretrained models for currency detection',
     'icon': '🤖',
@@ -59,7 +59,7 @@ UI_CONFIG = {
 # Module Metadata
 MODULE_METADATA = {
     'name': 'pretrained',
-    'title': '🤖 Pretrained Models',
+    'title': 'Pretrained Models',
     'description': 'Pretrained model management module with download, validation, and cleanup operations',
     'version': '2.0.0',
     'category': 'model',

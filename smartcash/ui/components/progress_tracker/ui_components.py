@@ -26,27 +26,28 @@ class UIComponentsManager:
     
     def _create_widgets(self):
         """Create UI widgets dengan layout vertikal untuk setiap progress bar"""
-        # Header dengan padding dan font yang lebih baik
+        # Header dengan modern typography
         self.header_widget = widgets.HTML("", layout=widgets.Layout(
             width='100%', 
-            margin='0 0 12px 0',
-            padding='0 4px'
+            margin='0 0 16px 0',
+            padding='0'
         ))
         
-        # Status message dengan spacing yang lebih baik
+        # Status message dengan modern design
         self.status_widget = widgets.HTML("", layout=widgets.Layout(
             width='100%', 
-            margin='0 0 16px 0',
-            padding='0 4px'
+            margin='0 0 20px 0',
+            padding='0'
         ))
         
-        # Progress bars dengan style yang konsisten
+        # Progress bars dengan consistent modern styling
         progress_style = {
             'width': '100%',
-            'margin': '12px 0',
-            'min_height': '24px',
-            'max_height': '28px',
-            'padding': '0 4px'
+            'margin': '8px 0',
+            'min_height': '32px',
+            'max_height': '36px',
+            'padding': '0',
+            'overflow': 'visible'
         }
         
         self.overall_output = widgets.Output(layout=widgets.Layout(**progress_style))
@@ -71,18 +72,19 @@ class UIComponentsManager:
         elif self.config.level.value == 1:  # SINGLE
             progress_widgets.append(self.overall_output)  # Use overall for single
         
-        # Container dengan shadow dan border yang lebih halus
+        # Modern container with glassmorphism effect
         self.container = widgets.VBox(
             [self.header_widget, self.status_widget] + progress_widgets,
             layout=widgets.Layout(
                 display='none',
                 width='100%',
-                margin='12px 0',
-                padding='20px',
-                border='1px solid #e0e0e0',
-                border_radius='10px',
-                background_color='#ffffff',
-                box_shadow='0 2px 8px rgba(0,0,0,0.05)',
+                margin='16px 0',
+                padding='24px',
+                border='1px solid rgba(255, 255, 255, 0.18)',
+                border_radius='16px',
+                background_color='rgba(255, 255, 255, 0.95)',
+                box_shadow='0 8px 32px rgba(0, 0, 0, 0.1), 0 2px 8px rgba(0, 0, 0, 0.05)',
+                backdrop_filter='blur(10px)',
                 min_height=self.config.get_container_height(),
                 max_height='none',
                 overflow='visible',
@@ -127,54 +129,90 @@ class UIComponentsManager:
     
     def update_header(self, operation: str):
         """Update header dengan operation name"""
-        # Header dengan typography yang lebih baik
+        # Modern header with better visual hierarchy
         self.header_widget.value = f"""
-        <div style='color: #2c3e50; margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;'>
-            <h3 style='font-size: 17px; font-weight: 600; margin: 0 0 4px 0; padding: 0; line-height: 1.4; color: #2c3e50;'>
+        <div style='
+            display: flex;
+            align-items: center;
+            margin: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        '>
+            <div style='
+                width: 4px;
+                height: 32px;
+                background: linear-gradient(180deg, #007bff 0%, #28a745 100%);
+                border-radius: 2px;
+                margin-right: 16px;
+            '></div>
+            <h3 style='
+                font-size: 18px;
+                font-weight: 700;
+                margin: 0;
+                padding: 0;
+                line-height: 1.3;
+                color: #1a1a1a;
+                letter-spacing: -0.01em;
+            '>
                 {operation}
             </h3>
         </div>
         """
     
     def update_status(self, message: str, style: str = None):
-        """Update status message dengan flexbox layout dan emoji handling"""
+        """Update status message dengan modern design dan adaptive logging level"""
         color_map = {
-            'success': '#28a745', 'info': '#007bff', 
-            'warning': '#ffc107', 'error': '#dc3545'
+            'success': '#16a34a', 'info': '#0ea5e9', 
+            'warning': '#f59e0b', 'error': '#ef4444'
         }
-        color = color_map.get(style, '#495057')
+        color = color_map.get(style, '#64748b')
         
         # Clean message dari emoji duplikat jika ada
         clean_message = self._clean_status_message(message)
         
-        # Status message dengan style yang lebih modern
-        bg_color = {
-            'success': 'rgba(40, 167, 69, 0.08)',
-            'info': 'rgba(0, 123, 255, 0.08)',
-            'warning': 'rgba(255, 193, 7, 0.08)',
-            'error': 'rgba(220, 53, 69, 0.08)'
-        }.get(style, 'rgba(233, 236, 239, 0.5)')
+        # Adaptive background based on logging level
+        bg_colors = {
+            'success': 'linear-gradient(135deg, rgba(22, 163, 74, 0.08) 0%, rgba(22, 163, 74, 0.04) 100%)',
+            'info': 'linear-gradient(135deg, rgba(14, 165, 233, 0.08) 0%, rgba(14, 165, 233, 0.04) 100%)',
+            'warning': 'linear-gradient(135deg, rgba(245, 158, 11, 0.08) 0%, rgba(245, 158, 11, 0.04) 100%)',
+            'error': 'linear-gradient(135deg, rgba(239, 68, 68, 0.08) 0%, rgba(239, 68, 68, 0.04) 100%)'
+        }
+        bg_color = bg_colors.get(style, 'linear-gradient(135deg, rgba(100, 116, 139, 0.05) 0%, rgba(100, 116, 139, 0.02) 100%)')
+        
+        # Status icon based on style
+        icons = {
+            'success': '✅',
+            'info': 'ℹ️',
+            'warning': '⚠️',
+            'error': '❌'
+        }
+        icon = icons.get(style, '📋')
         
         self.status_widget.value = f"""
         <div style="
-            display: flex; 
-            align-items: center; 
+            display: flex;
+            align-items: center;
             width: 100%;
             color: {color};
-            font-size: 13.5px;
-            font-weight: 500;
+            font-size: 14px;
+            font-weight: 600;
             margin: 0;
-            padding: 12px 16px;
+            padding: 16px 20px;
             background: {bg_color};
-            border-radius: 8px;
-            border-left: 3px solid {color};
+            border-radius: 12px;
+            border: 1px solid rgba({self._hex_to_rgb(color)}, 0.2);
             box-sizing: border-box;
             word-wrap: break-word;
             overflow-wrap: break-word;
-            line-height: 1.5;
-            transition: all 0.2s ease;
+            line-height: 1.4;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 2px 8px rgba({self._hex_to_rgb(color)}, 0.1);
         ">
-            {clean_message}
+            <span style="
+                font-size: 16px;
+                margin-right: 12px;
+                opacity: 0.9;
+            ">{icon}</span>
+            <span style="flex: 1;">{clean_message}</span>
         </div>
         """
     
@@ -182,8 +220,14 @@ class UIComponentsManager:
     def _clean_status_message(message: str) -> str:
         """Clean status message dari emoji duplikat"""
         import re
-        # Check jika sudah ada emoji status di awal
-        if re.match(r'^[✅❌⚠️ℹ️🚀]\s', message):
-            return message
-        # Jika tidak ada, return message as is (emoji akan ditambah di level yang memanggil)
-        return message
+        # Remove existing status emojis to prevent duplication
+        cleaned = re.sub(r'^[✅❌⚠️ℹ️🚀📋]\s*', '', message)
+        return cleaned.strip()
+        
+    @staticmethod
+    def _hex_to_rgb(hex_color: str) -> str:
+        """Convert hex color to RGB values for CSS"""
+        hex_color = hex_color.lstrip('#')
+        if len(hex_color) == 6:
+            return f"{int(hex_color[0:2], 16)}, {int(hex_color[2:4], 16)}, {int(hex_color[4:6], 16)}"
+        return "100, 116, 139"  # Default gray

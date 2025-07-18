@@ -387,9 +387,11 @@ class OperationContainer(BaseUIComponent):
         if not self.progress_tracker._initialized:
             self.progress_tracker.initialize()
         
-        # Show progress tracker if it's hidden
+        # Prevent multiple progress tracker instances within operation container
         if hasattr(self.progress_tracker, 'container') and self.progress_tracker.container:
-            if self.progress_tracker.container.layout.display == 'none':
+            # Check if already visible to prevent duplication
+            if (self.progress_tracker.container.layout.display == 'none' and 
+                not getattr(self.progress_tracker, '_display_active', False)):
                 self.progress_tracker.show()
             
         # Update progress value and message
@@ -477,9 +479,10 @@ class OperationContainer(BaseUIComponent):
             has_visible_bars = any(data.get('visible', False) for data in self.progress_bars.values())
             
             if has_visible_bars:
-                # Ensure tracker is visible
+                # Ensure tracker is visible with duplicate prevention
                 if hasattr(self.progress_tracker, 'container') and self.progress_tracker.container:
-                    if self.progress_tracker.container.layout.display == 'none':
+                    if (self.progress_tracker.container.layout.display == 'none' and 
+                        not getattr(self.progress_tracker, '_display_active', False)):
                         self.progress_tracker.show()
                 
                 # Update each visible progress bar

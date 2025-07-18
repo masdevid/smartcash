@@ -41,44 +41,46 @@ class ProgressTracker(BaseUIComponent):
     
     def _create_ui_components(self) -> None:
         """Create and initialize UI components."""
-        # Create main container with auto height
+        # Create main container with modern styling
         self._ui_components['container'] = widgets.VBox(
             [],
             layout=widgets.Layout(
                 display='block',
                 width='100%',
-                margin='10px 0',
-                padding='15px',
-                border='1px solid #e0e0e0',
-                border_radius='8px',
-                background_color='#f8fff8',
-                min_height='100px',
+                margin='16px 0',
+                padding='24px',
+                border='1px solid rgba(255, 255, 255, 0.18)',
+                border_radius='16px',
+                background_color='rgba(255, 255, 255, 0.95)',
+                box_shadow='0 8px 32px rgba(0, 0, 0, 0.1), 0 2px 8px rgba(0, 0, 0, 0.05)',
+                backdrop_filter='blur(10px)',
+                min_height='120px',
                 height='auto',
                 overflow='visible',
-                box_sizing='content-box'
+                box_sizing='border-box'
             )
         )
         
-        # Create header widget
+        # Create header widget with modern styling
         self._ui_components['header'] = widgets.HTML(
-            f"<h4>{self._config.operation}</h4>",
-            layout=widgets.Layout(width='100%', margin='0 0 10px 0')
+            self._create_modern_header(self._config.operation),
+            layout=widgets.Layout(width='100%', margin='0 0 16px 0')
         )
         
-        # Create status widget
+        # Create status widget with modern styling
         self._ui_components['status'] = widgets.HTML(
-            "<i>Initializing...</i>",
-            layout=widgets.Layout(width='100%', margin='0 0 8px 0')
+            self._create_modern_status("Initializing...", "info"),
+            layout=widgets.Layout(width='100%', margin='0 0 20px 0')
         )
         
-        # Create output widgets for progress bars with consistent height
-        bar_height = '30px'
+        # Create output widgets for progress bars with modern layout
+        bar_height = '36px'
         bar_layout = widgets.Layout(
             width='100%',
-            margin='5px 0',
+            margin='8px 0',
             height=bar_height,
             min_height=bar_height,
-            overflow='hidden'
+            overflow='visible'
         )
         
         # Create output widgets for each level
@@ -115,18 +117,18 @@ class ProgressTracker(BaseUIComponent):
         return self._ui_components.get('status')
     
     def _update_container_height(self) -> None:
-        """Update container height based on visible components."""
+        """Update container height based on visible components with modern spacing."""
         if not hasattr(self, '_ui_components') or 'container' not in self._ui_components:
             return
             
-        # Base height for header and status
-        base_height = 60  # px for header + status + padding
-        bar_height = 30   # px per progress bar
+        # Modern spacing: increased padding and margins
+        base_height = 80  # px for header + status + modern padding
+        bar_height = 40   # px per progress bar with better spacing
         
         # Count visible progress bars based on level
         visible_bars = self._config.level.value
         
-        # Calculate total height
+        # Calculate total height with modern spacing
         total_height = base_height + (visible_bars * bar_height)
         
         # Update container height
@@ -154,6 +156,105 @@ class ProgressTracker(BaseUIComponent):
         
         # Update container children
         container.children = children
+    
+    def _create_modern_header(self, operation: str) -> str:
+        """Create modern styled header HTML."""
+        return f"""
+        <div style='
+            display: flex;
+            align-items: center;
+            margin: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        '>
+            <div style='
+                width: 4px;
+                height: 32px;
+                background: linear-gradient(180deg, #007bff 0%, #28a745 100%);
+                border-radius: 2px;
+                margin-right: 16px;
+            '></div>
+            <h3 style='
+                font-size: 18px;
+                font-weight: 700;
+                margin: 0;
+                padding: 0;
+                line-height: 1.3;
+                color: #1a1a1a;
+                letter-spacing: -0.01em;
+            '>
+                {operation}
+            </h3>
+        </div>
+        """
+    
+    def _create_modern_status(self, message: str, style: str = "info") -> str:
+        """Create modern styled status HTML with adaptive logging level."""
+        color_map = {
+            'success': '#16a34a', 'info': '#0ea5e9', 
+            'warning': '#f59e0b', 'error': '#ef4444'
+        }
+        color = color_map.get(style, '#64748b')
+        
+        # Adaptive background based on logging level
+        bg_colors = {
+            'success': 'linear-gradient(135deg, rgba(22, 163, 74, 0.08) 0%, rgba(22, 163, 74, 0.04) 100%)',
+            'info': 'linear-gradient(135deg, rgba(14, 165, 233, 0.08) 0%, rgba(14, 165, 233, 0.04) 100%)',
+            'warning': 'linear-gradient(135deg, rgba(245, 158, 11, 0.08) 0%, rgba(245, 158, 11, 0.04) 100%)',
+            'error': 'linear-gradient(135deg, rgba(239, 68, 68, 0.08) 0%, rgba(239, 68, 68, 0.04) 100%)'
+        }
+        bg_color = bg_colors.get(style, 'linear-gradient(135deg, rgba(100, 116, 139, 0.05) 0%, rgba(100, 116, 139, 0.02) 100%)')
+        
+        # Status icon based on style
+        icons = {
+            'success': '✅',
+            'info': 'ℹ️',
+            'warning': '⚠️',
+            'error': '❌'
+        }
+        icon = icons.get(style, '📋')
+        
+        # Clean message from existing emojis
+        import re
+        clean_message = re.sub(r'^[✅❌⚠️ℹ️🚀📋]\s*', '', message).strip()
+        
+        rgb_color = self._hex_to_rgb(color)
+        
+        return f"""
+        <div style="
+            display: flex;
+            align-items: center;
+            width: 100%;
+            color: {color};
+            font-size: 14px;
+            font-weight: 600;
+            margin: 0;
+            padding: 16px 20px;
+            background: {bg_color};
+            border-radius: 12px;
+            border: 1px solid rgba({rgb_color}, 0.2);
+            box-sizing: border-box;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+            line-height: 1.4;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 2px 8px rgba({rgb_color}, 0.1);
+        ">
+            <span style="
+                font-size: 16px;
+                margin-right: 12px;
+                opacity: 0.9;
+            ">{icon}</span>
+            <span style="flex: 1;">{clean_message}</span>
+        </div>
+        """
+    
+    @staticmethod
+    def _hex_to_rgb(hex_color: str) -> str:
+        """Convert hex color to RGB values for CSS."""
+        hex_color = hex_color.lstrip('#')
+        if len(hex_color) == 6:
+            return f"{int(hex_color[0:2], 16)}, {int(hex_color[2:4], 16)}, {int(hex_color[4:6], 16)}"
+        return "100, 116, 139"  # Default gray
     
     def _register_default_callbacks(self) -> None:
         """Register default callbacks."""
@@ -201,16 +302,26 @@ class ProgressTracker(BaseUIComponent):
         self._update_container_height()
     
     def hide(self) -> None:
-        """Hide the progress tracker."""
+        """Hide the progress tracker and reset display state."""
         if self._initialized and 'container' in self._ui_components:
             self._ui_components['container'].layout.display = 'none'
             self._ui_components['container'].layout.visibility = 'hidden'
+            
+        # Reset display state to allow new instances
+        self._display_active = False
+        if hasattr(self, '_last_display_handle'):
+            delattr(self, '_last_display_handle')
     
-    def update_status(self, message: str, level: str = "current") -> None:
-        """Update the status message for a specific level."""
+    def update_status(self, message: str, level: str = "current", style: str = "info") -> None:
+        """Update the status message with adaptive styling based on logging level."""
         if not self._initialized:
             self.initialize()
             
+        # Update main status widget with modern styling
+        if 'status' in self._ui_components:
+            self._ui_components['status'].value = self._create_modern_status(message, style)
+            
+        # Also update specific level if provided
         if level in self._ui_components:
             self._ui_components[level].value = message
     
@@ -233,9 +344,16 @@ class ProgressTracker(BaseUIComponent):
             if level not in ['overall', 'step', 'current']:
                 level = 'overall'  # Default to overall if invalid level provided
             
-            # Update the status message
+            # Update the status message with modern styling
             if message and 'status' in self._ui_components:
-                self._ui_components['status'].value = message
+                # Determine style based on progress value
+                if progress == 100:
+                    style = "success"
+                elif progress > 0:
+                    style = "info"
+                else:
+                    style = "info"
+                self._ui_components['status'].value = self._create_modern_status(message, style)
             
             # Update the progress bar
             self.tqdm_manager.update_bar(level, progress, message)
@@ -252,15 +370,30 @@ class ProgressTracker(BaseUIComponent):
         except Exception as e:
             print(f"Progress update error: {e}")
             
-    def show(self):
-        """Display the progress tracker and return the display ID."""
+    def show(self, operation: str = None, steps: list = None, 
+             step_weights: dict = None, level = None,
+             auto_hide: bool = None):
+        """Display the progress tracker with enhanced duplicate prevention."""
         try:
+            # Prevent multiple instances by checking for existing display
+            if hasattr(self, '_display_active') and self._display_active:
+                return getattr(self, '_last_display_handle', None)
+            
             container = self._ui_components.get('container')
             if not container:
                 return None
-                
-            # Create a unique display ID
-            display_id = f"progress_{id(container)}"
+            
+            # Update configuration if provided
+            if operation:
+                self._config.operation = operation
+                if 'header' in self._ui_components:
+                    self._ui_components['header'].value = self._create_modern_header(operation)
+            
+            # Mark as active to prevent duplicates
+            self._display_active = True
+            
+            # Create a unique display ID to prevent conflicts
+            display_id = f"progress_{id(self)}_{hash(operation or self._config.operation)}"
             self._last_displayed = display_id
             
             # Ensure all UI components are properly initialized
@@ -268,17 +401,28 @@ class ProgressTracker(BaseUIComponent):
                 self.tqdm_manager = TqdmManager(self)
                 self.tqdm_manager.initialize_bars(self._config.get_level_configs())
             
+            # Show container
+            container.layout.display = 'flex'
+            container.layout.visibility = 'visible'
+            
             # Check if we're in a notebook environment
             try:
-                from IPython.display import display
+                from IPython.display import display, clear_output
                 is_notebook = True
             except ImportError:
                 is_notebook = False
             
             if is_notebook:
-                # In notebook, use IPython display
-                display_handle = display(container, display_id=display_id, display=True)
-                display(container, display_id=display_id)  # Force initial display
+                # Clear any existing display to prevent duplicates
+                if hasattr(self, '_last_display_handle'):
+                    try:
+                        clear_output(wait=True)
+                    except:
+                        pass
+                
+                # Display with unique ID
+                display_handle = display(container, display_id=display_id)
+                self._last_display_handle = display_handle
                 return display_handle
             else:
                 # In script mode, just print progress
@@ -289,19 +433,30 @@ class ProgressTracker(BaseUIComponent):
                 
         except Exception as e:
             print(f"Error displaying progress: {e}")
+            self._display_active = False
             return None
     
     def complete(self, message: str = "Completed!") -> None:
-        """Mark the operation as complete."""
+        """Mark the operation as complete with modern status styling."""
         if self.tqdm_manager:
             self.tqdm_manager.set_all_complete(message, self._config.get_level_configs())
+        
+        # Update status with success styling
+        if 'status' in self._ui_components:
+            self._ui_components['status'].value = self._create_modern_status(message, "success")
+            
         self._is_complete = True
         self.callback_manager.trigger('complete')
     
     def error(self, message: str = "An error occurred!") -> None:
-        """Mark the operation as failed."""
+        """Mark the operation as failed with modern error styling."""
         if self.tqdm_manager:
             self.tqdm_manager.set_all_error(message)
+        
+        # Update status with error styling
+        if 'status' in self._ui_components:
+            self._ui_components['status'].value = self._create_modern_status(message, "error")
+            
         self._is_error = True
         self.callback_manager.trigger('error', message)
     
@@ -309,9 +464,15 @@ class ProgressTracker(BaseUIComponent):
         """Reset the progress tracker to its initial state."""
         if self.tqdm_manager:
             self.tqdm_manager.initialize_bars(self._config.get_level_configs())
+        
+        # Reset status with modern styling
+        if 'status' in self._ui_components:
+            self._ui_components['status'].value = self._create_modern_status("Initializing...", "info")
+            
         self._is_complete = False
         self._is_error = False
         self._current_step_index = 0
+        self._display_active = False
         self.callback_manager.trigger('reset')
     
     # Callback registration methods

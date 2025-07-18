@@ -12,7 +12,7 @@ import ipywidgets as widgets
 from smartcash.ui.components.progress_tracker.progress_config import ProgressBarConfig
 
 class TqdmManager:
-    """Manager untuk tqdm progress bars dengan separate outputs per level"""
+    """Manager untuk tqdm progress bars dengan separate outputs per level dan duplicate prevention"""
     
     def __init__(self, ui_manager):
         self.ui_manager = ui_manager
@@ -25,16 +25,27 @@ class TqdmManager:
             'step': 'step_output',
             'current': 'current_output'
         }
+        self._active_displays = set()  # Track active displays to prevent duplicates
+        self._last_operation_id = None  # Track operation instances
     
     def initialize_bars(self, bar_configs: list[ProgressBarConfig]):
-        """Initialize tqdm progress bars in separate output widgets"""
+        """Initialize tqdm progress bars with enhanced duplicate prevention"""
         if not hasattr(self, 'ui_manager') or not hasattr(self.ui_manager, '_ui_components'):
             return
-            
+        
+        # Generate operation ID to prevent conflicts
+        operation_id = f"{id(self.ui_manager)}_{hash(str(bar_configs))}"
+        
+        # Skip if same operation is already active
+        if operation_id == self._last_operation_id and self.tqdm_bars:
+            return
+        
+        # Clean up previous instances
         self.close_all_bars()
+        self._last_operation_id = operation_id
         
         # Sort bars by their intended display order
-        bar_configs = sorted(bar_configs, key=lambda x: x.name)
+        bar_configs = sorted(bar_configs, key=lambda x: getattr(x, 'position', 0))
         
         for idx, bar_config in enumerate(bar_configs):
             if not bar_config.visible:
@@ -46,31 +57,34 @@ class TqdmManager:
                 
             output_widget = self.ui_manager._ui_components[output_key]
             
+            # Clear and initialize with logging level adaptation
             with output_widget:
                 try:
                     clear_output(wait=True)
+                    
+                    # Adaptive styling based on logging level
+                    tqdm_color = self._get_adaptive_color(bar_config, idx)
+                    
                     tqdm_bar = tqdm(
                         total=100,
                         desc=bar_config.description,
                         bar_format='{desc}: {bar}| {percentage:3.0f}%',
-                        colour=bar_config.get_tqdm_color(),
+                        colour=tqdm_color,
                         leave=True,
                         file=sys.stdout,
                         dynamic_ncols=True,
-                        position=idx  # Assign unique position
+                        position=idx,
+                        unit_scale=True
                     )
                     self.tqdm_bars[bar_config.name] = tqdm_bar
+                    self._active_displays.add(output_key)
+                    
                 except Exception as e:
                     print(f"Error initializing progress bar {bar_config.name}: {e}")
-                    
-        # Force initial display
-        if hasattr(self.ui_manager, '_last_displayed'):
-            display(self.ui_manager._ui_components['container'], 
-                   display_id=self.ui_manager._last_displayed)
     
     def update_bar(self, level_name: str, progress: int, message: str = "", 
                    bar_configs: list[ProgressBarConfig] = None):
-        """Update progress bar with proper message handling"""
+        """Update progress bar with enhanced duplicate prevention and logging level adaptation"""
         try:
             # Ensure progress is within bounds
             progress = max(0, min(100, int(progress)))
@@ -82,13 +96,23 @@ class TqdmManager:
             except ImportError:
                 is_notebook = False
             
+            # Prevent duplicate bar creation for same operation
+            output_key = f"{level_name}_output"
+            if (level_name not in self.tqdm_bars and 
+                output_key in self._active_displays):
+                # Bar should exist, but might have been cleared - reinitialize
+                self._reinitialize_single_bar(level_name, output_key)
+            
             # Initialize bar if it doesn't exist
             if level_name not in self.tqdm_bars:
                 if not hasattr(self, 'ui_manager') or not hasattr(self.ui_manager, '_ui_components'):
                     return
                     
-                output_key = f"{level_name}_output"
                 if output_key not in self.ui_manager._ui_components:
+                    return
+                
+                # Prevent multiple bars in same output
+                if output_key in self._active_displays:
                     return
                 
                 # In notebook, use the output widget
@@ -97,37 +121,44 @@ class TqdmManager:
                     with output_widget:
                         clear_output(wait=True)
                         
-                        # Create a new progress bar
+                        # Create a new progress bar with adaptive styling
+                        adaptive_color = self._get_adaptive_color_by_level(level_name)
+                        
                         bar = tqdm(
                             total=100,
                             desc="",
                             bar_format='{desc}: {bar}| {percentage:3.0f}%',
-                            colour='#0078D7',
+                            colour=adaptive_color,
                             leave=True,
                             file=sys.stdout,
                             dynamic_ncols=True,
                             position=len(self.tqdm_bars)
                         )
                         self.tqdm_bars[level_name] = bar
+                        self._active_displays.add(output_key)
                 else:
                     # In script mode, create a simple progress bar
                     bar = tqdm(
                         total=100,
                         desc=level_name.capitalize(),
                         bar_format='{l_bar}{bar}| {n_fmt}/{total_fmt} {desc}',
-                        colour='#0078D7',
+                        colour='green',
                         leave=False,
                         file=sys.stdout
                     )
                     self.tqdm_bars[level_name] = bar
+                    self._active_displays.add(output_key)
             
             # Get the progress bar
-            bar = self.tqdm_bars[level_name]
+            bar = self.tqdm_bars.get(level_name)
+            if not bar:
+                return
             
-            # Update progress and description
+            # Update progress and description with logging level adaptation
             if message:
                 clean_message = self._clean_message(message)
-                formatted_desc = self._truncate_message(clean_message, 45)
+                adapted_message = self._adapt_message_to_level(clean_message, level_name, progress)
+                formatted_desc = self._truncate_message(adapted_message, 45)
                 bar.set_description(formatted_desc, refresh=False)
             
             # Update progress
@@ -139,11 +170,6 @@ class TqdmManager:
             self.progress_values[level_name] = progress
             if message:
                 self.progress_messages[level_name] = message
-                
-            # In notebook, force display update
-            if is_notebook and hasattr(self.ui_manager, '_last_displayed'):
-                display(self.ui_manager._ui_components['container'], 
-                       display_id=self.ui_manager._last_displayed)
                 
         except Exception as e:
             print(f"Error updating progress bar {level_name}: {e}")
@@ -166,12 +192,12 @@ class TqdmManager:
             bar.set_description(clean_message)
     
     def close_all_bars(self):
-        """Close semua tqdm bars dengan cleanup per output"""
+        """Close semua tqdm bars dengan enhanced cleanup untuk prevent duplicates"""
         for bar_name, bar in self.tqdm_bars.items():
             try:
                 bar.close()
                 # Clear specific output widget
-                output_attr = self.output_mapping.get(bar_name)
+                output_attr = self.output_mapping.get(bar_name, f"{bar_name}_output")
                 if (output_attr and hasattr(self.ui_manager, '_ui_components') and 
                     output_attr in self.ui_manager._ui_components):
                     output_widget = self.ui_manager._ui_components[output_attr]
@@ -179,12 +205,18 @@ class TqdmManager:
                         clear_output(wait=True)
             except Exception:
                 pass
+        
+        # Clear tracking sets
         self.tqdm_bars.clear()
+        self._active_displays.clear()
+        self._last_operation_id = None
     
     def reset(self):
-        """Reset manager state"""
+        """Reset manager state dengan complete cleanup"""
         self.progress_values.clear()
         self.progress_messages.clear()
+        self._active_displays.clear()
+        self._last_operation_id = None
         self.close_all_bars()
     
     def get_progress_value(self, level_name: str) -> int:
@@ -221,3 +253,58 @@ class TqdmManager:
         if len(message) <= max_length:
             return message
         return f"{message[:max_length-3]}..."
+    
+    def _get_adaptive_color(self, bar_config, index: int) -> str:
+        """Get adaptive color based on logging level and progress bar type"""
+        # Use bar_config color if available, otherwise use sequence
+        if hasattr(bar_config, 'get_tqdm_color'):
+            return bar_config.get_tqdm_color()
+        
+        # Modern color palette that adapts to logging state
+        color_sequence = ['green', 'blue', 'cyan', 'yellow', 'magenta']
+        return color_sequence[index % len(color_sequence)]
+    
+    def _get_adaptive_color_by_level(self, level_name: str) -> str:
+        """Get color based on progress bar level"""
+        color_map = {
+            'overall': 'green',
+            'primary': 'green', 
+            'step': 'blue',
+            'current': 'cyan'
+        }
+        return color_map.get(level_name, 'green')
+    
+    def _adapt_message_to_level(self, message: str, level_name: str, progress: int) -> str:
+        """Adapt message formatting based on logging level and progress"""
+        # Add level-specific prefixes for better context
+        level_prefix = {
+            'overall': '📊',
+            'primary': '📊', 
+            'step': '🔄',
+            'current': '⚡'
+        }.get(level_name, '📋')
+        
+        if progress == 100:
+            return f"✅ {message}"
+        elif progress > 75:
+            return f"🟢 {message}"
+        elif progress > 50:
+            return f"{level_prefix} {message}"
+        elif progress > 25:
+            return f"🟡 {message}"
+        else:
+            return f"🔴 {message}"
+    
+    def _reinitialize_single_bar(self, level_name: str, output_key: str):
+        """Reinitialize a single progress bar if needed"""
+        if (hasattr(self.ui_manager, '_ui_components') and 
+            output_key in self.ui_manager._ui_components):
+            
+            output_widget = self.ui_manager._ui_components[output_key]
+            with output_widget:
+                clear_output(wait=True)
+                
+            # Remove from active displays to allow recreation
+            self._active_displays.discard(output_key)
+            if level_name in self.tqdm_bars:
+                del self.tqdm_bars[level_name]

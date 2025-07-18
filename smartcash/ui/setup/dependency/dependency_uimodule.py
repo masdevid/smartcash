@@ -41,7 +41,7 @@ class DependencyUIModule(BaseUIModule):
         self._update_logging_context()
         
         # Log initialization with the explicit namespace
-        self.logger.debug(f"🔄 Initializing DependencyUIModule (namespace: {self._module_namespace})")
+        self.logger.debug(f"🔄 Initializing DependencyUIModule (namespace: {self._get_module_namespace()})")
         
         # Set required components for validation
         self._required_components = [

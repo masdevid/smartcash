@@ -255,8 +255,17 @@ class ColabUIModule(BaseUIModule):
                 try:
                     # Test if the handler was registered by checking widget attributes
                     if hasattr(setup_button, '_click_handlers'):
-                        handler_count = len(setup_button._click_handlers)
-                        self.logger.info(f"📊 Button now has {handler_count} click handlers")
+                        # Handle different types of click handlers
+                        click_handlers = setup_button._click_handlers
+                        if hasattr(click_handlers, '__len__'):
+                            handler_count = len(click_handlers)
+                            self.logger.info(f"📊 Button now has {handler_count} click handlers")
+                        elif hasattr(click_handlers, '_callbacks'):
+                            # CallbackDispatcher case
+                            callback_count = len(click_handlers._callbacks) if hasattr(click_handlers._callbacks, '__len__') else 'unknown'
+                            self.logger.info(f"📊 Button has CallbackDispatcher with {callback_count} callbacks")
+                        else:
+                            self.logger.info(f"📊 Button has click handlers of type: {type(click_handlers)}")
                     elif hasattr(setup_button, '_model_id'):
                         self.logger.info(f"📊 Button widget model ID: {setup_button._model_id}")
                     else:

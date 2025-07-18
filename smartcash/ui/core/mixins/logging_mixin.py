@@ -36,6 +36,10 @@ class LoggingMixin:
         if hasattr(self, '_module_namespace') and self._module_namespace:
             return self._module_namespace
             
+        # Initialize _module_namespace if not set
+        if not hasattr(self, '_module_namespace'):
+            self._module_namespace = None
+            
         # Check if module has explicit namespace info
         if hasattr(self, 'module_name'):
             self._module_namespace = self.module_name
@@ -86,11 +90,11 @@ class LoggingMixin:
             del self._module_namespace
             
         # Get the updated namespace
-        self._get_module_namespace()
+        namespace = self._get_module_namespace()
         
         # Update the logger if it exists
         if hasattr(self, 'logger') and hasattr(self.logger, 'set_namespace'):
-            self.logger.set_namespace(self._module_namespace)
+            self.logger.set_namespace(namespace)
     
     def log(self, message: str, level: str = 'info') -> None:
         """

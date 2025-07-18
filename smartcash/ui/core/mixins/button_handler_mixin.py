@@ -48,21 +48,22 @@ class ButtonHandlerMixin:
             # Try different container sources for buttons
             buttons = {}
             
-            # Method 1: Get from action container
-            action_container = self._ui_components.get('actions')
-            if action_container:
-                # If action_container is a dictionary with a 'buttons' key
-                if isinstance(action_container, dict) and 'buttons' in action_container:
-                    if isinstance(action_container['buttons'], dict):
-                        buttons.update(action_container['buttons'])
-                # If action_container is an object with a 'buttons' attribute
-                elif hasattr(action_container, 'buttons') and isinstance(action_container.buttons, dict):
-                    buttons.update(action_container.buttons)
-                # If action_container has a get_buttons method
-                elif hasattr(action_container, 'get_buttons'):
-                    container_buttons = action_container.get_buttons()
-                    if container_buttons and isinstance(container_buttons, dict):
-                        buttons.update(container_buttons)
+            # Method 1: Get from action container (try both 'actions' and 'action_container')
+            for container_key in ['actions', 'action_container']:
+                action_container = self._ui_components.get(container_key)
+                if action_container:
+                    # If action_container is a dictionary with a 'buttons' key
+                    if isinstance(action_container, dict) and 'buttons' in action_container:
+                        if isinstance(action_container['buttons'], dict):
+                            buttons.update(action_container['buttons'])
+                    # If action_container is an object with a 'buttons' attribute
+                    elif hasattr(action_container, 'buttons') and isinstance(action_container.buttons, dict):
+                        buttons.update(action_container.buttons)
+                    # If action_container has a get_buttons method
+                    elif hasattr(action_container, 'get_buttons'):
+                        container_buttons = action_container.get_buttons()
+                        if container_buttons and isinstance(container_buttons, dict):
+                            buttons.update(container_buttons)
             
             # Method 2: Look for buttons in components
             if 'components' in self._ui_components and hasattr(self._ui_components['components'], 'get'):
@@ -73,7 +74,7 @@ class ButtonHandlerMixin:
             
             # Method 3: Look for direct button widgets in _ui_components
             for key, widget in self._ui_components.items():
-                if key == 'action_container' or key == 'actions' or not hasattr(widget, 'on_click'):
+                if key in ['action_container', 'actions'] or not hasattr(widget, 'on_click'):
                     continue
                 buttons[key] = widget
             
@@ -88,6 +89,9 @@ class ButtonHandlerMixin:
                         self.logger.debug(f"  - {btn_id}: {widget_type} (has_on_click: {has_onclick})")
                 else:
                     self.logger.warning("⚠️ No buttons found in UI components")
+                    # Debug: Log available UI component keys
+                    ui_keys = list(self._ui_components.keys())
+                    self.logger.debug(f"Available UI component keys: {ui_keys}")
                     
             if not buttons:
                 return

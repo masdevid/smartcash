@@ -14,7 +14,7 @@ class CheckOperationHandler(BasePreprocessingOperation):
     Orchestrates the data and configuration validation check by calling the backend.
     """
 
-    def execute(self) -> None:
+    def execute(self) -> Dict[str, Any]:
         """Executes the validation check by calling the backend service."""
         self.log_operation("🔍 Menghubungkan ke backend untuk memeriksa status...", level='info')
         try:
@@ -24,15 +24,18 @@ class CheckOperationHandler(BasePreprocessingOperation):
             if status.get('service_ready'):
                 self.log_operation("✅ Pemeriksaan berhasil. Ringkasan status dibuat.", level='success')
                 self._execute_callback('on_success', summary)
+                return {'success': True, 'message': 'Pemeriksaan berhasil diselesaikan'}
             else:
                 error_message = f"❌ Backend melaporkan layanan belum siap."
                 self.log_operation(error_message, level='error')
                 self._execute_callback('on_failure', summary) # Still show summary on failure
+                return {'success': False, 'message': 'Backend tidak siap'}
 
         except Exception as e:
             error_message = f"Gagal memanggil backend pemeriksaan status: {e}"
             self.log_operation(f"❌ {error_message}", level='error')
             self._execute_callback('on_failure', error_message)
+            return {'success': False, 'message': f'Error: {e}'}
         finally:
             self._execute_callback('on_complete')
 

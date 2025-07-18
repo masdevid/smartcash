@@ -21,7 +21,7 @@ from .backbone_uimodule import (
 
 from .components.backbone_ui import create_backbone_ui, update_model_summary
 from .configs.backbone_config_handler import BackboneConfigHandler
-from .operations.backbone_operation_manager import BackboneOperationManager
+from .operations.backbone_factory import BackboneOperationFactory
 
 # ==================== CONVENIENCE FUNCTIONS ====================
 
@@ -58,5 +58,5 @@ __all__ = [
     'create_backbone_ui',
     'update_model_summary',
     'BackboneConfigHandler',
-    'BackboneOperationManager'
+    'BackboneOperationFactory'
 ]

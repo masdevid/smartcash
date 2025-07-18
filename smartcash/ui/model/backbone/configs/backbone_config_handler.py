@@ -1,40 +1,60 @@
 """
 File: smartcash/ui/model/backbone/configs/backbone_config_handler.py
-Configuration handler for backbone module following UIModule pattern.
+Configuration handler for backbone module using BaseUIModule pattern (simplified).
 """
 
 from typing import Dict, Any, Optional, List
-from smartcash.ui.core.handlers.config_handler import ConfigHandler
 from smartcash.ui.logger import get_module_logger
 from .backbone_defaults import get_default_backbone_config, get_available_backbones
 from ..constants import VALIDATION_CONFIG, BackboneType
 
 
-class BackboneConfigHandler(ConfigHandler):
+class BackboneConfigHandler:
     """
-    Configuration handler for backbone module.
+    Configuration handler for backbone module using BaseUIModule pattern.
     
     Features:
     - 🧬 Backbone model configuration validation
-    - 🔧 Model parameter synchronization
+    - 🔧 Model parameter synchronization 
     - 📋 Configuration merge and validation
     - 🎯 UI component sync support
     - 🛡️ Type checking and constraints validation
     """
     
-    def __init__(self):
-        """Initialize backbone configuration handler."""
-        super().__init__(
-            module_name='backbone',
-            parent_module='model'
-        )
+    def __init__(self, config: Optional[Dict[str, Any]] = None):
+        """
+        Initialize backbone configuration handler.
+        
+        Args:
+            config: Optional initial configuration
+        """
         self.logger = get_module_logger("smartcash.ui.model.backbone.configs")
+        
+        # Set configuration namespace
+        self.module_name = 'backbone'
+        self.parent_module = 'model'
+        
+        # Initialize with default or provided config
+        self._config = config or get_default_backbone_config()
         self.available_backbones = get_available_backbones()
         
         # Config sections that require UI synchronization
         self.ui_sync_sections = ['backbone', 'model', 'ui']
         
         self.logger.debug("✅ BackboneConfigHandler initialized")
+    
+    @property
+    def config(self) -> Dict[str, Any]:
+        """Get current configuration."""
+        return self._config
+    
+    @config.setter
+    def config(self, value: Dict[str, Any]) -> None:
+        """Set configuration with validation."""
+        if self.validate_config(value):
+            self._config = value
+        else:
+            raise ValueError("Invalid configuration provided")
     
     def get_default_config(self) -> Dict[str, Any]:
         """
@@ -67,14 +87,11 @@ class BackboneConfigHandler(ConfigHandler):
                     self.logger.error(f"Missing required section: {section}")
                     return False
             
-            # Validate backbone section
-            backbone_config = config.get('backbone', {})
-            if not self._validate_backbone_section(backbone_config):
+            # Backbone-specific validation
+            if not self._validate_backbone_section(config.get('backbone', {})):
                 return False
             
-            # Validate model section
-            model_config = config.get('model', {})
-            if not self._validate_model_section(model_config):
+            if not self._validate_model_section(config.get('model', {})):
                 return False
             
             self.logger.debug("✅ Configuration validation passed")
@@ -99,8 +116,7 @@ class BackboneConfigHandler(ConfigHandler):
             return False
         
         # Check pretrained flag
-        pretrained = backbone_config.get('pretrained')
-        if not isinstance(pretrained, bool):
+        if not isinstance(backbone_config.get('pretrained'), bool):
             self.logger.error("pretrained must be a boolean value")
             return False
         
@@ -140,148 +156,54 @@ class BackboneConfigHandler(ConfigHandler):
         
         return True
     
-    def sync_to_ui(self, ui_components: Dict[str, Any], config: Dict[str, Any]) -> bool:
+    def update_config(self, updates: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Synchronize configuration to UI components.
+        Update configuration with deep merge.
+        
+        Args:
+            updates: Configuration updates to apply
+            
+        Returns:
+            Result dictionary with success status
+        """
+        try:
+            # Simple deep merge implementation
+            merged_config = self._merge_config(self._config, updates)
+            
+            # Validate merged configuration
+            if self.validate_config(merged_config):
+                self._config = merged_config
+                self.logger.debug("✅ Configuration updated successfully")
+                return {'success': True, 'message': 'Configuration updated successfully'}
+            else:
+                return {'success': False, 'message': 'Configuration validation failed after update'}
+                
+        except Exception as e:
+            error_msg = f"Failed to update configuration: {e}"
+            self.logger.error(error_msg)
+            return {'success': False, 'message': error_msg}
+    
+    def _merge_config(self, base: Dict[str, Any], updates: Dict[str, Any]) -> Dict[str, Any]:
+        """Deep merge two configuration dictionaries."""
+        result = base.copy()
+        
+        for key, value in updates.items():
+            if key in result and isinstance(result[key], dict) and isinstance(value, dict):
+                result[key] = self._merge_config(result[key], value)
+            else:
+                result[key] = value
+        
+        return result
+    
+    def set_ui_components(self, ui_components: Dict[str, Any]) -> None:
+        """
+        Set UI components reference for configuration extraction.
         
         Args:
             ui_components: UI components dictionary
-            config: Configuration to sync
-            
-        Returns:
-            True if sync successful, False otherwise
         """
-        try:
-            if not ui_components or not config:
-                self.logger.warning("Missing UI components or config for sync")
-                return False
-            
-            # Update form container if available
-            form_container = ui_components.get('form_container')
-            if form_container and hasattr(form_container, 'update_from_config'):
-                form_container.update_from_config(config)
-                self.logger.debug("✅ Form container updated from config")
-            
-            # Update summary container with backbone info
-            summary_container = ui_components.get('summary_container')
-            if summary_container and hasattr(summary_container, 'update_content'):
-                summary_content = self._generate_summary_content(config)
-                summary_container.update_content(summary_content)
-                self.logger.debug("✅ Summary container updated")
-            
-            return True
-            
-        except Exception as e:
-            self.logger.error(f"UI sync error: {e}")
-            return False
-    
-    def sync_from_ui(self, ui_components: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-        """
-        Synchronize configuration from UI components.
-        
-        Args:
-            ui_components: UI components dictionary
-            
-        Returns:
-            Configuration dictionary if sync successful, None otherwise
-        """
-        try:
-            if not ui_components:
-                self.logger.warning("No UI components available for sync")
-                return None
-            
-            # Get current config from form container
-            form_container = ui_components.get('form_container')
-            if form_container and hasattr(form_container, 'get_form_values'):
-                form_values = form_container.get_form_values()
-                
-                # Convert form values to config structure
-                config = self._form_values_to_config(form_values)
-                
-                self.logger.debug("✅ Configuration synced from UI")
-                return config
-            
-            self.logger.warning("Form container not available for sync")
-            return None
-            
-        except Exception as e:
-            self.logger.error(f"UI to config sync error: {e}")
-            return None
-    
-    def _form_values_to_config(self, form_values: Dict[str, Any]) -> Dict[str, Any]:
-        """Convert form values to configuration structure."""
-        backbone_type = form_values.get('backbone_type', 'efficientnet_b4')
-        pretrained = form_values.get('pretrained', True)
-        feature_optimization = form_values.get('feature_optimization', True)
-        mixed_precision = form_values.get('mixed_precision', True)
-        input_size = form_values.get('input_size', 640)
-        num_classes = form_values.get('num_classes', 7)
-        
-        return {
-            'backbone': {
-                'model_type': backbone_type,
-                'pretrained': pretrained,
-                'feature_optimization': feature_optimization,
-                'mixed_precision': mixed_precision,
-                'detection_layers': ['banknote'],
-                'layer_mode': 'single',
-                'input_size': input_size,
-                'num_classes': num_classes,
-                'early_training': {
-                    'enabled': True,
-                    'validation_from_pretrained': True,
-                    'auto_build': False
-                }
-            },
-            'model': {
-                'backbone': backbone_type,
-                'pretrained': pretrained,
-                'detection_layers': ['banknote'],
-                'layer_mode': 'single',
-                'feature_optimization': feature_optimization,
-                'mixed_precision': mixed_precision,
-                'input_size': input_size,
-                'num_classes': num_classes
-            },
-            'ui': {
-                'show_advanced_options': form_values.get('show_advanced_options', False),
-                'auto_validate': form_values.get('auto_validate', True),
-                'show_model_info': form_values.get('show_model_info', True),
-                'summary_panel_enabled': True
-            }
-        }
-    
-    def _generate_summary_content(self, config: Dict[str, Any]) -> Dict[str, Any]:
-        """Generate summary content for display."""
-        backbone_config = config.get('backbone', {})
-        model_type = backbone_config.get('model_type', 'efficientnet_b4')
-        
-        # Get backbone info
-        backbone_info = self.available_backbones.get(model_type, {})
-        
-        return {
-            'title': 'Backbone Configuration Summary',
-            'sections': {
-                'Model Information': {
-                    'Backbone': backbone_info.get('display_name', model_type),
-                    'Description': backbone_info.get('description', 'N/A'),
-                    'Pretrained': 'Yes' if backbone_config.get('pretrained') else 'No',
-                    'Recommended': 'Yes' if backbone_info.get('recommended') else 'No'
-                },
-                'Configuration': {
-                    'Input Size': f"{backbone_config.get('input_size', 640)}px",
-                    'Classes': backbone_config.get('num_classes', 7),
-                    'Feature Optimization': 'Enabled' if backbone_config.get('feature_optimization') else 'Disabled',
-                    'Mixed Precision': 'Enabled' if backbone_config.get('mixed_precision') else 'Disabled'
-                },
-                'Performance': {
-                    'Memory Usage': backbone_info.get('memory_usage', 'N/A'),
-                    'Inference Speed': backbone_info.get('inference_speed', 'N/A'),
-                    'Accuracy': backbone_info.get('accuracy', 'N/A'),
-                    'Output Channels': str(backbone_info.get('output_channels', []))
-                }
-            }
-        }
+        self._ui_components = ui_components
+        self.logger.debug("✅ UI components reference set")
     
     def get_validation_errors(self, config: Dict[str, Any]) -> List[str]:
         """

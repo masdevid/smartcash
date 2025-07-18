@@ -82,9 +82,12 @@ class BasePreprocessingOperation(OperationMixin, ABC):
             self.update_progress(progress_level, percentage, message)
 
     @abstractmethod
-    def execute(self) -> None:
+    def execute(self) -> Dict[str, Any]:
         """
         The main execution method for the operation.
         Subclasses must implement this method to perform their specific logic.
+        
+        Returns:
+            Dict with 'success' bool and 'message' str indicating operation result
         """
         raise NotImplementedError("Subclasses must implement the execute method.")

@@ -67,7 +67,7 @@ class FPN_PAN(nn.Module):
             self.fpn = FeaturePyramidNetwork(in_channels=self.in_channels, out_channels=self.out_channels)
             self.pan = PathAggregationNetwork(in_channels=self.out_channels, out_channels=self.out_channels)
             
-            self.logger.success(f"✅ FPN-PAN initialized: {self.in_channels} -> {self.out_channels}")
+            self.logger.info(f"✅ FPN-PAN initialized: {self.in_channels} -> {self.out_channels}")
             
         except Exception as e:
             self._raise_error(f"❌ Error initializing FPN-PAN components: {str(e)}")

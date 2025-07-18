@@ -3,8 +3,7 @@ File: smartcash/ui/dataset/preprocessing/operations/preprocess_operation.py
 Description: Operation handler for the main data preprocessing workflow.
 """
 
-import time
-from typing import Any, Dict, Optional, Callable
+from typing import Any, Dict
 from smartcash.dataset.preprocessor.api.preprocessing_api import preprocess_dataset
 from .preprocessing_operation_base import BasePreprocessingOperation
 
@@ -14,7 +13,7 @@ class PreprocessOperationHandler(BasePreprocessingOperation):
     Orchestrates the main data preprocessing workflow by calling the backend service.
     """
 
-    def execute(self) -> None:
+    def execute(self) -> Dict[str, Any]:
         """Executes the preprocessing workflow by calling the backend service."""
         self.log_operation("🚀 Menghubungkan ke backend untuk pra-pemrosesan...", level='info')
 
@@ -28,14 +27,18 @@ class PreprocessOperationHandler(BasePreprocessingOperation):
             if result.get('success'):
                 self.log_operation(f"✅ Pra-pemrosesan berhasil.", level='success')
                 self._execute_callback('on_success', summary)
+                return {'success': True, 'message': 'Preprocessing berhasil diselesaikan'}
             else:
-                self.log_operation(f"❌ Gagal melakukan pra-pemrosesan: {result.get('message', 'Alasan tidak diketahui.')}", level='error')
+                error_msg = result.get('message', 'Alasan tidak diketahui.')
+                self.log_operation(f"❌ Gagal melakukan pra-pemrosesan: {error_msg}", level='error')
                 self._execute_callback('on_failure', summary) # Still show summary on failure
+                return {'success': False, 'message': f'Preprocessing gagal: {error_msg}'}
 
         except Exception as e:
             error_message = f"Gagal memanggil backend pra-pemrosesan: {e}"
             self.log_operation(f"❌ {error_message}", level='error')
             self._execute_callback('on_failure', error_message)
+            return {'success': False, 'message': f'Error: {e}'}
         finally:
             self._execute_callback('on_complete')
 

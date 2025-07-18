@@ -1,325 +1,244 @@
+# -*- coding: utf-8 -*-
 """
 File: smartcash/ui/model/backbone/backbone_uimodule.py
-Main UIModule implementation for backbone module following new UIModule pattern.
+Description: Refactored implementation of the Backbone Module using the modern BaseUIModule pattern.
 """
 
 from typing import Dict, Any, Optional
-from smartcash.ui.core.ui_module import UIModule, ModuleStatus
-from smartcash.ui.logger import get_module_logger
+
+from smartcash.ui.core.base_ui_module import BaseUIModule
+from smartcash.ui.core.enhanced_ui_module_factory import EnhancedUIModuleFactory
+
+from smartcash.ui.core.decorators import suppress_ui_init_logs
+from .components.backbone_ui import create_backbone_ui
 from .configs.backbone_config_handler import BackboneConfigHandler
 from .configs.backbone_defaults import get_default_backbone_config
-from .operations.backbone_operation_manager import BackboneOperationManager
-from datetime import datetime
 
 
-class BackboneUIModule(UIModule):
+class BackboneUIModule(BaseUIModule):
     """
-    Implementasi UIModule untuk konfigurasi backbone model.
-    
-    Fitur:
-    - 🧬 Pemilihan dan konfigurasi backbone model
-    - 🏗️ Integrasi pipeline pelatihan dini
-    - 📊 Tampilan ringkasan model terkini  
-    - 🔧 Manajemen dan validasi konfigurasi
-    - 🎯 Integrasi dengan backend model builder
-    - 📋 Panel ringkasan konfigurasi di summary_container
-    - 🔄 Pelacakan progres untuk semua operasi
+    Backbone UI Module.
     """
-    
-    def __init__(self):
-        """Initialize backbone UI module."""
+    # Define required UI components at class level
+    _required_components = [
+        'main_container',
+        'header_container',
+        'form_container',
+        'action_container',
+        'operation_container'
+    ]
+
+    def __init__(self, enable_environment: bool = False):
+        """
+        Initialize the Backbone UI module.
+        
+        Args:
+            enable_environment: Whether to enable environment management features
+        """
+        # Call parent initializer with required parameters
         super().__init__(
             module_name='backbone',
-            parent_module='model'
+            parent_module='model',
+            enable_environment=enable_environment
         )
         
-        self.logger = get_module_logger("smartcash.ui.model.backbone")
+        # Initialize log buffer for pre-operation-container logs
+        self._log_buffer = []
         
-        # Initialize components
-        self._config_handler = None
-        self._operation_manager = None
-        self._ui_components = None
+        # Operation container reference for logging
+        self._operation_container = None
         
-        self.logger.debug("✅ BackboneUIModule diinisialisasi")
+        self.logger.debug("BackboneUIModule initialized.")
+
+    def get_default_config(self) -> Dict[str, Any]:
+        """Get default configuration for this module."""
+        return get_default_backbone_config()
+
+    def create_config_handler(self, config: Dict[str, Any]) -> BackboneConfigHandler:
+        """Creates a configuration handler instance."""
+        return BackboneConfigHandler(config)
+
+    def create_ui_components(self, config: Dict[str, Any]) -> Dict[str, Any]:
+        """Creates the UI components for the module."""
+        return create_backbone_ui(config=config)
+
+    def _register_default_operations(self) -> None:
+        """Register default operation handlers including backbone-specific operations."""
+        # Call parent method to register base operations
+        super()._register_default_operations()
+        
+        # Note: Dynamic button handler registration is now handled by BaseUIModule
     
-    def _initialize_config_handler(self, config: Optional[Dict[str, Any]] = None) -> None:
-        """Initialize configuration handler."""
+    def _get_module_button_handlers(self) -> Dict[str, Any]:
+        """Get Backbone module-specific button handlers."""
+        # Start with base handlers (save, reset)
+        handlers = {}
+        
+        # Add Backbone-specific handlers 
+        backbone_handlers = {
+            'validate': self._operation_validate,
+            'build': self._operation_build,
+            'save': self._handle_save_config,
+            'reset': self._handle_reset_config,
+        }
+        
+        handlers.update(backbone_handlers)
+        return handlers
+    
+    def _register_module_button_handlers(self) -> None:
+        """Register module-specific button handlers."""
         try:
-            self._config_handler = BackboneConfigHandler()
+            # Get module-specific handlers
+            module_handlers = self._get_module_button_handlers()
             
-            # Set initial configuration
+            # Register each handler
+            for button_id, handler in module_handlers.items():
+                self.register_button_handler(button_id, handler)
+                self.logger.debug(f"✅ Registered backbone button handler: {button_id}")
+            
+            # Setup button handlers after registering them
+            self._setup_button_handlers()
+            
+            self.logger.info(f"🎯 Registered {len(module_handlers)} backbone button handlers")
+            
+        except Exception as e:
+            self.logger.error(f"Failed to register module button handlers: {e}", exc_info=True)
+        
+    def _setup_operation_container(self) -> bool:
+        """
+        Set up the operation container for the module.
+        
+        Returns:
+            bool: True if setup was successful, False otherwise
+        """
+        try:
+            # Get the operation container from UI components
+            if not hasattr(self, '_ui_components') or not self._ui_components:
+                self.logger.error("UI components not available for operation container setup")
+                return False
+                
+            # Store reference to operation container
+            self._operation_container = self._ui_components.get('operation_container')
+            
+            if not self._operation_container:
+                self.logger.warning("Operation container not found in UI components")
+                return False
+                
+            # Flush any buffered logs to the operation container
+            self._flush_log_buffer()
+            
+            self.logger.debug("✅ Operation container setup complete")
+            return True
+            
+        except Exception as e:
+            self.logger.error(f"Failed to setup operation container: {e}", exc_info=True)
+            return False
+
+    @suppress_ui_init_logs(duration=3.0)
+    def initialize(self, config: Optional[Dict[str, Any]] = None, **kwargs) -> bool:
+        """
+        Initialize the Backbone module.
+        
+        Args:
+            config: Optional configuration dictionary
+            **kwargs: Additional initialization arguments
+            
+        Returns:
+            True if initialization was successful
+        """
+        try:
+            # Set config if provided before initialization
             if config:
-                merged_config = self._config_handler.merge_config(
-                    get_default_backbone_config(), config
-                )
-            else:
-                merged_config = get_default_backbone_config()
+                self._user_config = config
             
-            # Update config using keyword arguments
-            self.update_config(**merged_config)
-            self.logger.debug("✅ Handler konfigurasi diinisialisasi")
+            # Initialize using base class which handles everything
+            success = super().initialize()
             
-        except Exception as e:
-            self.logger.error(f"Gagal menginisialisasi handler konfigurasi: {e}")
-            raise
-    
-    def _initialize_operation_manager(self) -> None:
-        """Initialize operation manager."""
-        try:
-            if not self._ui_components:
-                raise RuntimeError("Komponen UI harus dibuat terlebih dahulu sebelum operation manager")
-            
-            operation_container = self._ui_components.get('operation_container')
-            if not operation_container:
-                raise RuntimeError("Container operasi tidak ditemukan dalam komponen UI")
-            
-            self._operation_manager = BackboneOperationManager(
-                config=self.get_config(),
-                operation_container=operation_container
-            )
-            
-            self._operation_manager.initialize()
-            
-            # Setup UI logging bridge to capture backend service logs
-            self._setup_ui_logging_bridge(operation_container)
-            
-            # Initialize progress tracker display
-            self._initialize_progress_display()
-            
-            self.logger.debug("✅ Manajer operasi diinisialisasi")
-            
-        except Exception as e:
-            self.logger.error(f"Gagal menginisialisasi manajer operasi: {e}")
-            raise
-    
-    def _setup_button_handlers(self) -> None:
-        """Setup button click handlers for UI operations."""
-        try:
-            if not self._ui_components or not self._operation_manager:
-                self.logger.warning("Tidak dapat menyiapkan tombol - komponen belum diinisialisasi")
-                return
-            
-            action_container = self._ui_components.get('containers', {}).get('action')
-            if not action_container:
-                self.logger.warning("Container aksi tidak ditemukan untuk pengaturan tombol")
-                return
-            
-            # Setup button click handlers with synchronous wrappers
-            buttons = action_container.get('buttons', {})
-            
-            if 'validate' in buttons:
-                buttons['validate'].on_click(self._handle_validate)
+            if success:
+                # Set UI components in config handler for extraction
+                if self._config_handler and hasattr(self._config_handler, 'set_ui_components'):
+                    self._config_handler.set_ui_components(self._ui_components)
                 
-            if 'build' in buttons:
-                buttons['build'].on_click(self._handle_build)
-            
-            # Setup save/reset button handlers
-            if 'save' in buttons:
-                buttons['save'].on_click(self._handle_save_config)
+                # Setup operation container reference for logging
+                self._setup_operation_container()
                 
-            if 'reset' in buttons:
-                buttons['reset'].on_click(self._handle_reset_config)
+                # Register module-specific button handlers
+                self._register_module_button_handlers()
+                
+                # Flush any buffered logs to operation container
+                self._flush_log_buffer()
+                
+                # Log initialization completion (Operation Checklist 3.2)
+                self.log("🧬 Backbone module siap digunakan", 'info')
+                self.log("✅ Semua fitur backbone tersedia", 'success')
+                
+                # Log module readiness
+                self.log("🏗️ Modul backbone siap digunakan", 'info')
+                
+                self.logger.debug("✅ Backbone module initialization completed")
             
-            self.logger.debug("✅ Pengaturan penangan tombol selesai")
+            return success
             
         except Exception as e:
-            self.logger.error(f"Gagal menyiapkan penangan tombol: {e}")
-    
-    
-    def _handle_validate(self, button) -> None:
-        """Synchronous handler for validate button."""
-        try:
-            if not self._operation_manager:
-                raise RuntimeError("Operation manager not available")
+            self.logger.error(f"Failed to initialize Backbone module: {e}")
+            return False
+
+    def _operation_validate(self, button=None) -> Dict[str, Any]:  # noqa: ARG002
+        """Handle validation operation with backend integration."""
+        def validate_data():
+            # Ensure UI components are ready first
+            if not hasattr(self, '_ui_components') or not self._ui_components:
+                return {'valid': False, 'message': "Komponen UI belum siap, silakan coba lagi"}
             
-            # Disable only validate button during operation
-            self._disable_validate_button()
-            
-            # Clear UI state
-            self._clear_ui_state()
-            
-            # Check prerequisites before validation
-            prereq_check = self._check_data_prerequisites_sync()
+            # Check data prerequisites
+            prereq_check = self._check_data_prerequisites()
             if not prereq_check['success']:
-                self._operation_manager.log(f"⚠️ Pemeriksaan prasyarat: {prereq_check['message']}", 'warning')
-                # Continue with validation even if data is missing - just warn user
+                return {'valid': False, 'message': f"Prerequisites missing: {prereq_check['message']}"}
             
-            # Get current configuration from UI
-            current_config = self._get_current_ui_config()
+            return {'valid': True}
+        
+        def execute_validate():
+            self.log("🔍 Memulai validasi konfigurasi backbone...", 'info')
+            return self._execute_validate_operation()
+        
+        return self._execute_operation_with_wrapper(
+            operation_name="Validasi Backbone",
+            operation_func=execute_validate,
+            button=button,
+            validation_func=validate_data,
+            success_message="Validasi backbone berhasil diselesaikan",
+            error_message="Kesalahan validasi backbone"
+        )
+
+    def _operation_build(self, button=None) -> Dict[str, Any]:  # noqa: ARG002
+        """Handle build operation with backend integration."""
+        def validate_build():
+            # Ensure UI components are ready first
+            if not hasattr(self, '_ui_components') or not self._ui_components:
+                return {'valid': False, 'message': "Komponen UI belum siap, silakan coba lagi"}
             
-            # Execute validation
-            result = self._operation_manager.execute_validate(current_config)
-            
-            # Update summary with validation results if successful
-            if result.get('success'):
-                self._update_summary_display_sync()
-                
-        except Exception as e:
-            self.logger.error(f"Kesalahan pada penangan validasi: {e}")
-            if self._operation_manager:
-                self._operation_manager.log(f"❌ Kesalahan validasi: {e}", 'error')
-        finally:
-            # Re-enable validate button
-            self._enable_validate_button()
-    
-    def _handle_build(self, button) -> None:
-        """Synchronous handler for build button."""
-        try:
-            if not self._operation_manager:
-                raise RuntimeError("Operation manager not available")
-            
-            # Disable only build button during operation
-            self._disable_build_button()
-            
-            # Clear UI state
-            self._clear_ui_state()
-            
-            # Check prerequisites before build
-            prereq_check = self._check_data_prerequisites_sync()
+            # Check data prerequisites
+            prereq_check = self._check_data_prerequisites()
             if not prereq_check['success']:
-                self._operation_manager.log(f"❌ Prerequisites missing: {prereq_check['message']}", 'error')
-                return
+                return {'valid': False, 'message': f"Prerequisites missing: {prereq_check['message']}"}
             
-            # Get current configuration from UI
-            current_config = self._get_current_ui_config()
-            
-            # Execute build
-            result = self._operation_manager.execute_build(current_config)
-            
-            # Update summary with build results if successful
-            if result.get('success'):
-                self._update_summary_display_sync()
-                
-        except Exception as e:
-            self.logger.error(f"Build handler error: {e}")
-            if self._operation_manager:
-                self._operation_manager.log(f"❌ Build error: {e}", 'error')
-        finally:
-            # Re-enable build button
-            self._enable_build_button()
-    
-    def _clear_ui_state(self) -> None:
-        """Clear UI state before operations."""
-        try:
-            if self._operation_manager:
-                self._operation_manager.clear_logs()
-                self._operation_manager.update_progress(0, "Initializing...")
-                
-        except Exception as e:
-            self.logger.error(f"Error clearing UI state: {e}")
-    
-    def _get_current_ui_config(self) -> Dict[str, Any]:
-        """Get current configuration from UI widgets."""
-        try:
-            current_config = self.get_config().copy()
-            
-            # Get widget values if available
-            widgets = self._ui_components.get('widgets', {})
-            if widgets:
-                backbone_config = current_config.setdefault('backbone', {})
-                
-                # Update backbone config from widgets
-                if 'backbone_dropdown' in widgets:
-                    backbone_config['model_type'] = widgets['backbone_dropdown'].value
-                if 'pretrained_checkbox' in widgets:
-                    backbone_config['pretrained'] = widgets['pretrained_checkbox'].value
-                if 'feature_opt_checkbox' in widgets:
-                    backbone_config['feature_optimization'] = widgets['feature_opt_checkbox'].value
-                if 'mixed_precision_checkbox' in widgets:
-                    backbone_config['mixed_precision'] = widgets['mixed_precision_checkbox'].value
-                if 'input_size_slider' in widgets:
-                    backbone_config['input_size'] = widgets['input_size_slider'].value
-                if 'num_classes_input' in widgets:
-                    backbone_config['num_classes'] = widgets['num_classes_input'].value
-            
-            return current_config
-            
-        except Exception as e:
-            self.logger.error(f"Error getting UI config: {e}")
-            return self.get_config().copy()
-    
-    def _update_summary_display_sync(self) -> None:
-        """Update summary container with current model info (synchronous)."""
-        try:
-            if not self._operation_manager:
-                return
-                
-            # Get current model summary
-            model_info = self._operation_manager.get_current_model_summary()
-            
-            # Update summary container
-            summary_container = self._ui_components.get('summary_container')
-            if summary_container and model_info:
-                from .components.backbone_ui import update_model_summary
-                update_model_summary(summary_container, model_info)
-                
-        except Exception as e:
-            self.logger.error(f"Error updating summary display: {e}")
-    
-    def _handle_save_config(self, button) -> None:
-        """Handle save config button click."""
-        try:
-            if not self._operation_manager:
-                self.logger.warning("Operation manager not available for logging")
-                return
-            
-            # Get current UI configuration
-            current_config = self._get_current_ui_config()
-            
-            # Update the module configuration using individual keys
-            for key, value in current_config.items():
-                self._config[key] = value
-            
-            # Log success message
-            if self._operation_manager:
-                self._operation_manager.log("💾 Configuration saved successfully", 'success')
-            
-            # Status updates are now handled via logging
-            
-            self.logger.info("Configuration saved successfully")
-            
-        except Exception as e:
-            error_msg = f"Failed to save configuration: {e}"
-            self.logger.error(error_msg)
-            if self._operation_manager:
-                self._operation_manager.log(f"❌ {error_msg}", 'error')
-            self._update_header_status("Save failed", "error")
-    
-    def _handle_reset_config(self, button) -> None:
-        """Handle reset config button click."""
-        try:
-            if not self._operation_manager:
-                self.logger.warning("Operation manager not available for logging")
-                return
-            
-            # Reset to default configuration
-            from .configs.backbone_defaults import get_default_backbone_config
-            default_config = get_default_backbone_config()
-            
-            # Update module configuration using individual keys
-            for key, value in default_config.items():
-                self._config[key] = value
-            
-            # Update UI widgets with default values
-            self._update_ui_widgets_from_config(default_config)
-            
-            # Log success message
-            if self._operation_manager:
-                self._operation_manager.log("🔄 Configuration reset to defaults", 'info')
-            
-            # Status updates are now handled via logging
-            
-            self.logger.info("Configuration reset to defaults")
-            
-        except Exception as e:
-            error_msg = f"Failed to reset configuration: {e}"
-            self.logger.error(error_msg)
-            if self._operation_manager:
-                self._operation_manager.log(f"❌ {error_msg}", 'error')
-            self._update_header_status("Reset failed", "error")
-    
-    def _check_data_prerequisites_sync(self) -> Dict[str, Any]:
-        """Check if all required data is available (synchronous)."""
+            return {'valid': True}
+        
+        def execute_build():
+            self.log("🏗️ Memulai pembangunan model backbone...", 'info')
+            return self._execute_build_operation()
+        
+        return self._execute_operation_with_wrapper(
+            operation_name="Pembangunan Model",
+            operation_func=execute_build,
+            button=button,
+            validation_func=validate_build,
+            success_message="Pembangunan model berhasil diselesaikan",
+            error_message="Kesalahan pembangunan model"
+        )
+
+    def _check_data_prerequisites(self) -> Dict[str, Any]:
+        """Check if all required data is available."""
         try:
             missing = []
             warnings = []
@@ -330,19 +249,14 @@ class BackboneUIModule(UIModule):
                 warnings.append("Pretrained models not found")
             
             # Check raw data using preprocessor API
-            raw_data_check = self._check_raw_data_sync()
+            raw_data_check = self._check_raw_data()
             if not raw_data_check['available']:
                 missing.append("Raw data not found")
             
             # Check preprocessed data
-            preprocessed_check = self._check_preprocessed_data_sync()
+            preprocessed_check = self._check_preprocessed_data()
             if not preprocessed_check['available']:
                 warnings.append("Preprocessed data not found")
-            
-            # Check augmented data
-            augmented_check = self._check_augmented_data_sync()
-            if not augmented_check['available']:
-                warnings.append("Augmented data not found")
             
             if missing:
                 return {
@@ -373,14 +287,14 @@ class BackboneUIModule(UIModule):
                 'missing': [],
                 'warnings': []
             }
-    
+
     def _check_pretrained_models(self) -> Dict[str, Any]:
         """Check if pretrained models are available."""
         try:
             from pathlib import Path
             
             pretrained_dir = Path('/data/pretrained')
-            backbone_config = self.get_config().get('backbone', {})
+            backbone_config = self.get_current_config().get('backbone', {})
             backbone_type = backbone_config.get('model_type', 'efficientnet_b4')
             
             # Check for backbone-specific pretrained models
@@ -402,14 +316,14 @@ class BackboneUIModule(UIModule):
         except Exception as e:
             self.logger.error(f"Error checking pretrained models: {e}")
             return {'available': False, 'path': '', 'files': 0}
-    
-    def _check_raw_data_sync(self) -> Dict[str, Any]:
-        """Check raw data using preprocessor API (synchronous)."""
+
+    def _check_raw_data(self) -> Dict[str, Any]:
+        """Check raw data using preprocessor API."""
         try:
             # Use preprocessor API to check raw data
-            from smartcash.dataset.preprocessor.api import get_preprocessing_status
+            from smartcash.dataset.preprocessor.api.preprocessing_api import get_preprocessing_status
             
-            status = get_preprocessing_status()
+            status = get_preprocessing_status(config=self.get_current_config())
             if status.get('success') and status.get('service_ready'):
                 file_stats = status.get('file_statistics', {})
                 
@@ -430,14 +344,14 @@ class BackboneUIModule(UIModule):
         except Exception as e:
             self.logger.error(f"Error checking raw data: {e}")
             return {'available': False, 'total_files': 0, 'details': {}}
-    
-    def _check_preprocessed_data_sync(self) -> Dict[str, Any]:
-        """Check preprocessed data using preprocessor API (synchronous)."""
+
+    def _check_preprocessed_data(self) -> Dict[str, Any]:
+        """Check preprocessed data using preprocessor API."""
         try:
             # Use preprocessor API to check preprocessed data
-            from smartcash.dataset.preprocessor.api import get_preprocessing_status
+            from smartcash.dataset.preprocessor.api.preprocessing_api import get_preprocessing_status
             
-            status = get_preprocessing_status()
+            status = get_preprocessing_status(config=self.get_current_config())
             if status.get('success') and status.get('service_ready'):
                 file_stats = status.get('file_statistics', {})
                 
@@ -458,404 +372,92 @@ class BackboneUIModule(UIModule):
         except Exception as e:
             self.logger.error(f"Error checking preprocessed data: {e}")
             return {'available': False, 'total_files': 0, 'details': {}}
-    
-    def _check_augmented_data_sync(self) -> Dict[str, Any]:
-        """Check augmented data using augmentor API (synchronous)."""
+
+    # ==================== OPERATION EXECUTION METHODS ====================
+
+    def _execute_validate_operation(self) -> Dict[str, Any]:
+        """Execute the validation operation using operation handler."""
         try:
-            # Use augmentor API to check augmented data
-            from smartcash.dataset.augmentor import get_augmentation_status
+            from .operations.backbone_validate_operation import BackboneValidateOperationHandler
             
-            status = get_augmentation_status({})
-            if status.get('service_ready'):
-                # Check for augmented files across splits
-                total_augmented = 0
-                for split in ['train', 'valid', 'test']:
-                    total_augmented += status.get(f'{split}_augmented', 0)
-                
-                return {
-                    'available': total_augmented > 0,
-                    'total_files': total_augmented,
-                    'details': status
-                }
+            # Create handler with current UI components and config
+            handler = BackboneValidateOperationHandler(
+                ui_module=self,
+                config=self.get_current_config(),
+                callbacks={'on_success': self._update_operation_summary}
+            )
             
-            return {'available': False, 'total_files': 0, 'details': {}}
+            # Execute the operation
+            result = handler.execute()
+            
+            # Return standardized result
+            if result and result.get('success'):
+                return {'success': True, 'message': 'Validasi berhasil diselesaikan'}
+            else:
+                error_msg = result.get('message', 'Validasi gagal') if result else 'Validasi gagal'
+                return {'success': False, 'message': error_msg}
             
         except Exception as e:
-            self.logger.error(f"Error checking augmented data: {e}")
-            return {'available': False, 'total_files': 0, 'details': {}}
-    
-    def _disable_validate_button(self) -> None:
-        """Disable only validate button during validation."""
+            return {'success': False, 'message': f"Error in validation operation: {e}"}
+
+    def _execute_build_operation(self) -> Dict[str, Any]:
+        """Execute the build operation using operation handler."""
         try:
-            action_container = self._ui_components.get('containers', {}).get('action')
-            if action_container:
-                buttons = action_container.get('buttons', {})
-                
-                if 'validate' in buttons:
-                    buttons['validate'].disabled = True
-                    buttons['validate'].description = '⏳ Validating...'
-                    
-        except Exception as e:
-            self.logger.error(f"Error disabling validate button: {e}")
-    
-    def _enable_validate_button(self) -> None:
-        """Re-enable validate button after validation."""
-        try:
-            action_container = self._ui_components.get('containers', {}).get('action')
-            if action_container:
-                buttons = action_container.get('buttons', {})
-                
-                if 'validate' in buttons:
-                    buttons['validate'].disabled = False
-                    buttons['validate'].description = '🔍 Validate'
-                    
-        except Exception as e:
-            self.logger.error(f"Error enabling validate button: {e}")
-    
-    def _disable_build_button(self) -> None:
-        """Disable only build button during build."""
-        try:
-            action_container = self._ui_components.get('containers', {}).get('action')
-            if action_container:
-                buttons = action_container.get('buttons', {})
-                
-                if 'build' in buttons:
-                    buttons['build'].disabled = True
-                    buttons['build'].description = '⏳ Building...'
-                    
-        except Exception as e:
-            self.logger.error(f"Error disabling build button: {e}")
-    
-    def _enable_build_button(self) -> None:
-        """Re-enable build button after build."""
-        try:
-            action_container = self._ui_components.get('containers', {}).get('action')
-            if action_container:
-                buttons = action_container.get('buttons', {})
-                
-                if 'build' in buttons:
-                    buttons['build'].disabled = False
-                    buttons['build'].description = '🏗️ Build Model'
-                    
-        except Exception as e:
-            self.logger.error(f"Error enabling build button: {e}")
-    
-    # Header status panel functionality has been removed
-    # Use self.logger or self._operation_manager.log for status updates instead
-    
-    def _update_ui_widgets_from_config(self, config: Dict[str, Any]) -> None:
-        """Update UI widgets with values from config."""
-        try:
-            widgets = self._ui_components.get('widgets', {})
-            backbone_config = config.get('backbone', {})
+            from .operations.backbone_build_operation import BackboneBuildOperationHandler
             
-            if 'backbone_dropdown' in widgets:
-                widgets['backbone_dropdown'].value = backbone_config.get('model_type', 'efficientnet_b4')
-            if 'pretrained_checkbox' in widgets:
-                widgets['pretrained_checkbox'].value = backbone_config.get('pretrained', True)
-            if 'feature_opt_checkbox' in widgets:
-                widgets['feature_opt_checkbox'].value = backbone_config.get('feature_optimization', True)
-            if 'mixed_precision_checkbox' in widgets:
-                widgets['mixed_precision_checkbox'].value = backbone_config.get('mixed_precision', True)
-            if 'input_size_slider' in widgets:
-                widgets['input_size_slider'].value = backbone_config.get('input_size', 640)
-            if 'num_classes_input' in widgets:
-                widgets['num_classes_input'].value = backbone_config.get('num_classes', 7)
-                
+            # Create handler with current UI components and config
+            handler = BackboneBuildOperationHandler(
+                ui_module=self,
+                config=self.get_current_config(),
+                callbacks={'on_success': self._update_operation_summary}
+            )
+            
+            # Execute the operation
+            result = handler.execute()
+            
+            # Return standardized result
+            if result and result.get('success'):
+                return {'success': True, 'message': 'Pembangunan model berhasil diselesaikan'}
+            else:
+                error_msg = result.get('message', 'Pembangunan model gagal') if result else 'Pembangunan model gagal'
+                return {'success': False, 'message': error_msg}
+            
         except Exception as e:
-            self.logger.error(f"Error updating UI widgets: {e}")
-            # Also log to operation container if available
-            if self._operation_manager:
-                self._operation_manager.log(f"⚠️ Warning: Could not update UI widgets - {e}", 'warning')
-    
-    def _setup_ui_logging_bridge(self, operation_container: Any) -> None:
-        """Setup UI logging bridge to capture backend service logs."""
+            return {'success': False, 'message': f"Error in build operation: {e}"}
+
+    def _update_operation_summary(self, content: str) -> None:
+        """Updates the operation summary container with new content."""
+        updater = self.get_component('operation_summary_updater')
+        if updater and callable(updater):
+            self.log(f"Memperbarui ringkasan operasi.", 'debug')
+            updater(content)
+        else:
+            self.log("Komponen updater ringkasan operasi tidak ditemukan atau tidak dapat dipanggil.", 'warning')
+
+    def _flush_log_buffer(self) -> None:
+        """Flush buffered logs to operation container."""
         try:
-            import logging
-            from smartcash.ui.core.logging.ui_logging_manager import setup_ui_logging
-            
-            # Get log message function from operation container
-            log_message_func = None
-            if isinstance(operation_container, dict) and 'log_message' in operation_container:
-                log_message_func = operation_container['log_message']
-            elif hasattr(operation_container, 'log_message'):
-                log_message_func = operation_container.log_message
-            
-            if not log_message_func:
-                self.logger.warning("⚠️ Could not setup UI logging bridge - log_message function not found")
+            if not hasattr(self, '_log_buffer') or not self._log_buffer:
+                return
+                
+            # Ensure operation container is available
+            if not hasattr(self, '_operation_container') or not self._operation_container:
+                self.logger.warning("⚠️ Operation container not available for log buffer flush")
                 return
             
-            # Setup basic UI logging for the module
-            setup_ui_logging(
-                module_name='model.backbone',
-                log_message_func=log_message_func
-            )
+            # Flush all buffered logs
+            for log_entry in self._log_buffer:
+                message, level = log_entry
+                self.log(message, level)
             
-            # Create custom handler for backend services
-            class BackendUILogHandler(logging.Handler):
-                """Custom handler to route backend service logs to UI."""
-                
-                def __init__(self, log_func: callable):
-                    super().__init__()
-                    self.log_func = log_func
-                    self.setLevel(logging.INFO)
-                    formatter = logging.Formatter('%(name)s: %(message)s')
-                    self.setFormatter(formatter)
-                
-                def emit(self, record):
-                    try:
-                        msg = self.format(record)
-                        level = 'debug' if record.levelno == logging.DEBUG else \
-                               'info' if record.levelno == logging.INFO else \
-                               'warning' if record.levelno == logging.WARNING else \
-                               'error'
-                        self.log_func(msg, level)
-                    except Exception:
-                        pass  # Silently handle logging errors
-            
-            # Create handler for backend services
-            backend_handler = BackendUILogHandler(log_message_func)
-            
-            # Configure backend service loggers
-            backend_namespaces = [
-                'smartcash.model',
-                'smartcash.dataset.preprocessor', 
-                'smartcash.dataset.augmentor',
-                'smartcash.common'
-            ]
-            
-            for namespace in backend_namespaces:
-                logger = logging.getLogger(namespace)
-                
-                # Remove existing console handlers to prevent duplicate output
-                for handler in logger.handlers[:]:
-                    if isinstance(handler, logging.StreamHandler):
-                        import sys
-                        if hasattr(handler, 'stream') and handler.stream in (sys.stdout, sys.stderr):
-                            logger.removeHandler(handler)
-                
-                # Add UI handler
-                logger.addHandler(backend_handler)
-                logger.setLevel(logging.INFO)
-            
-            self.logger.debug("✅ UI logging bridge setup completed for backend services")
-                
-        except ImportError as e:
-            self.logger.warning(f"⚠️ UI logging manager not available: {e}")
-        except Exception as e:
-            self.logger.error(f"Failed to setup UI logging bridge: {e}")
-    
-    def _initialize_progress_display(self) -> None:
-        """Initialize progress tracker display to show by default."""
-        try:
-            if not self._operation_manager:
-                return
-            
-            # Initialize progress tracker with default state
-            self._operation_manager.update_progress(0, "Ready - No operation running")
-            
-            # Log initial status to show the operation container is working
-            self._operation_manager.log("🧬 Backbone module ready", 'info')
-            self._operation_manager.log("📋 Progress tracker initialized", 'debug')
-            
-            self.logger.debug("✅ Progress display initialized")
+            # Clear the buffer after flushing
+            buffered_logs = len(self._log_buffer)
+            self._log_buffer.clear()
+            self.logger.debug(f"✅ Flushed {buffered_logs} logs to operation container")
             
         except Exception as e:
-            self.logger.error(f"Error initializing progress display: {e}")
-    
-    def _create_ui_components(self, config: Dict[str, Any]) -> Dict[str, Any]:
-        """Create UI components."""
-        try:
-            from .components.backbone_ui import create_backbone_ui
-            
-            self.logger.debug("Creating backbone UI components...")
-            ui_components = create_backbone_ui(config)
-            
-            if not ui_components:
-                raise RuntimeError("Failed to create UI components")
-            
-            self.logger.debug(f"✅ Created {len(ui_components)} UI components")
-            return ui_components
-            
-        except Exception as e:
-            self.logger.error(f"Failed to create UI components: {e}")
-            raise
-    
-    def initialize(self, config: Optional[Dict[str, Any]] = None, **kwargs) -> None:
-        """
-        Initialize the backbone module.
-        
-        Args:
-            config: Optional configuration dictionary
-            **kwargs: Additional initialization arguments
-        """
-        try:
-            self.logger.info("🧬 Initializing backbone models module")
-            
-            # Initialize configuration handler
-            self._initialize_config_handler(config)
-            
-            # Create UI components
-            self._ui_components = self._create_ui_components(self.get_config())
-            
-            # Initialize operation manager
-            self._initialize_operation_manager()
-            
-            # Setup button click handlers
-            self._setup_button_handlers()
-            
-            # Register shared methods for cross-module integration
-            self._register_shared_methods()
-            
-            # Set status to READY to indicate successful initialization
-            self._status = ModuleStatus.READY
-            self._initialized_at = datetime.now()
-            self.logger.info("✅ Backbone models module initialized successfully")
-            
-        except Exception as e:
-            self.logger.error(f"Failed to initialize backbone module: {e}")
-            raise RuntimeError("Failed to create UI components")
-    
-    def _register_shared_methods(self) -> None:
-        """Register shared methods for cross-module integration."""
-        try:
-            from smartcash.ui.core.ui_module import SharedMethodRegistry
-            
-            # Register backbone operations
-            SharedMethodRegistry.register_method(
-                'backbone.execute_validate',
-                self.execute_validate,
-                description='Validate backbone configuration'
-            )
-            
-            SharedMethodRegistry.register_method(
-                'backbone.execute_build', 
-                self.execute_build,
-                description='Build backbone model'
-            )
-            
-            SharedMethodRegistry.register_method(
-                'backbone.get_model_summary',
-                self.get_model_summary,
-                description='Get current model summary'
-            )
-            
-            SharedMethodRegistry.register_method(
-                'backbone.get_config',
-                self.get_config,
-                description='Get backbone configuration'
-            )
-            
-            SharedMethodRegistry.register_method(
-                'backbone.update_config',
-                self.update_config,
-                description='Update backbone configuration'
-            )
-            
-            self.logger.debug("✅ Shared methods registered")
-            
-        except Exception as e:
-            self.logger.warning(f"Failed to register shared methods: {e}")
-    
-    # ==================== OPERATION METHODS ====================
-    
-    def execute_validate(self, config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-        """
-        Execute backbone validation operation.
-        
-        Args:
-            config: Optional configuration override
-            
-        Returns:
-            Validation result dictionary
-        """
-        try:
-            if not self.is_initialized():
-                self.initialize()
-            
-            if not self._operation_manager:
-                raise RuntimeError("Operation manager not available")
-            
-            return self._operation_manager.execute_validate(config)
-            
-        except Exception as e:
-            error_msg = f"Validation execution failed: {e}"
-            self.logger.error(error_msg)
-            return {'success': False, 'message': error_msg}
-    
-    def execute_build(self, config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-        """
-        Execute backbone build operation.
-        
-        Args:
-            config: Optional configuration override
-            
-        Returns:
-            Build result dictionary
-        """
-        try:
-            if not self.is_initialized():
-                self.initialize()
-            
-            if not self._operation_manager:
-                raise RuntimeError("Operation manager not available")
-            
-            return self._operation_manager.execute_build(config)
-            
-        except Exception as e:
-            error_msg = f"Build execution failed: {e}"
-            self.logger.error(error_msg)
-            return {'success': False, 'message': error_msg}
-    
-    def get_model_summary(self) -> Dict[str, Any]:
-        """
-        Get current model summary.
-        
-        Returns:
-            Current model summary dictionary
-        """
-        try:
-            if not self.is_initialized():
-                self.initialize()
-            
-            if not self._operation_manager:
-                raise RuntimeError("Operation manager not available")
-            
-            return self._operation_manager.get_current_model_summary()
-            
-        except Exception as e:
-            error_msg = f"Get summary failed: {e}"
-            self.logger.error(error_msg)
-            return {'status': 'error', 'message': error_msg}
-    
-    # ==================== STATUS AND INFO METHODS ====================
-    
-    def get_backbone_status(self) -> Dict[str, Any]:
-        """
-        Get current backbone module status.
-        
-        Returns:
-            Status information dictionary
-        """
-        try:
-            base_status = {
-                'initialized': self.is_initialized(),
-                'module_name': self.module_name,
-                'parent_module': self.parent_module,
-                'config_available': self._config_handler is not None,
-                'operations_available': self._operation_manager is not None
-            }
-            
-            if self._operation_manager:
-                operation_status = self._operation_manager.get_status()
-                base_status.update(operation_status)
-            
-            return base_status
-            
-        except Exception as e:
-            self.logger.error(f"Failed to get status: {e}")
-            return {'initialized': False, 'error': str(e)}
-    
+            self.logger.error(f"Failed to flush log buffer: {e}")
+
     def get_ui_components(self) -> Dict[str, Any]:
         """
         Get UI components dictionary.
@@ -864,132 +466,42 @@ class BackboneUIModule(UIModule):
             UI components dictionary
         """
         return self._ui_components or {}
-        
-    def is_initialized(self) -> bool:
-        """
-        Check if the module is initialized.
-        
-        Returns:
-            bool: True if the module is initialized and ready
-        """
-        return self._status == ModuleStatus.READY
-    
-    def save_config(self) -> Dict[str, Any]:
-        """
-        Save current configuration.
-        
-        Returns:
-            Save operation result
-        """
+
+    def _handle_save_config(self, button=None) -> Dict[str, Any]:  # noqa: ARG002
+        """Handle save configuration button click."""
         try:
-            if not self._config_handler:
-                raise RuntimeError("Config handler not available")
-            
-            # Sync config from UI if available
-            if self._ui_components:
-                ui_config = self._config_handler.sync_from_ui(self._ui_components)
-                if ui_config:
-                    self.update_config(ui_config)
-            
-            # Save configuration (implementation depends on storage strategy)
-            current_config = self.get_config()
-            
-            self.logger.info("📋 Configuration saved successfully")
-            return {
-                'success': True,
-                'message': 'Configuration saved successfully',
-                'config': current_config
-            }
-            
+            self.log("💾 Menyimpan konfigurasi backbone...", 'info')
+            result = self.save_config()
+            if result.get('success', True):
+                self.log("✅ Konfigurasi backbone berhasil disimpan", 'success')
+                return {'success': True, 'message': 'Configuration saved successfully'}
+            else:
+                self.log("❌ Gagal menyimpan konfigurasi backbone", 'error')
+                return {'success': False, 'message': result.get('message', 'Save failed')}
         except Exception as e:
-            error_msg = f"Failed to save config: {e}"
-            self.logger.error(error_msg)
-            return {'success': False, 'message': error_msg}
-    
-    def reset_config(self) -> Dict[str, Any]:
-        """
-        Reset configuration to defaults.
-        
-        Returns:
-            Reset operation result
-        """
+            self.log(f"❌ Error menyimpan konfigurasi: {e}", 'error')
+            return {'success': False, 'message': str(e)}
+
+    def _handle_reset_config(self, button=None) -> Dict[str, Any]:  # noqa: ARG002
+        """Handle reset configuration button click."""
         try:
-            if not self._config_handler:
-                raise RuntimeError("Config handler not available")
-            
-            # Reset to default configuration
-            default_config = get_default_backbone_config()
-            self.update_config(default_config)
-            
-            # Sync to UI if available
-            if self._ui_components:
-                self._config_handler.sync_to_ui(self._ui_components, default_config)
-            
-            self.logger.info("🔄 Configuration reset to defaults")
-            return {
-                'success': True,
-                'message': 'Configuration reset to defaults',
-                'config': default_config
-            }
-            
+            self.log("🔄 Reset konfigurasi backbone ke default...", 'info')
+            result = self.reset_config()
+            if result.get('success', True):
+                self.log("✅ Konfigurasi backbone berhasil direset", 'success')
+                return {'success': True, 'message': 'Configuration reset successfully'}
+            else:
+                self.log("❌ Gagal reset konfigurasi backbone", 'error')
+                return {'success': False, 'message': result.get('message', 'Reset failed')}
         except Exception as e:
-            error_msg = f"Failed to reset config: {e}"
-            self.logger.error(error_msg)
-            return {'success': False, 'message': error_msg}
-    
-    def cleanup(self) -> None:
-        """Cleanup module resources."""
-        try:
-            if self._operation_manager:
-                self._operation_manager.cleanup()
-            
-            # Cleanup UI logging bridge
-            self._cleanup_ui_logging_bridge()
-            
-            # Clear references
-            self._config_handler = None
-            self._operation_manager = None
-            self._ui_components = None
-            
-            super().cleanup()
-            
-        except Exception as e:
-            self.logger.error(f"Error during cleanup: {e}")
-    
-    def _cleanup_ui_logging_bridge(self) -> None:
-        """Cleanup UI logging bridge handlers."""
-        try:
-            import logging
-            from smartcash.ui.core.logging.ui_logging_manager import cleanup_ui_logging
-            
-            # Cleanup UI logging for this module
-            cleanup_ui_logging('model.backbone')
-            
-            # Remove custom handlers from backend services
-            backend_namespaces = [
-                'smartcash.model',
-                'smartcash.dataset.preprocessor', 
-                'smartcash.dataset.augmentor',
-                'smartcash.common'
-            ]
-            
-            for namespace in backend_namespaces:
-                logger = logging.getLogger(namespace)
-                # Remove all handlers that were added by this module
-                for handler in logger.handlers[:]:
-                    if hasattr(handler, 'log_func'):  # Our custom handler
-                        logger.removeHandler(handler)
-            
-            self.logger.debug("✅ UI logging bridge cleanup completed")
-                
-        except Exception as e:
-            self.logger.debug(f"Error during logging cleanup: {e}")
+            self.log(f"❌ Error reset konfigurasi: {e}", 'error')
+            return {'success': False, 'message': str(e)}
 
 
-# ==================== FACTORY FUNCTIONS ====================
+# ==================== MODULE INITIALIZATION ====================
 
 # Global instance for singleton pattern
-_backbone_uimodule_instance: Optional[BackboneUIModule] = None
+_backbone_module_instance: Optional[BackboneUIModule] = None
 
 
 def create_backbone_uimodule(
@@ -1032,94 +544,27 @@ def get_backbone_uimodule(
     Returns:
         BackboneUIModule singleton instance
     """
-    global _backbone_uimodule_instance
+    global _backbone_module_instance
     
-    if _backbone_uimodule_instance is None:
-        _backbone_uimodule_instance = create_backbone_uimodule(
+    if _backbone_module_instance is None:
+        _backbone_module_instance = create_backbone_uimodule(
             config=config,
             auto_initialize=auto_initialize,
             **kwargs
         )
     
-    return _backbone_uimodule_instance
+    return _backbone_module_instance
 
 
 def reset_backbone_uimodule() -> None:
-    """Reset the backbone UIModule singleton instance."""
-    global _backbone_uimodule_instance
-    
-    if _backbone_uimodule_instance:
-        _backbone_uimodule_instance.cleanup()
-        _backbone_uimodule_instance = None
-
-
-# ==================== CONVENIENCE FUNCTIONS ====================
-
-def initialize_backbone_ui(
-    config: Optional[Dict[str, Any]] = None,
-    display: bool = True,
-    **kwargs
-) -> Optional[Dict[str, Any]]:
-    """
-    Initialize and display the backbone UI.
-    
-    Args:
-        config: Optional configuration dictionary
-        display: Whether to display the UI immediately
-        **kwargs: Additional arguments
-        
-    Returns:
-        If display=True: Returns None (displays UI directly)
-        If display=False: Returns a dictionary with UI components and status
-    """
-    try:
-        # Get the module and UI components
-        module = get_backbone_uimodule(config=config, **kwargs)
-        ui_components = module.get_ui_components()
-        
-        # Prepare the result dictionary
-        result = {
-            'success': True,
-            'module': module,
-            'ui_components': ui_components,
-            'status': module.get_backbone_status()
-        }
-        
-        # Display the UI if requested
-        if display and ui_components:
-            from IPython import get_ipython
-            from IPython.display import display as ipython_display, clear_output
-            
-            # Clear any existing output
-            if get_ipython() is not None:
-                clear_output(wait=True)
-            
-            # Get the main UI container and display it
-            main_ui = ui_components.get('main_container')
-            if main_ui is not None:
-                try:
-                    # Get the widget using the show() method
-                    ui_widget = main_ui.show()
-                    # Display the widget
-                    ipython_display(ui_widget)
-                except Exception as e:
-                    # Fallback to simple display if anything goes wrong
-                    logger = get_module_logger("smartcash.ui.model.backbone")
-                    logger.error(f"Error displaying UI: {str(e)}")
-                    ipython_display(main_ui)
-                return None  # Don't return data when display=True
-        
-        return result
-        
-    except Exception as e:
-        # Always return a dictionary, even on error
-        return {
-            'success': False,
-            'error': str(e),
-            'module': None,
-            'ui_components': {},
-            'status': {}
-        }
+    """Reset the global Backbone UIModule instance."""
+    global _backbone_module_instance
+    if _backbone_module_instance:
+        try:
+            _backbone_module_instance.cleanup()
+        except Exception:
+            pass
+    _backbone_module_instance = None
 
 
 def get_backbone_components() -> Dict[str, Any]:
@@ -1136,60 +581,5 @@ def get_backbone_components() -> Dict[str, Any]:
         return {}
 
 
-# ==================== TEMPLATE REGISTRATION ====================
-
-def register_backbone_shared_methods() -> None:
-    """Register backbone shared methods for cross-module access."""
-    try:
-        from smartcash.ui.core.ui_module import SharedMethodRegistry
-        
-        # Register module factory functions
-        SharedMethodRegistry.register_method(
-            'backbone.create_module',
-            create_backbone_uimodule,
-            description='Create backbone UIModule instance'
-        )
-        
-        SharedMethodRegistry.register_method(
-            'backbone.get_module',
-            get_backbone_uimodule,
-            description='Get backbone UIModule singleton'
-        )
-        
-        SharedMethodRegistry.register_method(
-            'backbone.reset_module',
-            reset_backbone_uimodule,
-            description='Reset backbone UIModule singleton'
-        )
-        
-    except Exception as e:
-        # Silently fail if shared methods not available
-        pass
-
-
-def register_backbone_template() -> None:
-    """Register backbone module template."""
-    try:
-        from smartcash.ui.core.template_registry import register_template
-        
-        template_info = {
-            'name': 'backbone',
-            'title': '🧬 Backbone Models',
-            'description': 'Backbone model configuration with early training pipeline',
-            'category': 'model',
-            'factory_function': create_backbone_uimodule,
-            'config_function': get_default_backbone_config,
-            'singleton_function': get_backbone_uimodule,
-            'reset_function': reset_backbone_uimodule
-        }
-        
-        register_template('backbone', template_info)
-        
-    except Exception as e:
-        # Silently fail if template registry not available
-        pass
-
-
-# Auto-register shared methods and template
-register_backbone_shared_methods()
-register_backbone_template()
+# Create the initialize function using enhanced factory pattern
+initialize_backbone_ui = EnhancedUIModuleFactory.create_display_function(BackboneUIModule)

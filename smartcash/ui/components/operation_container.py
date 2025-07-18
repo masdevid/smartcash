@@ -497,15 +497,15 @@ class OperationContainer(BaseUIComponent):
                                     # Fallback to set_progress with error styling
                                     self.progress_tracker.set_progress(
                                         data.get('value', 0), 
-                                        level,
-                                        f"❌ {data.get('message', 'Error')}"
+                                        f"❌ {data.get('message', 'Error')}",
+                                        level
                                     )
                             else:
                                 # Normal progress update
                                 self.progress_tracker.set_progress(
                                     data.get('value', 0), 
-                                    level,
-                                    data.get('message', '')
+                                    data.get('message', ''),
+                                    level
                                 )
                         except Exception as e:
                             # Log error but don't break the UI

@@ -274,7 +274,13 @@ def execute_full_setup(config: Dict[str, Any],
             
             if not result.get('success', False):
                 error_msg = f"Setup failed at stage '{stage_name}': {result.get('error', 'Unknown error')}"
-                logger.error(error_msg)
+                
+                # Include traceback in logs if available
+                if 'traceback' in result:
+                    logger.error(f"{error_msg}\n\nTraceback:\n{result['traceback']}")
+                else:
+                    logger.error(error_msg)
+                    
                 return {
                     'success': False,
                     'failed_stage': stage_name,

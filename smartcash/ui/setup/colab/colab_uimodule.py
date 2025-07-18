@@ -322,8 +322,15 @@ class ColabUIModule(BaseUIModule):
                 self.log(f"✅ {operation_name} berhasil diselesaikan", 'success')
                 if post_success_callback:
                     post_success_callback(result)
-            
-            return result
+            else:
+                # Log the full error details including traceback if available
+                error_details = []
+                if 'error' in result:
+                    error_details.append(f"Error: {result['error']}")
+                if 'traceback' in result:
+                    error_details.append(f"\nTraceback:\n{result['traceback']}")
+                if error_details:
+                    self.logger.error("\n".join(error_details))
         
         return self._execute_operation_with_wrapper(
             operation_name=operation_name,

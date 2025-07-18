@@ -198,7 +198,8 @@ def _create_operation_container() -> Dict[str, Any]:
         show_dialog=True,
         show_logs=True,
         log_module_name="Colab",
-        log_namespace_filter='colab',
+        # Remove restrictive namespace filter to allow all logs through
+        # log_namespace_filter='colab',  # This was blocking logs
         progress_levels='dual'
     )
 

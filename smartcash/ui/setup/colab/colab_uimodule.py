@@ -148,13 +148,14 @@ class ColabUIModule(BaseUIModule):
                 # Setup operation container reference for backwards compatibility
                 self._setup_operation_container()
                 
-                # Button handlers are connected automatically by ButtonHandlerMixin
+                # Initialize operation factory
+                self._initialize_operation_factory()
                 
                 # Setup button phases for sequential operations
                 self._setup_button_phases()
                 
-                # Initialize operation factory
-                self._initialize_operation_factory()
+                # Re-setup button handlers after UI components are fully initialized
+                self._setup_colab_button_handlers()
                 
                 # Flush any buffered logs to operation container
                 self._flush_log_buffer()
@@ -182,10 +183,111 @@ class ColabUIModule(BaseUIModule):
         """Setup operation container reference for backwards compatibility."""
         try:
             if hasattr(self, '_ui_components') and self._ui_components:
-                self._operation_container = self._ui_components.get('operation_container')
-                self.logger.debug("✅ Operation container reference set up")
+                operation_container = self._ui_components.get('operation_container')
+                self._operation_container = operation_container
+                
+                # Set up proper logging bridge for the operation container
+                if operation_container:
+                    # If it's a dict, extract the actual container object
+                    if isinstance(operation_container, dict):
+                        container_obj = operation_container.get('container')
+                        if container_obj:
+                            self._operation_container = container_obj
+                            self.logger.debug("✅ Operation container reference set up from dict")
+                        else:
+                            self.logger.debug("✅ Operation container reference set up as dict")
+                    else:
+                        self.logger.debug("✅ Operation container reference set up as object")
+                else:
+                    self.logger.warning("⚠️ Operation container not found in UI components")
         except Exception as e:
             self.logger.error(f"Failed to setup operation container: {e}")
+    
+    def _setup_colab_button_handlers(self) -> None:
+        """Setup Colab-specific button handlers after UI components are initialized."""
+        try:
+            if not hasattr(self, '_ui_components') or not self._ui_components:
+                self.logger.warning("⚠️ UI components not available for button handler setup")
+                return
+            
+            # Get the setup button from UI components 
+            setup_button = None
+            button_candidates = [
+                'setup_button',
+                'primary_button', 
+                'colab_setup'
+            ]
+            
+            for button_id in button_candidates:
+                button = self._ui_components.get(button_id)
+                if button and hasattr(button, 'on_click'):
+                    setup_button = button
+                    self.logger.debug(f"✅ Found setup button: {button_id}")
+                    break
+            
+            if not setup_button:
+                self.logger.warning("⚠️ No setup button found in UI components")
+                # Try to find it in action container
+                action_container = self._ui_components.get('action_container')
+                if action_container and isinstance(action_container, dict):
+                    buttons = action_container.get('buttons', {})
+                    setup_button = buttons.get('colab_setup')
+                    if setup_button:
+                        self.logger.debug("✅ Found setup button in action container")
+            
+            if setup_button and hasattr(setup_button, 'on_click'):
+                # Register the handler with debug wrapper
+                def debug_handler(button):
+                    self.logger.info("🔥 BUTTON CLICKED! Processing setup button...")
+                    try:
+                        result = self._handle_setup_button(button)
+                        self.logger.info(f"✅ Button handler completed: {result}")
+                        return result
+                    except Exception as e:
+                        self.logger.error(f"❌ Button handler failed: {e}", exc_info=True)
+                        raise
+                
+                # Use on_click to register the handler
+                setup_button.on_click(debug_handler)
+                self.logger.info("✅ Colab setup button handler registered successfully with debug wrapper")
+                
+                # Verify registration by checking if we can call the handler
+                try:
+                    # Test if the handler was registered by checking widget attributes
+                    if hasattr(setup_button, '_click_handlers'):
+                        handler_count = len(setup_button._click_handlers)
+                        self.logger.info(f"📊 Button now has {handler_count} click handlers")
+                    elif hasattr(setup_button, '_model_id'):
+                        self.logger.info(f"📊 Button widget model ID: {setup_button._model_id}")
+                    else:
+                        self.logger.info("📊 Button widget registered (no _click_handlers attribute)")
+                except Exception as e:
+                    self.logger.debug(f"Could not check handler registration: {e}")
+                
+                # Update button state
+                if hasattr(setup_button, 'description'):
+                    self.logger.debug(f"Setup button description: {setup_button.description}")
+                    
+            else:
+                self.logger.error("❌ Setup button not found or missing on_click method")
+                
+                # Debug: List all available UI components
+                ui_keys = list(self._ui_components.keys())
+                self.logger.debug(f"Available UI components: {ui_keys}")
+                
+                # Check for buttons with on_click methods
+                buttons_with_onclick = []
+                for key, component in self._ui_components.items():
+                    if hasattr(component, 'on_click'):
+                        buttons_with_onclick.append(key)
+                
+                if buttons_with_onclick:
+                    self.logger.debug(f"Components with on_click: {buttons_with_onclick}")
+                else:
+                    self.logger.warning("No components with on_click method found")
+                    
+        except Exception as e:
+            self.logger.error(f"Failed to setup Colab button handlers: {e}", exc_info=True)
     
     def _initialize_operation_factory(self) -> None:
         """Initialize the operation factory with current config."""
@@ -282,6 +384,11 @@ class ColabUIModule(BaseUIModule):
             if not self._log_buffer:
                 return
                 
+            # Ensure operation container is available
+            if not hasattr(self, '_operation_container') or not self._operation_container:
+                self.logger.warning("⚠️ Operation container not available for log buffer flush")
+                return
+                
             # Display all buffered logs to operation container
             for log_entry in self._log_buffer:
                 message, level = log_entry
@@ -289,6 +396,7 @@ class ColabUIModule(BaseUIModule):
             
             # Clear the buffer
             self._log_buffer.clear()
+            self.logger.debug(f"✅ Flushed {len(self._log_buffer)} buffered logs to operation container")
             
         except Exception as e:
             self.logger.debug(f"Failed to flush log buffer: {e}")

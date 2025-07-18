@@ -40,9 +40,6 @@ class DependencyUIModule(BaseUIModule):
         # Ensure the logger is properly initialized with the module namespace
         self._update_logging_context()
         
-        # Set the module namespace explicitly
-        self._module_namespace = 'smartcash.ui.setup.dependency'
-        
         # Log initialization with the explicit namespace
         self.logger.debug(f"🔄 Initializing DependencyUIModule (namespace: {self._module_namespace})")
         

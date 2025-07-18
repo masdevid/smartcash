@@ -31,6 +31,13 @@ class PreprocessingUIModule(BaseUIModule):
             'action_container',
             'operation_container'
         ]
+        
+        # Initialize log buffer for pre-operation-container logs
+        self._log_buffer = []
+        
+        # Operation container reference for logging
+        self._operation_container = None
+        
         self.logger.debug("PreprocessingUIModule initialized.")
 
     def get_default_config(self) -> Dict[str, Any]:
@@ -90,6 +97,23 @@ class PreprocessingUIModule(BaseUIModule):
                 # Set UI components in config handler for extraction
                 if self._config_handler and hasattr(self._config_handler, 'set_ui_components'):
                     self._config_handler.set_ui_components(self._ui_components)
+                
+                # Setup operation container reference for logging
+                self._setup_operation_container()
+                
+                # Re-setup button handlers after UI components are fully initialized
+                self._setup_preprocessing_button_handlers()
+                
+                # Flush any buffered logs to operation container
+                self._flush_log_buffer()
+                
+                # Log initialization completion (Operation Checklist 3.2)
+                self.log("🧹 Preprocessing module siap digunakan", 'info')
+                self.log("✅ Semua fitur preprocessing tersedia", 'success')
+                
+                # Update status panel (Operation Checklist 7.1)
+                self.log("📊 Status: Siap untuk preprocessing dataset", 'info')
+                self.update_operation_status("Siap untuk preprocessing dataset", "info")
                 
                 self.logger.debug("✅ Preprocessing module initialization completed")
             
@@ -372,6 +396,140 @@ class PreprocessingUIModule(BaseUIModule):
             
         except Exception as e:
             return {'success': False, 'message': f"Error in cleanup operation: {e}"}
+
+    def _setup_operation_container(self) -> None:
+        """Setup operation container reference for backwards compatibility."""
+        try:
+            if hasattr(self, '_ui_components') and self._ui_components:
+                operation_container = self._ui_components.get('operation_container')
+                self._operation_container = operation_container
+                
+                # Set up proper logging bridge for the operation container
+                if operation_container:
+                    # If it's a dict, extract the actual container object
+                    if isinstance(operation_container, dict):
+                        container_obj = operation_container.get('container')
+                        if container_obj:
+                            self._operation_container = container_obj
+                            self.logger.debug("✅ Operation container reference set up from dict")
+                        else:
+                            self.logger.debug("✅ Operation container reference set up as dict")
+                    else:
+                        self.logger.debug("✅ Operation container reference set up as object")
+                else:
+                    self.logger.warning("⚠️ Operation container not found in UI components")
+            else:
+                self.logger.warning("⚠️ UI components not available for operation container setup")
+                
+        except Exception as e:
+            self.logger.error(f"Failed to setup operation container: {e}")
+
+    def _setup_preprocessing_button_handlers(self) -> None:
+        """Setup Preprocessing-specific button handlers after UI components are initialized."""
+        try:
+            if not hasattr(self, '_ui_components') or not self._ui_components:
+                self.logger.warning("⚠️ UI components not available for button handler setup")
+                return
+            
+            # Get preprocessing buttons from UI components
+            button_candidates = [
+                'preprocess',
+                'check', 
+                'cleanup',
+                'save',
+                'reset'
+            ]
+            
+            handlers_registered = 0
+            
+            for button_id in button_candidates:
+                button = self._ui_components.get(button_id)
+                if button and hasattr(button, 'on_click'):
+                    # Get the handler method
+                    handler_method = getattr(self, f'_operation_{button_id}', None)
+                    if not handler_method:
+                        # Try the base class handlers
+                        handler_method = getattr(self, f'_handle_{button_id}', None)
+                    
+                    if handler_method:
+                        # Clear existing handlers
+                        button.on_click(None)
+                        
+                        # Create debug wrapper for the handler
+                        def create_debug_handler(btn_id, handler):
+                            def debug_handler(btn):
+                                self.logger.debug(f"🔘 Button '{btn_id}' clicked")
+                                try:
+                                    result = handler(btn)
+                                    self.logger.debug(f"✅ Button '{btn_id}' handler executed successfully")
+                                    return result
+                                except Exception as e:
+                                    self.logger.error(f"❌ Button '{btn_id}' handler failed: {e}")
+                                    raise
+                            return debug_handler
+                        
+                        # Register the handler with debug wrapper
+                        debug_handler = create_debug_handler(button_id, handler_method)
+                        button.on_click(debug_handler)
+                        handlers_registered += 1
+                        
+                        self.logger.debug(f"✅ Handler registered for button '{button_id}'")
+                    else:
+                        self.logger.warning(f"⚠️ No handler method found for button '{button_id}'")
+                else:
+                    self.logger.debug(f"🔍 Button '{button_id}' not found or not clickable")
+            
+            self.logger.debug(f"✅ Total button handlers registered: {handlers_registered}")
+            
+        except Exception as e:
+            self.logger.error(f"Failed to setup preprocessing button handlers: {e}")
+
+    def _flush_log_buffer(self) -> None:
+        """Flush buffered logs to operation container."""
+        try:
+            if not hasattr(self, '_log_buffer') or not self._log_buffer:
+                return
+                
+            # Ensure operation container is available
+            if not hasattr(self, '_operation_container') or not self._operation_container:
+                self.logger.warning("⚠️ Operation container not available for log buffer flush")
+                return
+            
+            # Flush all buffered logs
+            for log_entry in self._log_buffer:
+                message, level = log_entry
+                self.log(message, level)
+            
+            # Clear the buffer
+            self._log_buffer.clear()
+            self.logger.debug(f"✅ Flushed {len(self._log_buffer)} logs to operation container")
+            
+        except Exception as e:
+            self.logger.error(f"Failed to flush log buffer: {e}")
+
+    def log(self, message: str, level: str = 'info') -> None:
+        """
+        Log message with buffer handling for timing issues.
+        
+        Args:
+            message: Message to log
+            level: Log level (info, warning, error, debug)
+        """
+        try:
+            # If operation container is not ready, buffer the log
+            if not hasattr(self, '_operation_container') or not self._operation_container:
+                if not hasattr(self, '_log_buffer'):
+                    self._log_buffer = []
+                self._log_buffer.append((message, level))
+                return
+            
+            # Use the mixin log method
+            super().log(message, level)
+            
+        except Exception as e:
+            # Fallback to logger
+            if hasattr(self, 'logger'):
+                self.logger.debug(f"[{level.upper()}] {message}")
 
 
 def initialize_preprocessing_ui(display: bool = True, **kwargs: Any) -> PreprocessingUIModule:

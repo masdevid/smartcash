@@ -71,39 +71,42 @@ class SymlinkOperation(BaseColabOperation):
             
             for source, target in SYMLINK_MAP.items():
                 try:
-                    # Remove target if it exists and is not a symlink
-                    if os.path.exists(target) and not os.path.islink(target):
-                        if os.path.isdir(target):
-                            shutil.rmtree(target)
-                        else:
-                            os.remove(target)
-                        self.log(f"Removed existing target: {target}", 'info')
-                    
-                    # Remove existing symlink if it exists
-                    elif os.path.islink(target):
-                        os.unlink(target)
-                        self.log(f"Removed existing symlink: {target}", 'info')
+                    # Handle existing target with backup and content preservation
+                    backup_info = self._handle_existing_target(target)
                     
                     # Create parent directory for target if needed
                     os.makedirs(os.path.dirname(target), exist_ok=True)
                     
                     # Create symlink
                     os.symlink(source, target)
+                    
+                    # Copy backed up content to symlinked folder if backup exists
+                    if backup_info['backup_created']:
+                        self._restore_content_to_symlink(backup_info['backup_path'], target)
+                    
                     symlinks_created.append({
                         'source': source,
                         'target': target,
-                        'verified': os.path.islink(target) and os.path.exists(target)
+                        'verified': os.path.islink(target) and os.path.exists(target),
+                        'backup_info': backup_info
                     })
                     
                     self.log(f"✅ Symlink created: {source} → {target}", 'info')
+                    if backup_info['backup_created']:
+                        self.log(f"📦 Content restored from backup: {backup_info['files_copied']} files copied", 'info')
                     
                 except Exception as e:
+                    import traceback
+                    
                     symlinks_failed.append({
                         'source': source,
                         'target': target,
-                        'error': str(e)
+                        'error': str(e),
+                        'traceback': traceback.format_exc()
                     })
-                    self.log(f"❌ Symlink failed: {source} → {target}: {str(e)}", 'error')
+                    
+                    # Log with traceback for better debugging
+                    self.log_exception(f"Symlink gagal: {source} → {target}", e)
             
             # Step 3: Verify symlinks
             self.update_progress_safe(progress_callback, progress_steps[2]['progress'], progress_steps[2]['message'])
@@ -117,16 +120,255 @@ class SymlinkOperation(BaseColabOperation):
             verified_count = sum(1 for sl in symlinks_created if sl['verified'])
             success = len(symlinks_failed) == 0
             
-            return self.create_success_result(
-                f'Created {verified_count}/{total_symlinks} symbolic links',
-                symlinks_created=symlinks_created,
-                symlinks_failed=symlinks_failed,
-                verified_count=verified_count,
-                total_count=total_symlinks,
-                verification=verification
-            )
+            # Count backup and restore operations
+            backups_created = sum(1 for sl in symlinks_created if sl['backup_info']['backup_created'])
+            files_restored = sum(sl['backup_info']['files_copied'] for sl in symlinks_created if sl['backup_info']['backup_created'])
+            
+            if success:
+                success_msg = f'Created {verified_count}/{total_symlinks} symbolic links'
+                if backups_created > 0:
+                    success_msg += f' (backed up {backups_created} existing folders, restored {files_restored} files)'
+                
+                return self.create_success_result(
+                    success_msg,
+                    symlinks_created=symlinks_created,
+                    symlinks_failed=symlinks_failed,
+                    verified_count=verified_count,
+                    total_count=total_symlinks,
+                    backups_created=backups_created,
+                    files_restored=files_restored,
+                    verification=verification
+                )
+            else:
+                # Return error result with detailed failure information
+                failure_details = []
+                for failed in symlinks_failed:
+                    failure_details.append(f"  - {failed['source']} → {failed['target']}: {failed['error']}")
+                
+                error_msg = f"Gagal membuat {len(symlinks_failed)} dari {total_symlinks} symlinks"
+                detailed_error = f"{error_msg}\\n\\nDetail kesalahan:\\n" + "\\n".join(failure_details)
+                
+                # Clean up any temporary backups that weren't restored
+                self._cleanup_backup_files(symlinks_created, symlinks_failed)
+                
+                return self.create_error_result(
+                    detailed_error,
+                    symlinks_created=symlinks_created,
+                    symlinks_failed=symlinks_failed,
+                    verified_count=verified_count,
+                    total_count=total_symlinks,
+                    verification=verification
+                )
             
         return self.execute_with_error_handling(execute_operation)
+    
+    def _handle_existing_target(self, target: str) -> Dict[str, Any]:
+        """Handle existing target by backing it up if it's a directory.
+        
+        Args:
+            target: Target path for the symlink
+            
+        Returns:
+            Dictionary with backup information
+        """
+        backup_info = {
+            'backup_created': False,
+            'backup_path': None,
+            'target_type': None,
+            'files_copied': 0
+        }
+        
+        if not os.path.exists(target):
+            return backup_info
+        
+        # If it's already a symlink, just remove it
+        if os.path.islink(target):
+            os.unlink(target)
+            self.log(f"🔗 Removed existing symlink: {target}", 'info')
+            backup_info['target_type'] = 'symlink'
+            return backup_info
+        
+        # If it's a directory, back it up
+        if os.path.isdir(target):
+            backup_info['target_type'] = 'directory'
+            backup_info['backup_path'] = self._create_backup_directory(target)
+            backup_info['backup_created'] = True
+            self.log(f"📁 Backed up existing directory: {target} → {backup_info['backup_path']}", 'info')
+        
+        # If it's a file, back it up
+        elif os.path.isfile(target):
+            backup_info['target_type'] = 'file'
+            backup_info['backup_path'] = self._create_backup_file(target)
+            backup_info['backup_created'] = True
+            self.log(f"📄 Backed up existing file: {target} → {backup_info['backup_path']}", 'info')
+        
+        return backup_info
+    
+    def _create_backup_directory(self, target: str) -> str:
+        """Create backup of existing directory.
+        
+        Args:
+            target: Path to directory to backup
+            
+        Returns:
+            Path to backup directory
+        """
+        import tempfile
+        import time
+        
+        # Create temp directory for backup
+        temp_dir = tempfile.mkdtemp(prefix='smartcash_backup_')
+        backup_name = f"{os.path.basename(target)}_backup_{int(time.time())}"
+        backup_path = os.path.join(temp_dir, backup_name)
+        
+        # Move the directory to backup location
+        shutil.move(target, backup_path)
+        
+        return backup_path
+    
+    def _create_backup_file(self, target: str) -> str:
+        """Create backup of existing file.
+        
+        Args:
+            target: Path to file to backup
+            
+        Returns:
+            Path to backup file
+        """
+        import tempfile
+        import time
+        
+        # Create temp directory for backup
+        temp_dir = tempfile.mkdtemp(prefix='smartcash_backup_')
+        backup_name = f"{os.path.basename(target)}_backup_{int(time.time())}"
+        backup_path = os.path.join(temp_dir, backup_name)
+        
+        # Copy the file to backup location
+        shutil.copy2(target, backup_path)
+        
+        # Remove original file
+        os.remove(target)
+        
+        return backup_path
+    
+    def _restore_content_to_symlink(self, backup_path: str, target: str) -> None:
+        """Restore content from backup to symlinked directory.
+        
+        Args:
+            backup_path: Path to backup directory/file
+            target: Path to symlinked directory
+        """
+        try:
+            if not os.path.exists(backup_path):
+                return
+            
+            # If backup is a directory, copy its contents
+            if os.path.isdir(backup_path):
+                self._copy_directory_contents(backup_path, target)
+            
+            # If backup is a file, copy it to the symlinked directory
+            elif os.path.isfile(backup_path):
+                if os.path.isdir(target):
+                    dest_file = os.path.join(target, os.path.basename(backup_path).replace('_backup_', '_'))
+                    shutil.copy2(backup_path, dest_file)
+                    self.log(f"📄 Restored file: {dest_file}", 'info')
+            
+            # Clean up backup after successful restore
+            if os.path.isdir(backup_path):
+                shutil.rmtree(backup_path)
+            elif os.path.isfile(backup_path):
+                os.remove(backup_path)
+            
+        except Exception as e:
+            self.log(f"⚠️ Failed to restore content from backup: {str(e)}", 'warning')
+    
+    def _copy_directory_contents(self, source_dir: str, dest_dir: str) -> int:
+        """Copy contents of source directory to destination directory.
+        
+        Args:
+            source_dir: Source directory path
+            dest_dir: Destination directory path
+            
+        Returns:
+            Number of files copied
+        """
+        files_copied = 0
+        
+        try:
+            if not os.path.exists(dest_dir):
+                self.log(f"⚠️ Destination directory does not exist: {dest_dir}", 'warning')
+                return 0
+            
+            for root, _, files in os.walk(source_dir):
+                # Calculate relative path from source root
+                rel_path = os.path.relpath(root, source_dir)
+                
+                # Create corresponding directory in destination
+                if rel_path != '.':
+                    dest_subdir = os.path.join(dest_dir, rel_path)
+                    os.makedirs(dest_subdir, exist_ok=True)
+                
+                # Copy files
+                for file in files:
+                    src_file = os.path.join(root, file)
+                    if rel_path == '.':
+                        dest_file = os.path.join(dest_dir, file)
+                    else:
+                        dest_file = os.path.join(dest_dir, rel_path, file)
+                    
+                    try:
+                        shutil.copy2(src_file, dest_file)
+                        files_copied += 1
+                        self.log(f"📄 Copied: {file} → {os.path.relpath(dest_file, dest_dir)}", 'info')
+                    except Exception as e:
+                        self.log(f"⚠️ Failed to copy {file}: {str(e)}", 'warning')
+            
+            self.log(f"✅ Successfully copied {files_copied} files from backup", 'info')
+            
+        except Exception as e:
+            self.log(f"⚠️ Error copying directory contents: {str(e)}", 'warning')
+        
+        return files_copied
+    
+    def _cleanup_backup_files(self, symlinks_created: list, symlinks_failed: list) -> None:  # noqa: ARG002
+        """Clean up temporary backup files that weren't properly restored.
+        
+        Args:
+            symlinks_created: List of successfully created symlinks
+            symlinks_failed: List of failed symlinks
+        """
+        try:
+            # Clean up backups from failed operations
+            for failed in symlinks_failed:
+                if 'backup_info' in failed and failed['backup_info']['backup_created']:
+                    backup_path = failed['backup_info']['backup_path']
+                    if backup_path and os.path.exists(backup_path):
+                        try:
+                            if os.path.isdir(backup_path):
+                                shutil.rmtree(backup_path)
+                            else:
+                                os.remove(backup_path)
+                            self.log(f"🧹 Cleaned up backup: {backup_path}", 'info')
+                        except Exception as e:
+                            self.log(f"⚠️ Failed to cleanup backup {backup_path}: {str(e)}", 'warning')
+            
+            # Clean up any remaining temporary directories
+            import tempfile
+            temp_dir = tempfile.gettempdir()
+            for item in os.listdir(temp_dir):
+                if item.startswith('smartcash_backup_'):
+                    backup_path = os.path.join(temp_dir, item)
+                    try:
+                        if os.path.isdir(backup_path):
+                            shutil.rmtree(backup_path)
+                        else:
+                            os.remove(backup_path)
+                        self.log(f"🧹 Cleaned up orphaned backup: {backup_path}", 'info')
+                    except Exception as e:
+                        self.log(f"⚠️ Failed to cleanup orphaned backup {backup_path}: {str(e)}", 'warning')
+                        
+        except Exception as e:
+            self.log(f"⚠️ Error during backup cleanup: {str(e)}", 'warning')
     
     def _check_source_directories(self) -> list:
         """Check if source directories exist and return missing ones.
@@ -147,6 +389,6 @@ class SymlinkOperation(BaseColabOperation):
         Args:
             missing_dirs: List of missing directories to create
         """
-        created_dirs, failed_dirs = self.create_directories_batch(missing_dirs)
+        _, failed_dirs = self.create_directories_batch(missing_dirs)
         if failed_dirs:
             self.log(f"Failed to create {len(failed_dirs)} directories", 'warning')

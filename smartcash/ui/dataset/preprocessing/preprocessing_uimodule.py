@@ -4,7 +4,7 @@ File: smartcash/ui/dataset/preprocessing/preprocessing_uimodule.py
 Description: Final implementation of the Preprocessing Module using the modern BaseUIModule pattern.
 """
 
-from typing import Dict, Any, Optional, Callable, Tuple
+from typing import Dict, Any, Optional, Tuple
 
 from smartcash.ui.core.base_ui_module import BaseUIModule
 
@@ -267,49 +267,6 @@ class PreprocessingUIModule(BaseUIModule):
         if not hasattr(self, 'progress_display') or not self.progress_display:
             self._initialize_progress_display()
         super()._run_operation(operation_name, **kwargs)
-
-
-
-
-    def _operation_check(self, button: Any) -> None:
-        """Handles the check button click event."""
-        self.log("Memulai operasi pemeriksaan...", 'info')
-        self._run_operation(self._execute_check_operation, button)
-
-    def _operation_cleanup(self, button: Any) -> None:
-        """Handles the cleanup button click event by showing a confirmation dialog."""
-        self.log("Tombol pembersihan diklik.", 'info')
-        preprocessed_files, _ = self._get_preprocessed_data_stats()
-
-        op_container = self.get_component('operation_container')
-        if not op_container or not hasattr(op_container, 'show_dialog'):
-            self.log("Komponen dialog tidak tersedia, menjalankan pembersihan secara langsung.", 'warning')
-            self._run_operation(self._execute_cleanup_operation, button)
-            return
-
-        if preprocessed_files == 0:
-            self.log("Tidak ada data yang sudah diproses untuk dibersihkan.", 'info')
-            op_container.show_dialog(
-                title="Tidak Ada untuk Dibersihkan",
-                message="Tidak ada file yang dihasilkan oleh proses preprocessing yang ditemukan.",
-                confirm_text="OK",
-                on_cancel=None # No cancel button
-            )
-            return
-
-        self.log(f"Menampilkan dialog konfirmasi untuk membersihkan {preprocessed_files} file...", 'info')
-        message = (
-            f"Anda akan menghapus {preprocessed_files} file yang telah diproses.\n\n"
-            f"Tindakan ini tidak dapat diurungkan. Lanjutkan?"
-        )
-        op_container.show_dialog(
-            title="Konfirmasi Pembersihan",
-            message=message,
-            on_confirm=lambda: self._run_operation(self._execute_cleanup_operation, button),
-            confirm_text=f"Ya, Hapus {preprocessed_files} File",
-            cancel_text="Batal",
-            danger_mode=True
-        )
 
     def _get_preprocessed_data_stats(self) -> Tuple[int, int]:
         """Gets the count of preprocessed and raw files from the backend."""

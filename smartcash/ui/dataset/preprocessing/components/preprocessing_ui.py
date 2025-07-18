@@ -204,7 +204,8 @@ def create_preprocessing_ui_components(config: Optional[Dict[str, Any]] = None, 
         show_dialog=True,
         show_logs=True,
         progress_levels='dual',  # Enable dual progress for preprocessing operations
-        log_module_name=UI_CONFIG['module_name']
+        log_module_name=UI_CONFIG['module_name'],
+        log_namespace_filter='preprocessing'  # Allow preprocessing logs to be displayed
     )
     operation_widget = operation_dict.pop('container', None)
     ui_components.update(operation_dict)

@@ -79,12 +79,26 @@ class BaseColabOperation(LoggingMixin, OperationMixin):
         try:
             return operation_func(*args, **kwargs)
         except Exception as e:
+            import traceback
+            
             operation_name = self.module_name.replace('_', ' ').title()
             error_msg = f"{operation_name} failed: {str(e)}"
-            self.log(error_msg, 'error')
+            
+            # Get full traceback
+            tb_str = traceback.format_exc()
+            
+            # Log with traceback using the new method
+            if hasattr(self, 'log_exception'):
+                self.log_exception(f"Operasi gagal: {operation_name}", e)
+            else:
+                # Fallback to enhanced error logging
+                error_with_traceback = f"{error_msg}\n\n{tb_str}"
+                self.log(error_with_traceback, 'error')
+            
             return {
                 'success': False,
-                'error': error_msg
+                'error': error_msg,
+                'traceback': tb_str
             }
     
     def update_progress_safe(self, progress_callback: Optional[Callable], 
@@ -134,6 +148,13 @@ class BaseColabOperation(LoggingMixin, OperationMixin):
             'error': error
         }
         result.update(additional_data)
+        
+        # Log the error with traceback if available
+        if hasattr(self, 'log_exception') and 'traceback' in additional_data:
+            self.log_error(f"Operasi gagal: {error}", additional_data['traceback'])
+        else:
+            self.log_error(f"Operasi gagal: {error}")
+        
         return result
     
     def test_write_access(self, directory_path: str, test_filename: str = '.smartcash_write_test') -> bool:
@@ -546,7 +567,7 @@ class BaseColabOperation(LoggingMixin, OperationMixin):
             ],
             'symlink': [
                 {'progress': 10, 'message': '🔍 Checking symlink configuration...'},
-                {'progress': 30, 'message': '🔗 Creating symlinks...'},
+                {'progress': 30, 'message': '🔗 Creating symlinks and backing up existing folders...'},
                 {'progress': 70, 'message': '✅ Verifying symlinks...'},
                 {'progress': 100, 'message': '✅ Symlinks ready'}
             ],

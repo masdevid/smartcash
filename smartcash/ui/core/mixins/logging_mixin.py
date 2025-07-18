@@ -155,6 +155,22 @@ class LoggingMixin:
                 # Suppress print during normal operation to avoid console spam
                 pass
     
+    def log_exception(self, message: str, exception: Exception) -> None:
+        """Log exception with full traceback.
+        
+        Args:
+            message: Context message
+            exception: Exception object
+        """
+        import traceback
+        
+        # Get full traceback
+        tb_str = traceback.format_exc()
+        
+        # Format message with traceback
+        error_with_traceback = f"{message}\n\nError: {str(exception)}\n\n{tb_str}"
+        self.log(f"❌ {error_with_traceback}", 'error')
+    
     def update_operation_status(self, message: str, level: str = 'info') -> None:
         """
         Update operation status display.
@@ -303,9 +319,19 @@ class LoggingMixin:
         """Log warning message."""
         self.log(message, 'warning')
     
-    def log_error(self, message: str) -> None:
-        """Log error message."""
-        self.log(message, 'error')
+    def log_error(self, message: str, traceback: str = None) -> None:
+        """Log error message with optional traceback.
+        
+        Args:
+            message: Error message
+            traceback: Optional traceback string
+        """
+        if traceback:
+            # Format error with traceback for expansion
+            error_with_traceback = f"{message}\n\n{traceback}"
+            self.log(f"❌ {error_with_traceback}", 'error')
+        else:
+            self.log(f"❌ {message}", 'error')
     
     def log_debug(self, message: str) -> None:
         """Log debug message."""
@@ -323,9 +349,20 @@ class LoggingMixin:
         """Log operation completion."""
         self.log(f"✅ {operation_name} completed", 'info')
     
-    def log_operation_error(self, operation_name: str, error: str) -> None:
-        """Log operation error."""
-        self.log(f"❌ {operation_name} failed: {error}", 'error')
+    def log_operation_error(self, operation_name: str, error: str, traceback: str = None) -> None:
+        """Log operation error with optional traceback.
+        
+        Args:
+            operation_name: Name of the operation that failed
+            error: Error message
+            traceback: Optional traceback string
+        """
+        if traceback:
+            # Format error with traceback for expansion
+            error_with_traceback = f"{error}\n\n{traceback}"
+            self.log(f"❌ {operation_name} failed: {error_with_traceback}", 'error')
+        else:
+            self.log(f"❌ {operation_name} failed: {error}", 'error')
     
     def clear_logs(self) -> None:
         """Clear operation container logs."""

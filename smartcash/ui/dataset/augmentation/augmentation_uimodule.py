@@ -92,7 +92,7 @@ class AugmentationUIModule(BaseUIModule):
             'augment': self._operation_augment,
             'status': self._operation_check,  # Renamed from 'check' to 'status'
             'cleanup': self._operation_cleanup,
-            'generate_button': self._operation_generate_preview  # Live preview button
+            'generate': self._operation_generate_preview  # Live preview button
         }
         
         handlers.update(augmentation_handlers)

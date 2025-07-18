@@ -89,7 +89,10 @@ def _create_colab_ui_components(config: Dict[str, Any]) -> Tuple[Dict[str, Any],
     # Extract button references for proper registration
     # Only setup_button (primary one-click operation), save_button, and reset_button
     buttons_dict = action_container.get('buttons', {})
-    ui_components['setup_button'] = buttons_dict.get('colab_setup')
+    colab_setup_button = buttons_dict.get('colab_setup')
+    ui_components['setup_button'] = colab_setup_button
+    ui_components['primary_button'] = colab_setup_button  # Same button, multiple references
+    ui_components['colab_setup'] = colab_setup_button     # Original ID reference
     
     # Extract save/reset buttons from action container instance
     action_container_instance = action_container.get('action_container')
@@ -294,9 +297,11 @@ def create_colab_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> Dict[s
     footer_container = ui_components['footer_container']
     
     # Preserve the button references from the original ui_components
-    # Only the three required buttons: setup_button, save_button, reset_button
+    # Include all button references for proper handler registration
     button_refs = {
         'setup_button': ui_components.get('setup_button'),
+        'primary_button': ui_components.get('primary_button'),
+        'colab_setup': ui_components.get('colab_setup'),
         'save_button': ui_components.get('save_button'),
         'reset_button': ui_components.get('reset_button'),
         'set_phase': ui_components.get('set_phase'),

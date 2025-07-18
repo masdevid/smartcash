@@ -147,14 +147,20 @@ def create_dependency_ui_components(module_config: Dict[str, Any]) -> Dict[str, 
             'package_checkboxes': package_checkboxes,
             'custom_packages': custom_packages,
             
-            # Buttons (updated names)
-            'add_button': action_container['buttons'].get('add_packages'),
+            # Buttons - store both with and without _button suffix for handler compatibility
+            'install': action_container['buttons'].get('install'),
+            'check_status': action_container['buttons'].get('check_status'),
+            'update': action_container['buttons'].get('update'),
+            'uninstall': action_container['buttons'].get('uninstall'),
+            # Legacy names for backward compatibility
             'install_button': action_container['buttons'].get('install'),
             'check_button': action_container['buttons'].get('check_status'),
             'update_button': action_container['buttons'].get('update'),
             'uninstall_button': action_container['buttons'].get('uninstall'),
             
-            # Save/Reset buttons (from action container instance)
+            # Save/Reset buttons (from action container instance) - both with and without _button suffix
+            'save': getattr(action_container.get('action_container'), 'save_button', None) if action_container.get('action_container') else None,
+            'reset': getattr(action_container.get('action_container'), 'reset_button', None) if action_container.get('action_container') else None,
             'save_button': getattr(action_container.get('action_container'), 'save_button', None) if action_container.get('action_container') else None,
             'reset_button': getattr(action_container.get('action_container'), 'reset_button', None) if action_container.get('action_container') else None,
             

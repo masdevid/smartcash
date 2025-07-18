@@ -78,26 +78,39 @@ class ButtonHandlerMixin:
                 buttons[key] = widget
             
             # Log the buttons we found for debugging
-            if hasattr(self, 'logger') and buttons:
-                self.logger.debug(f"🔧 Found {len(buttons)} button(s) in UI components: {list(buttons.keys())}")
+            if hasattr(self, 'logger'):
+                if buttons:
+                    self.logger.info(f"🔧 Found {len(buttons)} button(s) in UI components: {list(buttons.keys())}")
+                    # Log button widget types for debugging
+                    for btn_id, btn_widget in buttons.items():
+                        widget_type = type(btn_widget).__name__ if btn_widget else "None"
+                        has_onclick = hasattr(btn_widget, 'on_click') if btn_widget else False
+                        self.logger.debug(f"  - {btn_id}: {widget_type} (has_on_click: {has_onclick})")
+                else:
+                    self.logger.warning("⚠️ No buttons found in UI components")
                     
             if not buttons:
-                if hasattr(self, 'logger'):
-                    self.logger.debug("No buttons found in UI components")
                 return
             
             # Setup registered handlers
             for button_id, handler in self._button_handlers.items():
+                if hasattr(self, 'logger'):
+                    self.logger.debug(f"🔍 Looking for button widget for handler '{button_id}'")
+                
                 # Try exact match first
                 button = buttons.get(button_id)
                 
                 # If not found, try with _button suffix
                 if button is None and f"{button_id}_button" in buttons:
                     button = buttons[f"{button_id}_button"]
+                    if hasattr(self, 'logger'):
+                        self.logger.debug(f"  - Found with _button suffix: {button_id}_button")
                 
                 # If still not found, try with btn_ prefix
                 if button is None and f"btn_{button_id}" in buttons:
                     button = buttons[f"btn_{button_id}"]
+                    if hasattr(self, 'logger'):
+                        self.logger.debug(f"  - Found with btn_ prefix: btn_{button_id}")
                 
                 if button and hasattr(button, 'on_click'):
                     # Wrap handler with error handling
@@ -106,6 +119,12 @@ class ButtonHandlerMixin:
                     
                     if hasattr(self, 'logger'):
                         self.logger.info(f"✅ Registered handler for button: {button_id}")
+                else:
+                    if hasattr(self, 'logger'):
+                        if button is None:
+                            self.logger.warning(f"⚠️ No button widget found for handler '{button_id}'")
+                        else:
+                            self.logger.warning(f"⚠️ Button widget for '{button_id}' has no on_click method")
                 
             # Setup default handlers if not already registered
             self._setup_default_button_handlers(buttons)

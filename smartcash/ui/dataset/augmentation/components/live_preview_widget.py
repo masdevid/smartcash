@@ -69,7 +69,7 @@ def create_live_preview_widget() -> Dict[str, Any]:
     # Widget mapping
     widgets_dict = {
         'preview_image': preview_image,
-        'generate_button': generate_button,
+        'generate': generate_button,
         'preview_status': preview_status
     }
     

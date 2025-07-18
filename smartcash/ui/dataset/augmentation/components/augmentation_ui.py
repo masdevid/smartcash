@@ -80,10 +80,10 @@ def _create_augment_ui_components(config: Dict[str, Any]) -> Tuple[Dict[str, Any
     preview_widget = form_widgets['widgets'].get('preview_widget')
     if preview_widget and isinstance(preview_widget, dict):
         preview_widgets = preview_widget.get('widgets', {})
-        generate_button = preview_widgets.get('generate_button')
+        generate_button = preview_widgets.get('generate')
         if generate_button:
-            ui_components['generate_button'] = generate_button
-            widgets_dict['generate_button'] = generate_button
+            ui_components['generate'] = generate_button
+            widgets_dict['generate'] = generate_button
     
     # 3. Create action buttons
     action_container = _create_action_buttons()
@@ -93,16 +93,26 @@ def _create_augment_ui_components(config: Dict[str, Any]) -> Tuple[Dict[str, Any
     ui_components['primary_button'] = action_container.get('primary_button')
     
     # Extract individual operation buttons from the buttons dictionary
+    # Store both with and without _button suffix for handler compatibility
     buttons_dict = action_container.get('buttons', {})
+    ui_components['augment'] = buttons_dict.get('augment')
+    ui_components['status'] = buttons_dict.get('status')
+    ui_components['cleanup'] = buttons_dict.get('cleanup')
+    # Legacy names for backward compatibility
     ui_components['augment_button'] = buttons_dict.get('augment')
     ui_components['status_button'] = buttons_dict.get('status') 
     ui_components['cleanup_button'] = buttons_dict.get('cleanup')
     
     # Extract save/reset buttons from action container instance
+    # Store both with and without _button suffix for handler compatibility
     action_container_instance = action_container.get('action_container')
     if action_container_instance:
-        ui_components['save_button'] = getattr(action_container_instance, 'save_button', None)
-        ui_components['reset_button'] = getattr(action_container_instance, 'reset_button', None)
+        save_btn = getattr(action_container_instance, 'save_button', None)
+        reset_btn = getattr(action_container_instance, 'reset_button', None)
+        ui_components['save'] = save_btn
+        ui_components['reset'] = reset_btn
+        ui_components['save_button'] = save_btn
+        ui_components['reset_button'] = reset_btn
     
     
     # 4. Create summary container
@@ -274,14 +284,21 @@ def create_augment_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> Dict
     footer_container = ui_components['footer_container']
     
     # Preserve the button references from the original ui_components
+    # Include both with and without _button suffix for handler compatibility
     button_refs = {
         'primary_button': ui_components.get('primary_button'),
-        'augment_button': ui_components.get('augment_button'),
-        'status_button': ui_components.get('status_button'),
-        'cleanup_button': ui_components.get('cleanup_button'),
-        'save_button': ui_components.get('save_button'),
-        'reset_button': ui_components.get('reset_button'),
-        'generate_button': ui_components.get('generate_button')
+        'augment': ui_components.get('augment'),
+        'status': ui_components.get('status'),
+        'cleanup': ui_components.get('cleanup'),
+        'save': ui_components.get('save'),
+        'reset': ui_components.get('reset'),
+        'generate': ui_components.get('generate'),
+        # Legacy names for backward compatibility
+        # 'augment_button': ui_components.get('augment_button'),
+        # 'status_button': ui_components.get('status_button'),
+        # 'cleanup_button': ui_components.get('cleanup_button'),
+        # 'save_button': ui_components.get('save_button'),
+        # 'reset_button': ui_components.get('reset_button')
     }
     
     # Create UI components dictionary

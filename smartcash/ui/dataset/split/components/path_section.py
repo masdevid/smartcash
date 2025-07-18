@@ -44,7 +44,7 @@ def create_path_section(config: Dict[str, Any]) -> Dict[str, Any]:
     test_dir = widgets.Text(
         value=output_config.get('test_dir', 'data/test'),
         description='Test Dir:',
-        layout=widgets.Layout(width='100%')
+        layout=widgets.Layout(width='auto')
     )
     
     # Create options group

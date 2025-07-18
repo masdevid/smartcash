@@ -14,17 +14,17 @@ def create_basic_options_widget() -> Dict[str, Any]:
         'num_variations': widgets.IntSlider(
             value=2, min=1, max=10, step=1, description='Jumlah Variasi:',
             continuous_update=False, readout=True, readout_format='d',
-            style={'description_width': '110px'}, layout=widgets.Layout(width='100%', max_width='100%')
+            style={'description_width': '110px'}, layout=widgets.Layout(width='auto', max_width='100%')
         ),
         'target_count': widgets.IntSlider(
             value=500, min=100, max=2000, step=50, description='Target Count:',
             continuous_update=False, readout=True, readout_format='d',
-            style={'description_width': '110px'}, layout=widgets.Layout(width='100%', max_width='100%')
+            style={'description_width': '110px'}, layout=widgets.Layout(width='auto', max_width='100%')
         ),
         'intensity': widgets.FloatSlider(
             value=0.7, min=0.1, max=1.0, step=0.1, description='Intensitas:',
             continuous_update=False, readout=True, readout_format='.1f',
-            style={'description_width': '110px'}, layout=widgets.Layout(width='100%', max_width='100%')
+            style={'description_width': '110px'}, layout=widgets.Layout(width='auto', max_width='100%')
         ),
         'target_split': widgets.Dropdown(
             options=[
@@ -33,7 +33,7 @@ def create_basic_options_widget() -> Dict[str, Any]:
                 ('🧪 Test - Dataset testing (Not Recommended)', 'test')
             ],
             value='train', description='Target Split:', disabled=False,
-            style={'description_width': '110px'}, layout=widgets.Layout(width='100%', max_width='100%')
+            style={'description_width': '110px'}, layout=widgets.Layout(width='auto', max_width='100%')
         ),
         # CHANGED: cleanup_target menggantikan output_prefix
         'cleanup_target': widgets.Dropdown(
@@ -43,7 +43,7 @@ def create_basic_options_widget() -> Dict[str, Any]:
                 ('🗑️ Both - Hapus augmented + samples', 'both')
             ],
             value='both', description='Cleanup Target:', disabled=False,
-            style={'description_width': '110px'}, layout=widgets.Layout(width='100%', max_width='100%')
+            style={'description_width': '110px'}, layout=widgets.Layout(width='auto', max_width='100%')
         ),
         'balance_classes': widgets.Checkbox(
             value=True, description='Balance Classes (Layer 1 & 2 optimal)',

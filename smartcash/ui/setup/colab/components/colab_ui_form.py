@@ -18,13 +18,13 @@ def create_module_form_widgets(config: Dict[str, Any]) -> Dict[str, Any]:
     """
     # Common layout for form elements
     input_layout = widgets.Layout(
-        width='90%',
+        width='auto',
         margin='5px 0',
         padding='5px 0'
     )
     
     checkbox_layout = widgets.Layout(
-        width='100%',
+        width='auto',
         margin='8px 0',
         padding='5px 0'
     )

@@ -346,7 +346,7 @@ class PreprocessingUIModule(BaseUIModule):
         updater = self.get_component('operation_summary_updater')
         if updater and callable(updater):
             self.log(f"Memperbarui ringkasan operasi.", 'debug')
-            updater(content, title="Ringkasan Operasi", icon="📊", visible=True)
+            updater(content)
         else:
             self.log("Komponen updater ringkasan operasi tidak ditemukan atau tidak dapat dipanggil.", 'warning')
 

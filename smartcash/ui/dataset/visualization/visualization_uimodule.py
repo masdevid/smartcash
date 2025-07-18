@@ -92,26 +92,12 @@ class VisualizationUIModule(BaseUIModule):
             'load_augmented': LoadAugmentedOperation(self)
         }
     
-    def _initialize_dashboard(self):
-        """Initialize the dashboard with stats cards."""
-        from smartcash.ui.components import create_dashboard_cards
-        
-        # Buat container untuk dashboard cards
-        dashboard = create_dashboard_cards()
-        self._dashboard_cards = dashboard["cards"]
-        
-        # Tambahkan container cards ke dalam layout
-        if 'containers' in self.components and 'dashboard_container' in self.components['containers']:
-            self.components['containers']['dashboard_container'].children = [dashboard["container"]]
-        
-        # Update statistik awal
-        self._update_dashboard_stats()
-
+    def _update_dashboard_stats(self) -> None:
         """Update statistics on the dashboard cards."""
-        if not self._dashboard_cards:
+        if not hasattr(self, '_dashboard_cards') or not self._dashboard_cards:
             return
         
-        # Contoh data statistik - ganti dengan data sebenarnya dari backend
+        # Get actual stats from backend or use default values
         stats = {
             'train': {
                 'preprocessed': 0,
@@ -134,6 +120,41 @@ class VisualizationUIModule(BaseUIModule):
                 'total': 0
             }
         }
+        
+        # Update statistik dari data yang ada
+        for split in ['train', 'validation', 'test']:
+            if split in self._datasets:
+                samples = self._datasets[split]
+                stats[split]['preprocessed'] = len(samples.get('preprocessed', []))
+                stats[split]['augmented'] = len(samples.get('augmented', []))
+                stats[split]['total'] = max(1, len(samples.get('raw', [])))
+                
+                # Update total
+                stats['total']['preprocessed'] += stats[split]['preprocessed']
+                stats['total']['augmented'] += stats[split]['augmented']
+                stats['total']['total'] += stats[split]['total']
+        
+        # Update UI cards if they exist
+        if hasattr(self, '_dashboard_cards') and self._dashboard_cards:
+            for card_name, card in self._dashboard_cards.items():
+                if card_name in stats['train']:
+                    value = stats['train'][card_name]
+                    card.update_value(str(value))
+    
+    def _initialize_dashboard(self):
+        """Initialize the dashboard with stats cards."""
+        from smartcash.ui.components import create_dashboard_cards
+        
+        # Buat container untuk dashboard cards
+        dashboard = create_dashboard_cards()
+        self._dashboard_cards = dashboard["cards"]
+        
+        # Tambahkan container cards ke dalam layout
+        if 'containers' in self.components and 'dashboard_container' in self.components['containers']:
+            self.components['containers']['dashboard_container'].children = [dashboard["container"]]
+        
+        # Update statistik awal
+        self._update_dashboard_stats()
         
         # Update statistik dari data yang ada
         for split in ['train', 'validation', 'test']:

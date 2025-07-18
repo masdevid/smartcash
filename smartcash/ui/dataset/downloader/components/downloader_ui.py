@@ -238,9 +238,9 @@ def create_downloader_ui_components(
         'check': action_buttons.get('check'),
         'cleanup': action_buttons.get('cleanup'),
         # Keep legacy names for backward compatibility
-        'download_button': action_buttons.get('download'),
-        'check_button': action_buttons.get('check'),
-        'cleanup_button': action_buttons.get('cleanup'),
+        # 'download_button': action_buttons.get('download'),
+        # 'check_button': action_buttons.get('check'),
+        # 'cleanup_button': action_buttons.get('cleanup'),
         
         # Add form widgets - accessed as attributes of input_options
         'workspace_input': input_options.workspace_input,

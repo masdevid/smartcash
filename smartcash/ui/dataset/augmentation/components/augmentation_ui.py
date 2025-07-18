@@ -90,7 +90,7 @@ def _create_augment_ui_components(config: Dict[str, Any]) -> Tuple[Dict[str, Any
     ui_components['action_container'] = action_container
     
     # Extract button references for proper registration
-    ui_components['primary_button'] = action_container.get('primary_button')
+    # ui_components['primary_button'] = action_container.get('primary_button')
     
     # Extract individual operation buttons from the buttons dictionary
     # Store both with and without _button suffix for handler compatibility
@@ -99,9 +99,9 @@ def _create_augment_ui_components(config: Dict[str, Any]) -> Tuple[Dict[str, Any
     ui_components['status'] = buttons_dict.get('status')
     ui_components['cleanup'] = buttons_dict.get('cleanup')
     # Legacy names for backward compatibility
-    ui_components['augment_button'] = buttons_dict.get('augment')
-    ui_components['status_button'] = buttons_dict.get('status') 
-    ui_components['cleanup_button'] = buttons_dict.get('cleanup')
+    # ui_components['augment_button'] = buttons_dict.get('augment')
+    # ui_components['status_button'] = buttons_dict.get('status') 
+    # ui_components['cleanup_button'] = buttons_dict.get('cleanup')
     
     # Extract save/reset buttons from action container instance
     # Store both with and without _button suffix for handler compatibility
@@ -286,7 +286,7 @@ def create_augment_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> Dict
     # Preserve the button references from the original ui_components
     # Include both with and without _button suffix for handler compatibility
     button_refs = {
-        'primary_button': ui_components.get('primary_button'),
+        # 'primary_button': ui_components.get('primary_button'),
         'augment': ui_components.get('augment'),
         'status': ui_components.get('status'),
         'cleanup': ui_components.get('cleanup'),

@@ -46,7 +46,12 @@ class ConfigSyncOperation(BaseColabOperation):
             progress_steps = self.get_progress_steps('config_sync')
             
             # Step 1: Check configuration
-            self.update_progress_safe(progress_callback, progress_steps[0]['progress'], progress_steps[0]['message'])
+            self.update_progress_safe(
+                progress_callback, 
+                progress_steps[0]['progress'], 
+                progress_steps[0]['message'],
+                progress_steps[0].get('phase_progress', 0)
+            )
             
             # Check if COLAB_DATA_ROOT exists
             if not self.ensure_directory_exists(COLAB_DATA_ROOT):
@@ -74,7 +79,12 @@ class ConfigSyncOperation(BaseColabOperation):
                     )
             
             # Step 2: Sync configuration
-            self.update_progress_safe(progress_callback, progress_steps[1]['progress'], progress_steps[1]['message'])
+            self.update_progress_safe(
+                progress_callback, 
+                progress_steps[1]['progress'], 
+                progress_steps[1]['message'],
+                progress_steps[1].get('phase_progress', 0)
+            )
             
             # Discover configs from repo
             available_configs = self.config_manager.discover_repo_configs()
@@ -129,12 +139,22 @@ class ConfigSyncOperation(BaseColabOperation):
                     self.log(f"❌ Error syncing {config_name}: {str(e)}", 'error')
             
             # Step 3: Validate sync
-            self.update_progress_safe(progress_callback, progress_steps[2]['progress'], progress_steps[2]['message'])
+            self.update_progress_safe(
+                progress_callback, 
+                progress_steps[2]['progress'], 
+                progress_steps[2]['message'],
+                progress_steps[2].get('phase_progress', 0)
+            )
             
             integrity_check = self.check_config_integrity()
             
             # Step 4: Complete
-            self.update_progress_safe(progress_callback, progress_steps[3]['progress'], progress_steps[3]['message'])
+            self.update_progress_safe(
+                progress_callback, 
+                progress_steps[3]['progress'], 
+                progress_steps[3]['message'],
+                progress_steps[3].get('phase_progress', 0)
+            )
             
             success_count = len([c for c in configs_processed if c['status'] == 'synced'])
             skip_count = len([c for c in configs_processed if c['status'] == 'skipped'])

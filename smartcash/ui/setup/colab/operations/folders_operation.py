@@ -42,24 +42,44 @@ class FoldersOperation(BaseColabOperation):
             progress_steps = self.get_progress_steps('folders')
             
             # Step 1: Check folder configuration
-            self.update_progress_safe(progress_callback, progress_steps[0]['progress'], progress_steps[0]['message'])
+            self.update_progress_safe(
+                progress_callback, 
+                progress_steps[0]['progress'], 
+                progress_steps[0]['message'],
+                progress_steps[0].get('phase_progress', 0)
+            )
             
             total_folders = len(REQUIRED_FOLDERS)
             self.log(f"Creating {total_folders} required folders", 'info')
             
             # Step 2: Create required folders
-            self.update_progress_safe(progress_callback, progress_steps[1]['progress'], progress_steps[1]['message'])
+            self.update_progress_safe(
+                progress_callback, 
+                progress_steps[1]['progress'], 
+                progress_steps[1]['message'],
+                progress_steps[1].get('phase_progress', 0)
+            )
             
             created_dirs, failed_dirs = self.create_directories_batch(REQUIRED_FOLDERS)
             
             # Step 3: Verify folder structure
-            self.update_progress_safe(progress_callback, progress_steps[2]['progress'], progress_steps[2]['message'])
+            self.update_progress_safe(
+                progress_callback, 
+                progress_steps[2]['progress'], 
+                progress_steps[2]['message'],
+                progress_steps[2].get('phase_progress', 0)
+            )
             
             # Verify all folders exist
             verification = self.validate_items_exist(REQUIRED_FOLDERS, "folder")
             
             # Step 4: Complete
-            self.update_progress_safe(progress_callback, progress_steps[3]['progress'], progress_steps[3]['message'])
+            self.update_progress_safe(
+                progress_callback, 
+                progress_steps[3]['progress'], 
+                progress_steps[3]['message'],
+                progress_steps[3].get('phase_progress', 0)
+            )
             
             return self.create_success_result(
                 f'Created {len(created_dirs)} new folders, {total_folders - len(created_dirs)} already existed',

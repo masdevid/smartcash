@@ -89,8 +89,17 @@ class ColabOperationFactory:
             method = getattr(operation, method_name)
             return method(**kwargs)
         except Exception as e:
-            self.logger.error(f"Failed to execute {operation_type}.{method_name}: {e}")
-            return {'success': False, 'error': str(e)}
+            import traceback
+            error_traceback = traceback.format_exc()
+            error_msg = f"Failed to execute {operation_type}.{method_name}: {e}\n\nTraceback:\n{error_traceback}"
+            self.logger.error(error_msg)
+            return {
+                'success': False, 
+                'error': str(e),
+                'traceback': error_traceback,
+                'operation': operation_type,
+                'method': method_name
+            }
 
 
 # Shared methods for common operations

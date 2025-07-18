@@ -43,13 +43,23 @@ class EnvSetupOperation(BaseColabOperation):
             progress_steps = self.get_progress_steps('env_setup')
             
             # Step 1: Check environment configuration
-            self.update_progress_safe(progress_callback, progress_steps[0]['progress'], progress_steps[0]['message'])
+            self.update_progress_safe(
+                progress_callback, 
+                progress_steps[0]['progress'], 
+                progress_steps[0]['message'],
+                progress_steps[0].get('phase_progress', 0)
+            )
             
             env_vars_set = []
             env_config = self.config.get('environment', {})
             
             # Step 2: Set environment variables based on type
-            self.update_progress_safe(progress_callback, progress_steps[1]['progress'], progress_steps[1]['message'])
+            self.update_progress_safe(
+                progress_callback, 
+                progress_steps[1]['progress'], 
+                progress_steps[1]['message'],
+                progress_steps[1].get('phase_progress', 0)
+            )
             
             if env_config.get('type') == 'colab':
                 # Set project root
@@ -76,12 +86,22 @@ class EnvSetupOperation(BaseColabOperation):
                 env_vars_set.extend(additional_vars)
             
             # Step 3: Verify environment setup
-            self.update_progress_safe(progress_callback, progress_steps[2]['progress'], progress_steps[2]['message'])
+            self.update_progress_safe(
+                progress_callback, 
+                progress_steps[2]['progress'], 
+                progress_steps[2]['message'],
+                progress_steps[2].get('phase_progress', 0)
+            )
             
             verification = self.verify_environment()
             
             # Step 4: Complete
-            self.update_progress_safe(progress_callback, progress_steps[3]['progress'], progress_steps[3]['message'])
+            self.update_progress_safe(
+                progress_callback, 
+                progress_steps[3]['progress'], 
+                progress_steps[3]['message'],
+                progress_steps[3].get('phase_progress', 0)
+            )
             
             return self.create_success_result(
                 f'Set {len(env_vars_set)} environment variables',

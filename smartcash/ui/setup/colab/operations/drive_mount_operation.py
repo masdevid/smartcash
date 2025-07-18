@@ -44,7 +44,12 @@ class DriveMountOperation(BaseColabOperation):
             progress_steps = self.get_progress_steps('mount')
             
             # Step 1: Check environment status
-            self.update_progress_safe(progress_callback, progress_steps[0]['progress'], progress_steps[0]['message'])
+            self.update_progress_safe(
+                progress_callback, 
+                progress_steps[0]['progress'], 
+                progress_steps[0]['message'],
+                progress_steps[0].get('phase_progress', 0)
+            )
             
             # Use standardized environment manager
             env_manager = get_environment_manager(logger=self.logger)
@@ -58,7 +63,12 @@ class DriveMountOperation(BaseColabOperation):
                 return self.create_error_result(error_msg, environment_info=system_info)
             
             # Step 2: Check Drive mount status
-            self.update_progress_safe(progress_callback, progress_steps[1]['progress'], progress_steps[1]['message'])
+            self.update_progress_safe(
+                progress_callback, 
+                progress_steps[1]['progress'], 
+                progress_steps[1]['message'],
+                progress_steps[1].get('phase_progress', 0)
+            )
             
             # Check if already mounted using EnvironmentManager
             if env_manager.is_drive_mounted:
@@ -76,13 +86,23 @@ class DriveMountOperation(BaseColabOperation):
                 )
             
             # Step 3: Mount Google Drive
-            self.update_progress_safe(progress_callback, progress_steps[2]['progress'], progress_steps[2]['message'])
+            self.update_progress_safe(
+                progress_callback, 
+                progress_steps[2]['progress'], 
+                progress_steps[2]['message'],
+                progress_steps[2].get('phase_progress', 0)
+            )
             
             # Use EnvironmentManager to mount drive
             success, message = env_manager.mount_drive()
             
             # Step 4: Verify mount
-            self.update_progress_safe(progress_callback, progress_steps[3]['progress'], progress_steps[3]['message'])
+            self.update_progress_safe(
+                progress_callback, 
+                progress_steps[3]['progress'], 
+                progress_steps[3]['message'],
+                progress_steps[3].get('phase_progress', 0)
+            )
             
             if success:
                 # Get updated paths after successful mount
@@ -94,7 +114,12 @@ class DriveMountOperation(BaseColabOperation):
                     write_access = self.test_write_access(str(env_manager.drive_path))
                 
                 # Step 5: Complete
-                self.update_progress_safe(progress_callback, progress_steps[4]['progress'], progress_steps[4]['message'])
+                self.update_progress_safe(
+                    progress_callback, 
+                    progress_steps[4]['progress'], 
+                    progress_steps[4]['message'],
+                    progress_steps[4].get('phase_progress', 0)
+                )
                 
                 self.log("Google Drive berhasil dipasang dan diverifikasi", 'success')
                 

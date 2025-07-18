@@ -42,7 +42,12 @@ class InitOperation(BaseColabOperation):
             steps = self.get_progress_steps('init')
             
             # Step 1: Detect environment
-            self.update_progress_safe(progress_callback, steps[0]['progress'], steps[0]['message'])
+            self.update_progress_safe(
+                progress_callback, 
+                steps[0]['progress'], 
+                steps[0]['message'],
+                steps[0].get('phase_progress', 0)
+            )
             
             env_info = self.detect_environment_enhanced()
             env_type = env_info.get('runtime', {}).get('type', 'local')
@@ -55,18 +60,32 @@ class InitOperation(BaseColabOperation):
             self.log(f"Environment detected: {env_type}", 'info')
             
             # Step 2: Environment detected
-            self.update_progress_safe(progress_callback, steps[1]['progress'], 
-                                    f"✅ Environment: {env_type}")
+            self.update_progress_safe(
+                progress_callback, 
+                steps[1]['progress'], 
+                f"✅ Environment: {env_type}",
+                steps[1].get('phase_progress', 0)
+            )
             
             # Step 3: Check system requirements
-            self.update_progress_safe(progress_callback, steps[2]['progress'], steps[2]['message'])
+            self.update_progress_safe(
+                progress_callback, 
+                steps[2]['progress'], 
+                steps[2]['message'],
+                steps[2].get('phase_progress', 0)
+            )
             
             system_info = self.format_system_info(env_info)
             self.log(f"System: {system_info['os_display']}", 'info')
             self.log(f"RAM: {system_info['ram_gb']:.1f}GB available", 'info')
             
             # Step 4: Validate configuration
-            self.update_progress_safe(progress_callback, steps[3]['progress'], steps[3]['message'])
+            self.update_progress_safe(
+                progress_callback, 
+                steps[3]['progress'], 
+                steps[3]['message'],
+                steps[3].get('phase_progress', 0)
+            )
             
             validation_result = self.validate_colab_environment(self.config)
             if not validation_result['valid']:
@@ -75,7 +94,12 @@ class InitOperation(BaseColabOperation):
                 )
             
             # Step 5: Complete
-            self.update_progress_safe(progress_callback, steps[4]['progress'], steps[4]['message'])
+            self.update_progress_safe(
+                progress_callback, 
+                steps[4]['progress'], 
+                steps[4]['message'],
+                steps[4].get('phase_progress', 0)
+            )
             
             return self.create_success_result(
                 f'Environment initialized as {env_type}',

@@ -44,7 +44,12 @@ class SymlinkOperation(BaseColabOperation):
             progress_steps = self.get_progress_steps('symlink')
             
             # Step 1: Check symlink configuration
-            self.update_progress_safe(progress_callback, progress_steps[0]['progress'], progress_steps[0]['message'])
+            self.update_progress_safe(
+                progress_callback, 
+                progress_steps[0]['progress'], 
+                progress_steps[0]['message'],
+                progress_steps[0].get('phase_progress', 0)
+            )
             
             env_config = self.config.get('environment', {})
             
@@ -62,15 +67,34 @@ class SymlinkOperation(BaseColabOperation):
                 self._create_missing_directories(missing_sources)
             
             # Step 2: Create symlinks
-            self.update_progress_safe(progress_callback, progress_steps[1]['progress'], progress_steps[1]['message'])
+            self.update_progress_safe(
+                progress_callback, 
+                progress_steps[1]['progress'], 
+                progress_steps[1]['message'],
+                progress_steps[1].get('phase_progress', 0)
+            )
             
             # Create symlinks using SYMLINK_MAP
             symlinks_created = []
             symlinks_failed = []
             total_symlinks = len(SYMLINK_MAP)
             
-            for source, target in SYMLINK_MAP.items():
+            for idx, (source, target) in enumerate(SYMLINK_MAP.items(), 1):
                 try:
+                    # Calculate phase progress within the current step (50-75% of overall progress)
+                    phase_progress = int(progress_steps[1]['phase_progress'] + 
+                                      (progress_steps[2]['phase_progress'] - progress_steps[1]['phase_progress']) * 
+                                      (idx / total_symlinks))
+                    
+                    # Update progress for current symlink
+                    self.update_progress_safe(
+                        progress_callback,
+                        progress_steps[1]['progress'] + 
+                        int((progress_steps[2]['progress'] - progress_steps[1]['progress']) * (idx / total_symlinks)),
+                        f"🔗 Creating symlink {idx}/{total_symlinks}: {os.path.basename(target)}",
+                        phase_progress
+                    )
+                    
                     # Handle existing target with backup and content preservation
                     backup_info = self._handle_existing_target(target)
                     
@@ -97,68 +121,59 @@ class SymlinkOperation(BaseColabOperation):
                     
                 except Exception as e:
                     import traceback
+                    error_msg = f"Failed to create symlink {source} → {target}: {str(e)}"
+                    self.log(error_msg, 'error')
+                    self.log(traceback.format_exc(), 'debug')
                     
                     symlinks_failed.append({
                         'source': source,
                         'target': target,
-                        'error': str(e),
-                        'traceback': traceback.format_exc()
+                        'error': str(e)
                     })
-                    
-                    # Log with traceback for better debugging
-                    self.log_exception(f"Symlink gagal: {source} → {target}", e)
             
             # Step 3: Verify symlinks
-            self.update_progress_safe(progress_callback, progress_steps[2]['progress'], progress_steps[2]['message'])
+            self.update_progress_safe(
+                progress_callback, 
+                progress_steps[2]['progress'], 
+                progress_steps[2]['message'],
+                progress_steps[2].get('phase_progress', 0)
+            )
             
-            # Final verification using base class method
+            # Verify all created symlinks
             verification = self.verify_symlinks_batch(SYMLINK_MAP)
             
+            # Update verification status for created symlinks
+            for symlink in symlinks_created:
+                symlink['verified'] = verification.get('symlink_status', {}).get(symlink['target'], {}).get('valid', False)
+            
             # Step 4: Complete
-            self.update_progress_safe(progress_callback, progress_steps[3]['progress'], progress_steps[3]['message'])
+            self.update_progress_safe(
+                progress_callback, 
+                progress_steps[3]['progress'], 
+                progress_steps[3]['message'],
+                progress_steps[3].get('phase_progress', 0)
+            )
             
-            verified_count = sum(1 for sl in symlinks_created if sl['verified'])
-            success = len(symlinks_failed) == 0
+            # Prepare result
+            verified_count = sum(1 for s in symlinks_created if s.get('verified', False))
+            backups_created = sum(1 for s in symlinks_created if s.get('backup_info', {}).get('backup_created', False))
+            files_restored = sum(s.get('backup_info', {}).get('files_copied', 0) for s in symlinks_created)
             
-            # Count backup and restore operations
-            backups_created = sum(1 for sl in symlinks_created if sl['backup_info']['backup_created'])
-            files_restored = sum(sl['backup_info']['files_copied'] for sl in symlinks_created if sl['backup_info']['backup_created'])
+            result = {
+                'success': len(symlinks_failed) == 0,
+                'message': f"Created {len(symlinks_created)}/{total_symlinks} symbolic links " \
+                         f"(backed up {backups_created} existing folders, " \
+                         f"restored {files_restored} files)",
+                'symlinks_created': symlinks_created,
+                'symlinks_failed': symlinks_failed,
+                'verified_count': verified_count,
+                'total_count': len(symlinks_created),
+                'backups_created': backups_created,
+                'files_restored': files_restored,
+                'verification': verification
+            }
             
-            if success:
-                success_msg = f'Created {verified_count}/{total_symlinks} symbolic links'
-                if backups_created > 0:
-                    success_msg += f' (backed up {backups_created} existing folders, restored {files_restored} files)'
-                
-                return self.create_success_result(
-                    success_msg,
-                    symlinks_created=symlinks_created,
-                    symlinks_failed=symlinks_failed,
-                    verified_count=verified_count,
-                    total_count=total_symlinks,
-                    backups_created=backups_created,
-                    files_restored=files_restored,
-                    verification=verification
-                )
-            else:
-                # Return error result with detailed failure information
-                failure_details = []
-                for failed in symlinks_failed:
-                    failure_details.append(f"  - {failed['source']} → {failed['target']}: {failed['error']}")
-                
-                error_msg = f"Gagal membuat {len(symlinks_failed)} dari {total_symlinks} symlinks"
-                detailed_error = f"{error_msg}\\n\\nDetail kesalahan:\\n" + "\\n".join(failure_details)
-                
-                # Clean up any temporary backups that weren't restored
-                self._cleanup_backup_files(symlinks_created, symlinks_failed)
-                
-                return self.create_error_result(
-                    detailed_error,
-                    symlinks_created=symlinks_created,
-                    symlinks_failed=symlinks_failed,
-                    verified_count=verified_count,
-                    total_count=total_symlinks,
-                    verification=verification
-                )
+            return result
             
         return self.execute_with_error_handling(execute_operation)
     
@@ -188,12 +203,15 @@ class SymlinkOperation(BaseColabOperation):
             backup_info['target_type'] = 'symlink'
             return backup_info
         
-        # If it's a directory, back it up
+        # If it's a directory, back it up and remove the original
         if os.path.isdir(target):
             backup_info['target_type'] = 'directory'
             backup_info['backup_path'] = self._create_backup_directory(target)
             backup_info['backup_created'] = True
             self.log(f"📁 Backed up existing directory: {target} → {backup_info['backup_path']}", 'info')
+            # Ensure the target directory is removed after backup
+            if os.path.exists(target):
+                shutil.rmtree(target)
         
         # If it's a file, back it up
         elif os.path.isfile(target):

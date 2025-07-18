@@ -102,19 +102,30 @@ class BaseColabOperation(LoggingMixin, OperationMixin):
             }
     
     def update_progress_safe(self, progress_callback: Optional[Callable], 
-                           progress: int, message: str) -> None:
+                           progress: int, message: str, phase_progress: Optional[int] = None) -> None:
         """Safely update progress with callback.
         
         Args:
             progress_callback: Optional callback function
-            progress: Progress percentage (0-100)
+            progress: Overall progress percentage (0-100)
             message: Progress message
+            phase_progress: Optional phase progress percentage (0-100)
         """
         if progress_callback:
             try:
-                progress_callback(progress, message)
+                if phase_progress is not None:
+                    # Update both overall and phase progress
+                    progress_callback(progress, message, phase_progress)
+                else:
+                    # Backward compatibility: update only overall progress
+                    progress_callback(progress, message)
             except Exception as e:
                 self.logger.warning(f"Progress callback failed: {e}")
+                # Try with just the original signature if the new one fails
+                try:
+                    progress_callback(progress, message)
+                except Exception as e2:
+                    self.logger.warning(f"Fallback progress callback also failed: {e2}")
     
     def create_success_result(self, message: str, **additional_data) -> Dict[str, Any]:
         """Create standardized success result.
@@ -528,54 +539,54 @@ class BaseColabOperation(LoggingMixin, OperationMixin):
             operation_type: Type of operation (init, verify, mount, etc.)
             
         Returns:
-            List of progress step dictionaries
+            List of progress step dictionaries with phase progress information
         """
         progress_steps = {
             'init': [
-                {'progress': 10, 'message': '🔍 Detecting runtime environment...'},
-                {'progress': 30, 'message': '✅ Environment detected'},
-                {'progress': 50, 'message': '🔧 Checking system requirements...'},
-                {'progress': 80, 'message': '🔍 Validating configuration...'},
-                {'progress': 100, 'message': '✅ Initialization complete'}
+                {'progress': 10, 'message': '🔍 Detecting runtime environment...', 'phase_progress': 25},
+                {'progress': 30, 'message': '✅ Environment detected', 'phase_progress': 50},
+                {'progress': 50, 'message': '🔧 Checking system requirements...', 'phase_progress': 75},
+                {'progress': 80, 'message': '🔍 Validating configuration...', 'phase_progress': 100},
+                {'progress': 100, 'message': '✅ Initialization complete', 'phase_progress': 100}
             ],
             'verify': [
-                {'progress': 10, 'message': '🔍 Starting verification...'},
-                {'progress': 30, 'message': '🔗 Verifying symlinks...'},
-                {'progress': 50, 'message': '📁 Verifying folders...'},
-                {'progress': 70, 'message': '🌍 Verifying environment variables...'},
-                {'progress': 90, 'message': '💻 Gathering system info...'},
-                {'progress': 100, 'message': '✅ Verification complete'}
+                {'progress': 10, 'message': '🔍 Starting verification...', 'phase_progress': 10},
+                {'progress': 30, 'message': '🔗 Verifying symlinks...', 'phase_progress': 30},
+                {'progress': 50, 'message': '📁 Verifying folders...', 'phase_progress': 50},
+                {'progress': 70, 'message': '🌍 Verifying environment variables...', 'phase_progress': 70},
+                {'progress': 90, 'message': '💻 Gathering system info...', 'phase_progress': 90},
+                {'progress': 100, 'message': '✅ Verification complete', 'phase_progress': 100}
             ],
             'mount': [
-                {'progress': 10, 'message': '🔍 Checking environment status...'},
-                {'progress': 30, 'message': '🔍 Checking Drive mount status...'},
-                {'progress': 50, 'message': '📁 Mounting Google Drive...'},
-                {'progress': 90, 'message': '🔍 Verifying mount...'},
-                {'progress': 100, 'message': '✅ Google Drive mounted successfully'}
+                {'progress': 10, 'message': '🔍 Checking environment status...', 'phase_progress': 20},
+                {'progress': 30, 'message': '🔍 Checking Drive mount status...', 'phase_progress': 40},
+                {'progress': 50, 'message': '📁 Mounting Google Drive...', 'phase_progress': 60},
+                {'progress': 90, 'message': '🔍 Verifying mount...', 'phase_progress': 80},
+                {'progress': 100, 'message': '✅ Google Drive mounted successfully', 'phase_progress': 100}
             ],
             'folders': [
-                {'progress': 10, 'message': '🔍 Checking folder configuration...'},
-                {'progress': 30, 'message': '📁 Creating required folders...'},
-                {'progress': 70, 'message': '✅ Verifying folder structure...'},
-                {'progress': 100, 'message': '✅ Folders ready'}
+                {'progress': 10, 'message': '🔍 Checking folder configuration...', 'phase_progress': 25},
+                {'progress': 30, 'message': '📁 Creating required folders...', 'phase_progress': 50},
+                {'progress': 70, 'message': '✅ Verifying folder structure...', 'phase_progress': 75},
+                {'progress': 100, 'message': '✅ Folders ready', 'phase_progress': 100}
             ],
             'env_setup': [
-                {'progress': 10, 'message': '🔍 Checking environment configuration...'},
-                {'progress': 30, 'message': '🌍 Setting up environment variables...'},
-                {'progress': 70, 'message': '🔍 Verifying environment setup...'},
-                {'progress': 100, 'message': '✅ Environment ready'}
+                {'progress': 10, 'message': '🔍 Checking environment configuration...', 'phase_progress': 25},
+                {'progress': 30, 'message': '🌍 Setting up environment variables...', 'phase_progress': 50},
+                {'progress': 70, 'message': '🔍 Verifying environment setup...', 'phase_progress': 75},
+                {'progress': 100, 'message': '✅ Environment ready', 'phase_progress': 100}
             ],
             'symlink': [
-                {'progress': 10, 'message': '🔍 Checking symlink configuration...'},
-                {'progress': 30, 'message': '🔗 Creating symlinks and backing up existing folders...'},
-                {'progress': 70, 'message': '✅ Verifying symlinks...'},
-                {'progress': 100, 'message': '✅ Symlinks ready'}
+                {'progress': 10, 'message': '🔍 Checking symlink configuration...', 'phase_progress': 25},
+                {'progress': 30, 'message': '🔗 Creating symlinks and backing up existing folders...', 'phase_progress': 50},
+                {'progress': 70, 'message': '✅ Verifying symlinks...', 'phase_progress': 75},
+                {'progress': 100, 'message': '✅ Symlinks ready', 'phase_progress': 100}
             ],
             'config_sync': [
-                {'progress': 10, 'message': '🔍 Checking configuration...'},
-                {'progress': 30, 'message': '⚙️ Syncing configuration...'},
-                {'progress': 70, 'message': '✅ Validating sync...'},
-                {'progress': 100, 'message': '✅ Configuration synchronized'}
+                {'progress': 10, 'message': '🔍 Checking configuration...', 'phase_progress': 25},
+                {'progress': 30, 'message': '⚙️ Syncing configuration...', 'phase_progress': 50},
+                {'progress': 70, 'message': '✅ Validating sync...', 'phase_progress': 75},
+                {'progress': 100, 'message': '✅ Configuration synchronized', 'phase_progress': 100}
             ]
         }
         

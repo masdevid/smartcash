@@ -46,7 +46,12 @@ class VerifyOperation(BaseColabOperation):
             issues = []
             
             # Step 1: Starting verification
-            self.update_progress_safe(progress_callback, progress_steps[0]['progress'], progress_steps[0]['message'])
+            self.update_progress_safe(
+                progress_callback, 
+                progress_steps[0]['progress'], 
+                progress_steps[0]['message'],
+                progress_steps[0].get('phase_progress', 0)
+            )
             
             # Only verify drive mount if explicitly requested in config
             if self.config.get('check_drive', False):
@@ -70,7 +75,12 @@ class VerifyOperation(BaseColabOperation):
                 }
             
             # Step 2: Verifying symlinks
-            self.update_progress_safe(progress_callback, progress_steps[1]['progress'], progress_steps[1]['message'])
+            self.update_progress_safe(
+                progress_callback, 
+                progress_steps[1]['progress'], 
+                progress_steps[1]['message'],
+                progress_steps[1].get('phase_progress', 0)
+            )
             
             # Verify symlinks if drive is mounted
             if self.config.get('drive_mounted', False):
@@ -85,7 +95,12 @@ class VerifyOperation(BaseColabOperation):
                 }
             
             # Step 3: Verifying folders
-            self.update_progress_safe(progress_callback, progress_steps[2]['progress'], progress_steps[2]['message'])
+            self.update_progress_safe(
+                progress_callback, 
+                progress_steps[2]['progress'], 
+                progress_steps[2]['message'],
+                progress_steps[2].get('phase_progress', 0)
+            )
             
             # Verify folders
             folder_verification = self.validate_items_exist(REQUIRED_FOLDERS, "folder")
@@ -94,7 +109,12 @@ class VerifyOperation(BaseColabOperation):
                 issues.extend([f"Missing folder: {folder}" for folder in folder_verification['missing_items']])
             
             # Step 4: Verifying environment variables
-            self.update_progress_safe(progress_callback, progress_steps[3]['progress'], progress_steps[3]['message'])
+            self.update_progress_safe(
+                progress_callback, 
+                progress_steps[3]['progress'], 
+                progress_steps[3]['message'],
+                progress_steps[3].get('phase_progress', 0)
+            )
             
             # Verify environment variables
             required_vars = ['SMARTCASH_ROOT', 'SMARTCASH_ENV', 'SMARTCASH_DATA_ROOT']
@@ -103,14 +123,24 @@ class VerifyOperation(BaseColabOperation):
             issues.extend(env_verification['issues'])
             
             # Step 5: Gathering system info
-            self.update_progress_safe(progress_callback, progress_steps[4]['progress'], progress_steps[4]['message'])
+            self.update_progress_safe(
+                progress_callback, 
+                progress_steps[4]['progress'], 
+                progress_steps[4]['message'],
+                progress_steps[4].get('phase_progress', 0)
+            )
             
             # Enhanced system information using env_detector
             system_info = self._get_enhanced_system_info()
             verification_results['system_info'] = system_info
             
             # Step 6: Verification complete
-            self.update_progress_safe(progress_callback, progress_steps[5]['progress'], progress_steps[5]['message'])
+            self.update_progress_safe(
+                progress_callback, 
+                progress_steps[5]['progress'], 
+                progress_steps[5]['message'],
+                progress_steps[5].get('phase_progress', 0)
+            )
             
             # Determine overall success
             all_verified = len(issues) == 0

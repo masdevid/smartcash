@@ -241,7 +241,6 @@ class ColabUIModule(BaseUIModule):
                     self.logger.info("🔥 BUTTON CLICKED! Processing setup button...")
                     try:
                         result = self._handle_setup_button(button)
-                        self.logger.info(f"✅ Button handler completed: {result}")
                         return result
                     except Exception as e:
                         self.logger.error(f"❌ Button handler failed: {e}", exc_info=True)
@@ -452,33 +451,37 @@ class ColabUIModule(BaseUIModule):
     # ==================== OPERATION HANDLERS ====================
     
     def _handle_setup_button(self, button=None) -> Dict[str, Any]:  # noqa: ARG002
-        """Handle setup button click - one-click operation that progresses through all phases sequentially."""
+        """Handle setup button click - execute full setup in one click."""
         try:
             self.log("🚀 Memulai setup lengkap lingkungan Colab...", 'info')
             
-            # Get initial phase from button state or start with init
-            current_phase = self._get_current_phase() or 'init'
+            # Execute all phases sequentially
+            phases = [
+                ('init', self._execute_init_phase),
+                ('drive', self._execute_drive_phase),
+                ('symlink', self._execute_symlink_phase),
+                ('folders', self._execute_folders_phase),
+                ('config', self._execute_config_phase),
+                ('env', self._execute_env_phase),
+                ('verify', self._execute_verify_phase)
+            ]
             
-            # Execute the appropriate phase operation
-            if current_phase == 'init':
-                return self._execute_init_phase(button)
-            elif current_phase == 'drive':
-                return self._execute_drive_phase(button)
-            elif current_phase == 'symlink':
-                return self._execute_symlink_phase(button)
-            elif current_phase == 'folders':
-                return self._execute_folders_phase(button)
-            elif current_phase == 'config':
-                return self._execute_config_phase(button)
-            elif current_phase == 'env':
-                return self._execute_env_phase(button)
-            elif current_phase == 'verify':
-                return self._execute_verify_phase(button)
-            elif current_phase == 'complete':
-                return {'success': True, 'message': '🎉 Setup Colab telah selesai!'}
-            else:
-                # Start from beginning if unknown phase
-                return self._execute_init_phase(button)
+            for phase_name, phase_func in phases:
+                self.log(f"🔄 Menjalankan fase: {phase_name}", 'info')
+                result = phase_func(button)
+                
+                if not result.get('success'):
+                    error_msg = f"❌ Fase {phase_name} gagal: {result.get('message', 'Unknown error')}"
+                    self.log(error_msg, 'error')
+                    return {'success': False, 'message': error_msg}
+                
+                self.log(f"✅ Fase {phase_name} berhasil", 'success')
+            
+            # All phases completed successfully
+            self._set_phase('complete')
+            success_msg = "🎉 Setup Colab lengkap berhasil diselesaikan!"
+            self.log(success_msg, 'success')
+            return {'success': True, 'message': success_msg}
                 
         except Exception as e:
             error_msg = f"Error in setup button handler: {e}"

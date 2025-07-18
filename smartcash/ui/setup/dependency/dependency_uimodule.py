@@ -40,9 +40,6 @@ class DependencyUIModule(BaseUIModule):
         # Ensure the logger is properly initialized with the module namespace
         self._update_logging_context()
         
-        # Log initialization with the explicit namespace
-        self.logger.debug(f"🔄 Initializing DependencyUIModule (namespace: {self._get_module_namespace()})")
-        
         # Set required components for validation
         self._required_components = [
             'main_container',
@@ -57,17 +54,6 @@ class DependencyUIModule(BaseUIModule):
         
         # Dependency-specific attributes
         self._package_status = {}
-    
-    def _get_module_namespace(self) -> str:
-        """
-        Override to provide a consistent namespace for this module.
-        
-        Returns:
-            The module's namespace string
-        """
-        if hasattr(self, '_module_namespace') and self._module_namespace:
-            return self._module_namespace
-        return 'smartcash.ui.setup.dependency'
     
     def _register_default_operations(self) -> None:
         """Register default operation handlers including dependency-specific operations."""

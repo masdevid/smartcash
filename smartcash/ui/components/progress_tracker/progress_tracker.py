@@ -69,7 +69,7 @@ class ProgressTracker(BaseUIComponent):
         
         # Create status widget with modern styling
         self._ui_components['status'] = widgets.HTML(
-            self._create_modern_status("Stand By", "info"),
+            self._create_modern_status("Ready", "info"),
             layout=widgets.Layout(width='100%', margin='0 0 8px 0')
         )
         
@@ -467,7 +467,7 @@ class ProgressTracker(BaseUIComponent):
         
         # Reset status with modern styling
         if 'status' in self._ui_components:
-            self._ui_components['status'].value = self._create_modern_status("Stand By", "info")
+            self._ui_components['status'].value = self._create_modern_status("Ready", "info")
             
         self._is_complete = False
         self._is_error = False

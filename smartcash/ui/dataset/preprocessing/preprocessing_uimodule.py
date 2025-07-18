@@ -291,16 +291,6 @@ class PreprocessingUIModule(BaseUIModule):
             error_message="Kesalahan pembersihan data"
         )
 
-    def _run_operation(
-        self, 
-        operation_name: str, 
-        **kwargs
-    ) -> None:
-        """Run a preprocessing operation."""
-        if not hasattr(self, 'progress_display') or not self.progress_display:
-            self._initialize_progress_display()
-        super()._run_operation(operation_name, **kwargs)
-
     def _get_preprocessed_data_stats(self) -> Tuple[int, int]:
         """Gets the count of preprocessed and raw files from the backend."""
         try:

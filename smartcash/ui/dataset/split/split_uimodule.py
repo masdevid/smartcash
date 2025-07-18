@@ -257,32 +257,6 @@ class SplitUIModule(BaseUIModule):
         except Exception as e:
             return {'error': f'Status check failed: {str(e)}'}
     
-    def _initialize_progress_display(self) -> None:
-        """Initialize operation container and show initial logs like backbone."""
-        try:
-            # Show rich initialization logs like backbone module
-            self.log("🔧 Split module operation manager initialized", 'info')
-            self.log("📊 Split UI module ready", 'info')
-            
-            # Log current configuration status
-            config = self.get_config()
-            split_config = config.get('split', {})
-            ratios = split_config.get('ratios', {})
-            
-            self.log(f"🎯 Default split ratios loaded: Train={ratios.get('train', 0.7):.1%}, Val={ratios.get('val', 0.15):.1%}, Test={ratios.get('test', 0.15):.1%}", 'info')
-            self.log(f"📁 Input directory: {split_config.get('input_dir', 'data/raw')}", 'info')
-            self.log(f"📂 Output directory: {split_config.get('output_dir', 'data/split')}", 'info')
-            self.log(f"🎲 Random seed: {split_config.get('seed', 42)}", 'debug')
-            
-            # Show operation container is ready (no progress tracker as requested)
-            operation_container = self._ui_components.get('operation_container')
-            if operation_container:
-                self.log("📈 Operation container ready for split configuration", 'info')
-            
-            self.log("✅ Split module fully initialized and ready", 'info')
-            
-        except Exception as e:
-            self.logger.debug(f"Operation container initialization failed: {e}")
 
 
 # ==================== FACTORY FUNCTIONS ====================

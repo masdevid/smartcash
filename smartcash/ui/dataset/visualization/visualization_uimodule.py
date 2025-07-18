@@ -65,9 +65,6 @@ class VisualizationUIModule(BaseUIModule):
         self._config = self.get_default_config()
         self._config_handler = self.create_config_handler(self._config)
         
-        # Load backend services
-        self._load_backend_apis()
-        
         # Initialize operations
         self._initialize_operations()
         
@@ -76,13 +73,10 @@ class VisualizationUIModule(BaseUIModule):
         self._ui_components = self.components  # For backward compatibility
         
         # Initialize progress display
-        self._initialize_progress_display()
         
         # Initialize dashboard cards
         self._initialize_dashboard()
         
-        # Initialize event handlers
-        self._setup_event_handlers()
     
     def _initialize_operations(self):
         """Initialize all visualization operations."""
@@ -112,8 +106,7 @@ class VisualizationUIModule(BaseUIModule):
         
         # Update statistik awal
         self._update_dashboard_stats()
-    
-    def _update_dashboard_stats(self):
+
         """Update statistics on the dashboard cards."""
         if not self._dashboard_cards:
             return
@@ -240,69 +233,6 @@ class VisualizationUIModule(BaseUIModule):
         
         # Set up event handlers
         self._setup_event_handlers()
-        
-    def _initialize_progress_display(self):
-        """Initialize progress display components.
-        
-        This method sets up the progress bar and status display for long-running operations.
-        """
-        if hasattr(self, '_progress_bar') and hasattr(self, '_status_label'):
-            return
-            
-        # Create progress bar
-        self._progress_bar = widgets.FloatProgress(
-            value=0,
-            min=0,
-            max=100,
-            description='Progress:',
-            bar_style='info',
-            orientation='horizontal',
-            layout=widgets.Layout(width='100%', visibility='hidden')
-        )
-        
-        # Create status label
-        self._status_label = widgets.HTML(
-            value='',
-            placeholder='Status: Ready',
-            description='',
-            layout=widgets.Layout(width='100%')
-        )
-        
-        # Add to UI if not already present
-        if hasattr(self, '_ui_components') and 'progress_container' in self._ui_components:
-            self._ui_components['progress_container'].children = [
-                self._progress_bar,
-                self._status_label
-            ]
-        
-        # Initialize event handlers
-        self._setup_event_handlers()
-    
-    def _setup_event_handlers(self):
-        """Set up event handlers for UI components."""
-        # Connect visualization controls to update methods
-        if 'visualization_type' in self.components:
-            self.components['visualization_type'].observe(
-                self._on_visualization_type_change, 'value'
-            )
-        
-        # Get action container if it exists
-        if 'containers' in self.components and 'actions' in self.components['containers']:
-            action_container = self.components['containers']['actions']
-            
-            # Check if we have buttons in the action container's return value
-            if isinstance(action_container, dict) and 'buttons' in action_container:
-                buttons = action_container['buttons']
-                
-                # Connect handlers for each button
-                for btn_name, btn in buttons.items():
-                    if hasattr(btn, 'on_click'):
-                        # Create a closure to capture the button name
-                        def make_handler(name):
-                            def handler(change):
-                                self._on_action_button_click(name)
-                            return handler
-                        btn.on_click(make_handler(btn_name))
     
     def _get_module_button_handlers(self) -> Dict[str, Any]:
         """Get Visualization module-specific button handlers.
@@ -397,62 +327,6 @@ class VisualizationUIModule(BaseUIModule):
             The API implementation or None if not available
         """
         return self._backend_apis.get(api_name)
-    
-    def _load_backend_apis(self) -> None:
-        """Load backend API modules for visualization operations.
-        
-        This method attempts to load various backend APIs for visualization features.
-        If a module is not available, it will log a debug message and continue without it.
-        """
-        # Initialize with empty backend APIs
-        self._backend_apis = {}
-        
-        # Try to import preprocessor samples API if available
-        try:
-            from smartcash.dataset.preprocessor.api.samples_api import (
-                get_samples,
-                generate_sample_previews,
-                get_class_samples,
-                get_samples_summary
-            )
-            
-            # Add preprocessor API functions if import was successful
-            self._backend_apis['samples_service'] = {
-                'get_samples': get_samples,
-                'generate_sample_previews': generate_sample_previews,
-                'get_class_samples': get_class_samples,
-                'get_samples_summary': get_samples_summary
-            }
-            
-            # Try to import file scanner separately to handle its own potential import errors
-            try:
-                from smartcash.dataset.preprocessor.utils.file_scanner import scan_directory
-                self._backend_apis['preprocessor_scanner'] = scan_directory
-            except (ImportError, ModuleNotFoundError) as e:
-                # This is an optional dependency, so we just log a debug message
-                self.logger.debug("Preprocessor file scanner not available. Some features may be limited.")
-                
-        except (ImportError, ModuleNotFoundError) as e:
-            # This is an optional dependency, so we just log a debug message
-            self.logger.debug("Preprocessor backend module not available. Some features may be limited.")
-        
-        # Try to import augmentor scanner if available
-        try:
-            from smartcash.dataset.augmentor.utils.file_scanner import FileScanner
-            
-            # Create an instance of FileScanner and use its methods
-            file_scanner = FileScanner()
-            
-            # Map the scanner methods to the expected API
-            self._backend_apis['augmentor_scanner'] = {
-                'scan_augmented_files': file_scanner.scan_augmented_files,
-                'scan_preprocessed_files': file_scanner.scan_preprocessed_files
-            }
-            
-        except ImportError as e:
-            self.logger.warning(f"Augmentor backend module not available: {e}")
-        except Exception as e:
-            self.logger.warning(f"Error initializing augmentor scanner: {e}")
     
     def update_visualization(self, viz_type: str) -> None:
         """Update the current visualization.
@@ -626,6 +500,3 @@ get_visualization_component = EnhancedUIModuleFactory.create_component_function(
     VisualizationUIModule,
     function_name='get_visualization_component'
 )
-
-# Alias for backward compatibility
-display_visualization = initialize_visualization_ui

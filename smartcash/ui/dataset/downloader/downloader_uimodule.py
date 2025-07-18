@@ -100,24 +100,6 @@ class DownloaderUIModule(BaseUIModule):
             self.logger.error(f"Failed to create UI components: {e}")
             raise
         
-    def _initialize_progress_display(self) -> None:
-        """Initialize progress display components."""
-        try:
-            # Ensure progress visibility for downloader operations
-            self._ensure_progress_visibility()
-            
-            # Initialize progress bars if needed
-            if hasattr(self, '_ui_components') and self._ui_components:
-                # Get progress tracker from operation container
-                operation_container = self._ui_components.get('operation_container')
-                if operation_container and isinstance(operation_container, dict):
-                    progress_tracker = operation_container.get('progress_tracker')
-                    if progress_tracker and hasattr(progress_tracker, 'initialize'):
-                        progress_tracker.initialize()
-                    
-        except Exception as e:
-            if hasattr(self, 'logger'):
-                self.logger.debug(f"Failed to initialize progress display: {e}")
     
     def _get_module_button_handlers(self) -> Dict[str, Any]:
         """Get Downloader module-specific button handlers."""

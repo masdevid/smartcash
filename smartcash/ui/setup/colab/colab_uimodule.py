@@ -77,22 +77,6 @@ class ColabUIModule(BaseUIModule):
         
         self.logger.debug("✅ ColabUIModule initialized")
     
-    def _initialize_progress_display(self) -> None:
-        """Initialize progress display components."""
-        try:
-            # Ensure progress visibility for colab operations
-            if hasattr(self, '_ensure_progress_visibility'):
-                self._ensure_progress_visibility()
-            
-            # Initialize progress bars if needed
-            if hasattr(self, '_ui_components') and self._ui_components:
-                progress_tracker = self._ui_components.get('progress_tracker')
-                if progress_tracker and hasattr(progress_tracker, 'initialize'):
-                    progress_tracker.initialize()
-                    
-        except Exception as e:
-            if hasattr(self, 'logger'):
-                self.logger.debug(f"Failed to initialize progress display: {e}")
     
     def get_default_config(self) -> Dict[str, Any]:
         """Get default configuration for Colab module (BaseUIModule requirement)."""

@@ -89,7 +89,6 @@ def create_visualization_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -
     current_config = config or {}
     ui_components = {
         'config': current_config,
-        'containers': {},
         'widgets': {}
     }
     
@@ -100,10 +99,7 @@ def create_visualization_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -
         icon='📊'  # Chart emoji for visualization
     )
     # Store both the container object and its widget
-    ui_components['containers']['header'] = {
-        'container': header_container.container,
-        'widget': header_container
-    }
+    ui_components['header'] = header_container
     
     # === 2. Buat Form Container ===
     # Buat widget form dengan tata letak dua kolom
@@ -127,7 +123,7 @@ def create_visualization_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -
     )
     
     # Simpan referensi
-    ui_components['containers']['form'] = form_container
+    ui_components['form'] = form_container
     ui_components['widgets'].update(form_widgets['widgets'])
     
     # === 3. Buat Action Container ===
@@ -162,27 +158,16 @@ def create_visualization_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -
         buttons=action_buttons,
         title="📊 Aksi Visualisasi"
     )
-    
+
     # Simpan container aksi
-    ui_components['containers']['actions'] = action_container
+    ui_components['actions'] = action_container
     
-    # Simpan referensi tombol dengan ID dasar saja
-    if hasattr(action_container, 'get_button'):
-        # Jika action container memiliki method get_button
-        ui_components['refresh'] = action_container.get_button('refresh')
-        ui_components['preprocessed'] = action_container.get_button('preprocessed')
-        ui_components['augmented'] = action_container.get_button('augmented')
-    elif hasattr(action_container, 'buttons') and isinstance(action_container.buttons, dict):
-        # Jika action container memiliki atribut buttons yang berupa dictionary
-        buttons = action_container.buttons
-        
-        # Gunakan ID dasar saja tanpa menambahkan _button
-        for btn_id in ['refresh', 'preprocessed', 'augmented']:
-            # Coba dapatin button dengan ID dasar
-            button = buttons.get(btn_id)
-            if button is not None:
-                ui_components[btn_id] = button
-    
+    # Get buttons from the action container's buttons dictionary
+    buttons = action_container['buttons']
+    ui_components['refresh'] = buttons.get('refresh')
+    ui_components['preprocessed'] = buttons.get('preprocessed')
+    ui_components['augmented'] = buttons.get('augmented')
+   
     # === 4. Buat Summary Container ===
     summary_content = _create_module_summary_content(current_config)
     summary_container = create_summary_container(
@@ -192,7 +177,7 @@ def create_visualization_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -
     )
     summary_container.set_content(summary_content)
     
-    ui_components['containers']['summary'] = summary_container
+    ui_components['summary'] = summary_container
     
     # === 5. Buat Operation Container ===
     operation_container = create_operation_container(
@@ -207,7 +192,7 @@ def create_visualization_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -
         collapsible=True,
         collapsed=False
     )
-    ui_components['containers']['operation'] = operation_container
+    ui_components['operation'] = operation_container
     
     # === 6. Buat Footer Container ===
     footer_container = create_footer_container(
@@ -216,10 +201,7 @@ def create_visualization_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -
         show_version=True
     )
     # Simpan container dan widget-nya
-    ui_components['containers']['footer'] = {
-        'container': footer_container.container,
-        'widget': footer_container
-    }
+    ui_components['footer'] = footer_container
     
     # === 5.1 Buat Dashboard Container ===
     # Buat container untuk dashboard cards
@@ -240,7 +222,7 @@ def create_visualization_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -
     )
     
     # Simpan dashboard container
-    ui_components['containers']['dashboard'] = dashboard_container
+    ui_components['dashboard'] = dashboard_container
     
     # === 7. Buat Main Container ===
     # Siapkan komponen untuk container utama
@@ -270,28 +252,8 @@ def create_visualization_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -
     # Simpan referensi UI utama
     ui_components['ui'] = main_container
     ui_components['main_container'] = main_container
-    
-    # Tambahkan semua container ke ui_components untuk akses mudah
-    ui_components['containers']['main'] = main_container
-    
-    # Buat kamus hasil dengan semua komponen
-    result = {
-        'ui_components': ui_components,
-        'ui': main_container.container,  # Gunakan widget sebenarnya, bukan objek MainContainer
-        'main_container': main_container.container,
-        'containers': ui_components['containers'],
-        'widgets': ui_components['widgets']
-    }
-    
-    # Tambahkan semua komponen ke root untuk kompatibilitas ke belakang
-    result.update(ui_components['containers'])
-    result.update(ui_components['widgets'])
-    
-    # Tambahkan referensi langsung ke semua container untuk akses lebih mudah
-    for container_name, container in ui_components['containers'].items():
-        result[container_name] = container
-    
-    return result
+    ui_components['main_layout'] = main_container
+    return ui_components
 
 
 def _create_module_form_widgets(config: Dict[str, Any]) -> Dict[str, Any]:

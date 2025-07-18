@@ -274,31 +274,6 @@ class AugmentationUIModule(BaseUIModule):
         except Exception as e:
             self.log(f"Failed to refresh preview: {e}", 'error')
     
-    def _initialize_progress_display(self) -> None:
-        """Initialize progress display components for augmentation operations."""
-        try:
-            # Ensure progress visibility for augmentation operations
-            if hasattr(self, '_ensure_progress_visibility'):
-                self._ensure_progress_visibility()
-            
-            # Initialize progress bars if needed
-            if hasattr(self, '_ui_components') and self._ui_components:
-                progress_tracker = self._ui_components.get('progress_tracker')
-                if progress_tracker and hasattr(progress_tracker, 'initialize'):
-                    progress_tracker.initialize()
-                    self.logger.debug("Progress tracker initialized")
-                
-                # Initialize operation container progress
-                operation_container = self._ui_components.get('operation_container')
-                if operation_container:
-                    if 'update_progress' in operation_container:
-                        self.logger.debug("Operation container progress system ready")
-                    
-        except Exception as e:
-            if hasattr(self, 'logger'):
-                self.logger.warning(f"Failed to initialize progress display: {e}")
-            else:
-                print(f"Failed to initialize progress display: {e}")
     
     # ==================== HELPER METHODS ====================
     

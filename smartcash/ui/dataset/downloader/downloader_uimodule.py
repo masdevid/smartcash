@@ -116,37 +116,6 @@ class DownloaderUIModule(BaseUIModule):
         handlers.update(downloader_handlers)
         return handlers
     
-    def ensure_components_ready(self) -> bool:
-        """Ensure all required UI components are ready for operations.
-        
-        Returns:
-            bool: True if all components are ready, False otherwise
-        """
-        # Check if UI components are initialized
-        if not hasattr(self, '_ui_components') or not self._ui_components:
-            self.log("⚠️ Komponen UI belum diinisialisasi", 'warning')
-            return False
-            
-        # Check if operation container is available
-        if 'operation_container' not in self._ui_components:
-            self.log("⚠️ Komponen UI yang diperlukan belum tersedia: operation_container", 'warning')
-            return False
-            
-        # Check if progress tracker is available within operation container
-        operation_container = self._ui_components.get('operation_container')
-        if operation_container and isinstance(operation_container, dict):
-            progress_tracker = operation_container.get('progress_tracker')
-            if not progress_tracker:
-                self.log("⚠️ Progress tracker belum tersedia dalam operation container", 'warning')
-                return False
-            
-        # Ensure progress tracker is ready
-        if not self.ensure_progress_ready():
-            self.log("⚠️ Progress tracker belum siap", 'warning')
-            return False
-            
-        return True
-    
     def _log_initialization_complete(self) -> None:
         """Log initialization completion to operation container (after it's ready)."""
         try:

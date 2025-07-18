@@ -9,6 +9,7 @@ from typing import Dict, Any, Optional, Tuple
 from smartcash.ui.core.base_ui_module import BaseUIModule
 from smartcash.ui.core.enhanced_ui_module_factory import EnhancedUIModuleFactory
 
+from smartcash.ui.core.decorators import suppress_ui_init_logs
 from .components.preprocessing_ui import create_preprocessing_ui_components
 from .configs.preprocessing_config_handler import PreprocessingConfigHandler
 from .configs.preprocessing_defaults import get_default_config
@@ -18,20 +19,28 @@ class PreprocessingUIModule(BaseUIModule):
     """
     Preprocessing UI Module.
     """
+    # Define required UI components at class level
+    _required_components = [
+        'main_container',
+        'header_container',
+        'form_container',
+        'action_container',
+        'operation_container'
+    ]
 
-    def __init__(self):
-        """Initialize the Preprocessing UI module."""
+    def __init__(self, enable_environment: bool = False):
+        """
+        Initialize the Preprocessing UI module.
+        
+        Args:
+            enable_environment: Whether to enable environment management features
+        """
+        # Call parent initializer with required parameters
         super().__init__(
             module_name='preprocessing',
-            parent_module='dataset'
+            parent_module='dataset',
+            enable_environment=enable_environment
         )
-        self._required_components = [
-            'main_container',
-            'header_container',
-            'form_container',
-            'action_container',
-            'operation_container'
-        ]
         
         # Initialize log buffer for pre-operation-container logs
         self._log_buffer = []
@@ -104,7 +113,8 @@ class PreprocessingUIModule(BaseUIModule):
         except Exception as e:
             self.logger.error(f"Failed to setup operation container: {e}", exc_info=True)
             return False
-    
+
+    @suppress_ui_init_logs(duration=3.0)
     def initialize(self, config: Optional[Dict[str, Any]] = None, **kwargs) -> bool:
         """
         Initialize the Preprocessing module.

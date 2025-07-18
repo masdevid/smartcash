@@ -31,27 +31,32 @@ class VisualizationUIModule(BaseUIModule):
     - 🇮🇩 Antarmuka dalam Bahasa Indonesia
     """
     
-    def __init__(self):
-        """Inisialisasi modul UI Visualisasi."""
-        # Inisialisasi BaseUIModule
+    # Define required UI components at class level
+    _required_components = [
+        'main_container',
+        'header_container', 
+        'form_container',
+        'dashboard_container',
+        'visualization_container',
+        'controls_container',
+        'progress_container'
+    ]
+    
+    def __init__(self, enable_environment: bool = False):
+        """
+        Inisialisasi modul UI Visualisasi.
+        
+        Args:
+            enable_environment: Apakah mengaktifkan fitur manajemen environment
+        """
+        # Initialize base module first
         super().__init__(
             module_name='visualization',
             parent_module='dataset',
-            enable_environment=False
+            enable_environment=enable_environment
         )
         
-        # Set required components for validation
-        self._required_components = [
-            'main_container',
-            'header_container', 
-            'form_container',
-            'dashboard_container',
-            'visualization_container',
-            'controls_container',
-            'progress_container'
-        ]
-        
-        # Initialize attributes
+        # Initialize instance attributes
         self._current_visualization = None
         self._datasets = {}
         self.components = {}
@@ -60,10 +65,11 @@ class VisualizationUIModule(BaseUIModule):
         self._backend_apis = {}
         self._operations = {}
         self._dashboard_cards = None
+        self._config = None
+        self._config_handler = None
         
         # Initialize configuration
-        self._config = self.get_default_config()
-        self._config_handler = self.create_config_handler(self._config)
+        self._initialize_config()
         
         # Initialize operations
         self._initialize_operations()
@@ -72,10 +78,13 @@ class VisualizationUIModule(BaseUIModule):
         self.components = self.create_ui_components(self._config)
         self._ui_components = self.components  # For backward compatibility
         
-        # Initialize progress display
-        
         # Initialize dashboard cards
         self._initialize_dashboard()
+    
+    def _initialize_config(self) -> None:
+        """Initialize configuration and config handler."""
+        self._config = self.get_default_config()
+        self._config_handler = self.create_config_handler(self._config)
         
     
     def _initialize_operations(self):

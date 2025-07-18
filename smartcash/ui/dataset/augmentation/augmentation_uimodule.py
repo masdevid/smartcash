@@ -9,6 +9,7 @@ from typing import Dict, Any, Optional
 from smartcash.ui.core.base_ui_module import BaseUIModule
 
 # Augmentation module imports
+from smartcash.ui.core.decorators import suppress_ui_init_logs
 from .components.augmentation_ui import create_augment_ui
 from .configs.augmentation_config_handler import AugmentationConfigHandler
 from .configs.augmentation_defaults import get_default_augmentation_config
@@ -43,6 +44,7 @@ class AugmentationUIModule(BaseUIModule):
         """Create config handler instance for this module."""
         return AugmentationConfigHandler(default_config=config)
     
+    @suppress_ui_init_logs(duration=3.0)
     def initialize(self, config: Optional[Dict[str, Any]] = None, **kwargs) -> bool:
         """
         Initialize the Augmentation module.

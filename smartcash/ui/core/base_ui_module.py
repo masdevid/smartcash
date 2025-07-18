@@ -98,10 +98,13 @@ class BaseUIModule(
         # Set up logger after module name is set
         self.logger = get_module_logger(f"smartcash.ui.{self.full_module_name}")
         
+        # Initialize UI components dictionary
+        self._ui_components = {}
+        
         # Initialize common attributes
         self._is_initialized = False
-        self._ui_components = None
-        self._required_components = []
+        self._ui_components = {}
+        self._required_components = getattr(self, '_required_components', [])
         
         # Ensure logging mixin has the correct module info
         if hasattr(self, '_update_logging_context'):
@@ -625,7 +628,7 @@ class BaseUIModule(
             'save': self._handle_save_config,
             'reset': self._handle_reset_config
         }
-    
+        
     def get_button_validation_status(self) -> Dict[str, Any]:
         """
         Get current button validation status.
@@ -633,38 +636,46 @@ class BaseUIModule(
         Returns:
             Dictionary with validation status information
         """
-        try:
-            from smartcash.ui.core.validation.button_validator import validate_button_handlers
+        return {
+            'is_valid': self._is_initialized and hasattr(self, '_ui_components') and bool(self._ui_components),
+            'missing_components': [
+                comp for comp in self._required_components 
+                if not (hasattr(self, '_ui_components') and self._ui_components.get(comp))
+            ],
+            'total_required': len(self._required_components),
+            'initialized': self._is_initialized
+        }
+        
+    def ensure_components_ready(self) -> bool:
+        """Ensure all required UI components are ready for operations.
+        
+        Returns:
+            bool: True if all components are ready, False otherwise
+        """
+        # Check if UI components are initialized
+        if not hasattr(self, '_ui_components') or not self._ui_components:
+            self.log("⚠️ UI components not initialized", 'warning')
+            return False
             
-            result = validate_button_handlers(self, auto_fix=False)
+        # Check if operation container is available
+        if 'operation_container' not in self._ui_components:
+            self.log("⚠️ Required UI component not available: operation_container", 'warning')
+            return False
             
-            return {
-                'is_valid': result.is_valid,
-                'has_errors': result.has_errors,
-                'has_warnings': result.has_warnings,
-                'error_count': len([i for i in result.issues if i.level.value == 'error']),
-                'warning_count': len([i for i in result.issues if i.level.value == 'warning']),
-                'button_count': len(result.button_ids),
-                'handler_count': len(result.handler_ids),
-                'missing_handlers': result.missing_handlers,
-                'orphaned_handlers': result.orphaned_handlers,
-                'issues': [
-                    {
-                        'level': issue.level.value,
-                        'message': issue.message,
-                        'button_id': issue.button_id,
-                        'suggestion': issue.suggestion,
-                        'auto_fixable': issue.auto_fixable
-                    }
-                    for issue in result.issues
-                ]
-            }
+        # Check if progress tracker is available within operation container
+        operation_container = self._ui_components.get('operation_container')
+        if operation_container and isinstance(operation_container, dict):
+            progress_tracker = operation_container.get('progress_tracker')
+            if not progress_tracker:
+                self.log("⚠️ Progress tracker not available in operation container", 'warning')
+                return False
+        
+        # Ensure progress tracker is ready if the method exists
+        if hasattr(self, 'ensure_progress_ready') and not self.ensure_progress_ready():
+            self.log("⚠️ Progress tracker not ready", 'warning')
+            return False
             
-        except Exception as e:
-            return {
-                'is_valid': False,
-                'error': str(e)
-            }
+        return True
     
     def _update_header_status(self, message: str, status_type: str = "info") -> None:
         """

@@ -167,35 +167,12 @@ class DependencyUIModule(BaseUIModule):
             self.logger.error(f"Failed to initialize Dependency module: {e}")
             return False
     
-    def ensure_components_ready(self) -> bool:
-        """Ensure all required UI components are ready for operations.
-        
-        Returns:
-            bool: True if all components are ready, False otherwise
-        """
-        required_components = ['operation_container', 'progress_tracker']
-        
-        if not hasattr(self, '_ui_components') or not self._ui_components:
-            self.log("⚠️ Komponen UI belum diinisialisasi", 'warning')
-            return False
-            
-        missing = [comp for comp in required_components if comp not in self._ui_components]
-        if missing:
-            self.log(f"⚠️ Komponen UI yang diperlukan belum tersedia: {', '.join(missing)}", 'warning')
-            return False
-            
-        # Ensure progress tracker is ready
-        if not self.ensure_progress_ready():
-            self.log("⚠️ Progress tracker belum siap", 'warning')
-            return False
-            
-        return True
         
     def _log_initialization_complete(self) -> None:
         """Log initialization completion to operation container (after it's ready)."""
         try:
-            # Ensure components are ready before proceeding
-            if not self.ensure_components_ready():
+            # Ensure components are ready before proceeding using parent class implementation
+            if not super().ensure_components_ready():
                 self.log("⚠️ Beberapa komponen UI belum siap, beberapa fitur mungkin terbatas", 'warning')
             
             # Log environment info if environment support is enabled

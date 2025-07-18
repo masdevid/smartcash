@@ -456,39 +456,63 @@ class LogAccordion(BaseUIComponent):
         if self.auto_scroll:
             self._scroll_to_bottom()
     
-    def _shorten_namespace(self, namespace: Optional[str]) -> str:
-        """Shorten long namespace paths for better readability."""
-        if not namespace:
+    def _shorten_namespace(self, namespace: str) -> str:
+        """Shorten long namespace paths for better readability.
+        
+        Args:
+            namespace: The full namespace to shorten
+            
+        Returns:
+            A shortened, more readable version of the namespace
+        """
+        if not namespace or not isinstance(namespace, str):
             return ""
             
         # Common prefixes to shorten
-        replacements = {
-            'smartcash.': '',
-            'smartcash.common.': 'common.',
-            'smartcash.dataset.': 'dataset.',
-            'smartcash.model.': 'model.',
-            'smartcash.ui.': 'ui.',
-            'smartcash.ui.core.': 'core.',
-            'smartcash.ui.core.shared.': 'core.',
-            'smartcash.ui.components.': 'components.',
-            'smartcash.ui.setup.': 'setup.',
-            'smartcash.ui.setup.colab.': 'colab.',
-            'smartcash.ui.setup.dependency': 'dependency.',
-        }
+        replacements = [
+            ('smartcash.', ''),
+            ('smartcash.common.', 'common.'),
+            ('smartcash.dataset.', 'dataset.'),
+            ('smartcash.model.', 'model.'),
+            ('smartcash.ui.', 'ui.'),
+            ('smartcash.ui.core.', 'core.'),
+            ('smartcash.ui.core.shared.', 'core.'),
+            ('smartcash.ui.components.', 'components.'),
+            ('smartcash.ui.setup.', 'setup.'),
+            ('smartcash.ui.setup.colab.', 'colab.'),
+            ('smartcash.ui.setup.dependency', 'dependency.'),
+            ('smartcash.ui.dataset.', 'dataset.'),
+            ('smartcash.ui.dataset.downloader.', 'downloader.'),
+            ('smartcash.ui.dataset.preprocessing.', 'preprocessing.'),
+            ('smartcash.ui.dataset.augmentation.', 'augmentation.'),
+            ('smartcash.ui.dataset.split.', 'split.'),
+            ('smartcash.ui.dataset.visualization.', 'visualization.'),
+            ('smartcash.ui.model.', 'model.'),
+            ('smartcash.ui.model.pretrained.', 'pretrained.'),
+            ('smartcash.ui.model.backbone.', 'backbone.'),
+            ('smartcash.ui.model.train.', 'train.'),
+            ('smartcash.ui.model.training.', 'training.'),
+            ('smartcash.ui.model.evaluate.', 'evaluate.'),
+            ('smartcash.ui.model.evaluation.', 'evaluation.'),
+        ]
         
         # Apply replacements
         short_ns = namespace
-        for old, new in replacements.items():
+        for old, new in replacements:
             if short_ns.startswith(old):
                 short_ns = new + short_ns[len(old):]
+                # Only apply the first matching replacement
                 break
+                
+        # If no replacements were made, try to get the last part of the path
+        if short_ns == namespace and '.' in short_ns:
+            short_ns = short_ns.split('.')[-1]
                 
         return short_ns
 
     def _create_log_widget(self, entry: LogEntry) -> widgets.HTML:
         """Create an HTML widget for a log entry in a single row format."""
         try:
-            # Get style for the log level
             style = get_log_level_style(entry.level)
             
             # Format timestamp in GMT+7
@@ -500,9 +524,9 @@ class LogAccordion(BaseUIComponent):
             # Add duplicate counter if needed
             duplicate_counter = f" <span class='duplicate-counter'>{entry.count}</span>" if entry.show_duplicate_indicator else ""
             
-            # Get full namespace or 'unknown' if not available
-            full_namespace = entry.namespace or 'unknown'
-            
+            # Get and format namespace
+            full_namespace = self._shorten_namespace(entry.namespace) if entry.namespace else ''
+                
             # Handle multi-line messages (e.g., tracebacks)
             message_lines = entry.message.split('\n')
             main_message = message_lines[0]  # First line only for compact view
@@ -542,27 +566,29 @@ class LogAccordion(BaseUIComponent):
                 gap: 6px;
                 line-height: 1.4;
                 font-size: 13px;
-                font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
-            '>
+                font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;'>
                 <!-- Namespace -->
-                <span style='
+                <span class='log-namespace' title='{entry.namespace or ""}' style='
                     color: #6c757d;
                     font-size: 11px;
+                    display: {'inline-block' if full_namespace else 'none'};
                     max-width: {'200px' if self.log_entry_style == 'compact' else 'none'};
                     overflow: hidden;
                     text-overflow: ellipsis;
                     white-space: nowrap;
-                    flex-shrink: 0;
-                    display: {'block' if self.log_entry_style == 'default' else 'inline'};
-                '>[{full_namespace}]</span>
-                
+                    margin-right: 8px;
+                    vertical-align: middle;
+                    line-height: 1.4;'>
+                    {full_namespace}
+                </span>
                 <!-- Icon -->
                 <span style='
                     font-size: 14px;
                     flex-shrink: 0;
                     width: 20px;
-                    text-align: center;
-                '>{level_emoji}</span>
+                    text-align: center;'>
+                    {level_emoji}
+                </span>
                 
                 <!-- Message -->
                 <span style='
@@ -573,16 +599,18 @@ class LogAccordion(BaseUIComponent):
                     white-space: pre-wrap;
                     line-height: 1.4;
                     display: inline-block;
-                    min-width: 0; /* Allows text wrapping in flex container */
-                '>{main_message}{duplicate_counter}</span>
+                    min-width: 0;'>
+                    {main_message}{duplicate_counter}
+                </span>
                 
                 <!-- Timestamp -->
                 <span style='
                     color: #6c757d;
                     font-size: 11px;
                     flex-shrink: 0;
-                    margin-left: 8px;
-                '>{timestamp}</span>
+                    margin-left: 8px;'>
+                    {timestamp}
+                </span>
                 
                 {expandable_html}
             </div>

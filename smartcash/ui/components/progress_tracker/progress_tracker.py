@@ -41,20 +41,20 @@ class ProgressTracker(BaseUIComponent):
     
     def _create_ui_components(self) -> None:
         """Create and initialize UI components."""
-        # Create main container with modern styling
+        # Create main container with modern styling (no padding)
         self._ui_components['container'] = widgets.VBox(
             [],
             layout=widgets.Layout(
                 display='block',
                 width='100%',
-                margin='16px 0',
-                padding='24px',
+                margin='8px 0',
+                padding='0px',
                 border='1px solid rgba(255, 255, 255, 0.18)',
-                border_radius='16px',
+                border_radius='12px',
                 background_color='rgba(255, 255, 255, 0.95)',
-                box_shadow='0 8px 32px rgba(0, 0, 0, 0.1), 0 2px 8px rgba(0, 0, 0, 0.05)',
+                box_shadow='0 4px 16px rgba(0, 0, 0, 0.08), 0 1px 4px rgba(0, 0, 0, 0.04)',
                 backdrop_filter='blur(10px)',
-                min_height='120px',
+                min_height='60px',
                 height='auto',
                 overflow='visible',
                 box_sizing='border-box'
@@ -64,20 +64,20 @@ class ProgressTracker(BaseUIComponent):
         # Create header widget with modern styling
         self._ui_components['header'] = widgets.HTML(
             self._create_modern_header(self._config.operation),
-            layout=widgets.Layout(width='100%', margin='0 0 16px 0')
+            layout=widgets.Layout(width='100%', margin='0 0 8px 0')
         )
         
         # Create status widget with modern styling
         self._ui_components['status'] = widgets.HTML(
-            self._create_modern_status("Initializing...", "info"),
-            layout=widgets.Layout(width='100%', margin='0 0 20px 0')
+            self._create_modern_status("Stand By", "info"),
+            layout=widgets.Layout(width='100%', margin='0 0 8px 0')
         )
         
-        # Create output widgets for progress bars with modern layout
-        bar_height = '36px'
+        # Create output widgets for progress bars with compact layout
+        bar_height = '24px'
         bar_layout = widgets.Layout(
             width='100%',
-            margin='8px 0',
+            margin='4px 0',
             height=bar_height,
             min_height=bar_height,
             overflow='visible'
@@ -117,18 +117,18 @@ class ProgressTracker(BaseUIComponent):
         return self._ui_components.get('status')
     
     def _update_container_height(self) -> None:
-        """Update container height based on visible components with modern spacing."""
+        """Update container height based on visible components with compact spacing."""
         if not hasattr(self, '_ui_components') or 'container' not in self._ui_components:
             return
             
-        # Modern spacing: increased padding and margins
-        base_height = 80  # px for header + status + modern padding
-        bar_height = 40   # px per progress bar with better spacing
+        # Compact spacing for minimal height
+        base_height = 50  # px for header + status + compact padding
+        bar_height = 28   # px per progress bar with compact spacing
         
         # Count visible progress bars based on level
         visible_bars = self._config.level.value
         
-        # Calculate total height with modern spacing
+        # Calculate total height with compact spacing
         total_height = base_height + (visible_bars * bar_height)
         
         # Update container height
@@ -467,7 +467,7 @@ class ProgressTracker(BaseUIComponent):
         
         # Reset status with modern styling
         if 'status' in self._ui_components:
-            self._ui_components['status'].value = self._create_modern_status("Initializing...", "info")
+            self._ui_components['status'].value = self._create_modern_status("Stand By", "info")
             
         self._is_complete = False
         self._is_error = False

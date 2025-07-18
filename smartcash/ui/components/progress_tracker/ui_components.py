@@ -29,23 +29,23 @@ class UIComponentsManager:
         # Header dengan modern typography
         self.header_widget = widgets.HTML("", layout=widgets.Layout(
             width='100%', 
-            margin='0 0 16px 0',
+            margin='0 0 8px 0',
             padding='0'
         ))
         
         # Status message dengan modern design
         self.status_widget = widgets.HTML("", layout=widgets.Layout(
             width='100%', 
-            margin='0 0 20px 0',
+            margin='0 0 8px 0',
             padding='0'
         ))
         
-        # Progress bars dengan consistent modern styling
+        # Progress bars dengan compact styling
         progress_style = {
             'width': '100%',
-            'margin': '8px 0',
-            'min_height': '32px',
-            'max_height': '36px',
+            'margin': '4px 0',
+            'min_height': '24px',
+            'max_height': '24px',
             'padding': '0',
             'overflow': 'visible'
         }
@@ -72,18 +72,18 @@ class UIComponentsManager:
         elif self.config.level.value == 1:  # SINGLE
             progress_widgets.append(self.overall_output)  # Use overall for single
         
-        # Modern container with glassmorphism effect
+        # Modern container with glassmorphism effect (no padding)
         self.container = widgets.VBox(
             [self.header_widget, self.status_widget] + progress_widgets,
             layout=widgets.Layout(
                 display='none',
                 width='100%',
-                margin='16px 0',
-                padding='24px',
+                margin='4px 0',
+                padding='0px',
                 border='1px solid rgba(255, 255, 255, 0.18)',
-                border_radius='16px',
+                border_radius='12px',
                 background_color='rgba(255, 255, 255, 0.95)',
-                box_shadow='0 8px 32px rgba(0, 0, 0, 0.1), 0 2px 8px rgba(0, 0, 0, 0.05)',
+                box_shadow='0 4px 16px rgba(0, 0, 0, 0.08), 0 1px 4px rgba(0, 0, 0, 0.04)',
                 backdrop_filter='blur(10px)',
                 min_height=self.config.get_container_height(),
                 max_height='none',
@@ -196,9 +196,9 @@ class UIComponentsManager:
             font-size: 14px;
             font-weight: 600;
             margin: 0;
-            padding: 16px 20px;
+            padding: 12px 16px;
             background: {bg_color};
-            border-radius: 12px;
+            border-radius: 8px;
             border: 1px solid rgba({self._hex_to_rgb(color)}, 0.2);
             box-sizing: border-box;
             word-wrap: break-word;

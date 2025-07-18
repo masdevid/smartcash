@@ -551,49 +551,36 @@ class LogAccordion(BaseUIComponent):
             # Determine which CSS class to use based on log_entry_style
             entry_class = 'log-entry-compact' if self.log_entry_style == 'compact' else 'log-entry'
             
-            # Create single row format with namespace in a span
+            # Create compact flex layout
             html = f"""
             <div class='{entry_class}' style='
-                padding: 4px 8px; 
-                margin: 2px 0; 
-                border-left: 3px solid {style['color']}; 
-                background: {style['bg']}; 
+                padding: 2px 8px;
+                margin: 1px 0;
+                border-left: 3px solid {style['color']};
+                background: {style['bg']};
                 border-radius: 3px;
-                transition: all 0.15s ease;'>
+                transition: all 0.15s ease;
+                font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;'>
                 
-                <div style='display: flex; align-items: flex-start; gap: 6px;'>
+                <div style='display: flex; gap: 6px; align-items: flex-start; line-height: 1.3;'>
                     <!-- Icon -->
-                    <span style='
-                        font-size: 14px;
-                        flex-shrink: 0;
-                        width: 20px;
-                        text-align: center;'>
-                        {level_emoji}
-                    </span>
+                    <div style='flex: 0 0 16px; margin-top: 1px;'>{level_emoji}</div>
                     
-                    <!-- Message with Namespace -->
-                    <div style='
-                        flex: 1;
-                        color: {style['text_color']};
-                        word-break: break-word;
-                        white-space: pre-wrap;
-                        line-height: 1.4;'>
-                        {f'<span style="color: #6c757d; font-size: 0.9em;">{full_namespace}</span><br/>' if full_namespace else ''}
-                        {main_message}{duplicate_counter}
+                    <!-- Message Content -->
+                    <div style='flex: 1; min-width: 0;'>
+                        <div style='display: flex; flex-wrap: wrap; gap: 4px; align-items: baseline;'>
+                            <!-- Namespace -->
+                            {f'<span style="color: #6c757d; font-size: 0.85em; flex-shrink: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 40%;" title="{full_namespace}">{full_namespace}</span>' if full_namespace else ''}
+                            
+                            <!-- Message -->
+                            <div style='color: {style['text_color']}; word-break: break-word; flex: 1; min-width: 100px;'>{main_message}{duplicate_counter}</div>
+                            
+                            <!-- Timestamp -->
+                            <span style='color: #6c757d; font-size: 0.85em; flex-shrink: 0; white-space: nowrap;'>{timestamp}</span>
+                        </div>
+                        {expandable_html}
                     </div>
-                    
-                    <!-- Timestamp -->
-                    <span style='
-                        color: #6c757d;
-                        font-size: 11px;
-                        flex-shrink: 0;
-                        margin-left: 4px;
-                        white-space: nowrap;'>
-                        {timestamp}
-                    </span>
                 </div>
-                
-                {expandable_html}
             </div>
             """
             

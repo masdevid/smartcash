@@ -31,7 +31,7 @@ def create_training_form(training_config: Dict[str, Any], ui_config: Dict[str, A
             options=[(config['display_name'], key) for key, config in layer_configs.items()],
             value=training_config.get('layer_mode', 'single'),
             style={'description_width': '150px'},
-            layout=widgets.Layout(width='100%')
+            layout=widgets.Layout(width='auto')
         )
         
         # Basic training parameters
@@ -42,7 +42,7 @@ def create_training_form(training_config: Dict[str, Any], ui_config: Dict[str, A
             max=1000,
             step=10,
             style={'description_width': '150px'},
-            layout=widgets.Layout(width='100%')
+            layout=widgets.Layout(width='auto')
         )
         
         batch_size_input = widgets.IntSlider(
@@ -50,9 +50,9 @@ def create_training_form(training_config: Dict[str, Any], ui_config: Dict[str, A
             value=training_config.get('batch_size', 16),
             min=1,
             max=256,
-            step=2,
+            step=1,
             style={'description_width': '150px'},
-            layout=widgets.Layout(width='100%')
+            layout=widgets.Layout(width='auto')
         )
         
         learning_rate_input = widgets.FloatLogSlider(
@@ -63,7 +63,7 @@ def create_training_form(training_config: Dict[str, Any], ui_config: Dict[str, A
             max=0,
             step=0.1,
             style={'description_width': '150px'},
-            layout=widgets.Layout(width='100%')
+            layout=widgets.Layout(width='auto')
         )
         
         # Optimization type
@@ -72,7 +72,7 @@ def create_training_form(training_config: Dict[str, Any], ui_config: Dict[str, A
             options=[(config['display_name'], key) for key, config in optimization_types.items()],
             value=training_config.get('optimization_type', 'default'),
             style={'description_width': '150px'},
-            layout=widgets.Layout(width='100%')
+            layout=widgets.Layout(width='auto')
         )
         
         # Advanced options (simplified)

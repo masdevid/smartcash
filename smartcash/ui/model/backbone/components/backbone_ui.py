@@ -193,6 +193,7 @@ def create_backbone_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> Dic
     ui_components['ui'] = main_container.container
     ui_components['main_container'] = main_container
     
+    ui_components['main_layout'] = main_container.container
     return ui_components
 
 
@@ -210,13 +211,13 @@ def _create_backbone_form_widgets(config: Dict[str, Any]) -> Dict[str, Any]:
     
     # Common layout settings
     input_layout = widgets.Layout(
-        width='90%',
+        width='auto',
         margin='5px 0',
         padding='5px 0'
     )
     
     checkbox_layout = widgets.Layout(
-        width='100%',
+        width='auto',
         margin='8px 0',
         padding='5px 0'
     )

@@ -98,7 +98,7 @@ def create_training_ui(config: Dict[str, Any]) -> Dict[str, Any]:
         charts_container = widgets.HBox([
             charts_data['loss_chart'],
             charts_data['map_chart']
-        ], layout=widgets.Layout(width='100%'))
+        ], layout=widgets.Layout(width='100%', padding='8px 0'))
         
         # 5. Create metrics results summary panel
         metrics_summary = _create_metrics_results_panel()

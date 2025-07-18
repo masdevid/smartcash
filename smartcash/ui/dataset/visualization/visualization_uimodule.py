@@ -139,7 +139,7 @@ class VisualizationUIModule(BaseUIModule):
             for card_name, card in self._dashboard_cards.items():
                 if card_name in stats['train']:
                     value = stats['train'][card_name]
-                    card.update_value(str(value))
+                    card.update(value=value)
     
     def _initialize_dashboard(self):
         """Initialize the dashboard with stats cards."""
@@ -152,6 +152,14 @@ class VisualizationUIModule(BaseUIModule):
         # Tambahkan container cards ke dalam layout
         if 'containers' in self.components and 'dashboard_container' in self.components['containers']:
             self.components['containers']['dashboard_container'].children = [dashboard["container"]]
+        
+        # Initialize stats dictionary
+        stats = {
+            'train': {'preprocessed': 0, 'augmented': 0, 'total': 0},
+            'validation': {'preprocessed': 0, 'augmented': 0, 'total': 0},
+            'test': {'preprocessed': 0, 'augmented': 0, 'total': 0},
+            'total': {'preprocessed': 0, 'augmented': 0, 'total': 0}
+        }
         
         # Update statistik awal
         self._update_dashboard_stats()

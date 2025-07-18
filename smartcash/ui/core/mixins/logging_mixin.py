@@ -72,6 +72,8 @@ class LoggingMixin:
             self._module_namespace = 'backbone'
         elif 'training' in class_name:
             self._module_namespace = 'training'
+        elif 'train' in class_name:
+            self._module_namespace = 'train'
         elif 'evaluation' in class_name:
             self._module_namespace = 'evaluation'
         else:

@@ -25,6 +25,7 @@ class OperationPhase(Enum):
     PROCESSING = auto()
     FINALIZING = auto()
     COMPLETED = auto()
+    FAILED = auto()
 
 
 class AugmentationBaseOperation(OperationMixin, LoggingMixin):
@@ -63,11 +64,16 @@ class AugmentationBaseOperation(OperationMixin, LoggingMixin):
         self._callbacks = callbacks or {}
         self._ui_components = getattr(ui_module, '_ui_components', {})
         self._phase = OperationPhase.INITIALIZING
+        self._current_phase = OperationPhase.INITIALIZING
         
         # Initialize common attributes
         self._last_update = None
         self._operation_id = str(id(self))
         self._start_time = time.time()
+        self._progress = 0.0
+        self._is_running = False
+        self._results: Dict[str, Any] = {}
+        self._errors: list[str] = []
         
         # Initialize logger if not already set
         if not hasattr(self, 'logger'):
@@ -185,38 +191,7 @@ class AugmentationBaseOperation(OperationMixin, LoggingMixin):
             Dictionary containing operation results
         """
         pass
-        self._is_running = False
-        
-        # Results tracking
-        self._results: Dict[str, Any] = {}
-        self._errors: list[str] = []
-        
-        # Initialize logger from UI module
-        self.logger = getattr(ui_module, 'logger', self.get_logger())
-        
-        # Initialize UI components
-        self._init_ui_components()
-        
-        self.logger.debug("%s initialized", self.__class__.__name__)
     
-    def _execute_callback(self, callback_name: str, *args, **kwargs) -> Any:
-        """Execute a callback if it exists.
-        
-        Args:
-            callback_name: Name of the callback to execute
-            *args: Positional arguments to pass to the callback
-            **kwargs: Keyword arguments to pass to the callback
-            
-        Returns:
-            The result of the callback or None if it doesn't exist
-        """
-        callback = self.callbacks.get(callback_name)
-        if callback and callable(callback):
-            try:
-                return callback(*args, **kwargs)
-            except Exception as e:
-                self.logger.error("Error in callback %s: %s", callback_name, str(e))
-        return None
     
     def _progress_adapter(self, level: str, current: int, total: int, message: str) -> None:
         """Adapts a backend progress callback to the UI's ProgressTracker.
@@ -322,20 +297,6 @@ class AugmentationBaseOperation(OperationMixin, LoggingMixin):
         # Execute progress callback if provided
         self._execute_callback('on_progress', self._progress, message)
     
-    def _set_phase(self, phase: OperationPhase, message: str = '') -> None:
-        """
-        Update the current operation phase.
-        
-        Args:
-            phase: New operation phase
-            message: Optional status message
-        """
-        self._current_phase = phase
-        phase_name = phase.name.replace('_', ' ').title()
-        status_message = f"{phase_name}: {message}" if message else f"{phase_name}..."
-        
-        self.logger.info(status_message)
-        self._update_progress(self._progress, status_message)
     
     def _execute_callback(self, callback_name: str, *args, **kwargs) -> Any:
         """

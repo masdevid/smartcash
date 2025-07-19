@@ -75,6 +75,10 @@ class ColabUIModule(BaseUIModule):
         # Initialize operation factory
         self._operation_factory: Optional[ColabOperationFactory] = None
         
+        # Setup completion tracking
+        self._setup_complete = False
+        self._setup_flag_file = self._get_setup_flag_file_path()
+        
         self.logger.debug("✅ ColabUIModule initialized")
     
     
@@ -142,6 +146,9 @@ class ColabUIModule(BaseUIModule):
                 
                 # Flush any buffered logs to operation container
                 self._flush_log_buffer()
+                
+                # Check setup completion status and update UI accordingly
+                self._check_setup_completion_status()
                 
                 # Log environment detection results (Operation Checklist 3.2)
                 env_type = "Google Colab" if self._is_colab_environment else "Lokal/Jupyter"
@@ -264,9 +271,10 @@ class ColabUIModule(BaseUIModule):
         # Call parent method to get base handlers (save, reset)
         handlers = super()._get_module_button_handlers()
         
-        # Add only the colab_setup button handler
+        # Add colab-specific button handlers
         colab_handlers = {
-            'colab_setup': self._handle_setup_button
+            'colab_setup': self._handle_setup_button,
+            'reset_setup': self.reset_setup_status  # For testing/reset purposes
         }
         
         handlers.update(colab_handlers)
@@ -294,6 +302,107 @@ class ColabUIModule(BaseUIModule):
             
         except Exception as e:
             self.logger.debug(f"Failed to flush log buffer: {e}")
+
+    def _get_setup_flag_file_path(self) -> str:
+        """Get the path to the setup completion flag file (local to Colab, not saved to drive)."""
+        try:
+            # Use /tmp for temporary files that don't persist across sessions
+            # This ensures the flag is local to current Colab session only
+            return "/tmp/.smartcash_setup_complete"
+        except Exception:
+            return ".smartcash_setup_complete"  # Fallback to local directory
+
+    def _check_setup_completion_status(self) -> None:
+        """Check if setup has been completed and update UI accordingly."""
+        try:
+            import os
+            
+            # Check if setup completion flag file exists
+            if os.path.exists(self._setup_flag_file):
+                self._setup_complete = True
+                self.log("✅ Setup sudah selesai sebelumnya", 'success')
+                self.log("ℹ️ Button setup telah dinonaktifkan", 'info')
+                self._disable_setup_button()
+            else:
+                self._setup_complete = False
+                self.log("🔧 Setup belum selesai - siap untuk memulai", 'info')
+                
+        except Exception as e:
+            self.logger.error(f"Failed to check setup completion status: {e}")
+            self._setup_complete = False
+
+    def _disable_setup_button(self) -> None:
+        """Disable setup button and update its appearance."""
+        try:
+            # Get action container to access buttons
+            action_container = self.get_component('action_container')
+            if action_container and isinstance(action_container, dict):
+                buttons = action_container.get('buttons', {})
+                setup_button = buttons.get('colab_setup')
+                
+                if setup_button:
+                    setup_button.disabled = True
+                    setup_button.description = "✅ Setup Complete"
+                    setup_button.tooltip = "Setup telah selesai sebelumnya. File flag ditemukan di /tmp/"
+                    setup_button.button_style = 'success'
+                    self.logger.debug("✅ Setup button disabled - setup already complete")
+                    
+        except Exception as e:
+            self.logger.error(f"Failed to disable setup button: {e}")
+
+    def _enable_setup_button(self) -> None:
+        """Enable setup button and reset its appearance."""
+        try:
+            # Get action container to access buttons
+            action_container = self.get_component('action_container')
+            if action_container and isinstance(action_container, dict):
+                buttons = action_container.get('buttons', {})
+                setup_button = buttons.get('colab_setup')
+                
+                if setup_button:
+                    setup_button.disabled = False
+                    setup_button.description = "🚀 Setup Environment"
+                    setup_button.tooltip = "Jalankan setup lengkap lingkungan Colab"
+                    setup_button.button_style = 'primary'
+                    self.logger.debug("✅ Setup button enabled")
+                    
+        except Exception as e:
+            self.logger.error(f"Failed to enable setup button: {e}")
+
+    def _create_setup_completion_flag(self) -> None:
+        """Create setup completion flag file."""
+        try:
+            import os
+            from datetime import datetime
+            
+            # Create flag file with timestamp
+            with open(self._setup_flag_file, 'w') as f:
+                f.write(f"SmartCash setup completed at: {datetime.now().isoformat()}\n")
+                f.write(f"Environment: {'colab' if self._is_colab_environment else 'local'}\n")
+                f.write("This file indicates that setup has been completed successfully.\n")
+                
+            self._setup_complete = True
+            self.log("✅ File flag setup completion dibuat", 'success')
+            self.log(f"📁 Flag file: {self._setup_flag_file}", 'info')
+            
+        except Exception as e:
+            self.logger.error(f"Failed to create setup completion flag: {e}")
+
+    def _remove_setup_completion_flag(self) -> None:
+        """Remove setup completion flag file (for testing/reset purposes)."""
+        try:
+            import os
+            
+            if os.path.exists(self._setup_flag_file):
+                os.remove(self._setup_flag_file)
+                self._setup_complete = False
+                self.log("🗑️ File flag setup completion dihapus", 'info')
+                self._enable_setup_button()
+            else:
+                self.log("ℹ️ File flag setup completion tidak ditemukan", 'info')
+                
+        except Exception as e:
+            self.logger.error(f"Failed to remove setup completion flag: {e}")
     
     # ==================== HELPER METHODS ====================
     
@@ -346,6 +455,15 @@ class ColabUIModule(BaseUIModule):
     def _handle_setup_button(self, button=None) -> Dict[str, Any]:  # noqa: ARG002
         """Handle setup button click - execute full setup in one click."""
         try:
+            # Check if setup is already complete
+            if self._setup_complete:
+                warning_msg = "⚠️ Setup sudah selesai sebelumnya. Reset jika ingin menjalankan ulang."
+                self.log(warning_msg, 'warning')
+                return {'success': False, 'message': warning_msg}
+            
+            # Disable setup button during operation
+            self._disable_setup_button_during_operation()
+            
             self.log("🚀 Memulai setup lengkap lingkungan Colab...", 'info')
             
             # Execute all phases sequentially
@@ -366,20 +484,66 @@ class ColabUIModule(BaseUIModule):
                 if not result.get('success'):
                     error_msg = f"❌ Fase {phase_name} gagal: {result.get('message', 'Unknown error')}"
                     self.log(error_msg, 'error')
+                    self._set_phase('error')
+                    # Re-enable button on failure
+                    self._enable_setup_button()
                     return {'success': False, 'message': error_msg}
                 
                 self.log(f"✅ Fase {phase_name} berhasil", 'success')
             
             # All phases completed successfully
             self._set_phase('complete')
+            
+            # Create setup completion flag file
+            self._create_setup_completion_flag()
+            
+            # Disable setup button permanently (until reset)
+            self._disable_setup_button()
+            
             success_msg = "🎉 Setup Colab lengkap berhasil diselesaikan!"
             self.log(success_msg, 'success')
+            self.log("🔒 Button setup dinonaktifkan karena setup sudah selesai", 'info')
+            
             return {'success': True, 'message': success_msg}
                 
         except Exception as e:
             error_msg = f"Error in setup button handler: {e}"
             self.logger.error(error_msg)
             self._set_phase('error')
+            # Re-enable button on error
+            self._enable_setup_button()
+            return {'success': False, 'message': error_msg}
+
+    def _disable_setup_button_during_operation(self) -> None:
+        """Disable setup button during operation with processing indicator."""
+        try:
+            # Get action container to access buttons
+            action_container = self.get_component('action_container')
+            if action_container and isinstance(action_container, dict):
+                buttons = action_container.get('buttons', {})
+                setup_button = buttons.get('colab_setup')
+                
+                if setup_button:
+                    setup_button.disabled = True
+                    setup_button.description = "⏳ Processing..."
+                    setup_button.tooltip = "Setup sedang berjalan, mohon tunggu..."
+                    setup_button.button_style = 'warning'
+                    self.logger.debug("✅ Setup button disabled during operation")
+                    
+        except Exception as e:
+            self.logger.error(f"Failed to disable setup button during operation: {e}")
+
+    def reset_setup_status(self) -> Dict[str, Any]:
+        """Reset setup status by removing flag file and re-enabling button."""
+        try:
+            self.log("🔄 Mereset status setup...", 'info')
+            self._remove_setup_completion_flag()
+            success_msg = "✅ Status setup telah direset. Button setup tersedia kembali."
+            self.log(success_msg, 'success')
+            return {'success': True, 'message': success_msg}
+        except Exception as e:
+            error_msg = f"Failed to reset setup status: {e}"
+            self.logger.error(error_msg)
             return {'success': False, 'message': error_msg}
     
     def _get_current_phase(self) -> str:

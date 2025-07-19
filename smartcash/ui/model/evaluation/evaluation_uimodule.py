@@ -3,7 +3,7 @@ Evaluation UIModule - BaseUIModule Pattern
 Handles model evaluation across 2×4 research scenarios (2 scenarios × 4 models = 8 tests)
 """
 
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any
 from smartcash.ui.core.base_ui_module import BaseUIModule
 from smartcash.ui.model.evaluation.configs.evaluation_config_handler import EvaluationConfigHandler
 from smartcash.ui.model.evaluation.configs.evaluation_defaults import get_default_evaluation_config
@@ -560,7 +560,7 @@ class EvaluationUIModule(BaseUIModule):
     
     # Button handler methods
     
-    def _handle_run_scenario_sync(self, button) -> None:
+    def _handle_run_scenario_sync(self, button=None) -> None:
         """
         Handle run scenario button click - determines action based on UI form selections.
         """

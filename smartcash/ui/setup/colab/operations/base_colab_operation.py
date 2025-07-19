@@ -623,26 +623,26 @@ class BaseColabOperation(LoggingMixin, OperationMixin):
         """
         progress_steps = {
             'init': [
-                {'progress': 10, 'message': '🔍 Detecting runtime environment...', 'phase_progress': 25},
-                {'progress': 30, 'message': '✅ Environment detected', 'phase_progress': 50},
-                {'progress': 50, 'message': '🔧 Checking system requirements...', 'phase_progress': 75},
-                {'progress': 80, 'message': '🔍 Validating configuration...', 'phase_progress': 100},
-                {'progress': 100, 'message': '✅ Initialization complete', 'phase_progress': 100}
+                {'progress': 10, 'message': '🔍 [1/5] Detecting runtime environment...', 'phase_progress': 25},
+                {'progress': 30, 'message': '✅ [2/5] Environment detected', 'phase_progress': 50},
+                {'progress': 50, 'message': '🔧 [3/5] Checking system requirements...', 'phase_progress': 75},
+                {'progress': 80, 'message': '🔍 [4/5] Validating configuration...', 'phase_progress': 100},
+                {'progress': 100, 'message': '✅ [5/5] Initialization complete', 'phase_progress': 100}
             ],
             'verify': [
-                {'progress': 10, 'message': '🔍 Starting verification...', 'phase_progress': 10},
-                {'progress': 30, 'message': '🔗 Verifying symlinks...', 'phase_progress': 30},
-                {'progress': 50, 'message': '📁 Verifying folders...', 'phase_progress': 50},
-                {'progress': 70, 'message': '🌍 Verifying environment variables...', 'phase_progress': 70},
-                {'progress': 90, 'message': '💻 Gathering system info...', 'phase_progress': 90},
-                {'progress': 100, 'message': '✅ Verification complete', 'phase_progress': 100}
+                {'progress': 10, 'message': '🔍 [1/6] Starting verification...', 'phase_progress': 10},
+                {'progress': 30, 'message': '🔗 [2/6] Verifying symlinks...', 'phase_progress': 30},
+                {'progress': 50, 'message': '📁 [3/6] Verifying folders...', 'phase_progress': 50},
+                {'progress': 70, 'message': '🌍 [4/6] Verifying environment variables...', 'phase_progress': 70},
+                {'progress': 90, 'message': '💻 [5/6] Gathering system info...', 'phase_progress': 90},
+                {'progress': 100, 'message': '✅ [6/6] Verification complete', 'phase_progress': 100}
             ],
             'mount': [
-                {'progress': 10, 'message': '🔍 Checking environment status...', 'phase_progress': 20},
-                {'progress': 30, 'message': '🔍 Checking Drive mount status...', 'phase_progress': 40},
-                {'progress': 50, 'message': '📁 Mounting Google Drive...', 'phase_progress': 60},
-                {'progress': 90, 'message': '🔍 Verifying mount...', 'phase_progress': 80},
-                {'progress': 100, 'message': '✅ Google Drive mounted successfully', 'phase_progress': 100}
+                {'progress': 10, 'message': '🔍 [1/5] Checking environment status...', 'phase_progress': 20},
+                {'progress': 30, 'message': '🔍 [2/5] Checking Drive mount status...', 'phase_progress': 40},
+                {'progress': 50, 'message': '📁 [3/5] Mounting Google Drive...', 'phase_progress': 60},
+                {'progress': 90, 'message': '🔍 [4/5] Verifying mount...', 'phase_progress': 80},
+                {'progress': 100, 'message': '✅ [5/5] Google Drive mounted successfully', 'phase_progress': 100}
             ],
             'folders': [
                 {'progress': 10, 'message': '🔍 Checking folder configuration...', 'phase_progress': 25},

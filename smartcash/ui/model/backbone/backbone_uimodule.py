@@ -166,6 +166,9 @@ class BackboneUIModule(BaseUIModule):
                 # Register module-specific button handlers
                 self._register_module_button_handlers()
                 
+                # Register rescan models button with BaseUIModule system
+                self._register_rescan_button()
+                
                 # Setup rescan models button handler
                 self._setup_rescan_button_handler()
                 
@@ -705,6 +708,22 @@ class BackboneUIModule(BaseUIModule):
             self.logger.error(f"Failed to check built models: {e}")
             return {}
 
+    def _register_rescan_button(self) -> None:
+        """Register rescan models button with BaseUIModule system."""
+        try:
+            if hasattr(self, '_ui_components') and self._ui_components:
+                widgets = self._ui_components.get('widgets', {})
+                rescan_button = widgets.get('rescan_models_button')
+                
+                if rescan_button:
+                    # Register with BaseUIModule button system
+                    self.register_button_handler('rescan_models', self._handle_rescan_models, rescan_button)
+                    self.logger.debug("✅ Rescan models button registered with BaseUIModule")
+                else:
+                    self.logger.warning("Rescan models button widget not found")
+        except Exception as e:
+            self.logger.error(f"Failed to register rescan button: {e}")
+
     def _setup_rescan_button_handler(self) -> None:
         """Setup the rescan models button click handler."""
         try:
@@ -813,10 +832,20 @@ class BackboneUIModule(BaseUIModule):
                     elif 'buttons' in action_container:
                         # Fallback: directly disable/enable button
                         buttons = action_container['buttons']
-                        for button_info in buttons:
-                            if button_info.get('id') == 'validate':
-                                button_info['disabled'] = not visible
-                                break
+                        # Check if buttons is a dict (button_id: button_widget) or list
+                        if isinstance(buttons, dict):
+                            # Handle dict structure
+                            if 'validate' in buttons:
+                                validate_button = buttons['validate']
+                                if hasattr(validate_button, 'disabled'):
+                                    validate_button.disabled = not visible
+                        elif isinstance(buttons, list):
+                            # Handle list structure
+                            for button_info in buttons:
+                                # Check if button_info is a dict with 'id' key
+                                if isinstance(button_info, dict) and button_info.get('id') == 'validate':
+                                    button_info['disabled'] = not visible
+                                    break
                                 
             self.logger.debug(f"Validate button visibility set to: {visible}")
         except Exception as e:

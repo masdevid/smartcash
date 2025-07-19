@@ -238,7 +238,8 @@ class ColabUIModule(BaseUIModule):
                 {'id': 'config', 'text': '⚙️ Config', 'description': 'Sinkronisasi konfigurasi'},
                 {'id': 'env', 'text': '🌍 Environment', 'description': 'Setup environment'},
                 {'id': 'verify', 'text': '🔍 Verifikasi', 'description': 'Memverifikasi pengaturan'},
-                {'id': 'complete', 'text': '🎉 Selesai', 'description': 'Setup selesai'}
+                {'id': 'complete', 'text': '🎉 Selesai', 'description': 'Setup selesai'},
+                {'id': 'error', 'text': '❌ Error', 'description': 'Terjadi kesalahan'}
             ]
             
             # Set phases to UI components if available

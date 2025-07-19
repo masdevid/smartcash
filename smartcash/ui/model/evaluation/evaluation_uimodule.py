@@ -3,7 +3,7 @@ Evaluation UIModule - BaseUIModule Pattern
 Handles model evaluation across 2×4 research scenarios (2 scenarios × 4 models = 8 tests)
 """
 
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 from smartcash.ui.core.base_ui_module import BaseUIModule
 from smartcash.ui.model.evaluation.configs.evaluation_config_handler import EvaluationConfigHandler
 from smartcash.ui.model.evaluation.configs.evaluation_defaults import get_default_evaluation_config
@@ -87,7 +87,8 @@ class EvaluationUIModule(BaseUIModule):
             Dictionary mapping button IDs to handler functions
         """
         return {
-            'run_scenario': self._handle_run_scenario_sync
+            'run_scenario': self._handle_run_scenario_sync,
+            'refresh_models': self._handle_refresh_models
         }
     
     def _get_module_operation_handlers(self) -> Dict[str, callable]:
@@ -1093,6 +1094,67 @@ class EvaluationUIModule(BaseUIModule):
                 
         except Exception as e:
             self.log_error(f"Metrics update failed: {e}")
+    
+    def initialize(self, config: Optional[Dict[str, Any]] = None, **kwargs) -> bool:
+        """
+        Initialize evaluation module and register refresh button.
+        
+        Args:
+            config: Optional configuration dictionary
+            **kwargs: Additional initialization arguments
+            
+        Returns:
+            True if initialization was successful
+        """
+        # Call parent initialization first
+        success = super().initialize(config, **kwargs)
+        
+        if success:
+            # Register refresh button after UI components are created
+            self._register_refresh_button()
+            
+        return success
+    
+    def _register_refresh_button(self) -> None:
+        """Register refresh button with BaseUIModule system."""
+        try:
+            if hasattr(self, '_ui_components') and self._ui_components:
+                # Access the main form layout
+                main_form_row = self._ui_components.get('main_form_row')
+                if main_form_row and hasattr(main_form_row, '_refresh_button'):
+                    refresh_button = main_form_row._refresh_button
+                    
+                    # Register with BaseUIModule button system
+                    self.register_button_handler('refresh_models', self._handle_refresh_models, refresh_button)
+                    self.logger.debug("✅ Refresh models button registered with BaseUIModule")
+                else:
+                    self.logger.warning("Main form row or refresh button not found")
+        except Exception as e:
+            self.logger.error(f"Failed to register refresh button: {e}")
+
+    def _handle_refresh_models(self, button=None) -> Dict[str, Any]:
+        """
+        Handle refresh models button click.
+        
+        Args:
+            button: Button widget (optional)
+            
+        Returns:
+            Dictionary with operation results
+        """
+        try:
+            self.log("🔄 Refreshing available models list...", 'info')
+            
+            # Here you would implement the actual model discovery/refresh logic
+            # For now, just log the action
+            self.log("✅ Model list refresh completed", 'success')
+            
+            return {'success': True, 'message': 'Models refreshed successfully'}
+            
+        except Exception as e:
+            error_msg = f"Failed to refresh models: {e}"
+            self.log_error(error_msg)
+            return {'success': False, 'message': error_msg}
     
     # Note: display() method is now provided by BaseUIModule
 

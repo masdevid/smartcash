@@ -23,6 +23,7 @@ wheels/
 # Development and environment
 venv/
 venv-test/
+.venv
 ENV/
 .env
 .env.*

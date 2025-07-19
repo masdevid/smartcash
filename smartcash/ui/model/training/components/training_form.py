@@ -41,16 +41,16 @@ def create_training_form(training_config: Dict[str, Any], ui_config: Dict[str, A
                 ('Pretrained Model', 'pretrained')
             ],
             value=model_selection.get('source', 'backbone'),
-            style={'description_width': '150px'},
-            layout=widgets.Layout(width='500px')
+            style={'description_width': 'initial'},
+            layout=widgets.Layout(width='auto', min_width='300px')
         )
         
         checkpoint_path_text = widgets.Text(
             description="Checkpoint Path:",
             value=model_selection.get('checkpoint_path', ''),
             placeholder="Path to checkpoint file (only for checkpoint source)",
-            style={'description_width': '150px'},
-            layout=widgets.Layout(width='500px')
+            style={'description_width': 'initial'},
+            layout=widgets.Layout(width='auto', min_width='300px')
         )
         
         # Basic Training Parameters
@@ -60,8 +60,8 @@ def create_training_form(training_config: Dict[str, Any], ui_config: Dict[str, A
             min=validation_config['min_epochs'],
             max=validation_config['max_epochs'],
             step=10,
-            style={'description_width': '150px'},
-            layout=widgets.Layout(width='500px')
+            style={'description_width': 'initial'},
+            layout=widgets.Layout(width='auto', min_width='300px')
         )
         
         batch_size_input = widgets.IntSlider(
@@ -70,8 +70,8 @@ def create_training_form(training_config: Dict[str, Any], ui_config: Dict[str, A
             min=validation_config['min_batch_size'],
             max=validation_config['max_batch_size'],
             step=1,
-            style={'description_width': '150px'},
-            layout=widgets.Layout(width='500px')
+            style={'description_width': 'initial'},
+            layout=widgets.Layout(width='auto', min_width='300px')
         )
         
         learning_rate_input = widgets.FloatLogSlider(
@@ -81,8 +81,8 @@ def create_training_form(training_config: Dict[str, Any], ui_config: Dict[str, A
             min=-6,
             max=0,
             step=0.1,
-            style={'description_width': '150px'},
-            layout=widgets.Layout(width='500px')
+            style={'description_width': 'initial'},
+            layout=widgets.Layout(width='auto', min_width='300px')
         )
         
         # Optimizer and Scheduler
@@ -90,16 +90,16 @@ def create_training_form(training_config: Dict[str, Any], ui_config: Dict[str, A
             description="Optimizer:",
             options=[(name, key) for key, name in optimizers.items()],
             value=training_config.get('optimizer', 'adam'),
-            style={'description_width': '150px'},
-            layout=widgets.Layout(width='500px')
+            style={'description_width': 'initial'},
+            layout=widgets.Layout(width='auto', min_width='300px')
         )
         
         scheduler_dropdown = widgets.Dropdown(
             description="LR Scheduler:",
             options=[(name, key) for key, name in schedulers.items()],
             value=training_config.get('scheduler', 'cosine'),
-            style={'description_width': '150px'},
-            layout=widgets.Layout(width='500px')
+            style={'description_width': 'initial'},
+            layout=widgets.Layout(width='auto', min_width='300px')
         )
         
         weight_decay_input = widgets.FloatSlider(
@@ -109,8 +109,8 @@ def create_training_form(training_config: Dict[str, Any], ui_config: Dict[str, A
             max=validation_config['max_weight_decay'],
             step=0.0001,
             readout_format='.4f',
-            style={'description_width': '150px'},
-            layout=widgets.Layout(width='500px')
+            style={'description_width': 'initial'},
+            layout=widgets.Layout(width='auto', min_width='300px')
         )
         
         # Advanced Training Options
@@ -119,13 +119,15 @@ def create_training_form(training_config: Dict[str, Any], ui_config: Dict[str, A
         mixed_precision_checkbox = widgets.Checkbox(
             description="Mixed Precision Training",
             value=training_config.get('mixed_precision', True),
-            style={'description_width': '200px'}
+            style={'description_width': 'initial'},
+            layout=widgets.Layout(width='auto')
         )
         
         early_stopping_checkbox = widgets.Checkbox(
             description="Early Stopping",
             value=early_stopping_config.get('enabled', True),
-            style={'description_width': '200px'}
+            style={'description_width': 'initial'},
+            layout=widgets.Layout(width='auto')
         )
         
         early_stopping_patience = widgets.IntSlider(
@@ -134,8 +136,8 @@ def create_training_form(training_config: Dict[str, Any], ui_config: Dict[str, A
             min=5,
             max=50,
             step=5,
-            style={'description_width': '150px'},
-            layout=widgets.Layout(width='500px')
+            style={'description_width': 'initial'},
+            layout=widgets.Layout(width='auto', min_width='300px')
         )
         
         # Data Configuration
@@ -148,8 +150,8 @@ def create_training_form(training_config: Dict[str, Any], ui_config: Dict[str, A
             max=0.5,
             step=0.05,
             readout_format='.2f',
-            style={'description_width': '150px'},
-            layout=widgets.Layout(width='500px')
+            style={'description_width': 'initial'},
+            layout=widgets.Layout(width='auto', min_width='300px')
         )
         
         workers_slider = widgets.IntSlider(
@@ -158,8 +160,8 @@ def create_training_form(training_config: Dict[str, Any], ui_config: Dict[str, A
             min=1,
             max=16,
             step=1,
-            style={'description_width': '150px'},
-            layout=widgets.Layout(width='500px')
+            style={'description_width': 'initial'},
+            layout=widgets.Layout(width='auto', min_width='300px')
         )
         
         # Monitoring Configuration
@@ -171,8 +173,8 @@ def create_training_form(training_config: Dict[str, Any], ui_config: Dict[str, A
             min=1,
             max=50,
             step=1,
-            style={'description_width': '150px'},
-            layout=widgets.Layout(width='500px')
+            style={'description_width': 'initial'},
+            layout=widgets.Layout(width='auto', min_width='300px')
         )
         
         # UI Configuration
@@ -181,13 +183,15 @@ def create_training_form(training_config: Dict[str, Any], ui_config: Dict[str, A
         show_advanced_checkbox = widgets.Checkbox(
             description="Show Advanced Options",
             value=ui_options.get('show_advanced_options', False),
-            style={'description_width': '200px'}
+            style={'description_width': 'initial'},
+            layout=widgets.Layout(width='auto')
         )
         
         enable_charts_checkbox = widgets.Checkbox(
             description="Enable Live Charts",
             value=ui_options.get('enable_live_charts', True),
-            style={'description_width': '200px'}
+            style={'description_width': 'initial'},
+            layout=widgets.Layout(width='auto')
         )
         
         # Create 3-column layout sections for single accordion

@@ -35,7 +35,7 @@ UI_CONFIG = {
     'title': 'SmartCash Model Training',
     'subtitle': 'Train object detection models with live monitoring and automatic backbone integration',
     'module_name': 'training',
-    'container_width': '100%',
+    'container_width': 'auto',
     'form_width': '100%',
     'chart_height': '300px',
     'operation_height': '200px'

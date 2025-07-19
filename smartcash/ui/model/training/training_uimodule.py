@@ -173,113 +173,113 @@ class TrainingUIModule(BaseUIModule, OperationMixin, ButtonHandlerMixin):
     def _handle_start_training(self, button=None) -> None:
         """Handle start training button click."""
         try:
-            self._update_status("Starting training...", 'info')
+            self.log_info("Starting training...")
             result = self.execute_start_training()
             
             if result.get('success'):
-                self._update_status(f"✅ Training started: {result.get('message', '')}", 'success')
+                self.log_success(f"Training started: {result.get('message', '')}")
             else:
-                self._update_status(f"❌ Training start failed: {result.get('message', '')}", 'error')
+                self.log_error(f"Training start failed: {result.get('message', '')}")
                 
         except Exception as e:
-            self._update_status(f"❌ Start training error: {e}", 'error')
+            self.log_error(f"Start training error: {e}")
     
     def _handle_stop_training(self, button=None) -> None:
         """Handle stop training button click."""
         try:
-            self._update_status("Stopping training...", 'info')
+            self.log_info("Stopping training...")
             result = self.execute_stop_training()
             
             if result.get('success'):
-                self._update_status(f"✅ Training stopped: {result.get('message', '')}", 'success')
+                self.log_success(f"Training stopped: {result.get('message', '')}")
             else:
-                self._update_status(f"❌ Training stop failed: {result.get('message', '')}", 'error')
+                self.log_error(f"Training stop failed: {result.get('message', '')}")
                 
         except Exception as e:
-            self._update_status(f"❌ Stop training error: {e}", 'error')
+            self.log_error(f"Stop training error: {e}")
     
     def _handle_resume_training(self, button=None) -> None:
         """Handle resume training button click."""
         try:
-            self._update_status("Resuming training...", 'info')
+            self.log_info("Resuming training...")
             result = self.execute_resume_training()
             
             if result.get('success'):
-                self._update_status(f"✅ Training resumed: {result.get('message', '')}", 'success')
+                self.log_success(f"Training resumed: {result.get('message', '')}")
             else:
-                self._update_status(f"❌ Training resume failed: {result.get('message', '')}", 'error')
+                self.log_error(f"Training resume failed: {result.get('message', '')}")
                 
         except Exception as e:
-            self._update_status(f"❌ Resume training error: {e}", 'error')
+            self.log_error(f"Resume training error: {e}")
     
     def _handle_validate_model(self, button=None) -> None:
         """Handle validate model button click."""
         try:
-            self._update_status("Validating model...", 'info')
+            self.log_info("Validating model...")
             result = self.execute_validate_model()
             
             if result.get('success'):
-                self._update_status(f"✅ Model validation completed: {result.get('message', '')}", 'success')
+                self.log_success(f"Model validation completed: {result.get('message', '')}")
             else:
-                self._update_status(f"❌ Model validation failed: {result.get('message', '')}", 'error')
+                self.log_error(f"Model validation failed: {result.get('message', '')}")
                 
         except Exception as e:
-            self._update_status(f"❌ Validate model error: {e}", 'error')
+            self.log_error(f"Validate model error: {e}")
     
     def _handle_refresh_backbone_config(self, button=None) -> None:
         """Handle refresh backbone config button click."""
         try:
-            self._update_status("Refreshing backbone configuration...", 'info')
+            self.log_info("Refreshing backbone configuration...")
             result = self.execute_refresh_backbone_config()
             
             if result.get('success'):
-                self._update_status(f"✅ Backbone config refreshed: {result.get('message', '')}", 'success')
+                self.log_success(f"Backbone config refreshed: {result.get('message', '')}")
             else:
-                self._update_status(f"❌ Backbone config refresh failed: {result.get('message', '')}", 'error')
+                self.log_error(f"Backbone config refresh failed: {result.get('message', '')}")
                 
         except Exception as e:
-            self._update_status(f"❌ Refresh backbone config error: {e}", 'error')
+            self.log_error(f"Refresh backbone config error: {e}")
     
     def _handle_save_config(self, button=None) -> None:
         """Handle save config button click."""
         try:
-            self._update_status("Saving configuration...", 'info')
+            self.log_info("Saving configuration...")
             result = self.save_current_config()
             
             if result.get('success'):
-                self._update_status("✅ Configuration saved successfully", 'success')
+                self.log_success("Configuration saved successfully")
             else:
-                self._update_status(f"❌ Save config failed: {result.get('message', '')}", 'error')
+                self.log_error(f"Save config failed: {result.get('message', '')}")
                 
         except Exception as e:
-            self._update_status(f"❌ Save config error: {e}", 'error')
+            self.log_error(f"Save config error: {e}")
     
     def _handle_reset_config(self, button=None) -> None:
         """Handle reset config button click."""
         try:
-            self._update_status("Resetting configuration...", 'info')
+            self.log_info("Resetting configuration...")
             result = self.reset_to_defaults()
             
             if result.get('success'):
-                self._update_status("✅ Configuration reset to defaults", 'success')
+                self.log_success("Configuration reset to defaults")
             else:
-                self._update_status(f"❌ Reset config failed: {result.get('message', '')}", 'error')
+                self.log_error(f"Reset config failed: {result.get('message', '')}")
                 
         except Exception as e:
-            self._update_status(f"❌ Reset config error: {e}", 'error')
+            self.log_error(f"Reset config error: {e}")
     
     def _log_initialization_complete(self) -> None:
         """Log initialization completion."""
         try:
-            self._update_status("✅ Training module initialized successfully", 'success')
-            self._update_status("🔧 Ready for model training operations", 'info')
-            self._update_status("📊 Live charts and progress tracking enabled", 'info')
+            self.log_success("Training module initialized successfully")
+            self.log_info("🔧 Ready for model training operations")
+            self.log_info("📊 Live charts and progress tracking enabled")
             
             # Log backbone integration status
             model_selection = self.get_config().get('model_selection', {})
             if model_selection.get('backbone_type'):
                 backbone_type = model_selection.get('backbone_type', 'unknown')
-                self._update_status(f"🔗 Integrated with {backbone_type} backbone", 'info')
+                self.log_info(f"🔗 Integrated with {backbone_type} backbone")
                 
         except Exception as e:
             self.logger.warning(f"Failed to log initialization complete: {e}")
@@ -449,11 +449,11 @@ class TrainingUIModule(BaseUIModule, OperationMixin, ButtonHandlerMixin):
     
     def _handle_operation_success(self, message: str) -> None:
         """Handle operation success."""
-        self._update_status(f"✅ {message}", 'success')
+        self.log_success(message)
     
     def _handle_operation_failure(self, message: str) -> None:
         """Handle operation failure."""
-        self._update_status(f"❌ {message}", 'error')
+        self.log_error(message)
     
     def _handle_chart_update(self, metrics: Dict[str, Any]) -> None:
         """Handle chart update requests from operations."""

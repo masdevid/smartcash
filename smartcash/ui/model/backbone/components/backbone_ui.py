@@ -198,16 +198,16 @@ def create_backbone_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> Dic
 
 
 def _create_backbone_form_widgets(config: Dict[str, Any]) -> Dict[str, Any]:
-    """Create form widgets for backbone configuration with two-column layout."""
+    """Create form widgets for backbone configuration with two-column layout based on MODEL_ARC_README.md."""
     backbone_config = config.get('backbone', {})
     
     # Get current values
     current_backbone = backbone_config.get('model_type', 'efficientnet_b4')
     current_pretrained = backbone_config.get('pretrained', True)
     current_feature_opt = backbone_config.get('feature_optimization', True)
-    current_mixed_precision = backbone_config.get('mixed_precision', True)
-    current_input_size = backbone_config.get('input_size', 640)
-    current_num_classes = backbone_config.get('num_classes', 7)
+    current_layer_mode = backbone_config.get('layer_mode', 'multi')
+    current_save_path = backbone_config.get('save_path', 'data/models')
+    # Remove fixed values (input_size and num_classes are now fixed as per MODEL_ARC_README.md)
     
     # Common layout settings
     input_layout = widgets.Layout(
@@ -235,7 +235,28 @@ def _create_backbone_form_widgets(config: Dict[str, Any]) -> Dict[str, Any]:
         layout=input_layout
     )
     
-    # Checkbox options
+    # Layer Mode Selection
+    layer_mode_dropdown = widgets.Dropdown(
+        options=[
+            ('Multi-Layer Detection (Recommended)', 'multi'),
+            ('Single Layer (Legacy)', 'single')
+        ],
+        value=current_layer_mode,
+        description='Detection Mode:',
+        style={'description_width': '140px'},
+        layout=input_layout
+    )
+    
+    # Model Save Path
+    save_path_text = widgets.Text(
+        value=current_save_path,
+        description='Save Path:',
+        style={'description_width': '140px'},
+        layout=input_layout,
+        placeholder='data/models'
+    )
+    
+    # Architecture options (no training options as requested)
     pretrained_checkbox = widgets.Checkbox(
         value=current_pretrained,
         description='Use Pretrained Weights',
@@ -250,62 +271,63 @@ def _create_backbone_form_widgets(config: Dict[str, Any]) -> Dict[str, Any]:
         style={'description_width': 'initial'}
     )
     
-    mixed_precision_checkbox = widgets.Checkbox(
-        value=current_mixed_precision,
-        description='Mixed Precision Training',
-        layout=checkbox_layout,
-        style={'description_width': 'initial'}
-    )
-    
     # Left column container
     left_column = widgets.VBox([
         widgets.HTML("<h4 style='margin: 10px 0 5px 0;'>🧬 Architecture</h4>"),
         backbone_dropdown,
+        layer_mode_dropdown,
         widgets.HTML("<div style='margin: 15px 0 5px 0; border-top: 1px solid #eee;'></div>"),
-        widgets.HTML("<h4 style='margin: 5px 0;'>⚙️ Training Options</h4>"),
+        widgets.HTML("<h4 style='margin: 5px 0;'>⚙️ Model Configuration</h4>"),
+        save_path_text,
         pretrained_checkbox,
-        feature_opt_checkbox,
-        mixed_precision_checkbox
+        feature_opt_checkbox
     ], layout=widgets.Layout(width='48%', margin='0 1% 0 0'))
     
-    # ===== Right Column: Parameters =====
-    # Input size slider
-    input_size_slider = widgets.IntSlider(
-        value=current_input_size,
-        min=320,
-        max=1280,
-        step=32,
-        description='Input Size:',
-        style={'description_width': '140px'},
-        layout=input_layout
-    )
+    # ===== Right Column: Multi-Layer Detection Info =====
+    # Fixed parameters info (no longer editable as per development logs)
+    fixed_params_info = widgets.HTML("""
+        <div style='margin-top: 10px; padding: 12px; background: #e8f4fd; border-radius: 4px; font-size: 0.9em; border-left: 4px solid #2196F3;'>
+            <h4 style='margin: 0 0 8px 0; font-size: 1em; color: #1976D2;'>📏 Fixed Parameters</h4>
+            <div style='line-height: 1.5;'>
+                <div><strong>• Input Size:</strong> 640×640 (Fixed as per MODEL_ARC_README.md)</div>
+                <div><strong>• Classes Layer 1:</strong> 7 (IDR denominations)</div>
+                <div><strong>• Classes Layer 2:</strong> 7 (Denomination features)</div>
+                <div><strong>• Classes Layer 3:</strong> 3 (Common features)</div>
+            </div>
+        </div>
+    """)
     
-    # Number of classes input
-    num_classes_input = widgets.IntText(
-        value=current_num_classes,
-        description='Num Classes:',
-        style={'description_width': '140px'},
-        layout=input_layout
-    )
-    
-    # Detection info
+    # Multi-layer detection info
     detection_info = widgets.HTML("""
         <div style='margin-top: 10px; padding: 12px; background: #f8f9fa; border-radius: 4px; font-size: 0.9em;'>
-            <h4 style='margin: 0 0 8px 0; font-size: 1em;'>🎯 Detection Configuration</h4>
+            <h4 style='margin: 0 0 8px 0; font-size: 1em;'>🎯 Multi-Layer Detection System</h4>
             <div style='line-height: 1.5;'>
-                <div><strong>• Layers:</strong> Banknote Detection</div>
-                <div><strong>• Mode:</strong> Single Layer</div>
-                <div><strong>• Classes:</strong> Currency banknotes</div>
+                <div><strong>• Layer 1:</strong> Full banknote bounding boxes</div>
+                <div><strong>• Layer 2:</strong> Denomination-specific markers</div>
+                <div><strong>• Layer 3:</strong> Common security features</div>
+                <div style='margin-top: 8px; color: #666;'><em>Total: 17 classes across 3 detection layers</em></div>
+            </div>
+        </div>
+    """)
+    
+    # Model status indicator (placeholder for when model is built)
+    model_status_info = widgets.HTML("""
+        <div style='margin-top: 10px; padding: 12px; background: #fff3cd; border-radius: 4px; font-size: 0.9em; border-left: 4px solid #ffc107;'>
+            <h4 style='margin: 0 0 8px 0; font-size: 1em; color: #856404;'>🔍 Model Status</h4>
+            <div style='line-height: 1.5;'>
+                <div><strong>• Status:</strong> <span id='model-status'>Not Built</span></div>
+                <div><strong>• Last Built:</strong> <span id='last-built'>Never</span></div>
+                <div><strong>• Available Models:</strong> <span id='available-models'>Checking...</span></div>
             </div>
         </div>
     """)
     
     # Right column container
     right_column = widgets.VBox([
-        widgets.HTML("<h4 style='margin: 10px 0 5px 0;'>📏 Model Parameters</h4>"),
-        input_size_slider,
-        num_classes_input,
-        detection_info
+        widgets.HTML("<h4 style='margin: 10px 0 5px 0;'>📊 Model Information</h4>"),
+        fixed_params_info,
+        detection_info,
+        model_status_info
     ], layout=widgets.Layout(width='48%', margin='0 0 0 1%'))
     
     # Create main form container with two columns
@@ -335,23 +357,26 @@ def _create_backbone_form_widgets(config: Dict[str, Any]) -> Dict[str, Any]:
         'widgets': [form_container],  # Single widget containing the two-column layout
         'widget_refs': {
             'backbone_dropdown': backbone_dropdown,
+            'layer_mode_dropdown': layer_mode_dropdown,
+            'save_path_text': save_path_text,
             'pretrained_checkbox': pretrained_checkbox,
             'feature_opt_checkbox': feature_opt_checkbox,
-            'mixed_precision_checkbox': mixed_precision_checkbox,
-            'input_size_slider': input_size_slider,
-            'num_classes_input': num_classes_input
+            'fixed_params_info': fixed_params_info,
+            'detection_info': detection_info,
+            'model_status_info': model_status_info
         }
     }
 
 
 def _generate_model_summary_content(config: Dict[str, Any]) -> Dict[str, Any]:
-    """Generate model summary content for the summary container."""
+    """Generate model summary content for the summary container based on MODEL_ARC_README.md."""
     backbone_config = config.get('backbone', {})
     available_backbones = get_available_backbones()
     
     # Get backbone information
     backbone_type = backbone_config.get('model_type', 'efficientnet_b4')
     backbone_info = available_backbones.get(backbone_type, {})
+    layer_mode = backbone_config.get('layer_mode', 'multi')
     
     # Generate summary sections for model status
     summary_sections = {
@@ -359,15 +384,26 @@ def _generate_model_summary_content(config: Dict[str, Any]) -> Dict[str, Any]:
             'Status': '⚠️ Not Built',
             'Message': 'Build model to see detailed summary',
             'Backbone': backbone_info.get('display_name', backbone_type),
-            'Pretrained': '✅ Auto-loaded from drive' if backbone_config.get('pretrained') else '❌ Disabled'
+            'Detection Mode': 'Multi-Layer' if layer_mode == 'multi' else 'Single Layer',
+            'Pretrained': '✅ Auto-loaded from timm/drive' if backbone_config.get('pretrained') else '❌ Disabled'
         },
-        'Current Configuration': {
-            'Input Size': f"{backbone_config.get('input_size', 640)}px",
-            'Number of Classes': backbone_config.get('num_classes', 7),
+        'Architecture Configuration': {
+            'Input Size': '640×640 (Fixed)',
+            'Detection Layers': '3 (Layer 1 + Layer 2 + Layer 3)' if layer_mode == 'multi' else '1 (Layer 1 only)',
+            'Total Classes': '17 (7+7+3)' if layer_mode == 'multi' else '7',
             'Feature Optimization': '✅ Enabled' if backbone_config.get('feature_optimization') else '❌ Disabled',
-            'Mixed Precision': '✅ Enabled' if backbone_config.get('mixed_precision') else '❌ Disabled'
+            'Save Path': backbone_config.get('save_path', 'data/models')
         }
     }
+    
+    # Add multi-layer specific information
+    if layer_mode == 'multi':
+        summary_sections['Detection Layers'] = {
+            'Layer 1 (Full Notes)': '7 classes - IDR denominations',
+            'Layer 2 (Features)': '7 classes - Denomination-specific markers',
+            'Layer 3 (Common)': '3 classes - Security features shared across notes',
+            'Training Strategy': 'Two-phase with uncertainty-based multi-task loss'
+        }
     
     return {
         'title': 'Model Summary',

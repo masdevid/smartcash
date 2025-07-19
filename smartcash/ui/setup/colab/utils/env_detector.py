@@ -13,11 +13,10 @@ Fungsi-fungsi ini digunakan untuk mendeteksi informasi lingkungan seperti:
 import os
 import sys
 import platform
-import traceback
-from typing import Dict, Any, Tuple, Callable, Union
+from typing import Dict, Any, Tuple, Callable
 
 # Import standardized environment management
-from smartcash.common.environment import get_environment_manager, EnvironmentManager
+from smartcash.common.environment import get_environment_manager
 from smartcash.common.constants.paths import get_paths_for_environment
 
 def safe_get(func: Callable, default: Any = None) -> Any:
@@ -167,9 +166,6 @@ def _get_python_version() -> str:
     """🐍 Get Python version"""
     return f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
 
-def _get_platform_info() -> str:
-    """🖥️ Get platform information"""
-    return f"{platform.system()} {platform.release()} ({platform.machine()})"
 
 def _get_os_info() -> Dict[str, str]:
     """Get detailed OS information.
@@ -197,7 +193,7 @@ def _is_google_colab() -> bool:
     
     # Method 1: Check for google.colab module (most reliable)
     try:
-        import google.colab
+        import google.colab  # noqa: F401
         return True
     except ImportError:
         pass
@@ -277,23 +273,11 @@ def _is_google_colab() -> bool:
     except Exception:
         pass
     
-    # Method 7: Check process information
-    try:
-        import psutil
-        current_process = psutil.Process()
-        
-        # Check parent processes for Colab indicators
-        parent = current_process.parent()
-        while parent is not None:
-            try:
-                cmdline = ' '.join(parent.cmdline()).lower()
-                if 'colab' in cmdline or 'jupyter' in cmdline:
-                    return True
-                parent = parent.parent()
-            except (psutil.NoSuchProcess, psutil.AccessDenied):
-                break
-    except Exception:
-        pass
+    # Method 7: Check process information (disabled to avoid false positives)
+    # This method has been disabled because it can give false positives when 
+    # colab-related development work is being done on local machines.
+    # The other 6 methods provide sufficient and more reliable detection.
+    pass
         
     return False
 

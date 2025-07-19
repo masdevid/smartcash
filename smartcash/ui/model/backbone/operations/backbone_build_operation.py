@@ -77,7 +77,8 @@ class BackboneBuildOperationHandler(BaseBackboneOperation):
                 'model_name': f'smartcash_{model_type}'
             }
             
-            self.log_operation(f"🧬 Membangun model backbone {model_type}", level='info')
+            layer_mode_text = "Multi-Layer Detection" if use_multi_layer else "Single Layer Detection"
+            self.log_operation(f"🧬 Membangun model backbone {model_type} dengan {layer_mode_text}", level='info')
             
             self.update_dual_progress(
                 current_step=2,
@@ -93,8 +94,9 @@ class BackboneBuildOperationHandler(BaseBackboneOperation):
             )
             self._current_step = 3  # Store for progress callback
             
-            # Enhanced configuration with multi-layer support
-            use_multi_layer = backbone_config.get('multi_layer_heads', False)
+            # Enhanced configuration with multi-layer support (default enabled)
+            layer_mode = backbone_config.get('layer_mode', 'multi')
+            use_multi_layer = (layer_mode == 'multi') or backbone_config.get('multi_layer_heads', True)
             
             # Use the new YOLO model builder for enhanced capabilities
             from smartcash.model.core.yolo_model_builder import build_banknote_detection_model

@@ -226,7 +226,21 @@ class BackboneUIModule(BaseUIModule):
         
         def execute_build():
             self.log("🏗️ Memulai pembangunan model backbone...", 'info')
-            return self._execute_build_operation()
+            
+            # Disable UI during operation
+            self._disable_ui_during_operation()
+            
+            try:
+                result = self._execute_build_operation()
+                
+                # Update model status if successful
+                if result.get('success'):
+                    self._update_built_model_indicators()
+                    
+                return result
+            finally:
+                # Re-enable UI after operation completes
+                self._enable_ui_after_operation()
         
         return self._execute_operation_with_wrapper(
             operation_name="Pembangunan Model",
@@ -496,3 +510,114 @@ class BackboneUIModule(BaseUIModule):
         except Exception as e:
             self.log(f"❌ Error reset konfigurasi: {e}", 'error')
             return {'success': False, 'message': str(e)}
+
+    def _disable_ui_during_operation(self) -> None:
+        """Disable UI components during operations to prevent interference."""
+        try:
+            if hasattr(self, '_ui_components') and self._ui_components:
+                widgets = self._ui_components.get('widgets', {})
+                
+                # Disable form widgets
+                for widget_name, widget in widgets.items():
+                    if hasattr(widget, 'disabled'):
+                        widget.disabled = True
+                        self.logger.debug(f"Disabled widget: {widget_name}")
+                
+                # Disable action buttons except for the one currently running
+                if 'action_container' in self._ui_components:
+                    action_container = self._ui_components['action_container']
+                    if isinstance(action_container, dict) and 'disable_buttons' in action_container:
+                        action_container['disable_buttons'](['validate', 'build'])
+                
+                self.log("🔒 UI disabled during operation", 'info')
+                
+        except Exception as e:
+            self.logger.error(f"Failed to disable UI: {e}")
+
+    def _enable_ui_after_operation(self) -> None:
+        """Re-enable UI components after operations complete."""
+        try:
+            if hasattr(self, '_ui_components') and self._ui_components:
+                widgets = self._ui_components.get('widgets', {})
+                
+                # Re-enable form widgets
+                for widget_name, widget in widgets.items():
+                    if hasattr(widget, 'disabled'):
+                        widget.disabled = False
+                        self.logger.debug(f"Enabled widget: {widget_name}")
+                
+                # Re-enable action buttons
+                if 'action_container' in self._ui_components:
+                    action_container = self._ui_components['action_container']
+                    if isinstance(action_container, dict) and 'enable_buttons' in action_container:
+                        action_container['enable_buttons'](['validate', 'build'])
+                
+                self.log("🔓 UI re-enabled after operation", 'info')
+                
+        except Exception as e:
+            self.logger.error(f"Failed to enable UI: {e}")
+
+    def _update_built_model_indicators(self) -> None:
+        """Update UI to show built model indicators."""
+        try:
+            # Check for built models
+            built_models = self._check_built_models()
+            
+            if hasattr(self, '_ui_components') and self._ui_components:
+                widgets = self._ui_components.get('widgets', {})
+                
+                # Update model status info if available
+                if 'model_status_info' in widgets:
+                    status_widget = widgets['model_status_info']
+                    if hasattr(status_widget, 'value'):
+                        # Update the HTML content to show built model status
+                        current_config = self.get_current_config()
+                        backbone_type = current_config.get('backbone', {}).get('model_type', 'efficientnet_b4')
+                        
+                        model_count = len(built_models.get(backbone_type, []))
+                        status_text = f"✅ Built" if model_count > 0 else "⚠️ Not Built"
+                        last_built = "Recently" if model_count > 0 else "Never"
+                        available_text = f"{model_count} model(s) found" if model_count > 0 else "No models found"
+                        
+                        # Use JavaScript to update the spans
+                        from IPython.display import Javascript, display
+                        js_code = f"""
+                        if (document.getElementById('model-status')) {{
+                            document.getElementById('model-status').innerText = '{status_text}';
+                            document.getElementById('last-built').innerText = '{last_built}';
+                            document.getElementById('available-models').innerText = '{available_text}';
+                        }}
+                        """
+                        display(Javascript(js_code))
+                        
+                        self.log(f"📊 Model indicators updated: {available_text}", 'info')
+                
+        except Exception as e:
+            self.logger.error(f"Failed to update built model indicators: {e}")
+
+    def _check_built_models(self) -> Dict[str, Any]:
+        """Check for built models by backbone type."""
+        try:
+            from pathlib import Path
+            import glob
+            
+            current_config = self.get_current_config()
+            save_path = current_config.get('backbone', {}).get('save_path', 'data/models')
+            
+            built_models = {}
+            
+            # Check for model files following the naming convention from MODEL_ARC_README.md
+            # Format: best_{model_name}_{backbone}_{date:%Y%m%d}.pt
+            for backbone in ['efficientnet_b4', 'cspdarknet']:
+                model_pattern = f"{save_path}/best_*_{backbone}_*.pt"
+                model_files = glob.glob(model_pattern)
+                built_models[backbone] = model_files
+                
+                if model_files:
+                    self.logger.debug(f"Found {len(model_files)} built models for {backbone}")
+            
+            return built_models
+            
+        except Exception as e:
+            self.logger.error(f"Failed to check built models: {e}")
+            return {}

@@ -1,20 +1,6 @@
 """
 File: smartcash/ui/model/training/training_uimodule.py
 Main UIModule implementation for training module using BaseUIModule pattern.
-
-This module implements the TrainingUIModule class which provides a user interface
-for model training operations. It's designed to be used with TrainingUIFactory
-for proper initialization and display.
-
-Example usage:
-    from smartcash.ui.model.training.training_ui_factory import TrainingUIFactory
-    
-    # Create and display the training UI
-    training_ui = TrainingUIFactory.create_and_display_training()
-    
-    # Or get a display function for later use
-    show_training = TrainingUIFactory.create_training_display()
-    training_ui = show_training()
 """
 
 from typing import Dict, Any, Optional, Callable
@@ -43,11 +29,7 @@ class TrainingUIModule(BaseUIModule, OperationMixin, ButtonHandlerMixin):
     """
     
     def __init__(self):
-        """
-        Initialize training UI module.
-        
-        Note: Use TrainingUIFactory.create_training_module() to create instances.
-        """
+        """Initialize training UI module."""
         super().__init__(
             module_name='training',
             parent_module='model'
@@ -60,35 +42,7 @@ class TrainingUIModule(BaseUIModule, OperationMixin, ButtonHandlerMixin):
         self._chart_updaters: Dict[str, Callable] = {}
         self._training_state = {'phase': 'idle'}
         
-        # Will be set by initialize()
-        self._config = None
-        
         self.logger.debug("✅ TrainingUIModule initialized")
-        
-    def initialize(self, config: Optional[Dict[str, Any]] = None, **kwargs) -> None:
-        """
-        Initialize the module with configuration.
-        
-        Args:
-            config: Optional configuration dictionary
-            **kwargs: Additional arguments for configuration
-            
-        Note:
-            This method is called by TrainingUIFactory when creating a new instance.
-        """
-        self.logger.debug("Initializing TrainingUIModule with config")
-        self._config = config or {}
-        
-        # Initialize configuration handler
-        self._config_handler = self.create_config_handler(self._config)
-        
-        # Initialize operations
-        self._init_operations()
-        
-        # Initialize UI components
-        self._init_ui_components()
-        
-        self.logger.debug("✅ TrainingUIModule initialized with config")
     
     def create_config_handler(self, config: Optional[Dict[str, Any]] = None) -> TrainingConfigHandler:
         """Create configuration handler."""
@@ -96,38 +50,6 @@ class TrainingUIModule(BaseUIModule, OperationMixin, ButtonHandlerMixin):
         config_handler = TrainingConfigHandler(merged_config)
         config_handler.set_ui_components(self._ui_components)
         return config_handler
-    
-    def _init_operations(self) -> None:
-        """
-        Initialize training operations.
-        
-        This method sets up all the training operations (start, stop, resume, validate)
-        using the TrainingOperationFactory.
-        """
-        self.logger.debug("Initializing training operations")
-        
-        # Create operation factory with the current module instance
-        self._operation_factory = TrainingOperationFactory(ui_module=self)
-        
-        # Register operation handlers
-        self.register_operation_handler(
-            'start_training',
-            self._operation_factory.create_start_training_handler()
-        )
-        self.register_operation_handler(
-            'stop_training',
-            self._operation_factory.create_stop_training_handler()
-        )
-        self.register_operation_handler(
-            'resume_training',
-            self._operation_factory.create_resume_training_handler()
-        )
-        self.register_operation_handler(
-            'validate_training',
-            self._operation_factory.create_validate_training_handler()
-        )
-        
-        self.logger.debug("✅ Training operations initialized")
     
     def _merge_with_defaults(self, config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """Merge provided config with defaults."""
@@ -621,7 +543,48 @@ class TrainingUIModule(BaseUIModule, OperationMixin, ButtonHandlerMixin):
         }
 
 
-# ==================== MODULE EXPORTS ====================
+# ==================== FACTORY FUNCTIONS ====================
 
-# Export only the module class for factory pattern usage
-__all__ = ['TrainingUIModule']
+# Global instance for singleton pattern
+_training_uimodule_instance: Optional[TrainingUIModule] = None
+
+
+def create_training_uimodule(
+    config: Optional[Dict[str, Any]] = None,
+    auto_initialize: bool = True,
+    **kwargs
+) -> TrainingUIModule:
+    """Create a new training UIModule instance."""
+    module = TrainingUIModule()
+    
+    if auto_initialize:
+        module.initialize()
+    
+    return module
+
+
+def get_training_uimodule(
+    config: Optional[Dict[str, Any]] = None,
+    auto_initialize: bool = True,
+    **kwargs
+) -> TrainingUIModule:
+    """Get or create training UIModule singleton instance."""
+    global _training_uimodule_instance
+    
+    if _training_uimodule_instance is None:
+        _training_uimodule_instance = create_training_uimodule(
+            config=config,
+            auto_initialize=auto_initialize
+        )
+    
+    return _training_uimodule_instance
+
+
+def reset_training_uimodule() -> None:
+    """Reset the training UIModule singleton instance."""
+    global _training_uimodule_instance
+    
+    if _training_uimodule_instance:
+        _training_uimodule_instance.cleanup()
+        _training_uimodule_instance = None
+

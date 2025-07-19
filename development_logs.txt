@@ -1,14 +1,33 @@
 setup.colab
----
-- ✅ Fixed colab error phase handling - added 'error' phase to button phases
-- ✅ Enhanced progress tracking with n/total phase information [1/5], [2/5], etc.
-- ✅ Mount drive operation failures resolved through better error handling
+- drive.mount tidak tertrigger. Jendela mount tidak muncul.
+- Operasi gagal: Mount Google Drive - Operasi gagal
+- Operasi tetap gagal walaupun melakukan mounting manual
+
+dataset.downloader
+- WARNING - smartcash.ui.dataset.downloader.operations.download_check_operation.DownloadCheckOperation - Unknown check phase: scan_downloads
+- WARNING:smartcash.ui.dataset.downloader.operations.download_check_operation.DownloadCheckOperation:Unknown check phase: scan_structure
+- WARNING:smartcash.ui.dataset.downloader.operations.download_check_operation.DownloadCheckOperation:Unknown check phase: scan_splits
+- WARNING:smartcash.ui.dataset.downloader.operations.download_check_operation.DownloadCheckOperation:Unknown check phase: scan_aggregate
+
+dataset.augmentation
+❌ Operasi gagal: Pemeriksaan Data - Gagal memeriksa status: 'AugmentStatusOperation' object has no attribute '_backend_apis'
 
 model.backbone
----
-- ✅ Fixed validate button visibility error - added proper type checking for buttons structure
-- ✅ Added rescan_models button handler registration with BaseUIModule system
+No button widget found for handler 'rescan_models'
+❌ Failed to register rescan button: ButtonHandlerMixin.register_button_handler() takes 3 positional arguments but 4 were given
+
+model.training
+- ⚠️ Error getting backbone config: cannot import name 'get_backbone_uimodule' from 'smartcash.ui.model.backbone.backbone_uimodule' (/content/smartcash/smartcash/ui/model/backbone/backbone_uimodule.py)
+- ❌ Backbone config refresh failed: No backbone configuration available
 
 model.evaluation
----
-- ✅ Fixed refresh_button registration and connected handler through initialize() override
+File "/content/smartcash/smartcash/ui/model/evaluation/evaluation_uimodule.py", line 1110, in initialize
+    success = super().initialize(config, **kwargs)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: BaseUIModule.initialize() takes 1 positional argument but 2 were given
+
+model.pretrained
+❌ Button handler validate failed: 'PretrainedUIModule' object has no attribute '_execute_operation'
+❌ Button handler download failed: 'PretrainedUIModule' object has no attribute '_execute_operation'
+❌ Button handler refresh failed: 'PretrainedUIModule' object has no attribute '_execute_operation'
+❌ Button handler cleanup failed: 'PretrainedUIModule' object has no attribute '_execute_operation'

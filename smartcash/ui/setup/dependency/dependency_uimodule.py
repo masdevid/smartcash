@@ -276,7 +276,6 @@ class DependencyUIModule(BaseUIModule):
     
     def _operation_check_status(self, button=None) -> Dict[str, Any]:
         """Handle package status check operation using common wrapper."""
-        self.logger.debug(f"🔄 Check Status button clicked. Button: {button}")
         
         def validate_components():
             return {'valid': True}

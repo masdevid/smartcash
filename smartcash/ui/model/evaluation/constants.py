@@ -149,7 +149,7 @@ EVALUATION_METRICS = {
 BUTTON_CONFIG = {
     'run_all_scenarios': {
         'text': '🚀 Run All Scenarios',
-        'style': 'primary',
+        'style': 'success',
         'tooltip': 'Run evaluation across all scenarios and models (8 total tests)'
     },
     'run_position_scenario': {
@@ -164,17 +164,17 @@ BUTTON_CONFIG = {
     },
     'load_checkpoint': {
         'text': '📂 Load Models',
-        'style': 'secondary',
+        'style': 'warning',
         'tooltip': 'Load best trained model checkpoints for evaluation'
     },
     'export_results': {
         'text': '📊 Export Results',
-        'style': 'success',
+        'style': 'secondary',
         'tooltip': 'Export evaluation results and metrics'
     },
     'clear_results': {
         'text': '🗑️ Clear Results',
-        'style': 'warning',
+        'style': 'danger',
         'tooltip': 'Clear previous evaluation results'
     }
 }

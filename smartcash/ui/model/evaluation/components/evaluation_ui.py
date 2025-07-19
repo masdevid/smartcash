@@ -3,9 +3,8 @@ Evaluation UI Components - Using Standard Container Components
 Creates comprehensive UI for 2×4 evaluation matrix (2 scenarios × 4 models = 8 tests)
 """
 
-from typing import Dict, Any, Optional
+from typing import Dict, Any
 import ipywidgets as widgets
-from IPython.display import display
 from smartcash.ui.logger import get_module_logger
 from smartcash.ui.components.header_container import create_header_container
 from smartcash.ui.components.action_container import create_action_container
@@ -14,10 +13,7 @@ from smartcash.ui.components.operation_container import create_operation_contain
 from smartcash.ui.components.summary_container import create_summary_container
 from smartcash.ui.model.evaluation.constants import (
     UI_CONFIG,
-    RESEARCH_SCENARIOS,
     MODEL_COMBINATIONS,
-    EVALUATION_MATRIX,
-    BUTTON_CONFIG,
     EVALUATION_METRICS
 )
 
@@ -41,11 +37,11 @@ def create_evaluation_ui(config: Dict[str, Any]) -> Dict[str, Any]:
             icon='📊'  # Chart emoji for evaluation
         )
         
-        # Create compact form sections - Row 1: 2 columns (Execution + Model options)
+        # Create compact form sections - Row 1: 2 columns (Execution + Backbone/Layer options)
         execution_model_row = _create_execution_model_row(config)
         
-        # Row 2: Metrics selection
-        metrics_section = _create_metrics_form_section(config)
+        # Row 2: 2 columns (Metrics selection + Model Selection)
+        metrics_model_row = _create_metrics_model_row(config)
         
         # Create action container with single run scenario button (no double icons)
         action_container = create_action_container(
@@ -93,7 +89,7 @@ def create_evaluation_ui(config: Dict[str, Any]) -> Dict[str, Any]:
             components=[
                 {'type': 'header', 'component': header_widget, 'order': 0},
                 {'type': 'form', 'component': execution_model_row, 'order': 1},
-                {'type': 'form', 'component': metrics_section, 'order': 2},
+                {'type': 'form', 'component': metrics_model_row, 'order': 2},
                 {'type': 'action', 'component': action_widget, 'order': 3},
                 {'type': 'operation', 'component': operation_widget, 'order': 4},
                 {'type': 'custom', 'component': summary_widget, 'order': 5}
@@ -111,7 +107,7 @@ def create_evaluation_ui(config: Dict[str, Any]) -> Dict[str, Any]:
             'main_container': main_widget,
             'header_container': header_container,
             'execution_model_row': execution_model_row,
-            'metrics_section': metrics_section,
+            'metrics_model_row': metrics_model_row,
             'action_container': action_container,
             'operation_container': operation_container,  # Store full container object like backbone
             'summary_container': summary_container,
@@ -133,6 +129,82 @@ def create_evaluation_ui(config: Dict[str, Any]) -> Dict[str, Any]:
             'error': str(e),
             'components_count': 0
         }
+
+def _create_model_display_widget(config: Dict[str, Any]) -> widgets.Widget:
+    """Create model display widget showing available best models (display only, not selection)."""
+    
+    # Container for model display
+    model_display_items = []
+    model_display_items.append(widgets.HTML("<h3>📋 Available Best Models</h3>"))
+    
+    # Create refresh button with icon
+    refresh_button = widgets.Button(
+        description="🔄 Refresh",
+        tooltip="Refresh available models list",
+        button_style='info',
+        layout=widgets.Layout(width='100px', height='28px', margin='0 0 10px 0')
+    )
+    
+    # Placeholder for refresh functionality (will be connected in the module)
+    refresh_button.on_click(lambda b: _refresh_model_list())
+    model_display_items.append(refresh_button)
+    
+    # Mock model data following {scenario}_{backbone}_{layer} format
+    # TODO: Replace with actual model discovery from training results
+    available_models = [
+        {'name': 'position_yolov5_efficientnet-b4', 'map': 0.847, 'scenario': 'position', 'backbone': 'yolov5_efficientnet-b4'},
+        {'name': 'position_yolov5_cspdarknet', 'map': 0.782, 'scenario': 'position', 'backbone': 'yolov5_cspdarknet'},
+        {'name': 'lighting_yolov5_efficientnet-b4', 'map': 0.823, 'scenario': 'lighting', 'backbone': 'yolov5_efficientnet-b4'},
+        {'name': 'lighting_yolov5_cspdarknet', 'map': 0.798, 'scenario': 'lighting', 'backbone': 'yolov5_cspdarknet'}
+    ]
+    
+    if available_models:
+        # Display models in a compact list format (display only, no selection checkboxes)
+        for model in available_models:
+            model_info = widgets.HTML(
+                value=f"""
+                <div style='background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 4px; padding: 8px; margin: 3px 0;'>
+                    <div style='font-weight: bold; color: #495057;'>{model['name']}</div>
+                    <div style='font-size: 0.85em; color: #6c757d;'>mAP: {model['map']:.3f} | Scenario: {model['scenario']}</div>
+                </div>
+                """,
+                layout=widgets.Layout(margin='2px 0')
+            )
+            model_display_items.append(model_info)
+        
+        # Add info text
+        info_text = widgets.HTML(
+            value="""
+            <div style='font-size: 0.8em; color: #6c757d; margin-top: 10px; padding: 5px;'>
+                ℹ️ Models are selected automatically based on scenario, backbone, and layer settings above.
+            </div>
+            """,
+            layout=widgets.Layout(margin='5px 0')
+        )
+        model_display_items.append(info_text)
+        
+    else:
+        # Show empty placeholder when no models available
+        empty_placeholder = widgets.HTML(
+            value="""
+            <div style='text-align: center; color: #6c757d; padding: 20px 10px;'>
+                <div style='font-size: 2em; opacity: 0.3; margin-bottom: 10px;'>🤖</div>
+                <p style='margin: 5px 0; font-size: 0.9em;'>No trained models available</p>
+                <p style='margin: 5px 0; font-size: 0.8em; color: #999;'>
+                    Complete backbone → training workflow first
+                </p>
+            </div>
+            """,
+            layout=widgets.Layout(margin='10px 0')
+        )
+        model_display_items.append(empty_placeholder)
+    
+    return widgets.VBox(model_display_items, layout=widgets.Layout(margin='5px 0'))
+
+def _refresh_model_list():
+    """Placeholder function for refreshing model list. Will be implemented in the module."""
+    # This will be connected to the actual refresh operation in the evaluation module
+    pass
 
 def _create_execution_model_row(config: Dict[str, Any]) -> widgets.Widget:
     """Create compact 2-column row with execution options and model configurations."""
@@ -173,11 +245,12 @@ def _create_execution_model_row(config: Dict[str, Any]) -> widgets.Widget:
     )
     execution_items.append(save_intermediate)
     
-    # Right column: Backbone & Layer Options
+    # Right column: Model Selection (actual selection logic)
     model_items = []
-    model_items.append(widgets.HTML("<h3>🤖 Backbone & Layer Options</h3>"))
+    model_items.append(widgets.HTML("<h3>🤖 Model Selection</h3>"))
     
-    # Backbone selection (radio buttons)
+    # Backbone selection (radio buttons) - this determines which models to evaluate
+    from smartcash.ui.model.evaluation.constants import MODEL_COMBINATIONS
     backbone_options = list(set([model['backbone'] for model in MODEL_COMBINATIONS]))
     backbone_radio = widgets.RadioButtons(
         options=backbone_options,
@@ -188,7 +261,7 @@ def _create_execution_model_row(config: Dict[str, Any]) -> widgets.Widget:
     )
     model_items.append(backbone_radio)
     
-    # Layer mode selection (radio buttons)
+    # Layer mode selection (radio buttons) - this determines which layer mode to use
     layer_options = list(set([model['layer_mode'] for model in MODEL_COMBINATIONS]))
     layer_radio = widgets.RadioButtons(
         options=layer_options,
@@ -199,10 +272,11 @@ def _create_execution_model_row(config: Dict[str, Any]) -> widgets.Widget:
     )
     model_items.append(layer_radio)
     
-    # Auto-select best checkbox
+    # Auto-select best trained models checkbox
     auto_select = widgets.Checkbox(
         value=config.get('evaluation', {}).get('models', {}).get('auto_select_best', True),
-        description="🎯 Auto-select best models",
+        description="🎯 Auto-select best trained models",
+        tooltip="Automatically select best models with format: {scenario}_{backbone}_{layer}",
         style={'description_width': 'initial'},
         layout=widgets.Layout(margin='5px 0')
     )
@@ -215,22 +289,23 @@ def _create_execution_model_row(config: Dict[str, Any]) -> widgets.Widget:
     return widgets.HBox([left_column, right_column], layout=widgets.Layout(margin='10px 0'))
 
 
-def _create_metrics_form_section(config: Dict[str, Any]) -> widgets.Widget:
-    """Create compact metrics configuration section."""
-    metrics_items = []
+def _create_metrics_model_row(config: Dict[str, Any]) -> widgets.Widget:
+    """Create 2-column row with metrics selection and available best models."""
     
-    # Title
+    # Left column: Metrics selection (restored original)
+    metrics_items = []
     metrics_items.append(widgets.HTML("<h3>📈 Evaluation Metrics</h3>"))
     
     # Create metrics checkboxes in a more compact horizontal layout
     metrics_row1 = []
     metrics_row2 = []
     
+    from smartcash.ui.model.evaluation.constants import EVALUATION_METRICS
     metric_keys = list(EVALUATION_METRICS.keys())
     half_point = len(metric_keys) // 2
     
     # First row of metrics
-    for i, metric_key in enumerate(metric_keys[:half_point]):
+    for metric_key in metric_keys[:half_point]:
         metric_info = EVALUATION_METRICS[metric_key]
         checkbox = widgets.Checkbox(
             value=True,
@@ -257,151 +332,13 @@ def _create_metrics_form_section(config: Dict[str, Any]) -> widgets.Widget:
     if metrics_row2:
         metrics_items.append(widgets.HBox(metrics_row2))
     
-    return widgets.VBox(metrics_items, layout=widgets.Layout(margin='10px 0'))
+    # Right column: Available Best Models (display only)
+    model_display_widget = _create_model_display_widget(config)
+    
+    # Create 2-column layout
+    left_column = widgets.VBox(metrics_items, layout=widgets.Layout(width='48%', margin='0 1% 0 0'))
+    right_column = widgets.VBox([model_display_widget], layout=widgets.Layout(width='48%', margin='0 0 0 1%'))
+    
+    return widgets.HBox([left_column, right_column], layout=widgets.Layout(margin='10px 0'))
 
 
-def display_evaluation_ui(ui_components: Dict[str, Any]) -> None:
-    """
-    Display the evaluation UI with comprehensive error handling and logging.
-    
-    Args:
-        ui_components: Dictionary containing all UI components with 'main_container' as the root
-    """
-    # Get logger first to ensure we can log any issues
-    try:
-        logger = get_module_logger("smartcash.ui.model.evaluation.components")
-    except Exception as e:
-        print(f"[WARNING] Failed to get logger: {e}")
-        logger = None
-    
-    def log_info(msg):
-        if logger:
-            logger.info(msg)
-        # Remove direct print to prevent console output outside operation containers
-        
-    def log_error(msg, exc_info=False):
-        if logger:
-            logger.error(msg, exc_info=exc_info)
-        # Remove direct print to prevent console output outside operation containers
-    
-    log_info("🖥️ ===== Starting Evaluation UI Display =====")
-    
-    try:
-        # Check if we have components to display
-        if not ui_components:
-            error_msg = "No UI components provided to display"
-            log_error(error_msg)
-            display(HTML(f"<h3 style='color: red;'>❌ {error_msg}</h3>"))
-            return
-        
-        # Log available component keys for debugging
-        component_keys = list(ui_components.keys())
-        log_info(f"📋 Available UI components: {component_keys}")
-        
-        # Get the main container
-        main_container = ui_components.get('main_container')
-        if main_container is None:
-            error_msg = "Main container not found in UI components"
-            log_error(error_msg)
-            display(HTML(f"<h3 style='color: red;'>❌ {error_msg}</h3>"))
-            return
-        
-        log_info("🎯 Found main container, checking type...")
-        log_info(f"Main container type: {type(main_container).__name__}")
-        log_info(f"Main container attributes: {dir(main_container) if hasattr(main_container, '__dir__') else 'N/A'}")
-        
-        # Clear any existing output first
-        log_info("🧹 Clearing previous output...")
-        clear_output(wait=True)
-        
-        # Display a test widget first to verify display is working
-        try:
-            log_info("🧪 Testing basic display functionality...")
-            test_button = widgets.Button(description="Test Button")
-            display(HTML("<h3>🔄 Display Test</h3>"))
-            display(test_button)
-            log_info("✅ Basic display test passed")
-        except Exception as test_error:
-            log_error(f"❌ Basic display test failed: {test_error}", exc_info=True)
-        
-        # Try different display methods in order of preference
-        log_info("🔄 Attempting to display main UI...")
-        
-        try:
-            # Method 1: If main_container is a widget with _ipython_display_
-            if hasattr(main_container, '_ipython_display_'):
-                log_info("🔹 Attempting to display using _ipython_display_ method")
-                display(HTML("<h3>🔹 Using _ipython_display_ method</h3>"))
-                display(main_container)
-                log_info("✅ UI displayed successfully using _ipython_display_")
-                return
-            
-            # Method 2: If main_container has a container attribute
-            if hasattr(main_container, 'container'):
-                log_info("🔹 Attempting to display using container attribute")
-                display(HTML("<h3>🔹 Using container attribute</h3>"))
-                display(main_container.container)
-                log_info("✅ UI displayed successfully using container attribute")
-                return
-            
-            # Method 3: If main_container has a show method
-            if hasattr(main_container, 'show'):
-                log_info("🔹 Attempting to display using show() method")
-                display(HTML("<h3>🔹 Using show() method</h3>"))
-                display(main_container.show())
-                log_info("✅ UI displayed successfully using show() method")
-                return
-            
-            # Method 4: Direct display as last resort
-            log_info("🔹 Attempting direct display")
-            display(HTML("<h3>🔹 Using direct display</h3>"))
-            display(main_container)
-            log_info("✅ UI displayed successfully using direct display")
-            
-        except Exception as display_error:
-            log_error(f"❌ Failed to display UI: {str(display_error)}", exc_info=True)
-            
-            # Fallback: Show detailed error with component structure
-            error_html = f"""
-            <div style='border: 2px solid #ff4444; padding: 15px; border-radius: 5px; background: #ffeeee; margin: 10px 0;'>
-                <h3 style='color: #cc0000; margin-top: 0;'>❌ Failed to Display Evaluation UI</h3>
-                <p><strong>Error:</strong> {error}</p>
-                <p><strong>Main Container Type:</strong> {container_type}</p>
-                <p><strong>Available Components:</strong> {components}</p>
-                <p>Please check the logs for more details.</p>
-            </div>
-            """.format(
-                error=str(display_error),
-                container_type=type(main_container).__name__,
-                components=", ".join(component_keys) if component_keys else "None"
-            )
-            
-            try:
-                display(HTML(error_html))
-                
-                # Also try to display the main container directly as a fallback
-                display(HTML("<h4>Attempting fallback display of main container:</h4>"))
-                display(main_container)
-                
-            except Exception as fallback_error:
-                log_error(f"❌ Fallback display also failed: {fallback_error}", exc_info=True)
-                display(HTML(f"<div style='color:red;'>Fallback display failed: {fallback_error}</div>"))
-    
-    except Exception as e:
-        log_error(f"❌ Fatal error in display_evaluation_ui: {str(e)}", exc_info=True)
-        
-        # Try to display at least some error message
-        try:
-            error_html = f"""
-            <div style='border: 2px solid #ff0000; padding: 15px; border-radius: 5px; background: #ffdddd; margin: 10px 0;'>
-                <h3 style='color: #cc0000; margin-top: 0;'>❌ Fatal Error Displaying UI</h3>
-                <p><strong>Error:</strong> {error}</p>
-                <p>Please check the logs for more details and report this issue.</p>
-            </div>
-            """.format(error=str(e))
-            display(HTML(error_html))
-        except:
-            print(f"[FATAL] Could not display error message: {e}")
-    
-    finally:
-        log_info("🏁 ===== Evaluation UI Display Completed =====")

@@ -1,150 +1,188 @@
 """
-Default configuration for evaluation module.
-Loads from smartcash/configs/evaluation_config.yaml
+File: smartcash/ui/model/evaluation/configs/evaluation_defaults.py
+Default configuration for evaluation module using BaseUIModule pattern.
 """
 
 from typing import Dict, Any
-from smartcash.ui.model.evaluation.constants import (
-    RESEARCH_SCENARIOS,
-    EVALUATION_METRICS,
-    MODEL_COMBINATIONS,
-    EVALUATION_MATRIX
-)
+from enum import Enum
+
+
+class EvaluationPhase(Enum):
+    """Evaluation phase enumeration."""
+    IDLE = "idle"
+    INITIALIZING = "initializing"
+    RUNNING = "running"
+    VALIDATING = "validating"
+    COMPLETED = "completed"
+    STOPPED = "stopped"
+    ERROR = "error"
 
 def get_default_evaluation_config() -> Dict[str, Any]:
     """
-    Get default evaluation configuration matching evaluation_config.yaml structure.
+    Get default evaluation configuration.
     
     Returns:
         Default evaluation configuration dictionary
     """
     return {
-        "evaluation": {
-            # Data paths (matches evaluation_config.yaml)
-            "data": {
-                "test_dir": "data/preprocessed/test",
-                "evaluation_dir": "data/evaluation", 
-                "results_dir": "data/evaluation/results"
-            },
-            
-            # 2 Scenarios from evaluation_config.yaml
-            "scenarios": {
-                "position_variation": {
-                    "name": "Position Variation",
-                    "enabled": True,
-                    "augmentation_config": {
-                        "num_variations": 5
-                    }
+        'evaluation': {
+            'scenarios': {
+                'position_variation': {
+                    'enabled': True,
+                    'description': 'Test model performance across different object positions',
+                    'test_cases': ['center', 'left', 'right', 'top', 'bottom', 'corner']
                 },
-                "lighting_variation": {
-                    "name": "Lighting Variation",
-                    "enabled": True,
-                    "augmentation_config": {
-                        "num_variations": 5
-                    }
+                'lighting_variation': {
+                    'enabled': True,
+                    'description': 'Test model performance under different lighting conditions',
+                    'test_cases': ['bright', 'dim', 'artificial', 'natural', 'mixed']
                 }
             },
-            
-            # Metrics configuration (matches evaluation_config.yaml)
-            "metrics": {
-                "map": {
-                    "enabled": True,
-                    "iou_thresholds": [0.5, 0.75]
-                },
-                "precision_recall": {
-                    "enabled": True,
-                    "confidence_threshold": 0.25,
-                    "iou_threshold": 0.5,
-                    "per_class": True
-                },
-                "f1_score": {
-                    "enabled": True,
-                    "beta": 1.0,
-                    "per_class": True
-                },
-                "accuracy": {
-                    "enabled": True,
-                    "per_class": True
-                },
-                "inference_time": {
-                    "enabled": True
+            'models': {
+                'source': 'trained',  # 'trained', 'checkpoint', 'best'
+                'auto_discover': True,
+                'selection_criteria': 'best_map',  # 'best_map', 'latest', 'manual'
+                'max_models': 4
+            },
+            'metrics': {
+                'primary': ['mAP@0.5', 'mAP@0.75', 'precision', 'recall'],
+                'secondary': ['accuracy', 'f1_score', 'inference_time'],
+                'thresholds': {
+                    'mAP@0.5': 0.5,
+                    'mAP@0.75': 0.3,
+                    'precision': 0.7,
+                    'recall': 0.7
                 }
             },
-            
-            # Checkpoint management (matches evaluation_config.yaml)
-            "checkpoints": {
-                "auto_select_best": True,
-                "sort_by": "val_map",
-                "max_checkpoints": 10
+            'execution': {
+                'run_mode': 'all_scenarios',  # 'all_scenarios', 'position_only', 'lighting_only', 'single_model'
+                'parallel_execution': False,
+                'timeout_per_test': 300,  # seconds
+                'save_intermediate_results': True,
+                'compare_with_baseline': True
             },
-            
-            # Analysis modules (matches evaluation_config.yaml)
-            "analysis": {
-                "currency_analysis": {
-                    "enabled": True,
-                    "primary_layer": "banknote",
-                    "confidence_threshold": 0.3
-                },
-                "class_analysis": {
-                    "enabled": True,
-                    "compute_confusion_matrix": True
-                }
-            },
-            
-            # Model selection (4 combinations: 2 backbones × 2 layer modes)
-            "models": {
-                "selected_models": [
-                    "cspdarknet_single",
-                    "cspdarknet_multilayer", 
-                    "efficientnet_b4_single",
-                    "efficientnet_b4_multilayer"
-                ],
-                "auto_select_best": True
-            },
-            
-            # Execution options
-            "execution": {
-                "run_mode": "all_scenarios",  # "all_scenarios", "position_only", "lighting_only"
-                "parallel_execution": False,
-                "save_intermediate_results": True
+            'output': {
+                'save_dir': 'runs/evaluation',
+                'name': 'smartcash_evaluation',
+                'exist_ok': True,
+                'save_detailed_results': True,
+                'generate_report': True
             }
         },
-        
-        # Inference settings
-        "inference": {
-            "confidence_threshold": 0.25,
-            "iou_threshold": 0.45,
-            "max_detections": 100,
-            "img_size": 640,
-            "half": True,
-            "fuse": True,
-            "nms": True
+        'model_selection': {
+            'auto_detect': True,
+            'source': 'trained',  # 'trained', 'checkpoint', 'pretrained'
+            'filter_criteria': {
+                'min_map': 0.5,
+                'min_epochs': 10,
+                'status': 'completed'
+            }
         },
-        
-        # UI configuration
-        "ui": {
-            "show_progress": True,
-            "show_live_metrics": True,
-            "auto_refresh_results": True,
-            "results_per_page": 10
+        'ui': {
+            'show_advanced_options': False,
+            'auto_refresh_models': True,
+            'real_time_updates': True,
+            'compact_view': False
+        },
+        'reporting': {
+            'format': 'html',  # 'html', 'json', 'csv'
+            'include_charts': True,
+            'include_comparisons': True,
+            'detailed_metrics': True
         }
     }
 
-def get_scenario_configs() -> Dict[str, Any]:
-    """Get scenario configuration details."""
-    return RESEARCH_SCENARIOS
+def get_evaluation_scenarios() -> Dict[str, Dict[str, Any]]:
+    """Get available evaluation scenarios."""
+    return {
+        'position_variation': {
+            'name': 'Position Variation',
+            'description': 'Test model robustness across different object positions',
+            'icon': '📐',
+            'test_count': 6,
+            'estimated_time': '5-10 minutes'
+        },
+        'lighting_variation': {
+            'name': 'Lighting Variation', 
+            'description': 'Test model performance under different lighting conditions',
+            'icon': '💡',
+            'test_count': 5,
+            'estimated_time': '5-8 minutes'
+        },
+        'all_scenarios': {
+            'name': 'Comprehensive Evaluation',
+            'description': 'Run all evaluation scenarios for complete assessment',
+            'icon': '🎯',
+            'test_count': 8,
+            'estimated_time': '10-20 minutes'
+        }
+    }
 
-def get_model_combinations() -> list:
-    """Get all 4 model combinations (2 backbones × 2 layer modes)."""
-    return MODEL_COMBINATIONS
 
-def get_evaluation_matrix() -> list:
-    """Get complete evaluation matrix (2 scenarios × 4 models = 8 tests)."""
-    return EVALUATION_MATRIX
-
-def get_available_metrics() -> Dict[str, Any]:
+def get_evaluation_metrics() -> Dict[str, Dict[str, Any]]:
     """Get available evaluation metrics."""
-    return EVALUATION_METRICS
+    return {
+        'mAP@0.5': {
+            'name': 'mAP@0.5',
+            'description': 'Mean Average Precision at IoU threshold 0.5',
+            'format': '.3f',
+            'higher_better': True,
+            'critical': True
+        },
+        'mAP@0.75': {
+            'name': 'mAP@0.75',
+            'description': 'Mean Average Precision at IoU threshold 0.75',
+            'format': '.3f',
+            'higher_better': True,
+            'critical': True
+        },
+        'precision': {
+            'name': 'Precision',
+            'description': 'Precision score for all classes',
+            'format': '.3f',
+            'higher_better': True,
+            'critical': True
+        },
+        'recall': {
+            'name': 'Recall',
+            'description': 'Recall score for all classes',
+            'format': '.3f',
+            'higher_better': True,
+            'critical': True
+        },
+        'f1_score': {
+            'name': 'F1-Score',
+            'description': 'F1 score combining precision and recall',
+            'format': '.3f',
+            'higher_better': True,
+            'critical': False
+        },
+        'accuracy': {
+            'name': 'Accuracy',
+            'description': 'Overall accuracy across all classes',
+            'format': '.3f',
+            'higher_better': True,
+            'critical': False
+        },
+        'inference_time': {
+            'name': 'Inference Time',
+            'description': 'Average inference time per image (ms)',
+            'format': '.1f',
+            'higher_better': False,
+            'critical': False
+        }
+    }
+
+
+def get_model_selection_criteria() -> Dict[str, str]:
+    """Get model selection criteria options."""
+    return {
+        'best_map': 'Best mAP@0.5',
+        'best_f1': 'Best F1-Score',
+        'latest': 'Latest Trained',
+        'fastest': 'Fastest Inference',
+        'manual': 'Manual Selection'
+    }
 
 def validate_evaluation_config(config: Dict[str, Any]) -> bool:
     """
@@ -199,3 +237,15 @@ def validate_evaluation_config(config: Dict[str, Any]) -> bool:
         print(f"Validation error: {e}")
         traceback.print_exc()
         return False
+
+
+# Constants for evaluation validation
+EVALUATION_VALIDATION_CONFIG = {
+    'min_test_timeout': 60,  # seconds
+    'max_test_timeout': 1800,  # 30 minutes
+    'min_models': 1,
+    'max_models': 10,
+    'required_metrics': ['mAP@0.5', 'precision', 'recall'],
+    'min_threshold_map': 0.1,
+    'max_threshold_map': 1.0
+}

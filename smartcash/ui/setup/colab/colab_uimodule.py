@@ -633,12 +633,12 @@ class ColabUIModule(BaseUIModule):
         """
         try:
             status = {
-                'initialized': self._is_initialized,
+                'initialized': getattr(self, '_is_initialized', False),
                 'module_name': self.module_name,
                 'environment_detected': self._environment_detected,
                 'is_colab': self._is_colab_environment,
-                'config_loaded': self._config_handler is not None,
-                'ui_created': bool(self._ui_components)
+                'config_loaded': hasattr(self, '_config_handler') and self._config_handler is not None,
+                'ui_created': hasattr(self, '_ui_components') and bool(self._ui_components)
             }
             
             # Add environment-specific information

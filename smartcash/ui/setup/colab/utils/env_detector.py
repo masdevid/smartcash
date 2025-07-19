@@ -194,28 +194,106 @@ def _get_os_info() -> Dict[str, str]:
 
 def _is_google_colab() -> bool:
     """🔍 Check if running in Google Colab using multiple detection methods"""
-    # Method 1: Check for google.colab module
+    
+    # Method 1: Check for google.colab module (most reliable)
     try:
         import google.colab
         return True
     except ImportError:
         pass
     
-    # Method 2: Check environment variables
-    if os.environ.get('COLAB_RELEASE_TAG', ''):
-        return True
-        
+    # Method 2: Check environment variables (comprehensive list)
+    colab_env_vars = [
+        'COLAB_RELEASE_TAG',
+        'COLAB_CPU_COUNT', 
+        'COLAB_JUPYTER_IP',
+        'COLAB_BACKEND_VERSION'
+    ]
+    
+    for env_var in colab_env_vars:
+        if os.environ.get(env_var, ''):
+            return True
+    
     # Method 3: Check if running in IPython and the runtime type is 'google.colab'
     try:
         from IPython import get_ipython
-        if 'google.colab' in str(get_ipython()):
-            return True
-    except:
+        ipython = get_ipython()
+        if ipython is not None:
+            # Check if it's Colab's IPython instance
+            ipython_str = str(ipython)
+            if 'google.colab' in ipython_str or 'colab' in ipython_str.lower():
+                return True
+            
+            # Check IPython config
+            if hasattr(ipython, 'config') and ipython.config:
+                config_str = str(ipython.config)
+                if 'colab' in config_str.lower():
+                    return True
+    except Exception:
         pass
         
-    # Method 4: Check for specific files that exist in Colab
-    if os.path.exists('/content'):
-        return True
+    # Method 4: Check for specific files and directories that exist in Colab
+    colab_indicators = [
+        '/content',  # Main content directory
+        '/content/drive',  # Drive mount point
+        '/opt/bin/nvidia-smi',  # Colab GPU setup
+        '/usr/local/cuda',  # CUDA installation in Colab
+        '/etc/apt/sources.list.d/colab.list'  # Colab-specific apt sources
+    ]
+    
+    for indicator in colab_indicators:
+        if os.path.exists(indicator):
+            return True
+    
+    # Method 5: Check system information that's typical of Colab
+    try:
+        # Check hostname patterns
+        hostname = platform.node().lower()
+        if any(pattern in hostname for pattern in ['colab', 'runtime']):
+            return True
+            
+        # Check for Colab-specific Python paths
+        import sys
+        for path in sys.path:
+            if '/content' in path or 'colab' in path.lower():
+                return True
+                
+        # Check for Colab-specific site-packages
+        import site
+        for site_path in site.getsitepackages():
+            if 'colab' in site_path.lower():
+                return True
+                
+    except Exception:
+        pass
+    
+    # Method 6: Check for Jupyter server info that indicates Colab
+    try:
+        # Try to detect if we're in a Jupyter environment with Colab characteristics
+        from jupyter_core.paths import jupyter_runtime_dir
+        runtime_dir = jupyter_runtime_dir()
+        if runtime_dir and ('colab' in runtime_dir.lower() or '/tmp' in runtime_dir):
+            return True
+    except Exception:
+        pass
+    
+    # Method 7: Check process information
+    try:
+        import psutil
+        current_process = psutil.Process()
+        
+        # Check parent processes for Colab indicators
+        parent = current_process.parent()
+        while parent is not None:
+            try:
+                cmdline = ' '.join(parent.cmdline()).lower()
+                if 'colab' in cmdline or 'jupyter' in cmdline:
+                    return True
+                parent = parent.parent()
+            except (psutil.NoSuchProcess, psutil.AccessDenied):
+                break
+    except Exception:
+        pass
         
     return False
 

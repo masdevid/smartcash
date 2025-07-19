@@ -289,7 +289,7 @@ def _create_backbone_form_widgets(config: Dict[str, Any]) -> Dict[str, Any]:
         <div style='margin-top: 10px; padding: 12px; background: #e8f4fd; border-radius: 4px; font-size: 0.9em; border-left: 4px solid #2196F3;'>
             <h4 style='margin: 0 0 8px 0; font-size: 1em; color: #1976D2;'>📏 Fixed Parameters</h4>
             <div style='line-height: 1.5;'>
-                <div><strong>• Input Size:</strong> 640×640 (Fixed as per MODEL_ARC_README.md)</div>
+                <div><strong>• Input Size:</strong> 640×640</div>
                 <div><strong>• Classes Layer 1:</strong> 7 (IDR denominations)</div>
                 <div><strong>• Classes Layer 2:</strong> 7 (Denomination features)</div>
                 <div><strong>• Classes Layer 3:</strong> 3 (Common features)</div>
@@ -310,7 +310,7 @@ def _create_backbone_form_widgets(config: Dict[str, Any]) -> Dict[str, Any]:
         </div>
     """)
     
-    # Model status indicator (placeholder for when model is built)
+    # Model status indicator with rescan button
     model_status_info = widgets.HTML("""
         <div style='margin-top: 10px; padding: 12px; background: #fff3cd; border-radius: 4px; font-size: 0.9em; border-left: 4px solid #ffc107;'>
             <h4 style='margin: 0 0 8px 0; font-size: 1em; color: #856404;'>🔍 Model Status</h4>
@@ -322,12 +322,24 @@ def _create_backbone_form_widgets(config: Dict[str, Any]) -> Dict[str, Any]:
         </div>
     """)
     
+    # Rescan models button
+    rescan_models_button = widgets.Button(
+        description='🔄 Rescan Models',
+        button_style='info',
+        tooltip='Rescan for existing built models',
+        layout=widgets.Layout(
+            width='150px',
+            margin='10px 0 0 0'
+        )
+    )
+    
     # Right column container
     right_column = widgets.VBox([
         widgets.HTML("<h4 style='margin: 10px 0 5px 0;'>📊 Model Information</h4>"),
         fixed_params_info,
         detection_info,
-        model_status_info
+        model_status_info,
+        rescan_models_button
     ], layout=widgets.Layout(width='48%', margin='0 0 0 1%'))
     
     # Create main form container with two columns
@@ -363,7 +375,8 @@ def _create_backbone_form_widgets(config: Dict[str, Any]) -> Dict[str, Any]:
             'feature_opt_checkbox': feature_opt_checkbox,
             'fixed_params_info': fixed_params_info,
             'detection_info': detection_info,
-            'model_status_info': model_status_info
+            'model_status_info': model_status_info,
+            'rescan_models_button': rescan_models_button
         }
     }
 

@@ -117,10 +117,94 @@ class EvaluationUIModule(BaseUIModule):
             # Initialize summary panel with empty state
             self._update_summary_panel({})
             
+            # Post-init hook: Scan for best models and update UI accordingly
+            self._scan_available_models_post_init()
+            
             self.log_info("📊 Evaluation services initialized - Ready to test models")
             
         except Exception as e:
             self.log_error(f"Post-initialization setup failed: {e}")
+
+    def _scan_available_models_post_init(self) -> None:
+        """
+        Post-initialization hook to scan for available best models and update UI state.
+        Implements fail-fast principle - disable evaluation if no models found.
+        """
+        try:
+            self.log_info("🔍 Scanning for available best models...")
+            
+            # Get available models using the enhanced discovery method
+            models_result = self._get_available_models()
+            
+            if models_result.get('success') and models_result.get('models'):
+                models = models_result['models']
+                valid_models = [m for m in models.values() if m.get('status') == 'valid']
+                
+                if valid_models:
+                    # Models found - enable evaluation
+                    self.log_success(f"✅ Found {len(valid_models)} valid best models")
+                    self._update_ui_model_state(valid_models, enable_evaluation=True)
+                    
+                    # Log best models found
+                    for model in valid_models[:3]:  # Show top 3
+                        self.log_info(f"   🏆 {model['name']} (mAP: {model['map_score']:.3f})")
+                else:
+                    # No valid models - fail fast
+                    self.log_warning("⚠️ No valid models found - evaluation disabled")
+                    self._update_ui_model_state([], enable_evaluation=False)
+            else:
+                # No models found - fail fast
+                error_msg = models_result.get('error', 'Unknown model discovery error')
+                self.log_error(f"❌ Model scanning failed: {error_msg}")
+                self._update_ui_model_state([], enable_evaluation=False)
+                
+        except Exception as e:
+            self.log_error(f"❌ Post-init model scanning failed: {e}")
+            self._update_ui_model_state([], enable_evaluation=False)
+
+    def _update_ui_model_state(self, available_models: list, enable_evaluation: bool) -> None:
+        """
+        Update UI state based on available models scan.
+        
+        Args:
+            available_models: List of available valid models
+            enable_evaluation: Whether to enable evaluation functionality
+        """
+        try:
+            # Update action container buttons
+            action_container = self.get_component('action_container')
+            if action_container and isinstance(action_container, dict):
+                buttons = action_container.get('buttons', {})
+                run_button = buttons.get('run_scenario')
+                
+                if run_button:
+                    run_button.disabled = not enable_evaluation
+                    if not enable_evaluation:
+                        run_button.description = "⚠️ No Models Available"
+                        run_button.tooltip = "No valid best models found. Complete training workflow first."
+                        run_button.button_style = 'warning'
+                    else:
+                        run_button.description = "▶️ Run Scenario"
+                        run_button.tooltip = f"Execute evaluation with {len(available_models)} available models"
+                        run_button.button_style = 'success'
+            
+            # Update model list in main form
+            main_form = self.get_component('main_form_row')
+            if main_form and hasattr(main_form, '_refresh_models'):
+                main_form._refresh_models(available_models)
+            
+            # Update summary with model scan results
+            scan_summary = {
+                'models_available': len(available_models),
+                'evaluation_enabled': enable_evaluation,
+                'scan_completed': True
+            }
+            self._update_summary_panel(scan_summary if available_models else {})
+            
+            self.log_debug(f"✅ UI state updated: evaluation_enabled={enable_evaluation}")
+            
+        except Exception as e:
+            self.log_error(f"Failed to update UI model state: {e}")
 
     def _initialize_backend_services(self) -> None:
         """Initialize evaluation backend services with UI integration."""
@@ -203,15 +287,18 @@ class EvaluationUIModule(BaseUIModule):
         try:
             self.log_info("🚀 Starting comprehensive evaluation...")
             
-            # Check if services are available
+            # Fail-fast: Check if services are available
             if not self.evaluation_service or not self.checkpoint_selector:
-                return self._execute_fallback_evaluation(['position_variation', 'lighting_variation'])
+                error_msg = "Backend evaluation services not available"
+                self.log_error(f"❌ {error_msg}")
+                return {'success': False, 'error': error_msg}
             
-            # Get available checkpoints using proper checkpoint format
+            # Fail-fast: Get available checkpoints using proper checkpoint format
             available_checkpoints = self.checkpoint_selector.list_available_checkpoints()
             if not available_checkpoints:
-                self.log_warning("⚠️ No checkpoints found, running with mock data")
-                return self._execute_fallback_evaluation(['position_variation', 'lighting_variation'])
+                error_msg = "No valid checkpoints found for evaluation"
+                self.log_error(f"❌ {error_msg}")
+                return {'success': False, 'error': error_msg}
             
             # Select best checkpoints (limit to top 2 for demo)
             selected_checkpoints = [cp['path'] for cp in available_checkpoints[:2]]
@@ -261,15 +348,18 @@ class EvaluationUIModule(BaseUIModule):
         try:
             self.log_info("📐 Starting position variation scenario...")
             
-            # Check if services are available
+            # Fail-fast: Check if services are available
             if not self.evaluation_service or not self.checkpoint_selector:
-                return self._execute_fallback_evaluation(['position_variation'])
+                error_msg = "Backend evaluation services not available"
+                self.log_error(f"❌ {error_msg}")
+                return {'success': False, 'error': error_msg}
             
-            # Get best checkpoint for position scenario
+            # Fail-fast: Get best checkpoint for position scenario
             best_checkpoint = self.checkpoint_selector.get_best_checkpoint()
             if not best_checkpoint:
-                self.log_warning("⚠️ No checkpoints found, running with mock data")
-                return self._execute_fallback_evaluation(['position_variation'])
+                error_msg = "No valid checkpoints found for position evaluation"
+                self.log_error(f"❌ {error_msg}")
+                return {'success': False, 'error': error_msg}
             
             # Run single scenario evaluation
             result = self.evaluation_service.run_scenario(
@@ -308,15 +398,18 @@ class EvaluationUIModule(BaseUIModule):
         try:
             self.log_info("💡 Starting lighting variation scenario...")
             
-            # Check if services are available
+            # Fail-fast: Check if services are available
             if not self.evaluation_service or not self.checkpoint_selector:
-                return self._execute_fallback_evaluation(['lighting_variation'])
+                error_msg = "Backend evaluation services not available"
+                self.log_error(f"❌ {error_msg}")
+                return {'success': False, 'error': error_msg}
             
-            # Get best checkpoint for lighting scenario
+            # Fail-fast: Get best checkpoint for lighting scenario
             best_checkpoint = self.checkpoint_selector.get_best_checkpoint()
             if not best_checkpoint:
-                self.log_warning("⚠️ No checkpoints found, running with mock data")
-                return self._execute_fallback_evaluation(['lighting_variation'])
+                error_msg = "No valid checkpoints found for lighting evaluation"
+                self.log_error(f"❌ {error_msg}")
+                return {'success': False, 'error': error_msg}
             
             # Run single scenario evaluation
             result = self.evaluation_service.run_scenario(
@@ -355,8 +448,9 @@ class EvaluationUIModule(BaseUIModule):
         """
         try:
             if not self.checkpoint_selector:
-                self.log_warning("⚠️ Checkpoint selector not available, using fallback data")
-                return self._get_fallback_models()
+                error_msg = "Checkpoint selector service not available"
+                self.log_error(f"❌ {error_msg}")
+                return {'success': False, 'error': error_msg, 'models': {}}
             
             # Get available checkpoints using proper checkpoint format
             available_checkpoints = self.checkpoint_selector.list_available_checkpoints()
@@ -656,7 +750,8 @@ class EvaluationUIModule(BaseUIModule):
     
     def _update_summary_panel(self, results: dict) -> None:
         """
-        Update summary panel with evaluation results.
+        Update summary panel with evaluation results and reports.
+        Ensures all evaluation reports are shown in summary container.
         
         Args:
             results: Results dictionary from evaluation
@@ -664,32 +759,100 @@ class EvaluationUIModule(BaseUIModule):
         try:
             summary_container = self.get_component('summary_container')
             if summary_container:
-                if results:
-                    # Display actual results
+                if results and results.get('successful_tests'):
+                    # Display comprehensive evaluation results with detailed reports
                     successful = results.get('successful_tests', 0)
                     total = results.get('total_tests', 0)
+                    success_rate = (successful/total*100) if total > 0 else 0
+                    
+                    # Generate detailed report sections
+                    performance_report = self._generate_performance_report(results)
+                    model_comparison_report = self._generate_model_comparison_report(results)
+                    scenario_breakdown = self._generate_scenario_breakdown(results)
                     
                     summary_html = f"""
-                    <div style='padding: 15px;'>
-                        <h4 style='margin-top: 0; color: #28a745;'>🎉 Evaluation Results</h4>
-                        <div style='display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin: 10px 0;'>
-                            <div><strong>Tests Completed:</strong> {successful}/{total}</div>
-                            <div><strong>Success Rate:</strong> {(successful/total*100):.1f}%</div>
-                        </div>
-                        <div style='margin-top: 15px;'>
-                            <strong>📊 Model Performance:</strong>
-                            <div style='margin: 10px 0; font-size: 0.9em; color: #666;'>
-                                Best Model: {results.get('best_model', 'N/A')}<br>
-                                Avg mAP: {results.get('average_map', 0):.3f}
+                    <div style='padding: 15px; font-family: -apple-system, BlinkMacSystemFont, sans-serif;'>
+                        <h4 style='margin-top: 0; color: #28a745; border-bottom: 2px solid #28a745; padding-bottom: 8px;'>
+                            🎉 Evaluation Report - {successful}/{total} Tests Completed
+                        </h4>
+                        
+                        <!-- Quick Stats -->
+                        <div style='display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; margin: 15px 0;'>
+                            <div style='background: #e8f5e9; padding: 12px; border-radius: 6px; text-align: center;'>
+                                <div style='font-size: 1.5em; font-weight: bold; color: #2e7d32;'>{success_rate:.1f}%</div>
+                                <div style='font-size: 0.9em; color: #555;'>Success Rate</div>
                             </div>
+                            <div style='background: #e3f2fd; padding: 12px; border-radius: 6px; text-align: center;'>
+                                <div style='font-size: 1.5em; font-weight: bold; color: #1565c0;'>{results.get('models_evaluated', 0)}</div>
+                                <div style='font-size: 0.9em; color: #555;'>Models Tested</div>
+                            </div>
+                            <div style='background: #fff3e0; padding: 12px; border-radius: 6px; text-align: center;'>
+                                <div style='font-size: 1.5em; font-weight: bold; color: #ef6c00;'>{results.get('scenarios_completed', 0)}</div>
+                                <div style='font-size: 0.9em; color: #555;'>Scenarios</div>
+                            </div>
+                        </div>
+                        
+                        <!-- Performance Report -->
+                        <div style='margin: 20px 0;'>
+                            <h5 style='color: #1976d2; margin-bottom: 10px;'>📊 Performance Report</h5>
+                            <div style='background: #f8f9fa; border-left: 4px solid #1976d2; padding: 12px; border-radius: 4px;'>
+                                {performance_report}
+                            </div>
+                        </div>
+                        
+                        <!-- Model Comparison -->
+                        <div style='margin: 20px 0;'>
+                            <h5 style='color: #7b1fa2; margin-bottom: 10px;'>🏆 Model Comparison</h5>
+                            <div style='background: #f8f9fa; border-left: 4px solid #7b1fa2; padding: 12px; border-radius: 4px;'>
+                                {model_comparison_report}
+                            </div>
+                        </div>
+                        
+                        <!-- Scenario Breakdown -->
+                        <div style='margin: 20px 0;'>
+                            <h5 style='color: #388e3c; margin-bottom: 10px;'>📋 Scenario Breakdown</h5>
+                            <div style='background: #f8f9fa; border-left: 4px solid #388e3c; padding: 12px; border-radius: 4px;'>
+                                {scenario_breakdown}
+                            </div>
+                        </div>
+                        
+                        <!-- Generation Info -->
+                        <div style='margin-top: 20px; padding-top: 15px; border-top: 1px solid #dee2e6; font-size: 0.85em; color: #6c757d; text-align: center;'>
+                            Report generated on {self._get_current_timestamp()} | Best Model: {results.get('best_model', 'N/A')}
                         </div>
                     </div>
                     """
                     
+                elif results and results.get('scan_completed'):
+                    # Display model scan results
+                    models_available = results.get('models_available', 0)
+                    evaluation_enabled = results.get('evaluation_enabled', False)
+                    
+                    scan_html = f"""
+                    <div style='padding: 15px; text-align: center;'>
+                        <h4 style='margin-top: 0; color: #1976d2;'>🔍 Model Scan Results</h4>
+                        <div style='margin: 20px 0;'>
+                            <div style='font-size: 2.5em; color: {"#28a745" if evaluation_enabled else "#dc3545"}; margin-bottom: 10px;'>
+                                {"✅" if evaluation_enabled else "❌"}
+                            </div>
+                            <p style='font-size: 1.1em; margin: 10px 0;'>
+                                {'Evaluation Ready' if evaluation_enabled else 'No Models Available'}
+                            </p>
+                            <p style='font-size: 0.9em; color: #6c757d;'>
+                                Found {models_available} valid best models
+                            </p>
+                        </div>
+                        {f'<div style="background: #e8f5e9; padding: 10px; border-radius: 6px; margin: 15px 0;">Click "Run Scenario" to start evaluation with available models</div>' if evaluation_enabled else 
+                         '<div style="background: #ffebee; padding: 10px; border-radius: 6px; margin: 15px 0;">Complete the training workflow first to generate best models</div>'}
+                    </div>
+                    """
+                    
                     if hasattr(summary_container, 'set_content'):
-                        summary_container.set_content(summary_html)
+                        summary_container.set_content(scan_html)
                     elif hasattr(summary_container, 'set_html'):
-                        summary_container.set_html(summary_html, 'success')
+                        summary_container.set_html(scan_html, 'info' if evaluation_enabled else 'warning')
+                    return
+                    
                 else:
                     # Display empty state
                     empty_html = f"""
@@ -698,13 +861,7 @@ class EvaluationUIModule(BaseUIModule):
                         <div style='margin: 20px 0;'>
                             <div style='font-size: 3em; opacity: 0.3;'>📈</div>
                             <p>No evaluation results yet</p>
-                            <p style='font-size: 0.9em;'>Click "Run Scenario" to start evaluation</p>
-                        </div>
-                        <div style='display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin: 15px 0;'>
-                            <div><strong>Tests Completed:</strong> 0/8</div>
-                            <div><strong>Success Rate:</strong> 0%</div>
-                            <div><strong>Best Model:</strong> None</div>
-                            <div><strong>Avg mAP:</strong> N/A</div>
+                            <p style='font-size: 0.9em;'>Model scanning in progress...</p>
                         </div>
                     </div>
                     """
@@ -713,9 +870,101 @@ class EvaluationUIModule(BaseUIModule):
                         summary_container.set_content(empty_html)
                     elif hasattr(summary_container, 'set_html'):
                         summary_container.set_html(empty_html, 'info')
+                    return
+                
+                # Set the comprehensive evaluation results
+                if hasattr(summary_container, 'set_content'):
+                    summary_container.set_content(summary_html)
+                elif hasattr(summary_container, 'set_html'):
+                    summary_container.set_html(summary_html, 'success')
                         
         except Exception as e:
             self.log_error(f"Failed to update summary panel: {e}")
+
+    def _generate_performance_report(self, results: dict) -> str:
+        """Generate detailed performance report section."""
+        try:
+            best_model = results.get('best_model', 'N/A')
+            avg_map = results.get('average_map', 0.0)
+            
+            return f"""
+            <div style='font-size: 0.9em;'>
+                <div style='margin-bottom: 8px;'><strong>Best Performing Model:</strong> {best_model}</div>
+                <div style='margin-bottom: 8px;'><strong>Average mAP:</strong> {avg_map:.3f}</div>
+                <div style='margin-bottom: 8px;'><strong>Overall Grade:</strong> {self._calculate_performance_grade(avg_map)}</div>
+                <div><strong>Recommendation:</strong> {self._get_performance_recommendation(avg_map)}</div>
+            </div>
+            """
+        except Exception:
+            return "Performance report generation failed"
+
+    def _generate_model_comparison_report(self, results: dict) -> str:
+        """Generate model comparison report section."""
+        try:
+            models_evaluated = results.get('models_evaluated', 0)
+            best_model = results.get('best_model', 'N/A')
+            
+            return f"""
+            <div style='font-size: 0.9em;'>
+                <div style='margin-bottom: 8px;'><strong>Models Compared:</strong> {models_evaluated}</div>
+                <div style='margin-bottom: 8px;'><strong>Winner:</strong> {best_model}</div>
+                <div style='margin-bottom: 8px;'><strong>Performance Gap:</strong> Detailed analysis available in logs</div>
+                <div><strong>Next Steps:</strong> Consider training with best performing architecture</div>
+            </div>
+            """
+        except Exception:
+            return "Model comparison report generation failed"
+
+    def _generate_scenario_breakdown(self, results: dict) -> str:
+        """Generate scenario-specific breakdown."""
+        try:
+            scenarios = results.get('scenarios_completed', [])
+            if isinstance(scenarios, int):
+                scenarios = ['position_variation', 'lighting_variation'][:scenarios]
+            
+            breakdown = []
+            for scenario in scenarios:
+                breakdown.append(f"<div style='margin-bottom: 4px;'>• {scenario.replace('_', ' ').title()}: ✅ Completed</div>")
+            
+            return f"""
+            <div style='font-size: 0.9em;'>
+                {''.join(breakdown) if breakdown else '<div>No scenarios completed yet</div>'}
+            </div>
+            """
+        except Exception:
+            return "Scenario breakdown generation failed"
+
+    def _calculate_performance_grade(self, avg_map: float) -> str:
+        """Calculate performance grade based on mAP score."""
+        if avg_map >= 0.9:
+            return "🏆 Excellent (A+)"
+        elif avg_map >= 0.8:
+            return "⭐ Very Good (A)"
+        elif avg_map >= 0.7:
+            return "✅ Good (B)"
+        elif avg_map >= 0.6:
+            return "⚠️ Fair (C)"
+        else:
+            return "❌ Needs Improvement (D)"
+
+    def _get_performance_recommendation(self, avg_map: float) -> str:
+        """Get performance-based recommendation."""
+        if avg_map >= 0.85:
+            return "Model ready for production deployment"
+        elif avg_map >= 0.75:
+            return "Consider additional training or data augmentation"
+        elif avg_map >= 0.65:
+            return "Review training parameters and data quality"
+        else:
+            return "Significant improvements needed - check model architecture"
+
+    def _get_current_timestamp(self) -> str:
+        """Get current timestamp for reports."""
+        try:
+            from datetime import datetime
+            return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        except Exception:
+            return "Unknown"
     
     # Additional helper methods for evaluation
     
@@ -742,96 +991,7 @@ class EvaluationUIModule(BaseUIModule):
             self.log_error(f"Failed to get evaluation status: {e}")
             return {'ready': False, 'error': str(e)}
     
-    # Missing helper methods for evaluation operations
-    
-    def _execute_fallback_evaluation(self, scenarios: List[str]) -> Dict[str, Any]:
-        """
-        Execute fallback evaluation when backend services are unavailable.
-        
-        Args:
-            scenarios: List of scenario names to evaluate
-            
-        Returns:
-            Mock evaluation results
-        """
-        try:
-            self.log_warning("⚠️ Running fallback evaluation with mock data")
-            
-            import random
-            import time
-            
-            # Simulate evaluation progress
-            total_tests = len(scenarios) * 2  # 2 mock models per scenario
-            
-            for i, scenario in enumerate(scenarios):
-                self.log_info(f"🎯 Mock evaluation: {scenario}")
-                time.sleep(0.5)  # Simulate processing time
-                
-                # Update progress if operation container is available
-                if hasattr(self, 'operation_container'):
-                    progress = int(((i + 1) / len(scenarios)) * 100)
-                    operation_container = self.get_component('operation_container')
-                    if operation_container and hasattr(operation_container, 'update_progress'):
-                        operation_container.update_progress(progress, f"Processing {scenario}")
-            
-            # Generate mock results
-            mock_results = {
-                'success': True,
-                'scenarios_evaluated': len(scenarios),
-                'checkpoints_evaluated': 2,
-                'metrics': {
-                    'mAP': random.uniform(0.75, 0.90),
-                    'precision': random.uniform(0.80, 0.95),
-                    'recall': random.uniform(0.75, 0.90),
-                    'f1_score': random.uniform(0.78, 0.92)
-                },
-                'mock_evaluation': True
-            }
-            
-            self.log_success("✅ Fallback evaluation completed")
-            return mock_results
-            
-        except Exception as e:
-            self.log_error(f"❌ Fallback evaluation failed: {e}")
-            return {'success': False, 'error': str(e)}
-    
-    def _get_fallback_models(self) -> Dict[str, Any]:
-        """
-        Get fallback model data when checkpoint selector is unavailable.
-        
-        Returns:
-            Dictionary with mock model data
-        """
-        try:
-            # Generate mock models with proper checkpoint format
-            from datetime import datetime, timedelta
-            
-            mock_models = {}
-            backbones = ['efficientnet_b4', 'cspdarknet']
-            
-            for i, backbone in enumerate(backbones):
-                date = (datetime.now() - timedelta(days=i)).strftime('%Y%m%d')
-                model_key = f"smartcash_{backbone}_{date}"
-                
-                mock_models[model_key] = {
-                    'name': f'SmartCash {backbone.title()} - {date}',
-                    'checkpoint_path': f'data/checkpoints/best_smartcash_{backbone}_{date}.pt',
-                    'model_name': 'smartcash',
-                    'backbone': backbone,
-                    'layer_mode': 'full_layers',
-                    'date': date,
-                    'map_score': 0.847 - (i * 0.03),  # Decreasing scores
-                    'epoch': 100 - (i * 10),
-                    'file_size_mb': 45.2 + (i * 2.1),
-                    'status': 'completed'
-                }
-            
-            self.log_info(f"📋 Generated {len(mock_models)} fallback models")
-            return {'success': True, 'models': mock_models}
-            
-        except Exception as e:
-            self.log_error(f"❌ Failed to generate fallback models: {e}")
-            return {'success': False, 'error': str(e), 'models': {}}
+    # Helper methods for evaluation operations
     
     def _extract_best_model(self, result: Dict[str, Any]) -> str:
         """

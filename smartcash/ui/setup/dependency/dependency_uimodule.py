@@ -200,60 +200,78 @@ class DependencyUIModule(BaseUIModule):
         """Handle package installation operation using common wrapper."""
         self.logger.debug(f"🔄 Install button clicked. Button: {button}")
         
-        def log_validation(result):
-            self.logger.debug(f"✅ Package validation result: {result}")
-            return result
+        def validate_packages():
+            """Validate packages before installation."""
+            packages = self._get_selected_packages()
+            if not packages:
+                return {'valid': False, 'message': 'Tidak ada paket yang dipilih untuk diinstal'}
+            return {'valid': True, 'packages': packages}
             
-        def log_execution(result):
-            self.logger.debug(f"✅ Install operation completed. Result: {result}")
-            return result
+        def execute_install():
+            """Execute package installation."""
+            packages = self._get_selected_packages()
+            self.log(f"🔄 Memulai instalasi {len(packages)} paket...", 'info')
+            return self._execute_install_operation(packages)
             
-        self._execute_operation(
-            operation_name="install",
-            validate_callback=lambda: log_validation(self._validate_packages()),
-            execute_callback=lambda: log_execution(
-                self._execute_install_operation(self._get_selected_packages())
-            )
+        return self._execute_operation_with_wrapper(
+            operation_name="Instalasi Paket",
+            operation_func=execute_install,
+            button=button,
+            validation_func=validate_packages,
+            success_message="Instalasi paket berhasil diselesaikan",
+            error_message="Kesalahan instalasi paket"
         )
     
     def _operation_uninstall_packages(self, button=None) -> Dict[str, Any]:
         """Handle package uninstallation operation using common wrapper."""
         self.logger.debug(f"🔄 Uninstall button clicked. Button: {button}")
         
-        def log_validation(result):
-            self.logger.debug(f"✅ Package validation result: {result}")
-            return result
+        def validate_packages():
+            """Validate packages before uninstallation."""
+            packages = self._get_selected_packages()
+            if not packages:
+                return {'valid': False, 'message': 'Tidak ada paket yang dipilih untuk dihapus'}
+            return {'valid': True, 'packages': packages}
             
-        def log_execution(result):
-            self.logger.debug(f"✅ Uninstall operation completed. Result: {result}")
-            return result
+        def execute_uninstall():
+            """Execute package uninstallation."""
+            packages = self._get_selected_packages()
+            self.log(f"🔄 Memulai penghapusan {len(packages)} paket...", 'info')
+            return self._execute_uninstall_operation(packages)
             
-        self._execute_operation(
-            operation_name="uninstall",
-            validate_callback=lambda: log_validation(self._validate_packages()),
-            execute_callback=lambda: log_execution(
-                self._execute_uninstall_operation(self._get_selected_packages())
-            )
+        return self._execute_operation_with_wrapper(
+            operation_name="Penghapusan Paket",
+            operation_func=execute_uninstall,
+            button=button,
+            validation_func=validate_packages,
+            success_message="Penghapusan paket berhasil diselesaikan",
+            error_message="Kesalahan penghapusan paket"
         )
     
     def _operation_update_packages(self, button=None) -> Dict[str, Any]:
         """Handle package update operation using common wrapper."""
         self.logger.debug(f"🔄 Update button clicked. Button: {button}")
         
-        def log_validation(result):
-            self.logger.debug(f"✅ Package validation result: {result}")
-            return result
+        def validate_packages():
+            """Validate packages before update."""
+            packages = self._get_selected_packages()
+            if not packages:
+                return {'valid': False, 'message': 'Tidak ada paket yang dipilih untuk diperbarui'}
+            return {'valid': True, 'packages': packages}
             
-        def log_execution(result):
-            self.logger.debug(f"✅ Update operation completed. Result: {result}")
-            return result
+        def execute_update():
+            """Execute package update."""
+            packages = self._get_selected_packages()
+            self.log(f"🔄 Memulai pembaruan {len(packages)} paket...", 'info')
+            return self._execute_update_operation(packages)
             
-        self._execute_operation(
-            operation_name="update",
-            validate_callback=lambda: log_validation(self._validate_packages()),
-            execute_callback=lambda: log_execution(
-                self._execute_update_operation(self._get_selected_packages())
-            )
+        return self._execute_operation_with_wrapper(
+            operation_name="Pembaruan Paket",
+            operation_func=execute_update,
+            button=button,
+            validation_func=validate_packages,
+            success_message="Pembaruan paket berhasil diselesaikan",
+            error_message="Kesalahan pembaruan paket"
         )
     
     def _operation_check_status(self, button=None) -> Dict[str, Any]:
@@ -420,4 +438,48 @@ class DependencyUIModule(BaseUIModule):
             
         except Exception as e:
             return {'error': f'Pemeriksaan status gagal: {str(e)}'}
+
+    def _validate_packages(self) -> Dict[str, Any]:
+        """
+        Validate selected packages before operation.
+        
+        Returns:
+            Validation result dictionary
+        """
+        try:
+            packages = self._get_selected_packages()
+            
+            if not packages:
+                return {
+                    'valid': False,
+                    'message': 'Tidak ada paket yang dipilih untuk operasi',
+                    'packages': []
+                }
+            
+            # Check for valid package names
+            invalid_packages = []
+            for package in packages:
+                if not package or not isinstance(package, str) or package.strip() == '':
+                    invalid_packages.append(package)
+            
+            if invalid_packages:
+                return {
+                    'valid': False,
+                    'message': f'Nama paket tidak valid: {invalid_packages}',
+                    'packages': packages,
+                    'invalid_packages': invalid_packages
+                }
+            
+            return {
+                'valid': True,
+                'message': f'Validasi berhasil untuk {len(packages)} paket',
+                'packages': packages
+            }
+            
+        except Exception as e:
+            return {
+                'valid': False,
+                'message': f'Error validasi paket: {str(e)}',
+                'packages': []
+            }
     

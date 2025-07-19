@@ -199,92 +199,86 @@ def _create_main_form_layout(config: Dict[str, Any]) -> widgets.Widget:
     return main_layout
 
 def _create_model_selection_checkboxes(_config: Dict[str, Any]) -> List[widgets.Widget]:
-    """Create model selection checkboxes based on available checkpoints with proper naming format."""
+    """
+    Create single model selection based on available checkpoints with proper naming format.
+    Implements single selection (radio buttons) instead of multiple checkboxes.
+    Shows empty placeholder when no models available (fail-fast principle).
+    """
     
     model_widgets = []
     
-    # Mock available models following the checkpoint format: best_{model_name}_{backbone}_{date:%Y%m%d}.pt
     # TODO: Replace with actual checkpoint discovery from training results
-    available_models = [
-        {
-            'checkpoint': 'best_smartcash_efficientnet_b4_20250719.pt',
-            'model_name': 'smartcash',
-            'backbone': 'efficientnet_b4',
-            'date': '20250719',
-            'map_score': 0.847,
-            'scenarios': ['position_variation', 'lighting_variation']
-        },
-        {
-            'checkpoint': 'best_smartcash_cspdarknet_20250718.pt',
-            'model_name': 'smartcash',
-            'backbone': 'cspdarknet',
-            'date': '20250718',
-            'map_score': 0.782,
-            'scenarios': ['position_variation', 'lighting_variation']
-        },
-        {
-            'checkpoint': 'best_smartcash_efficientnet_b4_20250717.pt',
-            'model_name': 'smartcash',
-            'backbone': 'efficientnet_b4',
-            'date': '20250717',
-            'map_score': 0.823,
-            'scenarios': ['position_variation']
-        }
-    ]
+    # This will be populated by the post-init hook in the evaluation module
+    available_models = []  # Start with empty list for fail-fast demonstration
     
     if available_models:
+        # Create radio button group for single model selection
+        model_options = []
         for model in available_models:
-            # Create checkbox for each model
-            model_checkbox = widgets.Checkbox(
-                value=True,  # Selected by default
-                description=f"📦 {model['backbone']} ({model['date']})",
-                tooltip=f"Checkpoint: {model['checkpoint']} | mAP: {model['map_score']:.3f}",
-                style={'description_width': 'initial'},
-                layout=widgets.Layout(width='auto', margin='3px 0')
-            )
-            
-            # Add detailed model info as HTML
-            model_info = widgets.HTML(
-                value=f"""
-                <div style='background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 4px; padding: 8px; margin: 2px 0 8px 20px; font-size: 0.85em;'>
-                    <div style='font-weight: bold; color: #495057;'>{model['checkpoint']}</div>
-                    <div style='color: #6c757d;'>mAP: {model['map_score']:.3f} | Scenarios: {", ".join(model['scenarios'])}</div>
+            display_name = f"📦 {model['backbone']} ({model['date']}) - mAP: {model['map_score']:.3f}"
+            model_options.append((display_name, model['checkpoint']))
+        
+        # Single model selection using radio buttons
+        model_radio = widgets.RadioButtons(
+            options=model_options,
+            value=model_options[0][1] if model_options else None,  # Select first by default
+            description='Select Model:',
+            style={'description_width': '100px'},
+            layout=widgets.Layout(width='auto', margin='10px 0')
+        )
+        
+        model_widgets.append(model_radio)
+        
+        # Add detailed info for selected model
+        model_info_html = widgets.HTML(
+            value="""
+            <div id='selected-model-info' style='background: #e8f5e9; border: 1px solid #c8e6c9; border-radius: 6px; padding: 12px; margin: 10px 0; font-size: 0.9em;'>
+                <div style='font-weight: bold; color: #2e7d32; margin-bottom: 6px;'>✅ Selected Model Details</div>
+                <div style='color: #4caf50;'>Select a model above to see details</div>
+            </div>
+            """,
+            layout=widgets.Layout(margin='10px 0')
+        )
+        model_widgets.append(model_info_html)
+        
+        # Add evaluation requirements info
+        requirements_info = widgets.HTML(
+            value="""
+            <div style='background: #fff3e0; border: 1px solid #ffcc02; border-radius: 6px; padding: 10px; margin: 10px 0; font-size: 0.85em;'>
+                <div style='font-weight: bold; color: #f57c00; margin-bottom: 6px;'>ℹ️ Evaluation Requirements</div>
+                <div style='color: #ef6c00;'>
+                    • Only 1 best model can be selected at a time<br>
+                    • Model must be validated and checkpoint available<br>
+                    • Evaluation will fail fast if no valid models found
                 </div>
-                """,
-                layout=widgets.Layout(margin='0 0 5px 0')
-            )
-            
-            model_widgets.extend([model_checkbox, model_info])
-        
-        # Add selection controls
-        selection_controls = widgets.HBox([
-            widgets.Button(
-                description="✅ Select All",
-                button_style='success',
-                layout=widgets.Layout(width='100px', height='28px', margin='5px 5px 5px 0')
-            ),
-            widgets.Button(
-                description="❌ Clear All",
-                button_style='warning',
-                layout=widgets.Layout(width='100px', height='28px', margin='5px 0')
-            )
-        ], layout=widgets.Layout(margin='10px 0'))
-        
-        model_widgets.append(selection_controls)
+            </div>
+            """,
+            layout=widgets.Layout(margin='10px 0')
+        )
+        model_widgets.append(requirements_info)
         
     else:
-        # Show empty placeholder
+        # Show empty placeholder with dashed box (fail-fast principle)
         empty_placeholder = widgets.HTML(
             value="""
-            <div style='text-align: center; color: #6c757d; padding: 30px 10px; border: 2px dashed #dee2e6; border-radius: 8px;'>
-                <div style='font-size: 3em; opacity: 0.3; margin-bottom: 15px;'>🤖</div>
-                <p style='margin: 5px 0; font-size: 1.1em; font-weight: 600;'>No Trained Models Available</p>
-                <p style='margin: 5px 0; font-size: 0.9em; color: #999;'>
-                    Complete the training workflow first to generate checkpoints
+            <div style='text-align: center; color: #6c757d; padding: 40px 20px; border: 3px dashed #dee2e6; border-radius: 12px; background: #fafafa;'>
+                <div style='font-size: 4em; opacity: 0.2; margin-bottom: 20px;'>🤖</div>
+                <h4 style='margin: 10px 0; color: #dc3545; font-weight: 600;'>No Best Models Available</h4>
+                <p style='margin: 8px 0; font-size: 1em; color: #6c757d;'>
+                    Complete the <strong>Training Workflow</strong> first to generate best model checkpoints
                 </p>
-                <p style='margin: 10px 0; font-size: 0.8em; color: #6c757d;'>
-                    Expected format: <code>best_{model_name}_{backbone}_{date:%Y%m%d}.pt</code>
-                </p>
+                <div style='background: #fff; border: 1px solid #e0e0e0; border-radius: 6px; padding: 12px; margin: 15px 0; font-size: 0.85em;'>
+                    <div style='font-weight: bold; color: #495057; margin-bottom: 6px;'>Expected checkpoint format:</div>
+                    <code style='background: #f8f9fa; padding: 2px 6px; border-radius: 3px; color: #d63384;'>
+                        best_{model_name}_{backbone}_{date:%Y%m%d}.pt
+                    </code>
+                </div>
+                <div style='margin-top: 20px; padding: 10px; background: #ffebee; border: 1px solid #f8bbd9; border-radius: 6px;'>
+                    <div style='font-weight: bold; color: #d32f2f; font-size: 0.9em;'>⚠️ Fail-Fast Principle</div>
+                    <div style='color: #c62828; font-size: 0.85em; margin-top: 4px;'>
+                        Evaluation is disabled until valid best models are detected
+                    </div>
+                </div>
             </div>
             """,
             layout=widgets.Layout(margin='15px 0')

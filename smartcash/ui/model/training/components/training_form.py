@@ -47,8 +47,8 @@ def create_training_form(training_config: Dict[str, Any], ui_config: Dict[str, A
         
         checkpoint_path_text = widgets.Text(
             description="Checkpoint Path:",
-            value=model_selection.get('checkpoint_path', ''),
-            placeholder="Path to checkpoint file (only for checkpoint source)",
+            value=model_selection.get('checkpoint_path', 'data/models/best_smartcash_backbone_latest.pt'),
+            placeholder="data/models/best_smartcash_backbone_latest.pt",
             style={'description_width': 'initial'},
             layout=widgets.Layout(width='auto', min_width='300px')
         )
@@ -140,19 +140,9 @@ def create_training_form(training_config: Dict[str, Any], ui_config: Dict[str, A
             layout=widgets.Layout(width='auto', min_width='300px')
         )
         
-        # Data Configuration
-        data_config = training_config.get('data', {})
+        # Data Configuration - validation split is fixed at 75/15/15 (train/valid/test)
         
-        val_split_slider = widgets.FloatSlider(
-            description="Validation Split:",
-            value=data_config.get('val_split', 0.2),
-            min=0.1,
-            max=0.5,
-            step=0.05,
-            readout_format='.2f',
-            style={'description_width': 'initial'},
-            layout=widgets.Layout(width='auto', min_width='300px')
-        )
+        data_config = training_config.get('data', {})
         
         workers_slider = widgets.IntSlider(
             description="Data Workers:",
@@ -177,22 +167,7 @@ def create_training_form(training_config: Dict[str, Any], ui_config: Dict[str, A
             layout=widgets.Layout(width='auto', min_width='300px')
         )
         
-        # UI Configuration
-        ui_options = training_config.get('ui', {})
-        
-        show_advanced_checkbox = widgets.Checkbox(
-            description="Show Advanced Options",
-            value=ui_options.get('show_advanced_options', False),
-            style={'description_width': 'initial'},
-            layout=widgets.Layout(width='auto')
-        )
-        
-        enable_charts_checkbox = widgets.Checkbox(
-            description="Enable Live Charts",
-            value=ui_options.get('enable_live_charts', True),
-            style={'description_width': 'initial'},
-            layout=widgets.Layout(width='auto')
-        )
+        # UI Configuration removed - not needed for training module
         
         # Create 3-column layout sections for single accordion
         
@@ -209,9 +184,14 @@ def create_training_form(training_config: Dict[str, Any], ui_config: Dict[str, A
             widgets.VBox([
                 widgets.HTML("<h5 style='color: #007bff; margin: 0 0 10px 0;'>ℹ️ Model Info</h5>"),
                 widgets.HTML(
-                    '<div style="padding: 8px; background: #f8f9fa; border-radius: 4px; font-size: 12px; color: #6c757d;">'
-                    'Select backbone or load from checkpoint for training'
-                    '</div>'
+                    '<div id="model-info-display" style="padding: 8px; background: #f8f9fa; border-radius: 4px; font-size: 12px; color: #6c757d;">'
+                    '<strong>Backbone Source:</strong><br>'
+                    '• Uses backbone module output<br>'
+                    '• Multi-layer detection: 3 layers<br>'
+                    '• Input size: 640x640<br>'
+                    '• Auto-configured from backbone'
+                    '</div>',
+                    layout=widgets.Layout(width='100%')
                 )
             ], layout=widgets.Layout(flex='1', margin='0 10px'))
         ], layout=widgets.Layout(width='100%', margin='0 0 15px 0'))
@@ -241,8 +221,15 @@ def create_training_form(training_config: Dict[str, Any], ui_config: Dict[str, A
         # Row 3: Data & Validation (3 columns)
         data_row = widgets.HBox([
             widgets.VBox([
-                widgets.HTML("<h5 style='color: #fd7e14; margin: 0 0 10px 0;'>📊 Validation Split</h5>"),
-                val_split_slider,
+                widgets.HTML("<h5 style='color: #fd7e14; margin: 0 0 10px 0;'>📊 Data Split</h5>"),
+                widgets.HTML(
+                    '<div style="padding: 8px; background: #e3f2fd; border-radius: 4px; font-size: 12px; color: #1565c0;">'
+                    '<strong>Fixed Split:</strong><br>'
+                    '• Train: 75%<br>'
+                    '• Valid: 15%<br>'
+                    '• Test: 15%'
+                    '</div>'
+                ),
                 widgets.HTML("<h5 style='color: #fd7e14; margin: 15px 0 10px 0;'>🔧 Mixed Precision</h5>"),
                 mixed_precision_checkbox
             ], layout=widgets.Layout(flex='1', margin='0 10px')),
@@ -260,25 +247,7 @@ def create_training_form(training_config: Dict[str, Any], ui_config: Dict[str, A
             ], layout=widgets.Layout(flex='1', margin='0 10px'))
         ], layout=widgets.Layout(width='100%', margin='0 0 15px 0'))
         
-        # Row 4: UI & Advanced Options (3 columns)
-        ui_row = widgets.HBox([
-            widgets.VBox([
-                widgets.HTML("<h5 style='color: #6f42c1; margin: 0 0 10px 0;'>🎨 Show Advanced</h5>"),
-                show_advanced_checkbox
-            ], layout=widgets.Layout(flex='1', margin='0 10px')),
-            widgets.VBox([
-                widgets.HTML("<h5 style='color: #6f42c1; margin: 0 0 10px 0;'>📈 Live Charts</h5>"),
-                enable_charts_checkbox
-            ], layout=widgets.Layout(flex='1', margin='0 10px')),
-            widgets.VBox([
-                widgets.HTML("<h5 style='color: #6f42c1; margin: 0 0 10px 0;'>ℹ️ Configuration</h5>"),
-                widgets.HTML(
-                    '<div style="padding: 8px; background: #f8f9fa; border-radius: 4px; font-size: 12px; color: #6c757d;">'
-                    'UI preferences and display options'
-                    '</div>'
-                )
-            ], layout=widgets.Layout(flex='1', margin='0 10px'))
-        ], layout=widgets.Layout(width='100%', margin='0 0 15px 0'))
+        # UI & Display Options row removed - not needed for training module
         
         # Create single comprehensive section with all rows
         comprehensive_section = widgets.VBox([
@@ -293,9 +262,8 @@ def create_training_form(training_config: Dict[str, Any], ui_config: Dict[str, A
             widgets.HTML('<h4 style="color: #28a745; border-bottom: 2px solid #28a745; padding-bottom: 5px; margin: 20px 0 15px 0;">🚀 Core Training Parameters</h4>'),
             training_row,
             widgets.HTML('<h4 style="color: #fd7e14; border-bottom: 2px solid #fd7e14; padding-bottom: 5px; margin: 20px 0 15px 0;">📊 Data & Advanced Settings</h4>'),
-            data_row,
-            widgets.HTML('<h4 style="color: #6f42c1; border-bottom: 2px solid #6f42c1; padding-bottom: 5px; margin: 20px 0 15px 0;">🎨 UI & Display Options</h4>'),
-            ui_row
+            data_row
+            # UI & Display Options section removed
         ], layout=widgets.Layout(width='100%', padding='15px'))
         
         # Create single accordion with comprehensive section
@@ -318,11 +286,9 @@ def create_training_form(training_config: Dict[str, Any], ui_config: Dict[str, A
             'mixed_precision': mixed_precision_checkbox,
             'early_stopping': early_stopping_checkbox,
             'early_stopping_patience': early_stopping_patience,
-            'val_split': val_split_slider,
             'workers': workers_slider,
-            'save_period': save_period_slider,
-            'show_advanced': show_advanced_checkbox,
-            'enable_charts': enable_charts_checkbox
+            'save_period': save_period_slider
+            # UI-related widgets removed
         }
         
         # Add method to get form values
@@ -349,13 +315,10 @@ def create_training_form(training_config: Dict[str, Any], ui_config: Dict[str, A
                         }
                     },
                     'data': {
-                        'val_split': form_widgets['val_split'].value,
+                        'val_split': 0.15,  # Fixed validation split (15%)
                         'workers': form_widgets['workers'].value
-                    },
-                    'ui': {
-                        'show_advanced_options': form_widgets['show_advanced'].value,
-                        'enable_live_charts': form_widgets['enable_charts'].value
                     }
+                    # UI options removed
                 }
             except Exception as e:
                 logger.error(f"Failed to get form values: {e}")
@@ -368,7 +331,6 @@ def create_training_form(training_config: Dict[str, Any], ui_config: Dict[str, A
                 model_selection = config.get('model_selection', {})
                 training_config = config.get('training', {})
                 data_config = config.get('data', {})
-                ui_config = config.get('ui', {})
                 early_stopping = training_config.get('early_stopping', {})
                 
                 form_widgets['model_source'].value = model_selection.get('source', 'backbone')
@@ -383,10 +345,9 @@ def create_training_form(training_config: Dict[str, Any], ui_config: Dict[str, A
                 form_widgets['early_stopping'].value = early_stopping.get('enabled', True)
                 form_widgets['early_stopping_patience'].value = early_stopping.get('patience', 15)
                 form_widgets['save_period'].value = training_config.get('save_period', 10)
-                form_widgets['val_split'].value = data_config.get('val_split', 0.2)
+                # val_split is fixed at 15% - no UI control needed
                 form_widgets['workers'].value = data_config.get('workers', 4)
-                form_widgets['show_advanced'].value = ui_config.get('show_advanced_options', False)
-                form_widgets['enable_charts'].value = ui_config.get('enable_live_charts', True)
+                # UI-related config updates removed
                 
                 logger.debug("✅ Form updated from configuration")
                 
@@ -398,17 +359,65 @@ def create_training_form(training_config: Dict[str, Any], ui_config: Dict[str, A
         form_accordion.update_from_config = update_from_config
         form_accordion._widgets = form_widgets
         
-        # Set up dynamic visibility for checkpoint path
+        # Set up dynamic visibility for checkpoint path and info display
         def on_model_source_change(change):
-            """Show/hide checkpoint path based on model source."""
-            if change['new'] == 'checkpoint':
+            """Update checkpoint path visibility and model info based on model source."""
+            source = change['new']
+            
+            # Update checkpoint path visibility
+            if source == 'checkpoint':
                 checkpoint_path_text.layout.display = 'block'
+                # Set default path if empty
+                if not checkpoint_path_text.value.strip():
+                    checkpoint_path_text.value = 'data/models/best_smartcash_backbone_latest.pt'
             else:
                 checkpoint_path_text.layout.display = 'none'
+            
+            # Update model info display
+            from IPython.display import Javascript, display
+            if source == 'backbone':
+                info_html = (
+                    '<strong>Backbone Source:</strong><br>'
+                    '• Uses backbone module output<br>'
+                    '• Multi-layer detection: 3 layers<br>'
+                    '• Layer 1: Full banknote (7 classes)<br>'
+                    '• Layer 2: Denomination (7 classes)<br>'
+                    '• Layer 3: Common features (3 classes)<br>'
+                    '• Input size: 640x640<br>'
+                    '• Auto-configured from backbone'
+                )
+            elif source == 'checkpoint':
+                info_html = (
+                    '<strong>Checkpoint Source:</strong><br>'
+                    '• Resume from saved training state<br>'
+                    '• Preserves model weights and optimizer<br>'
+                    '• Continues from last saved epoch<br>'
+                    '• Training progress and metrics restored<br>'
+                    '• Best performance checkpoint used'
+                )
+            elif source == 'pretrained':
+                info_html = (
+                    '<strong>Pretrained Source:</strong><br>'
+                    '• Uses COCO pretrained YOLOv5 weights<br>'
+                    '• Transfer learning from general objects<br>'
+                    '• Fine-tuned for Indonesian currency<br>'
+                    '• Standard single-layer detection<br>'
+                    '• Input size: 640x640'
+                )
+            else:
+                info_html = 'Select model source for detailed information'
+            
+            js_code = f'''
+            var element = document.getElementById("model-info-display");
+            if (element) {{
+                element.innerHTML = '{info_html}';
+            }}
+            '''
+            display(Javascript(js_code))
         
         model_source_dropdown.observe(on_model_source_change, names='value')
         
-        # Initial visibility setup
+        # Initial setup
         if model_source_dropdown.value != 'checkpoint':
             checkpoint_path_text.layout.display = 'none'
         

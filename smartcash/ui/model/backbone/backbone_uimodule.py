@@ -80,6 +80,7 @@ class BackboneUIModule(BaseUIModule):
             'build': self._operation_build,
             'save': self._handle_save_config,
             'reset': self._handle_reset_config,
+            'rescan_models': self._handle_rescan_models,
         }
         
         handlers.update(backbone_handlers)
@@ -165,8 +166,14 @@ class BackboneUIModule(BaseUIModule):
                 # Register module-specific button handlers
                 self._register_module_button_handlers()
                 
+                # Setup rescan models button handler
+                self._setup_rescan_button_handler()
+                
                 # Flush any buffered logs to operation container
                 self._flush_log_buffer()
+                
+                # Perform initial model scan
+                self._perform_initial_model_scan()
                 
                 # Log initialization completion (Operation Checklist 3.2)
                 self.log("🧬 Backbone module siap digunakan", 'info')
@@ -441,12 +448,38 @@ class BackboneUIModule(BaseUIModule):
 
     def _update_operation_summary(self, content: str) -> None:
         """Updates the operation summary container with new content."""
-        updater = self.get_component('operation_summary_updater')
-        if updater and callable(updater):
-            self.log(f"Memperbarui ringkasan operasi.", 'debug')
-            updater(content)
-        else:
-            self.log("Komponen updater ringkasan operasi tidak ditemukan atau tidak dapat dipanggil.", 'warning')
+        try:
+            # Try to get operation container summary updater
+            operation_container = self._ui_components.get('operation_container')
+            if operation_container and isinstance(operation_container, dict):
+                # Check for summary update function
+                if 'update_summary' in operation_container:
+                    operation_container['update_summary'](content)
+                    self.log("✅ Ringkasan operasi diperbarui", 'debug')
+                    return
+                
+                # Check for summary container in operation container
+                if 'summary_container' in operation_container:
+                    summary_container = operation_container['summary_container']
+                    if hasattr(summary_container, 'update_content'):
+                        summary_container.update_content({'title': 'Operation Summary', 'content': content})
+                        self.log("✅ Ringkasan operasi diperbarui melalui summary container", 'debug')
+                        return
+            
+            # Fallback: use summary container directly
+            summary_container = self._ui_components.get('summary_container')
+            if summary_container and hasattr(summary_container, 'update_content'):
+                summary_container.update_content({'title': 'Operation Summary', 'content': content})
+                self.log("✅ Ringkasan operasi diperbarui melalui summary container utama", 'debug')
+                return
+            
+            # If all else fails, just log the content
+            self.log("📝 " + content, 'info')
+            
+        except Exception as e:
+            self.logger.error(f"Failed to update operation summary: {e}")
+            # Fallback: just log the content
+            self.log("📝 " + content, 'info')
 
     def _flush_log_buffer(self) -> None:
         """Flush buffered logs to operation container."""
@@ -523,11 +556,36 @@ class BackboneUIModule(BaseUIModule):
                         widget.disabled = True
                         self.logger.debug(f"Disabled widget: {widget_name}")
                 
-                # Disable action buttons except for the one currently running
-                if 'action_container' in self._ui_components:
-                    action_container = self._ui_components['action_container']
-                    if isinstance(action_container, dict) and 'disable_buttons' in action_container:
-                        action_container['disable_buttons'](['validate', 'build'])
+                # Disable action buttons
+                action_container = self._ui_components.get('action_container')
+                if action_container:
+                    # Try multiple methods to disable buttons
+                    if isinstance(action_container, dict):
+                        # Method 1: Use disable_buttons function if available
+                        if 'disable_buttons' in action_container:
+                            action_container['disable_buttons'](['validate', 'build', 'save', 'reset'])
+                        
+                        # Method 2: Direct button access
+                        if 'buttons' in action_container:
+                            buttons = action_container['buttons']
+                            if hasattr(buttons, 'children'):
+                                for button in buttons.children:
+                                    if hasattr(button, 'disabled'):
+                                        button.disabled = True
+                        
+                        # Method 3: Container-level disable
+                        if 'container' in action_container:
+                            container = action_container['container']
+                            if hasattr(container, 'children'):
+                                for child in container.children:
+                                    if hasattr(child, 'disabled'):
+                                        child.disabled = True
+                    
+                    # Method 4: Direct widget access if action_container is a widget
+                    elif hasattr(action_container, 'children'):
+                        for child in action_container.children:
+                            if hasattr(child, 'disabled'):
+                                child.disabled = True
                 
                 self.log("🔒 UI disabled during operation", 'info')
                 
@@ -547,10 +605,35 @@ class BackboneUIModule(BaseUIModule):
                         self.logger.debug(f"Enabled widget: {widget_name}")
                 
                 # Re-enable action buttons
-                if 'action_container' in self._ui_components:
-                    action_container = self._ui_components['action_container']
-                    if isinstance(action_container, dict) and 'enable_buttons' in action_container:
-                        action_container['enable_buttons'](['validate', 'build'])
+                action_container = self._ui_components.get('action_container')
+                if action_container:
+                    # Try multiple methods to enable buttons
+                    if isinstance(action_container, dict):
+                        # Method 1: Use enable_buttons function if available
+                        if 'enable_buttons' in action_container:
+                            action_container['enable_buttons'](['validate', 'build', 'save', 'reset'])
+                        
+                        # Method 2: Direct button access
+                        if 'buttons' in action_container:
+                            buttons = action_container['buttons']
+                            if hasattr(buttons, 'children'):
+                                for button in buttons.children:
+                                    if hasattr(button, 'disabled'):
+                                        button.disabled = False
+                        
+                        # Method 3: Container-level enable
+                        if 'container' in action_container:
+                            container = action_container['container']
+                            if hasattr(container, 'children'):
+                                for child in container.children:
+                                    if hasattr(child, 'disabled'):
+                                        child.disabled = False
+                    
+                    # Method 4: Direct widget access if action_container is a widget
+                    elif hasattr(action_container, 'children'):
+                        for child in action_container.children:
+                            if hasattr(child, 'disabled'):
+                                child.disabled = False
                 
                 self.log("🔓 UI re-enabled after operation", 'info')
                 
@@ -621,3 +704,120 @@ class BackboneUIModule(BaseUIModule):
         except Exception as e:
             self.logger.error(f"Failed to check built models: {e}")
             return {}
+
+    def _setup_rescan_button_handler(self) -> None:
+        """Setup the rescan models button click handler."""
+        try:
+            if hasattr(self, '_ui_components') and self._ui_components:
+                widgets = self._ui_components.get('widgets', {})
+                rescan_button = widgets.get('rescan_models_button')
+                
+                if rescan_button and hasattr(rescan_button, 'on_click'):
+                    rescan_button.on_click(self._handle_rescan_models)
+                    self.logger.debug("✅ Rescan models button handler registered")
+                else:
+                    self.logger.warning("Rescan models button not found or invalid")
+        except Exception as e:
+            self.logger.error(f"Failed to setup rescan button handler: {e}")
+
+    def _handle_rescan_models(self, button=None) -> None:
+        """Handle rescan models button click."""
+        try:
+            self.log("🔄 Rescanning for existing models...", 'info')
+            self._perform_model_scan()
+        except Exception as e:
+            self.log(f"❌ Error during model rescan: {e}", 'error')
+
+    def _perform_initial_model_scan(self) -> None:
+        """Perform initial model scan during module initialization."""
+        try:
+            self.log("🔍 Scanning for existing backbone models...", 'info')
+            self._perform_model_scan()
+        except Exception as e:
+            self.logger.error(f"Failed to perform initial model scan: {e}")
+            self.log("⚠️ Failed to scan for existing models", 'warning')
+
+    def _perform_model_scan(self) -> None:
+        """Perform model scan and update UI indicators."""
+        try:
+            # Check for built models
+            built_models = self._check_built_models()
+            
+            # Get current backbone type
+            current_config = self.get_current_config()
+            backbone_type = current_config.get('backbone', {}).get('model_type', 'efficientnet_b4')
+            
+            # Count models for current backbone
+            current_backbone_models = built_models.get(backbone_type, [])
+            model_count = len(current_backbone_models)
+            
+            # Determine status
+            if model_count > 0:
+                status_text = "✅ Built"
+                last_built = "Recently"
+                available_text = f"{model_count} model(s) found"
+                status_level = 'success'
+                
+                # Update validate button visibility
+                self._update_validate_button_visibility(True)
+            else:
+                status_text = "⚠️ Not Built"
+                last_built = "Never"
+                available_text = "No models found"
+                status_level = 'warning'
+                
+                # Hide validate button if no models
+                self._update_validate_button_visibility(False)
+            
+            # Update UI indicators
+            self._update_model_status_display(status_text, last_built, available_text)
+            
+            # Log results
+            total_models = sum(len(models) for models in built_models.values())
+            if total_models > 0:
+                self.log(f"✅ Found {total_models} built models across all backbones", status_level)
+                self.log(f"📊 Current backbone ({backbone_type}): {model_count} models", 'info')
+            else:
+                self.log("❌ No built models found - build models first", 'warning')
+                
+        except Exception as e:
+            self.logger.error(f"Failed to perform model scan: {e}")
+            self.log("❌ Model scan failed", 'error')
+            # Set error state
+            self._update_model_status_display("❌ Error", "Scan Failed", "Error scanning models")
+
+    def _update_model_status_display(self, status: str, last_built: str, available: str) -> None:
+        """Update the model status display in the UI."""
+        try:
+            from IPython.display import Javascript, display
+            js_code = f"""
+            if (document.getElementById('model-status')) {{
+                document.getElementById('model-status').innerText = '{status}';
+                document.getElementById('last-built').innerText = '{last_built}';
+                document.getElementById('available-models').innerText = '{available}';
+            }}
+            """
+            display(Javascript(js_code))
+        except Exception as e:
+            self.logger.error(f"Failed to update model status display: {e}")
+
+    def _update_validate_button_visibility(self, visible: bool) -> None:
+        """Update validate button visibility based on model availability."""
+        try:
+            if hasattr(self, '_ui_components') and self._ui_components:
+                action_container = self._ui_components.get('action_container')
+                if action_container and isinstance(action_container, dict):
+                    # Update button visibility through action container
+                    if 'update_button_visibility' in action_container:
+                        action_container['update_button_visibility']('validate', visible)
+                    elif 'buttons' in action_container:
+                        # Fallback: directly disable/enable button
+                        buttons = action_container['buttons']
+                        for button_info in buttons:
+                            if button_info.get('id') == 'validate':
+                                button_info['disabled'] = not visible
+                                break
+                                
+            self.logger.debug(f"Validate button visibility set to: {visible}")
+        except Exception as e:
+            self.logger.error(f"Failed to update validate button visibility: {e}")

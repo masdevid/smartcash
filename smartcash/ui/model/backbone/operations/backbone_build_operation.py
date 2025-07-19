@@ -4,13 +4,22 @@ Description: Operation handler for backbone model building.
 """
 
 from typing import Dict, Any
+import os
 from .backbone_base_operation import BaseBackboneOperation
+from smartcash.ui.core.mixins.colab_secrets_mixin import ColabSecretsMixin
 
 
-class BackboneBuildOperationHandler(BaseBackboneOperation):
+class BackboneBuildOperationHandler(BaseBackboneOperation, ColabSecretsMixin):
     """
     Orchestrates the backbone model building by calling the backend API.
+    
+    Inherits from ColabSecretsMixin to handle HuggingFace token authentication.
     """
+    
+    def __init__(self, *args, **kwargs):
+        """Initialize with secrets management."""
+        BaseBackboneOperation.__init__(self, *args, **kwargs)
+        ColabSecretsMixin.__init__(self)
 
     def execute(self) -> Dict[str, Any]:
         """Executes the model build by calling the backend API."""
@@ -19,11 +28,28 @@ class BackboneBuildOperationHandler(BaseBackboneOperation):
         # Start dual progress tracking: 4 overall steps
         self.start_dual_progress("Pembangunan Model", total_steps=4)
         
+        # Initialize variables at function scope to avoid UnboundLocalError
+        use_multi_layer = False
+        model_type = 'efficientnet_b4'
+        
         try:
-            # Step 1: Initialize backend API
+            # Step 1: Setup HuggingFace authentication and initialize backend API
             self.update_dual_progress(
                 current_step=1, 
                 current_percent=0,
+                message="Menyiapkan autentikasi HuggingFace..."
+            )
+            
+            # Setup HuggingFace token authentication
+            hf_token = self._setup_huggingface_auth()
+            if hf_token:
+                self.log_operation("✅ HuggingFace token berhasil diatur", level='success')
+            else:
+                self.log_operation("⚠️ HuggingFace token tidak ditemukan - menggunakan model publik", level='warning')
+            
+            self.update_dual_progress(
+                current_step=1, 
+                current_percent=25,
                 message="Menginisialisasi backend API..."
             )
             
@@ -101,14 +127,39 @@ class BackboneBuildOperationHandler(BaseBackboneOperation):
             # Use the new YOLO model builder for enhanced capabilities
             from smartcash.model.core.yolo_model_builder import build_banknote_detection_model
             
-            # Build model using enhanced builder
+            # Create enhanced progress callback that routes all logs to operation container
+            def enhanced_progress_callback(*args, **kwargs):
+                # Handle different callback signatures from backend
+                if len(args) >= 2:
+                    percentage = args[0] if isinstance(args[0], (int, float)) else 0
+                    message = args[1] if isinstance(args[1], str) else ""
+                elif len(args) == 1:
+                    percentage = args[0] if isinstance(args[0], (int, float)) else 0
+                    message = ""
+                else:
+                    percentage = kwargs.get('percentage', 0)
+                    message = kwargs.get('message', "")
+                
+                # Route all backend messages through operation container logging
+                if message:
+                    self.log_operation(f"🔧 {message}", level='info')
+                
+                # Update current step progress
+                self.update_dual_progress(
+                    current_step=self._current_step if hasattr(self, '_current_step') else 3,
+                    current_percent=percentage,
+                    message=message
+                )
+            
+            # Build model using enhanced builder with proper log routing
             build_result = build_banknote_detection_model(
                 backbone_type=model_type,
                 multi_layer=use_multi_layer,
                 testing_mode=backbone_config.get('testing_mode', False),
                 backbone={'pretrained': backbone_config.get('pretrained', True)},
                 head={'use_attention': backbone_config.get('use_attention', True)},
-                model={'img_size': backbone_config.get('input_size', 640)}
+                model={'img_size': backbone_config.get('input_size', 640)},
+                progress_callback=enhanced_progress_callback
             )
             
             self.update_dual_progress(
@@ -269,3 +320,63 @@ class BackboneBuildOperationHandler(BaseBackboneOperation):
 """
         
         return summary
+
+    def _setup_huggingface_auth(self) -> str:
+        """Setup HuggingFace authentication using token from secrets or environment."""
+        try:
+            # Try to get HF_TOKEN from Colab secrets first
+            hf_token = None
+            
+            # Method 1: Try Colab secrets using the mixin
+            if hasattr(self, 'get_secret'):
+                try:
+                    hf_token = self.get_secret('HF_TOKEN')
+                    if hf_token:
+                        self.log_operation("🔐 HF_TOKEN ditemukan di Colab secrets", level='info')
+                except Exception as e:
+                    self.log_operation(f"⚠️ Gagal mengakses Colab secrets: {e}", level='warning')
+            
+            # Method 2: Try environment variable as fallback
+            if not hf_token:
+                hf_token = os.environ.get('HF_TOKEN')
+                if hf_token:
+                    self.log_operation("🔐 HF_TOKEN ditemukan di environment variables", level='info')
+            
+            # Method 3: Try alternative secret names
+            if not hf_token and hasattr(self, 'get_secret'):
+                alternative_names = ['HUGGINGFACE_TOKEN', 'huggingface_token', 'HF_API_TOKEN']
+                for token_name in alternative_names:
+                    try:
+                        hf_token = self.get_secret(token_name)
+                        if hf_token:
+                            self.log_operation(f"🔐 Token ditemukan dengan nama: {token_name}", level='info')
+                            break
+                    except Exception:
+                        continue
+            
+            # Setup the token if found
+            if hf_token:
+                # Set environment variable for huggingface_hub
+                os.environ['HF_TOKEN'] = hf_token
+                os.environ['HUGGINGFACE_HUB_TOKEN'] = hf_token  # Alternative name
+                
+                # Try to login to HuggingFace Hub
+                try:
+                    from huggingface_hub import login
+                    login(token=hf_token, add_to_git_credential=False)
+                    self.log_operation("✅ Berhasil login ke HuggingFace Hub", level='success')
+                except ImportError:
+                    self.log_operation("📦 huggingface_hub tidak tersedia - token diatur di environment", level='info')
+                except Exception as e:
+                    self.log_operation(f"⚠️ Gagal login ke HuggingFace Hub: {e}", level='warning')
+                    # Continue anyway, token is still set in environment
+                
+                return hf_token
+            else:
+                self.log_operation("❌ HF_TOKEN tidak ditemukan di secrets atau environment", level='warning')
+                self.log_operation("💡 Tip: Tambahkan HF_TOKEN di Colab secrets untuk akses model private", level='info')
+                return ""
+                
+        except Exception as e:
+            self.log_operation(f"❌ Error saat setup HuggingFace auth: {e}", level='error')
+            return ""

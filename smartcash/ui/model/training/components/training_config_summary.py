@@ -78,6 +78,11 @@ def create_config_summary(config: Dict[str, Any]) -> widgets.Widget:
         </div>
         """
         
+        # Display fixed data split (75/15/15)
+        train_split = data_config.get('train_split', 0.75)
+        val_split = data_config.get('val_split', 0.15)
+        test_split = data_config.get('test_split', 0.15)
+        
         data_card = f"""
         <div style="flex: 1; background: #e8f5e8; padding: 16px; border-radius: 8px; margin: 5px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); min-width: 200px;">
             <div style="text-align: center; margin-bottom: 12px;">
@@ -85,8 +90,10 @@ def create_config_summary(config: Dict[str, Any]) -> widgets.Widget:
                 <h5 style="margin: 0; color: #388e3c; font-size: 14px; font-weight: 600;">Data Configuration</h5>
             </div>
             <div style="font-size: 12px; color: #424242; line-height: 1.4;">
-                <div style="margin-bottom: 6px;"><strong>Train Split:</strong> {data_config.get('train_split', 0.8):.1%}</div>
-                <div style="margin-bottom: 6px;"><strong>Val Split:</strong> {data_config.get('val_split', 0.2):.1%}</div>
+                <div style="margin-bottom: 6px;"><strong>Data Split (Fixed):</strong></div>
+                <div style="margin-bottom: 4px; padding-left: 8px;">• Train: {train_split:.0%}</div>
+                <div style="margin-bottom: 4px; padding-left: 8px;">• Valid: {val_split:.0%}</div>
+                <div style="margin-bottom: 6px; padding-left: 8px;">• Test: {test_split:.0%}</div>
                 <div style="margin-bottom: 6px;"><strong>Workers:</strong> {data_config.get('workers', 4)}</div>
                 <div><strong>Augmentation:</strong> {format_bool(data_config.get('augmentation', {}).get('enabled', True))}</div>
             </div>

@@ -96,14 +96,7 @@ def create_training_ui(config: Dict[str, Any]) -> Dict[str, Any]:
                 'tooltip': 'Resume training from checkpoint',
                 'disabled': True
             },
-            {
-                'id': 'validate_model',
-                'text': '✅ Validate Model',
-                'style': 'info',
-                'icon': None,
-                'tooltip': 'Run comprehensive model validation',
-                'disabled': False
-            },
+            # validate_model button removed - overlaps with backbone module
             {
                 'id': 'refresh_backbone_config',
                 'text': '🔄 Refresh Config',

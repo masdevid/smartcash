@@ -52,8 +52,10 @@ def get_default_training_config() -> Dict[str, Any]:
             'validation_required': True
         },
         'data': {
-            'train_split': 0.8,
-            'val_split': 0.2,
+            'train_split': 0.75,  # Fixed: 75% for training
+            'val_split': 0.15,    # Fixed: 15% for validation  
+            'test_split': 0.15,   # Fixed: 15% for testing (not configurable)
+            'split_fixed': True,  # Indicates splits are fixed and not configurable
             'augmentation': {
                 'enabled': True,
                 'mixup': 0.1,

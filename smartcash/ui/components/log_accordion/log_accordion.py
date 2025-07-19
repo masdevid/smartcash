@@ -639,16 +639,78 @@ class LogAccordion(BaseUIComponent):
         return ""
     
     def _scroll_to_bottom(self) -> None:
-        """Scroll the log container to the bottom using JavaScript."""
+        """Smart scroll: auto-scroll to bottom unless user manually scrolled up, with 30s timeout."""
         if not self.auto_scroll:
             return
             
-        # Use direct f-string interpolation with self.log_id
+        # Smart scrolling with manual scroll detection and timeout
         js_code = f"""
         (function() {{
             const logContainer = document.querySelector('.{self.log_id}');
-            if (logContainer) {{
+            if (!logContainer) return;
+            
+            // Initialize scroll state tracking if not exists
+            if (!window.logScrollState) {{
+                window.logScrollState = {{}};
+            }}
+            
+            const containerId = '{self.log_id}';
+            if (!window.logScrollState[containerId]) {{
+                window.logScrollState[containerId] = {{
+                    userScrolled: false,
+                    lastActivity: Date.now(),
+                    scrollTimeout: null,
+                    isScrolling: false
+                }};
+                
+                // Add scroll event listener to detect manual scrolling
+                logContainer.addEventListener('scroll', function() {{
+                    const state = window.logScrollState[containerId];
+                    
+                    // Prevent recursive calls during auto-scroll
+                    if (state.isScrolling) return;
+                    
+                    const isAtBottom = logContainer.scrollHeight - logContainer.scrollTop - logContainer.clientHeight < 50;
+                    
+                    // If user scrolled away from bottom, mark as manually scrolled
+                    if (!isAtBottom) {{
+                        state.userScrolled = true;
+                        state.lastActivity = Date.now();
+                        
+                        // Clear existing timeout
+                        if (state.scrollTimeout) {{
+                            clearTimeout(state.scrollTimeout);
+                        }}
+                        
+                        // Set 30-second timeout to resume auto-scroll
+                        state.scrollTimeout = setTimeout(() => {{
+                            state.userScrolled = false;
+                            console.log('Log auto-scroll resumed after 30s timeout');
+                        }}, 30000);
+                        
+                        console.log('Manual scroll detected - auto-scroll paused');
+                    }} else {{
+                        // User scrolled back to bottom - resume auto-scroll
+                        state.userScrolled = false;
+                        if (state.scrollTimeout) {{
+                            clearTimeout(state.scrollTimeout);
+                            state.scrollTimeout = null;
+                        }}
+                    }}
+                }});
+            }}
+            
+            const state = window.logScrollState[containerId];
+            
+            // Only auto-scroll if user hasn't manually scrolled away
+            if (!state.userScrolled) {{
+                state.isScrolling = true;
                 logContainer.scrollTop = logContainer.scrollHeight;
+                
+                // Reset flag after scroll completes
+                setTimeout(() => {{
+                    state.isScrolling = false;
+                }}, 100);
             }}
         }})();
         """

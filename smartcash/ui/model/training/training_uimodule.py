@@ -164,7 +164,7 @@ class TrainingUIModule(BaseUIModule, OperationMixin, ButtonHandlerMixin):
             'start_training': self._handle_start_training,
             'stop_training': self._handle_stop_training,
             'resume_training': self._handle_resume_training,
-            'validate_model': self._handle_validate_model,
+            # 'validate_model': removed - overlaps with backbone module
             'refresh_backbone_config': self._handle_refresh_backbone_config,
             'save': self._handle_save_config,
             'reset': self._handle_reset_config
@@ -212,19 +212,7 @@ class TrainingUIModule(BaseUIModule, OperationMixin, ButtonHandlerMixin):
         except Exception as e:
             self.log_error(f"Resume training error: {e}")
     
-    def _handle_validate_model(self, button=None) -> None:
-        """Handle validate model button click."""
-        try:
-            self.log_info("Validating model...")
-            result = self.execute_validate_model()
-            
-            if result.get('success'):
-                self.log_success(f"Model validation completed: {result.get('message', '')}")
-            else:
-                self.log_error(f"Model validation failed: {result.get('message', '')}")
-                
-        except Exception as e:
-            self.log_error(f"Validate model error: {e}")
+    # _handle_validate_model removed - validation now handled by backbone module
     
     def _handle_refresh_backbone_config(self, button=None) -> None:
         """Handle refresh backbone config button click."""
@@ -276,7 +264,7 @@ class TrainingUIModule(BaseUIModule, OperationMixin, ButtonHandlerMixin):
             self.log_info("📊 Live charts and progress tracking enabled")
             
             # Log backbone integration status
-            model_selection = self.get_config().get('model_selection', {})
+            model_selection = self.get_current_config().get('model_selection', {})
             if model_selection.get('backbone_type'):
                 backbone_type = model_selection.get('backbone_type', 'unknown')
                 self.log_info(f"🔗 Integrated with {backbone_type} backbone")
@@ -290,7 +278,7 @@ class TrainingUIModule(BaseUIModule, OperationMixin, ButtonHandlerMixin):
         """Execute training start operation."""
         try:
             # Merge config with current configuration
-            operation_config = self.get_config().copy()
+            operation_config = self.get_current_config().copy()
             if config:
                 operation_config.update(config)
             
@@ -320,7 +308,7 @@ class TrainingUIModule(BaseUIModule, OperationMixin, ButtonHandlerMixin):
     def execute_stop_training(self, config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """Execute training stop operation."""
         try:
-            operation_config = self.get_config().copy()
+            operation_config = self.get_current_config().copy()
             if config:
                 operation_config.update(config)
             
@@ -341,7 +329,7 @@ class TrainingUIModule(BaseUIModule, OperationMixin, ButtonHandlerMixin):
     def execute_resume_training(self, config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """Execute training resume operation."""
         try:
-            operation_config = self.get_config().copy()
+            operation_config = self.get_current_config().copy()
             if config:
                 operation_config.update(config)
             
@@ -362,7 +350,7 @@ class TrainingUIModule(BaseUIModule, OperationMixin, ButtonHandlerMixin):
     def execute_validate_model(self, config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """Execute model validation operation."""
         try:
-            operation_config = self.get_config().copy()
+            operation_config = self.get_current_config().copy()
             if config:
                 operation_config.update(config)
             
@@ -395,7 +383,7 @@ class TrainingUIModule(BaseUIModule, OperationMixin, ButtonHandlerMixin):
             model_result = self._config_handler.select_model_from_backbone(backbone_config)
             if model_result['success']:
                 # Update configuration and UI
-                self.update_config(model_selection=model_result['model_selection'])
+                self._update_module_config(model_selection=model_result['model_selection'])
                 self._sync_config_to_ui()
                 
                 return {
@@ -480,7 +468,7 @@ class TrainingUIModule(BaseUIModule, OperationMixin, ButtonHandlerMixin):
                 return {'success': False, 'message': 'Config handler not available'}
             
             # Extract config from UI if needed
-            current_config = self.get_config()
+            current_config = self.get_current_config()
             
             # In a real implementation, this would save to file or database
             self.logger.info("📋 Configuration saved successfully")
@@ -499,7 +487,7 @@ class TrainingUIModule(BaseUIModule, OperationMixin, ButtonHandlerMixin):
         """Reset configuration to defaults."""
         try:
             default_config = get_default_training_config()
-            self.update_config(**default_config)
+            self._update_module_config(**default_config)
             self._sync_config_to_ui()
             
             self.logger.info("🔄 Configuration reset to defaults")
@@ -518,11 +506,40 @@ class TrainingUIModule(BaseUIModule, OperationMixin, ButtonHandlerMixin):
         """Sync current configuration to UI components."""
         try:
             if self._config_handler and self._ui_components:
-                # This would sync configuration values to UI widgets
-                # Implementation depends on UI framework
-                self.logger.debug("📋 Configuration synced to UI")
+                current_config = self.get_current_config()
+                
+                # Update form if available
+                form_container = self._ui_components.get('form_container')
+                if form_container and hasattr(form_container, 'update_from_config'):
+                    form_container.update_from_config(current_config)
+                    self.logger.debug("📋 Configuration synced to UI form")
+                else:
+                    self.logger.warning("Form container or update method not available")
+                    
         except Exception as e:
             self.logger.warning(f"Failed to sync config to UI: {e}")
+
+    def _update_module_config(self, **updates: Any) -> None:
+        """Update module configuration with provided values."""
+        try:
+            if self._config_handler:
+                current_config = self.get_current_config()
+                
+                # Deep update configuration
+                for key, value in updates.items():
+                    if key in current_config and isinstance(current_config[key], dict) and isinstance(value, dict):
+                        current_config[key].update(value)
+                    else:
+                        current_config[key] = value
+                
+                # Update the config handler
+                self._config_handler.config = current_config
+                self.logger.debug(f"✅ Module configuration updated with: {list(updates.keys())}")
+            else:
+                self.logger.warning("Config handler not available for update")
+                
+        except Exception as e:
+            self.logger.error(f"Failed to update module config: {e}")
     
     def get_training_status(self) -> Dict[str, Any]:
         """Get current training status."""

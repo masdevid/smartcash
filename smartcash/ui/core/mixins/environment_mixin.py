@@ -102,6 +102,9 @@ class EnvironmentMixin:
     @property
     def is_colab(self) -> bool:
         """Check if running in Google Colab."""
+        # Force re-check of Colab environment
+        if hasattr(self, '_environment_manager'):
+            self._is_colab = getattr(self._environment_manager, 'is_colab', False)
         if self._is_colab is None:
             self._setup_environment()
         return self._is_colab or False

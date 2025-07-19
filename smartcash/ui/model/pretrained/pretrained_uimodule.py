@@ -1,6 +1,10 @@
 """
 File: smartcash/ui/model/pretrained/pretrained_uimodule.py
 Description: Pretrained Module implementation using BaseUIModule pattern.
+
+This module provides the PretrainedUIModule class which implements the UI for
+working with pretrained models. It follows the BaseUIModule pattern and is
+meant to be used with the PretrainedUIFactory for proper initialization.
 """
 
 from typing import Dict, Any, Optional
@@ -255,14 +259,3 @@ class PretrainedUIModule(BaseUIModule):
             'model_status': self._model_status,
             'environment_paths': self.environment_paths
         }
-
-
-# ==================== FACTORY FUNCTIONS ====================
-
-from smartcash.ui.core.enhanced_ui_module_factory import EnhancedUIModuleFactory
-
-# Create the initialize function using enhanced factory pattern
-initialize_pretrained_ui = EnhancedUIModuleFactory.create_display_function(PretrainedUIModule)
-
-# Global module instance for singleton pattern
-_pretrained_module_instance: Optional[PretrainedUIModule] = None

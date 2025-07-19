@@ -166,8 +166,8 @@ class TrainingUIModule(BaseUIModule, OperationMixin, ButtonHandlerMixin):
             'resume_training': self._handle_resume_training,
             'validate_model': self._handle_validate_model,
             'refresh_backbone_config': self._handle_refresh_backbone_config,
-            'save_config': self._handle_save_config,
-            'reset_config': self._handle_reset_config
+            'save': self._handle_save_config,
+            'reset': self._handle_reset_config
         }
     
     def _handle_start_training(self, button=None) -> None:

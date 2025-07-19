@@ -88,12 +88,13 @@ class PretrainedUIFactory(UIFactory):
                 return {'success': False, 'message': error_msg}
             
             logger.debug("✅ Berhasil membuat dan menampilkan Pretrained UI")
-            return {'success': True, 'module': module}
+            # Return the UI component directly
+            return module.get_ui_components().get('main_container')
             
         except Exception as e:
             error_msg = f"Gagal membuat dan menampilkan Pretrained UI: {str(e)}"
             logger.error(error_msg, exc_info=True)
-            return {'success': False, 'message': error_msg, 'error': str(e)}
+            return None
 
 
 # Fungsi utilitas untuk kemudahan penggunaan

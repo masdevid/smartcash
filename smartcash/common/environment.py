@@ -106,18 +106,19 @@ class EnvironmentManager:
     
     @property
     def is_colab(self) -> bool:
-        """Check if running in Google Colab environment."""
+        """Check if running in Google Colab."""
+        # Always check the current environment state
+        self._in_colab = _is_colab_environment()
         return self._in_colab
         
     @property
     def is_drive_mounted(self) -> bool:
-        """Lazily check if Google Drive is mounted."""
-        if self._drive_mounted is None:
-            self._drive_mounted = _is_drive_mounted() if self._in_colab else False
-            if self._drive_mounted and self._drive_path is None:
-                self._drive_path = _get_drive_path()
+        """Check if Google Drive is mounted."""
+        # Always check the current drive mount state
+        self._drive_mounted = _is_drive_mounted()
+        if self._drive_mounted and self._drive_path is None:
+            self._drive_path = _get_drive_path()
         return self._drive_mounted
-        return self._in_colab
     
     @property
     def base_dir(self) -> Path:

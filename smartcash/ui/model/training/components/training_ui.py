@@ -74,41 +74,41 @@ def create_training_ui(config: Dict[str, Any]) -> Dict[str, Any]:
         action_buttons = [
             {
                 'id': 'start_training',
-                'text': 'Start Training',
+                'text': '▶️ Start Training',
                 'style': 'success',
-                'icon': 'play',
+                'icon': None,
                 'tooltip': 'Start model training with backbone integration',
                 'disabled': False
             },
             {
                 'id': 'stop_training',
-                'text': 'Stop Training',
+                'text': '⏹️ Stop Training',
                 'style': 'danger',
-                'icon': 'stop',
+                'icon': None,
                 'tooltip': 'Stop current training process safely',
                 'disabled': True
             },
             {
                 'id': 'resume_training',
-                'text': 'Resume Training',
+                'text': '⏯️ Resume Training',
                 'style': 'warning',
-                'icon': 'play-circle',
+                'icon': None,
                 'tooltip': 'Resume training from checkpoint',
                 'disabled': True
             },
             {
                 'id': 'validate_model',
-                'text': 'Validate Model',
+                'text': '✅ Validate Model',
                 'style': 'info',
-                'icon': 'check-circle',
+                'icon': None,
                 'tooltip': 'Run comprehensive model validation',
                 'disabled': False
             },
             {
                 'id': 'refresh_backbone_config',
-                'text': 'Refresh Config',
+                'text': '🔄 Refresh Config',
                 'style': 'secondary',
-                'icon': 'sync',
+                'icon': None,
                 'tooltip': 'Refresh configuration from backbone module',
                 'disabled': False
             }
@@ -121,6 +121,7 @@ def create_training_ui(config: Dict[str, Any]) -> Dict[str, Any]:
             container_margin="15px 0"
         )
         action_container = action_container_result['container']
+        buttons = action_container_result['buttons']
         
         # 4. Create dual chart layout for live monitoring
         charts_data = create_dual_charts_layout(training_config, ui_config)
@@ -175,10 +176,12 @@ def create_training_ui(config: Dict[str, Any]) -> Dict[str, Any]:
         
         # Prepare UI components dictionary
         ui_components = {
-            'main_container': main_container,
+            'main_container': main_container,  # main_container is already the VBox widget
             'header_container': header_container,
             'form_container': form_container,
             'action_container': action_container_result,  # Store full result for button access
+            'save': buttons['save'],
+            'reset': buttons['reset'],
             'charts': {
                 'loss_chart': charts_data['loss_chart'],
                 'map_chart': charts_data['map_chart']

@@ -1,6 +1,20 @@
 """
 File: smartcash/ui/model/training/training_uimodule.py
 Main UIModule implementation for training module using BaseUIModule pattern.
+
+This module implements the TrainingUIModule class which provides a user interface
+for model training operations. It's designed to be used with TrainingUIFactory
+for proper initialization and display.
+
+Example usage:
+    from smartcash.ui.model.training.training_ui_factory import TrainingUIFactory
+    
+    # Create and display the training UI
+    training_ui = TrainingUIFactory.create_and_display_training()
+    
+    # Or get a display function for later use
+    show_training = TrainingUIFactory.create_training_display()
+    training_ui = show_training()
 """
 
 from typing import Dict, Any, Optional, Callable
@@ -29,7 +43,11 @@ class TrainingUIModule(BaseUIModule, OperationMixin, ButtonHandlerMixin):
     """
     
     def __init__(self):
-        """Initialize training UI module."""
+        """
+        Initialize training UI module.
+        
+        Note: Use TrainingUIFactory.create_training_module() to create instances.
+        """
         super().__init__(
             module_name='training',
             parent_module='model'
@@ -42,7 +60,35 @@ class TrainingUIModule(BaseUIModule, OperationMixin, ButtonHandlerMixin):
         self._chart_updaters: Dict[str, Callable] = {}
         self._training_state = {'phase': 'idle'}
         
+        # Will be set by initialize()
+        self._config = None
+        
         self.logger.debug("✅ TrainingUIModule initialized")
+        
+    def initialize(self, config: Optional[Dict[str, Any]] = None, **kwargs) -> None:
+        """
+        Initialize the module with configuration.
+        
+        Args:
+            config: Optional configuration dictionary
+            **kwargs: Additional arguments for configuration
+            
+        Note:
+            This method is called by TrainingUIFactory when creating a new instance.
+        """
+        self.logger.debug("Initializing TrainingUIModule with config")
+        self._config = config or {}
+        
+        # Initialize configuration handler
+        self._config_handler = self.create_config_handler(self._config)
+        
+        # Initialize operations
+        self._init_operations()
+        
+        # Initialize UI components
+        self._init_ui_components()
+        
+        self.logger.debug("✅ TrainingUIModule initialized with config")
     
     def create_config_handler(self, config: Optional[Dict[str, Any]] = None) -> TrainingConfigHandler:
         """Create configuration handler."""
@@ -543,94 +589,7 @@ class TrainingUIModule(BaseUIModule, OperationMixin, ButtonHandlerMixin):
         }
 
 
-# ==================== FACTORY FUNCTIONS ====================
+# ==================== MODULE EXPORTS ====================
 
-# Global instance for singleton pattern
-_training_uimodule_instance: Optional[TrainingUIModule] = None
-
-
-def create_training_uimodule(
-    config: Optional[Dict[str, Any]] = None,
-    auto_initialize: bool = True,
-    **kwargs
-) -> TrainingUIModule:
-    """Create a new training UIModule instance."""
-    module = TrainingUIModule()
-    
-    if auto_initialize:
-        module.initialize()
-    
-    return module
-
-
-def get_training_uimodule(
-    config: Optional[Dict[str, Any]] = None,
-    auto_initialize: bool = True,
-    **kwargs
-) -> TrainingUIModule:
-    """Get or create training UIModule singleton instance."""
-    global _training_uimodule_instance
-    
-    if _training_uimodule_instance is None:
-        _training_uimodule_instance = create_training_uimodule(
-            config=config,
-            auto_initialize=auto_initialize
-        )
-    
-    return _training_uimodule_instance
-
-
-def reset_training_uimodule() -> None:
-    """Reset the training UIModule singleton instance."""
-    global _training_uimodule_instance
-    
-    if _training_uimodule_instance:
-        _training_uimodule_instance.cleanup()
-        _training_uimodule_instance = None
-
-
-# ==================== ENHANCED UI FACTORY INTEGRATION ====================
-
-def initialize_training_ui(
-    config: Optional[Dict[str, Any]] = None,
-    display: bool = False,
-    **kwargs
-) -> Dict[str, Any]:
-    """
-    Initialize training UI with convenience wrapper.
-    
-    Args:
-        config: Optional configuration dictionary
-        display: Whether to display the UI immediately
-        **kwargs: Additional arguments
-        
-    Returns:
-        Initialization result dictionary
-    """
-    try:
-        module = get_training_uimodule(config=config, **kwargs)
-        
-        result = {
-            'success': True,
-            'module': module,
-            'ui_components': module.get_ui_components(),
-            'status': module.get_training_status()
-        }
-        
-        if display and result['ui_components']:
-            from IPython.display import display as ipython_display
-            main_ui = result['ui_components'].get('main_container')
-            if main_ui:
-                ipython_display(main_ui)
-                return None  # Don't return data when display=True
-        
-        return result
-        
-    except Exception as e:
-        return {
-            'success': False,
-            'error': str(e),
-            'module': None,
-            'ui_components': {},
-            'status': {}
-        }
+# Export only the module class for factory pattern usage
+__all__ = ['TrainingUIModule']

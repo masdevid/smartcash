@@ -7,8 +7,12 @@ menggunakan BaseUIModule sebagai dasar, dengan integrasi error handler inti.
 file_path: /Users/masdevid/Projects/smartcash/smartcash/ui/core/ui_factory.py
 """
 
-from typing import Dict, Any, Optional, Type, Callable, TypeVar, Union
+import io
+import sys
 import traceback
+from typing import Dict, Any, Optional, Type, Callable, TypeVar, Union, TextIO
+from contextlib import contextmanager
+
 from smartcash.ui.core.base_ui_module import BaseUIModule
 from smartcash.ui.core.errors.handlers import get_error_handler, CoreErrorHandler
 from smartcash.ui.core.errors.exceptions import UIError
@@ -24,6 +28,76 @@ class UIFactory:
     Factory ini menyediakan cara standar untuk membuat dan menampilkan
     komponen UI dengan penanganan error dan logging yang konsisten.
     """
+    
+    @classmethod
+    def _suppress_console_errors(cls):
+        """Context manager untuk menekan output error standar Python."""
+        class SuppressStderr:
+            def __enter__(self):
+                self.stderr = sys.stderr
+                sys.stderr = io.StringIO()
+                return self
+                
+            def __exit__(self, exc_type, exc_val, exc_tb):
+                sys.stderr = self.stderr
+                return True
+                
+        return SuppressStderr()
+    
+    @classmethod
+    def _format_error_message(cls, error: Exception, context: Dict[str, Any] = None) -> str:
+        """Format pesan error untuk ditampilkan ke pengguna."""
+        context = context or {}
+        error_type = error.__class__.__name__
+        error_msg = str(error)
+        
+        # Tambahkan konteks tambahan jika tersedia
+        context_info = []
+        if 'module_name' in context:
+            context_info.append(f"module: {context['module_name']}")
+        if 'operation' in context:
+            context_info.append(f"operation: {context['operation']}")
+            
+        context_str = f" ({', '.join(context_info)})" if context_info else ""
+        
+        return f"{error_type}: {error_msg}{context_str}"
+    
+    @classmethod
+    def _handle_ui_error(
+        cls,
+        error: Exception,
+        error_message: str,
+        logger,
+        context: Optional[Dict[str, Any]] = None,
+        show_traceback: bool = True
+    ) -> None:
+        """Menangani error dengan menampilkan UI error dan mencatat log."""
+        context = context or {}
+        
+        # Log error
+        error_handler = get_error_handler()
+        error_handler.handle_error(
+            error_message,
+            error,
+            logger=logger,
+            context=context
+        )
+        
+        # Format traceback
+        tb_str = ''.join(traceback.format_exception(type(error), error, error.__traceback__)) \
+            if show_traceback else None
+            
+        # Tampilkan error UI
+        error_ui = create_error_component(
+            error_message=cls._format_error_message(error, context),
+            traceback=tb_str,
+            title=error_message,
+            error_type="error"
+        )
+        
+        # Tekan output error standar dan tampilkan UI error
+        with cls._suppress_console_errors():
+            display(error_ui['widget'])
     
     @classmethod
     def create_module(
@@ -46,45 +120,42 @@ class UIFactory:
             
         Returns:
             Instance modul UI yang sudah diinisialisasi
+            
+        Raises:
+            UIError: Jika terjadi kesalahan saat membuat modul
         """
         logger = get_module_logger("smartcash.ui.core.ui_factory")
         
         try:
             # Buat instance modul
-            module = module_class(
-                module_name=module_name,
-                parent_module=parent_module,
-                **kwargs
-            )
-            
-            # Inisialisasi konfigurasi jika disediakan
-            if config and hasattr(module, 'update_config'):
-                module.update_config(config)
+            with cls._suppress_console_errors():
+                module = module_class(
+                    module_name=module_name,
+                    parent_module=parent_module,
+                    **kwargs
+                )
                 
-            logger.debug(f"✅ Modul {module.full_module_name} berhasil dibuat")
-            return module
+                # Inisialisasi konfigurasi jika disediakan
+                if config and hasattr(module, 'update_config'):
+                    module.update_config(config)
+                    
+                logger.debug(f"✅ Modul {getattr(module, 'full_module_name', module_name)} berhasil dibuat")
+                return module
             
         except Exception as e:
-            error_handler = get_error_handler()
-            error_handler.handle_error(
-                f"Gagal membuat modul {module_name}",
-                e,
-                logger=logger,
-                context={
-                    'module_class': module_class.__name__,
-                    'module_name': module_name,
-                    'parent_module': parent_module
-                }
-            )
+            context = {
+                'module_class': module_class.__name__,
+                'module_name': module_name,
+                'parent_module': parent_module,
+                'operation': 'create_module'
+            }
             
-            # Create and display error component
-            error_ui = create_error_component(
+            cls._handle_ui_error(
+                error=e,
                 error_message=f"Gagal membuat modul {module_name}",
-                traceback=''.join(traceback.format_exception(type(e), e, e.__traceback__)),
-                title="Error Membuat Modul",
-                error_type="error"
+                logger=logger,
+                context=context
             )
-            display(error_ui['widget'])
             
             raise UIError(f"Gagal membuat modul {module_name}: {str(e)}") from e
     
@@ -109,70 +180,61 @@ class UIFactory:
             
         Returns:
             Informasi modul atau None jika berhasil ditampilkan
+            
+        Notes:
+            - Menekan output error standar Python
+            - Menampilkan error menggunakan komponen UI yang lebih informatif
         """
+        logger = get_module_logger("smartcash.ui.core.ui_factory")
+        
         try:
-            # Buat modul
-            module = cls.create_module(
-                module_class=module_class,
-                module_name=module_name,
-                parent_module=parent_module,
-                config=config,
-                **kwargs
-            )
-            
-            # Tampilkan UI
-            if hasattr(module, 'display_ui'):
-                display_result = module.display_ui()
-                if display_result and not display_result.get('success', False):
-                    error_msg = display_result.get('message', 'Gagal menampilkan UI')
-                    error_handler = get_error_handler()
-                    error_handler.handle_error(
-                        f"Gagal menampilkan modul {module.module_name if hasattr(module, 'module_name') else 'unknown'}",
-                        Exception(error_msg),
-                        logger=logger,
-                        context={
-                            'module_class': module.__class__.__name__,
-                            'module_name': getattr(module, 'module_name', 'unknown'),
-                            'parent_module': getattr(module, 'parent_module', None)
-                        }
-                    )
-                    
-                    # Create and display error component
-                    error_ui = create_error_component(
-                        error_message=f"Gagal menampilkan modul {getattr(module, 'module_name', 'unknown')}",
-                        traceback=''.join(traceback.format_exception(type(Exception(error_msg)), Exception(error_msg), Exception(error_msg).__traceback__)),
-                        title="Error Menampilkan Modul",
-                        error_type="error"
-                    )
-                    display(error_ui['widget'])
-                    
-                    return None
-                    
-                return module.get_module_info() if hasattr(module, 'get_module_info') else {}
+            with cls._suppress_console_errors():
+                # Buat instance modul
+                module = cls.create_module(
+                    module_class=module_class,
+                    module_name=module_name,
+                    parent_module=parent_module,
+                    config=config,
+                    **kwargs
+                )
                 
-            return None
-            
+                # Tampilkan UI
+                if hasattr(module, 'display_ui'):
+                    display_result = module.display_ui()
+                    if display_result and not display_result.get('success', False):
+                        error_msg = display_result.get('message', 'Gagal menampilkan UI')
+                        error = Exception(error_msg)
+                        
+                        cls._handle_ui_error(
+                            error=error,
+                            error_message=f"Gagal menampilkan modul {getattr(module, 'module_name', 'unknown')}",
+                            logger=logger,
+                            context={
+                                'module_class': module.__class__.__name__,
+                                'module_name': getattr(module, 'module_name', 'unknown'),
+                                'parent_module': getattr(module, 'parent_module', None),
+                                'operation': 'display_ui'
+                            }
+                        )
+                        
+                        return None
+                        
+                    return module.get_module_info() if hasattr(module, 'get_module_info') else {}
+                    
+                return None
+                
         except Exception as e:
-            error_handler = get_error_handler()
-            error_handler.handle_error(
-                f"Gagal menampilkan modul {module_name}",
-                e,
+            cls._handle_ui_error(
+                error=e,
+                error_message=f"Gagal menampilkan modul {module_name}",
                 logger=logger,
                 context={
                     'module_class': module_class.__name__,
                     'module_name': module_name,
-                    'parent_module': parent_module
+                    'parent_module': parent_module,
+                    'operation': 'create_and_display'
                 }
             )
-            
-            # Create and display error component
-            error_ui = create_error_component(
-                error_message=f"Gagal menampilkan modul {module_name}",
-                traceback=''.join(traceback.format_exception(type(e), e, e.__traceback__)),
-                title="Error Menampilkan Modul",
-                error_type="error"
-            )
-            display(error_ui['widget'])
             
             return {'error': str(e), 'success': False}
     

@@ -1,9 +1,12 @@
-Training UI updates:
-- Training Configuration Summary make it 4 column cards based UI
-- 📊 Training Results & Performance Metrics:
-    - Accuracy, Precision, Recall, F1
-    - mAP, Loss
-- Training Forms:
-    - Single Accordion for all forms
-    - Use 3 column layouts
-    
+- "WARNING:timm.models._builder:Unexpected keys (bn2.bias, bn2.num_batches_tracked, bn2.running_mean, bn2.running_var, bn2.weight, classifier.bias, classifier.weight, conv_head.weight) found while loading pretrained weights. This may be expected if model is being adapted." Is this warning normal? Ignore it if it's okay or expected.
+- from the logs `model.builder - 🏗️ Building efficientnet_b4 model | Layers: ['banknote'] | Mode: single` it seems still using old implementation. Based on `MODEL_ARC_README.md` it should build multi head by default. 
+- It's not clear where the model build path is. Input to change default path needed.  
+- I need indicators wether model on specific backbone has built already
+- Forms options should be updated based on latest implementation described in `MODEL_ARC_README.md`
+- Training options should not included. 
+- Fixed image size and num classes shouldn't have input forms.
+- Backbone modul wasn't disabled during operation
+- Need information cards about what parameters sent to backend, and what parameters backend used.
+- Need Summary Cards after model succesfully built
+- Backend logs still appear outside operation container
+- Log Accordion always scrolled to top each time new log appended (it's inconvenient)

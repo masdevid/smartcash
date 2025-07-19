@@ -97,6 +97,38 @@ class TrainingUIModule(BaseUIModule, OperationMixin, ButtonHandlerMixin):
         config_handler.set_ui_components(self._ui_components)
         return config_handler
     
+    def _init_operations(self) -> None:
+        """
+        Initialize training operations.
+        
+        This method sets up all the training operations (start, stop, resume, validate)
+        using the TrainingOperationFactory.
+        """
+        self.logger.debug("Initializing training operations")
+        
+        # Create operation factory with the current module instance
+        self._operation_factory = TrainingOperationFactory(ui_module=self)
+        
+        # Register operation handlers
+        self.register_operation_handler(
+            'start_training',
+            self._operation_factory.create_start_training_handler()
+        )
+        self.register_operation_handler(
+            'stop_training',
+            self._operation_factory.create_stop_training_handler()
+        )
+        self.register_operation_handler(
+            'resume_training',
+            self._operation_factory.create_resume_training_handler()
+        )
+        self.register_operation_handler(
+            'validate_training',
+            self._operation_factory.create_validate_training_handler()
+        )
+        
+        self.logger.debug("✅ Training operations initialized")
+    
     def _merge_with_defaults(self, config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """Merge provided config with defaults."""
         default_config = get_default_training_config()

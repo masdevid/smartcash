@@ -169,44 +169,7 @@ class BackboneConfigHandler(LoggingMixin, ConfigurationMixin):
         
         return True
     
-    def update_config(self, updates: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Update configuration with deep merge.
-        
-        Args:
-            updates: Configuration updates to apply
-            
-        Returns:
-            Result dictionary with success status
-        """
-        try:
-            # Simple deep merge implementation
-            merged_config = self._merge_config(self._config, updates)
-            
-            # Validate merged configuration
-            if self.validate_config(merged_config):
-                self._config = merged_config
-                self.logger.debug("✅ Configuration updated successfully")
-                return {'success': True, 'message': 'Configuration updated successfully'}
-            else:
-                return {'success': False, 'message': 'Configuration validation failed after update'}
-                
-        except Exception as e:
-            error_msg = f"Failed to update configuration: {e}"
-            self.logger.error(error_msg)
-            return {'success': False, 'message': error_msg}
-    
-    def _merge_config(self, base: Dict[str, Any], updates: Dict[str, Any]) -> Dict[str, Any]:
-        """Deep merge two configuration dictionaries."""
-        result = base.copy()
-        
-        for key, value in updates.items():
-            if key in result and isinstance(result[key], dict) and isinstance(value, dict):
-                result[key] = self._merge_config(result[key], value)
-            else:
-                result[key] = value
-        
-        return result
+    # Note: update_config is provided by ConfigurationMixin
     
     def set_ui_components(self, ui_components: Dict[str, Any]) -> None:
         """

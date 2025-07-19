@@ -7,7 +7,7 @@ Description: Final implementation of the Preprocessing Module using the modern B
 from typing import Dict, Any, Optional, Tuple
 
 from smartcash.ui.core.base_ui_module import BaseUIModule
-from smartcash.ui.core.enhanced_ui_module_factory import EnhancedUIModuleFactory
+# Enhanced UI Module Factory removed - use direct instantiation
 
 from smartcash.ui.core.decorators import suppress_ui_init_logs
 from .components.preprocessing_ui import create_preprocessing_ui_components

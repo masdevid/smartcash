@@ -3,12 +3,12 @@ File: smartcash/ui/core/__init__.py
 Deskripsi: Core UI module dengan fail-fast principle
 """
 
-# Handlers
-from smartcash.ui.core.handlers.base_handler import BaseHandler
-from smartcash.ui.core.handlers.ui_handler import UIHandler
+# Handlers - removed (deprecated)
+# from smartcash.ui.core.handlers.base_handler import BaseHandler
+# from smartcash.ui.core.handlers.ui_handler import UIHandler
 
-# Initializers
-from smartcash.ui.core.initializers.base_initializer import BaseInitializer
+# Initializers - removed (deprecated)
+# from smartcash.ui.core.initializers.base_initializer import BaseInitializer
 
 # Shared utilities
 from smartcash.ui.core.shared.shared_config_manager import SharedConfigManager, get_shared_config_manager
@@ -45,10 +45,10 @@ from smartcash.ui.core.decorators import (
 )
 
 __all__ = [
-    # Handlers
-    'BaseHandler',
-    'UIHandler',
-    'BaseInitializer',
+    # Handlers - removed (deprecated)
+    # 'BaseHandler',
+    # 'UIHandler',
+    # 'BaseInitializer',
     
     # Shared utilities
     'SharedConfigManager',

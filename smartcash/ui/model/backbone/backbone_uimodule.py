@@ -7,7 +7,7 @@ Description: Refactored implementation of the Backbone Module using the modern B
 from typing import Dict, Any, Optional
 
 from smartcash.ui.core.base_ui_module import BaseUIModule
-from smartcash.ui.core.enhanced_ui_module_factory import EnhancedUIModuleFactory
+# Enhanced UI Module Factory removed - use direct instantiation
 
 from smartcash.ui.core.decorators import suppress_ui_init_logs
 from .components.backbone_ui import create_backbone_ui

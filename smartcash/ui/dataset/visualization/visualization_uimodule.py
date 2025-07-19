@@ -10,7 +10,7 @@ import ipywidgets as widgets
 
 # Core imports
 from smartcash.ui.core.base_ui_module import BaseUIModule
-from smartcash.ui.core.enhanced_ui_module_factory import EnhancedUIModuleFactory
+# Enhanced UI Module Factory removed - use direct instantiation
 from smartcash.ui.core.decorators import suppress_ui_init_logs
 
 # Local imports

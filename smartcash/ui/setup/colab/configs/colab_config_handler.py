@@ -147,12 +147,7 @@ class ColabConfigHandler(LoggingMixin, ConfigurationMixin):
             # Additional reset logic specific to Colab
             self._detect_environment()  # Re-detect environment after reset
             
-            self.log_with_status(
-                message="Colab configuration reset to defaults",
-                status_message="Konfigurasi Colab direset ke pengaturan awal",
-                log_level='info',
-                status_level='success'
-            )
+            self.log_success("Konfigurasi Colab direset ke pengaturan awal")
             
             return result
             

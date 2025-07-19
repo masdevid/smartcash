@@ -1097,6 +1097,4 @@ class EvaluationUIModule(BaseUIModule):
     # Note: display() method is now provided by BaseUIModule
 
 
-# Use enhanced factory for standardized initialization
-from smartcash.ui.core.enhanced_ui_module_factory import create_display_function
-initialize_evaluation_ui = create_display_function(EvaluationUIModule)
+# Enhanced factory removed - use direct instantiation

@@ -58,124 +58,16 @@ class EvaluationConfigHandler(LoggingMixin, ConfigurationMixin):
         self._loaded_config = config
         
         # If no config was provided, try to load from file
-        if self._loaded_config is None:
-            self.load_config()
+        if self._loaded_config is None and hasattr(self, '_config_file_path'):
+            try:
+                self._loaded_config = super().load_config(self._config_file_path)
+            except Exception:
+                self._loaded_config = self._default_config.copy()
         else:
-            # Apply provided config
-            self.update_config(config)
+            # Apply provided config using simple dict update (ConfigurationMixin's methods available)
+            self._config.update(config)
     
-    def load_config(self, config_path: Optional[str] = None) -> Dict[str, Any]:
-        """
-        Load evaluation configuration from YAML file.
-        
-        Args:
-            config_path: Optional path to config file
-            
-        Returns:
-            Loaded configuration dictionary
-        """
-        try:
-            config_file = config_path or self._config_file_path
-            
-            if not os.path.exists(config_file):
-                self.logger.warning(f"Config file not found: {config_file}, using defaults")
-                self._loaded_config = self._default_config.copy()
-                return self._loaded_config
-            
-            with open(config_file, 'r', encoding='utf-8') as f:
-                yaml_config = yaml.safe_load(f)
-            
-            # Merge YAML config with defaults
-            merged_config = self._merge_configs(self._default_config, yaml_config)
-            
-            # Validate merged configuration
-            if not validate_evaluation_config(merged_config):
-                self.logger.warning("Invalid configuration, using defaults")
-                self._loaded_config = self._default_config.copy()
-                return self._loaded_config
-            
-            self._loaded_config = merged_config
-            self.logger.info(f"Evaluation config loaded from {config_file}")
-            
-            return self._loaded_config
-            
-        except Exception as e:
-            self.logger.error(f"Failed to load evaluation config: {e}")
-            self._loaded_config = self._default_config.copy()
-            return self._loaded_config
-    
-    def save_config(self, config: Dict[str, Any], config_path: Optional[str] = None) -> bool:
-        """
-        Save evaluation configuration to YAML file.
-        
-        Args:
-            config: Configuration to save
-            config_path: Optional path to save config
-            
-        Returns:
-            True if saved successfully, False otherwise
-        """
-        try:
-            config_file = config_path or self._config_file_path
-            
-            # Validate configuration before saving
-            if not validate_evaluation_config(config):
-                self.logger.error("Invalid configuration, cannot save")
-                return False
-            
-            # Create directory if it doesn't exist
-            os.makedirs(os.path.dirname(config_file), exist_ok=True)
-            
-            with open(config_file, 'w', encoding='utf-8') as f:
-                yaml.dump(config, f, default_flow_style=False, indent=2)
-            
-            self._loaded_config = config.copy()
-            self.logger.info(f"Evaluation config saved to {config_file}")
-            
-            return True
-            
-        except Exception as e:
-            self.logger.error(f"Failed to save evaluation config: {e}")
-            return False
-    
-    def get_config(self) -> Dict[str, Any]:
-        """
-        Get current configuration.
-        
-        Returns:
-            Current configuration dictionary
-        """
-        if self._loaded_config is None:
-            return self.load_config()
-        return self._loaded_config.copy()
-    
-    def update_config(self, updates: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Update configuration with new values.
-        
-        Args:
-            updates: Configuration updates
-            
-        Returns:
-            Updated configuration dictionary
-        """
-        try:
-            current_config = self.get_config()
-            updated_config = self._merge_configs(current_config, updates)
-            
-            # Validate updated configuration
-            if not validate_evaluation_config(updated_config):
-                self.logger.error("Invalid configuration update")
-                return current_config
-            
-            self._loaded_config = updated_config
-            self.logger.info("Evaluation configuration updated")
-            
-            return updated_config
-            
-        except Exception as e:
-            self.logger.error(f"Failed to update evaluation config: {e}")
-            return self.get_config()
+    # Note: load_config, save_config, get_config, and update_config are provided by ConfigurationMixin
     
     def get_scenarios_config(self) -> Dict[str, Any]:
         """

@@ -435,19 +435,3 @@ class AugmentationUIModule(BaseUIModule):
         except Exception as e:
             self.log(f"Error updating operation phase: {e}", 'warning')
 
-
-def initialize_augmentation_ui(display: bool = True) -> AugmentationUIModule:
-    """
-    Initializes and optionally displays the Augmentation UI Module.
-
-    Args:
-        display: If True, the UI will be displayed in the output.
-
-    Returns:
-        An instance of the AugmentationUIModule.
-    """
-    module = AugmentationUIModule()
-    module.initialize()
-    if display:
-        module.display_ui()
-    return module

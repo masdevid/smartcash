@@ -5,5 +5,6 @@ NOTE: Cell code should remain minimal (import and run initializer only).
       Initializer handles all the logic.
 """
 
-from smartcash.ui.dataset.visualization import initialize_visualization_ui
-initialize_visualization_ui(display=True)
+from smartcash.ui.dataset.visualization import create_visualization_display
+visualize = create_visualization_display()
+visualize()

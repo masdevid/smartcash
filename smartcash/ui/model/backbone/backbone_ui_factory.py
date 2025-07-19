@@ -1,46 +1,46 @@
 """
-Factory untuk membuat dan menampilkan modul UI Pretrained.
+Factory untuk membuat dan menampilkan modul UI Backbone.
 
 File ini menyediakan factory khusus untuk membuat dan menampilkan
-modul UI Pretrained menggunakan BaseUIModule dan UI Factory pattern.
+modul UI Backbone menggunakan BaseUIModule dan UI Factory pattern.
 """
 
 from typing import Dict, Any, Optional
 from smartcash.ui.core.ui_factory import UIFactory
-from smartcash.ui.model.pretrained.pretrained_uimodule import PretrainedUIModule
+from smartcash.ui.model.backbone.backbone_uimodule import BackboneUIModule
 from smartcash.ui.logger import get_module_logger
 
 logger = get_module_logger(__name__)
 
-class PretrainedUIFactory(UIFactory):
+class BackboneUIFactory(UIFactory):
     """
-    Factory untuk membuat dan menampilkan modul UI Pretrained.
+    Factory untuk membuat dan menampilkan modul UI Backbone.
     
     Kelas ini menyediakan method khusus untuk membuat dan menampilkan
-    modul UI Pretrained dengan konfigurasi default yang sesuai.
+    modul UI Backbone dengan konfigurasi default yang sesuai.
     """
     
     @classmethod
-    def create_pretrained_module(
+    def create_backbone_module(
         cls,
         config: Optional[Dict[str, Any]] = None,
         **kwargs
-    ) -> PretrainedUIModule:
+    ) -> BackboneUIModule:
         """
-        Buat instance PretrainedUIModule dengan konfigurasi yang diberikan.
+        Buat instance BackboneUIModule dengan konfigurasi yang diberikan.
         
         Args:
             config: Konfigurasi opsional untuk modul
             **kwargs: Argumen tambahan untuk inisialisasi modul
                 
         Returns:
-            Instance PretrainedUIModule yang sudah diinisialisasi
+            Instance BackboneUIModule yang sudah diinisialisasi
         """
         try:
-            logger.debug(f"Membuat instance PretrainedUIModule")
+            logger.debug(f"Membuat instance BackboneUIModule")
             
-            # Create instance directly since PretrainedUIModule handles its own initialization
-            module = PretrainedUIModule()
+            # Create instance directly since BackboneUIModule handles its own initialization
+            module = BackboneUIModule()
             
             # Initialize with config if provided
             if config is not None:
@@ -48,21 +48,21 @@ class PretrainedUIFactory(UIFactory):
             else:
                 module.initialize(**kwargs)
             
-            logger.debug(f"✅ Berhasil membuat instance PretrainedUIModule")
+            logger.debug(f"✅ Berhasil membuat instance BackboneUIModule")
             return module
             
         except Exception as e:
-            logger.error(f"Gagal membuat PretrainedUIModule: {e}", exc_info=True)
+            logger.error(f"Gagal membuat BackboneUIModule: {e}", exc_info=True)
             raise
     
     @classmethod
-    def create_and_display_pretrained(
+    def create_and_display_backbone(
         cls,
         config: Optional[Dict[str, Any]] = None,
         **kwargs
     ) -> Dict[str, Any]:
         """
-        Buat dan tampilkan modul Pretrained UI.
+        Buat dan tampilkan modul Backbone UI.
         
         Args:
             config: Konfigurasi opsional untuk modul
@@ -73,49 +73,49 @@ class PretrainedUIFactory(UIFactory):
             Dict berisi informasi modul atau error message
         """
         try:
-            logger.debug(f"Membuat dan menampilkan Pretrained UI")
+            logger.debug(f"Membuat dan menampilkan Backbone UI")
             
             # Get auto_display flag from kwargs (default to True if not specified)
             auto_display = kwargs.pop('auto_display', True)
             
             # Buat instance modul
-            module = cls.create_pretrained_module(config=config, **kwargs)
+            module = cls.create_backbone_module(config=config, **kwargs)
             
             # Display the UI if auto_display is True
             if auto_display:
-                logger.debug(f"Displaying Pretrained UI...")
+                logger.debug(f"Displaying Backbone UI...")
                 display_result = module.display_ui()
                 if not display_result.get('success', False):
                     error_msg = display_result.get('message', 'Gagal menampilkan UI')
                     logger.error(error_msg)
                     return {'success': False, 'message': error_msg}
-                logger.debug(f"✅ Pretrained UI displayed successfully")
+                logger.debug(f"✅ Backbone UI displayed successfully")
             else:
-                logger.debug(f"✅ Pretrained UI module created (auto-display disabled)")
+                logger.debug(f"✅ Backbone UI module created (auto-display disabled)")
             
             # Return the module to allow for more flexible usage
             return module
             
         except Exception as e:
-            error_msg = f"Gagal membuat dan menampilkan Pretrained UI: {str(e)}"
+            error_msg = f"Gagal membuat dan menampilkan Backbone UI: {str(e)}"
             logger.error(error_msg, exc_info=True)
             return {'success': False, 'message': error_msg}
 
 
-def create_pretrained_display(**kwargs) -> callable:
+def create_backbone_display(**kwargs) -> callable:
     """
-    Create a display function for the pretrained UI.
+    Create a display function for the backbone UI.
     
     This is a convenience function that returns a callable that can be used
-    to display the pretrained UI with the given configuration.
+    to display the backbone UI with the given configuration.
     
     Args:
-        **kwargs: Configuration options for the pretrained UI
+        **kwargs: Configuration options for the backbone UI
         
     Returns:
-        A callable that will display the pretrained UI when called
+        A callable that will display the backbone UI when called
     """
     def display_fn():
-        return PretrainedUIFactory.create_and_display_pretrained(**kwargs)
+        return BackboneUIFactory.create_and_display_backbone(**kwargs)
     
     return display_fn

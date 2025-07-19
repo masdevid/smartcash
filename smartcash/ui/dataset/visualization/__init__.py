@@ -1,16 +1,29 @@
 """
-File: smartcash/ui/dataset/visualization/__init__.py
-Description: Modul visualisasi dataset untuk analisis dan eksplorasi data.
+Visualization Module - Model visualization functionality and interfaces
 
-Modul ini menyediakan antarmuka pengguna untuk visualisasi dataset dengan fitur:
-- Visualisasi data interaktif
-- Analisis statistik
-- Ekspor hasil visualisasi
+file_path: /Users/masdevid/Projects/smartcash/smartcash/ui/dataset/visualization/__init__.py
 """
 
-from .visualization_uimodule import initialize_visualization_ui
+from .visualization_uimodule import VisualizationUIModule
+from .visualization_ui_factory import VisualizationUIFactory, create_visualization_display
 
-# Ekspor fungsi utama
-__all__ = ['initialize_visualization_ui']
+def initialize_visualization_ui(config=None, **kwargs):
+    """
+    Initialize and display the visualization UI.
+    
+    Args:
+        config: Optional configuration dict
+        **kwargs: Additional arguments for UI initialization
+        
+    Returns:
+        The created UI module or None if failed
+    """
+    return VisualizationUIFactory.create_and_display_visualization(config=config, **kwargs)
 
-
+# Export main classes and functions
+__all__ = [
+    'VisualizationUIModule',
+    'VisualizationUIFactory',
+    'initialize_visualization_ui',
+    'create_visualization_display'
+]

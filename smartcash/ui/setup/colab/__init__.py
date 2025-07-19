@@ -1,26 +1,29 @@
 """
-file_path: smartcash/ui/setup/colab/__init__.py
-Deskripsi: Modul utama untuk inisialisasi dan manajemen UI di lingkungan Google Colab.
+Colab Setup Module - Configuration and initialization for colab environment
 
-Note: This module has been refactored to use UIModule pattern.
+file_path: /Users/masdevid/Projects/smartcash/smartcash/ui/setup/colab/__init__.py
 """
 
-# Import new UIModule functions (preferred approach)
-from .colab_uimodule import (
-    ColabUIModule,
-    create_colab_uimodule,
-    get_colab_uimodule,
-    reset_colab_uimodule,
-    initialize_colab_ui,
-    get_colab_components
-)
+from .colab_uimodule import ColabUIModule
+from .colab_ui_factory import ColabUIFactory, create_colab_display
 
+def initialize_colab_ui(config=None, **kwargs):
+    """
+    Initialize and display the colab UI.
+    
+    Args:
+        config: Optional configuration dict
+        **kwargs: Additional arguments for UI initialization
+        
+    Returns:
+        The created UI module or None if failed
+    """
+    return ColabUIFactory.create_and_display_colab(config=config, **kwargs)
+
+# Export main classes and functions
 __all__ = [
-    # UIModule pattern (current implementation)
-    "ColabUIModule",
-    "create_colab_uimodule", 
-    "get_colab_uimodule",
-    "reset_colab_uimodule",
-    "initialize_colab_ui",
-    "get_colab_components"
+    'ColabUIModule',
+    'ColabUIFactory',
+    'initialize_colab_ui',
+    'create_colab_display'
 ]

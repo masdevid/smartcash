@@ -1,9 +1,8 @@
 """
 File: smartcash/ui/cells/cell_1_3_dependency.py
-Deskripsi: Entry point untuk instalasi dependensi
-NOTE: Cell Code should remain minimal (import and run initializer only). 
-      Initializer should handle all the logic.
+Deskripsi: Entry point untuk dependency checker
 """
 
-from smartcash.ui.setup.dependency import initialize_dependency_ui
-initialize_dependency_ui(display=True)
+from smartcash.ui.setup.dependency import create_dependency_display
+dependency = create_dependency_display()
+dependency()

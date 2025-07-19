@@ -374,21 +374,3 @@ class PreprocessingUIModule(BaseUIModule):
             
         except Exception as e:
             return {'success': False, 'message': f"Error in cleanup operation: {e}"}
-
-
-
-# ==================== MODULE INITIALIZATION ====================
-
-def reset_preprocessing_uimodule() -> None:
-    """Reset the global Preprocessing UIModule instance."""
-    global _preprocessing_module_instance
-    if _preprocessing_module_instance:
-        try:
-            _preprocessing_module_instance.cleanup()
-        except Exception:
-            pass
-    _preprocessing_module_instance = None
-
-
-# Create the initialize function using enhanced factory pattern
-initialize_preprocessing_ui = EnhancedUIModuleFactory.create_display_function(PreprocessingUIModule)

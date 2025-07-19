@@ -1,52 +1,29 @@
 """
-File: smartcash/ui/dataset/downloader/__init__.py
-Description: Dataset Downloader module entry point with UIModule pattern.
+Downloader Module - Data handling and processing for downloader
 
-This module provides the UIModule pattern API for the dataset downloader,
-including UI initialization, display, and component access.
+file_path: /Users/masdevid/Projects/smartcash/smartcash/ui/dataset/downloader/__init__.py
 """
 
-from typing import Dict, Any, Optional
+from .downloader_uimodule import DownloaderUIModule
+from .downloader_ui_factory import DownloaderUIFactory, create_downloader_display
 
-# Conditional import to avoid issues in non-Jupyter environments
-try:
-    from IPython.display import display
-except ImportError:
-    # Fallback for non-Jupyter environments
-    def display(obj):
-        print(obj)
-
-# Import UIModule components
-from smartcash.ui.dataset.downloader.downloader_uimodule import (
-    DownloaderUIModule,
-    create_downloader_uimodule,
-    get_downloader_uimodule,
-    reset_downloader_uimodule,
-    initialize_downloader_ui
-)
-
-
-def get_downloader_components(config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-    """Get downloader UI components.
+def initialize_downloader_ui(config=None, **kwargs):
+    """
+    Initialize and display the downloader UI.
     
     Args:
-        config: Optional configuration dictionary
+        config: Optional configuration dict
+        **kwargs: Additional arguments for UI initialization
         
     Returns:
-        Dictionary of UI components
+        The created UI module or None if failed
     """
-    module = create_downloader_uimodule(config=config, auto_initialize=True)
-    return getattr(module, 'get_ui_components', lambda: {})()
+    return DownloaderUIFactory.create_and_display_downloader(config=config, **kwargs)
 
-# Export public API
+# Export main classes and functions
 __all__ = [
-    # Core UIModule components
     'DownloaderUIModule',
-    'create_downloader_uimodule',
-    'get_downloader_uimodule',
-    'reset_downloader_uimodule',
+    'DownloaderUIFactory',
     'initialize_downloader_ui',
-    
-    # Helper functions
-    'get_downloader_components'
+    'create_downloader_display'
 ]

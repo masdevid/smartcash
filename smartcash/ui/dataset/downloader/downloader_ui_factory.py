@@ -1,46 +1,46 @@
 """
-Factory untuk membuat dan menampilkan modul UI Pretrained.
+Factory untuk membuat dan menampilkan modul UI Downloader.
 
 File ini menyediakan factory khusus untuk membuat dan menampilkan
-modul UI Pretrained menggunakan BaseUIModule dan UI Factory pattern.
+modul UI Downloader menggunakan BaseUIModule dan UI Factory pattern.
 """
 
 from typing import Dict, Any, Optional
 from smartcash.ui.core.ui_factory import UIFactory
-from smartcash.ui.model.pretrained.pretrained_uimodule import PretrainedUIModule
+from smartcash.ui.dataset.downloader.downloader_uimodule import DownloaderUIModule
 from smartcash.ui.logger import get_module_logger
 
 logger = get_module_logger(__name__)
 
-class PretrainedUIFactory(UIFactory):
+class DownloaderUIFactory(UIFactory):
     """
-    Factory untuk membuat dan menampilkan modul UI Pretrained.
+    Factory untuk membuat dan menampilkan modul UI Downloader.
     
     Kelas ini menyediakan method khusus untuk membuat dan menampilkan
-    modul UI Pretrained dengan konfigurasi default yang sesuai.
+    modul UI Downloader dengan konfigurasi default yang sesuai.
     """
     
     @classmethod
-    def create_pretrained_module(
+    def create_downloader_module(
         cls,
         config: Optional[Dict[str, Any]] = None,
         **kwargs
-    ) -> PretrainedUIModule:
+    ) -> DownloaderUIModule:
         """
-        Buat instance PretrainedUIModule dengan konfigurasi yang diberikan.
+        Buat instance DownloaderUIModule dengan konfigurasi yang diberikan.
         
         Args:
             config: Konfigurasi opsional untuk modul
             **kwargs: Argumen tambahan untuk inisialisasi modul
                 
         Returns:
-            Instance PretrainedUIModule yang sudah diinisialisasi
+            Instance DownloaderUIModule yang sudah diinisialisasi
         """
         try:
-            logger.debug(f"Membuat instance PretrainedUIModule")
+            logger.debug(f"Membuat instance DownloaderUIModule")
             
-            # Create instance directly since PretrainedUIModule handles its own initialization
-            module = PretrainedUIModule()
+            # Create instance directly since DownloaderUIModule handles its own initialization
+            module = DownloaderUIModule()
             
             # Initialize with config if provided
             if config is not None:
@@ -48,21 +48,21 @@ class PretrainedUIFactory(UIFactory):
             else:
                 module.initialize(**kwargs)
             
-            logger.debug(f"✅ Berhasil membuat instance PretrainedUIModule")
+            logger.debug(f"✅ Berhasil membuat instance DownloaderUIModule")
             return module
             
         except Exception as e:
-            logger.error(f"Gagal membuat PretrainedUIModule: {e}", exc_info=True)
+            logger.error(f"Gagal membuat DownloaderUIModule: {e}", exc_info=True)
             raise
     
     @classmethod
-    def create_and_display_pretrained(
+    def create_and_display_downloader(
         cls,
         config: Optional[Dict[str, Any]] = None,
         **kwargs
     ) -> Dict[str, Any]:
         """
-        Buat dan tampilkan modul Pretrained UI.
+        Buat dan tampilkan modul Downloader UI.
         
         Args:
             config: Konfigurasi opsional untuk modul
@@ -73,49 +73,49 @@ class PretrainedUIFactory(UIFactory):
             Dict berisi informasi modul atau error message
         """
         try:
-            logger.debug(f"Membuat dan menampilkan Pretrained UI")
+            logger.debug(f"Membuat dan menampilkan Downloader UI")
             
             # Get auto_display flag from kwargs (default to True if not specified)
             auto_display = kwargs.pop('auto_display', True)
             
             # Buat instance modul
-            module = cls.create_pretrained_module(config=config, **kwargs)
+            module = cls.create_downloader_module(config=config, **kwargs)
             
             # Display the UI if auto_display is True
             if auto_display:
-                logger.debug(f"Displaying Pretrained UI...")
+                logger.debug(f"Displaying Downloader UI...")
                 display_result = module.display_ui()
                 if not display_result.get('success', False):
                     error_msg = display_result.get('message', 'Gagal menampilkan UI')
                     logger.error(error_msg)
                     return {'success': False, 'message': error_msg}
-                logger.debug(f"✅ Pretrained UI displayed successfully")
+                logger.debug(f"✅ Downloader UI displayed successfully")
             else:
-                logger.debug(f"✅ Pretrained UI module created (auto-display disabled)")
+                logger.debug(f"✅ Downloader UI module created (auto-display disabled)")
             
             # Return the module to allow for more flexible usage
             return module
             
         except Exception as e:
-            error_msg = f"Gagal membuat dan menampilkan Pretrained UI: {str(e)}"
+            error_msg = f"Gagal membuat dan menampilkan Downloader UI: {str(e)}"
             logger.error(error_msg, exc_info=True)
             return {'success': False, 'message': error_msg}
 
 
-def create_pretrained_display(**kwargs) -> callable:
+def create_downloader_display(**kwargs) -> callable:
     """
-    Create a display function for the pretrained UI.
+    Create a display function for the downloader UI.
     
     This is a convenience function that returns a callable that can be used
-    to display the pretrained UI with the given configuration.
+    to display the downloader UI with the given configuration.
     
     Args:
-        **kwargs: Configuration options for the pretrained UI
+        **kwargs: Configuration options for the downloader UI
         
     Returns:
-        A callable that will display the pretrained UI when called
+        A callable that will display the downloader UI when called
     """
     def display_fn():
-        return PretrainedUIFactory.create_and_display_pretrained(**kwargs)
+        return DownloaderUIFactory.create_and_display_downloader(**kwargs)
     
     return display_fn

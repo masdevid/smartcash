@@ -1,19 +1,21 @@
 """
-File: smartcash/ui/model/__init__.py
-Deskripsi: Model UI module exports
+Model Module - Comprehensive model management for SmartCash
+
+This module provides interfaces for model management including training, evaluation,
+and backbone model integration.
+
+file_path: /Users/masdevid/Projects/smartcash/smartcash/ui/model/__init__.py
 """
+from . import pretrained
+from . import backbone
+from . import training
+from . import evaluation
 
-from .backbone import (
-    BackboneUIModule,
-    create_backbone_uimodule,
-    get_backbone_uimodule,
-    create_backbone_ui
-)
-
+# Export main classes and functions
 __all__ = [
-    # Backbone UIModule
-    'BackboneUIModule',
-    'create_backbone_uimodule',
-    'get_backbone_uimodule',
-    'create_backbone_ui'
+    # Core components
+    'pretrained',
+    'backbone',
+    'training',
+    'evaluation',
 ]

@@ -525,17 +525,3 @@ class VisualizationUIModule(BaseUIModule):
         # Update UI components based on current state
         pass
 
-
-# ==================== FACTORY FUNCTIONS ====================
-
-# Create standardized display function using enhanced factory
-initialize_visualization_ui = EnhancedUIModuleFactory.create_display_function(
-    VisualizationUIModule,
-    function_name='initialize_visualization_ui'
-)
-
-# Create component function for programmatic use
-get_visualization_component = EnhancedUIModuleFactory.create_component_function(
-    VisualizationUIModule,
-    function_name='get_visualization_component'
-)

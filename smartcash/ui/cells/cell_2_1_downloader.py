@@ -5,7 +5,6 @@ NOTE: Cell Code should remain minimal (import and run initializer only).
       Initializer should handle all the logic.
 """
 
-from smartcash.ui.dataset.downloader.downloader_uimodule import initialize_downloader_ui
-
-# Initialize and display the downloader UI
-initialize_downloader_ui(display=True)
+from smartcash.ui.dataset.downloader import create_downloader_display
+downloader = create_downloader_display()
+downloader()

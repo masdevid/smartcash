@@ -1,45 +1,18 @@
 """
-File: smartcash/ui/setup/__init__.py
-Deskripsi: Entry point untuk submodul `smartcash.ui.setup`.
+Setup Module - Environment and dependency setup for SmartCash
 
-Refaktor:
-    - Mengganti import eager menjadi lazy import untuk menghindari import berat
-      ketika hanya membutuhkan sebagian kecil fungsionalitas.
-    - Menyediakan fallback backward-compatibility melalui `__getattr__`.
+This module provides interfaces for setting up the SmartCash environment,
+including dependency management and Colab environment configuration.
+
+file_path: /Users/masdevid/Projects/smartcash/smartcash/ui/setup/__init__.py
 """
 
-from __future__ import annotations
+from . import colab
+from . import dependency
 
-import importlib
-from types import ModuleType
-from typing import Any
-
-# ---------------------------------------------------------------------------
-# Lazy Import Utilities
-# ---------------------------------------------------------------------------
-
-def _lazy_import(module_path: str) -> ModuleType:
-    """Import modul secara lazy dan kembalikan reference-nya."""
-    return importlib.import_module(module_path)
-
-
-# ---------------------------------------------------------------------------
-# Public Lazy Attributes
-# ---------------------------------------------------------------------------
-
-_lazy_attrs = {
-    "initialize_dependency_ui": "smartcash.ui.setup.dependency.initialize_dependency_ui",
-    "colab": "smartcash.ui.setup.colab",
-    "initialize_colab_ui": "smartcash.ui.setup.colab.initializer.initialize_colab_env_ui",
-}
-
-
-def __getattr__(name: str) -> Any:  # pragma: no cover
-    if name in _lazy_attrs:
-        module_path, func_name = _lazy_attrs[name].rsplit(".", 1)
-        module = _lazy_import(module_path)
-        return getattr(module, func_name)
-    raise AttributeError(f"module '{__name__}' has no attribute '{name}'")
-
-
-__all__: list[str] = list(_lazy_attrs.keys())
+# Export main classes and functions
+__all__ = [
+    # Submodules
+    'colab',
+    'dependency'
+]

@@ -129,41 +129,46 @@ def test_cell_execution(cell_name: str, cell_path: str):
         return False
 
 def test_direct_function_calls():
-    """Test calling the initialize functions directly"""
+    """Test calling the factory display functions directly"""
     
-    print("\\n🔬 Testing direct function calls...")
+    print("\n🔬 Testing direct function calls...")
     print("=" * 60)
     
     tests = [
-        ("Colab UI", "smartcash.ui.setup.colab.colab_initializer", "initialize_colab_ui"),
-        ("Dependency UI", "smartcash.ui.setup.dependency.dependency_initializer", "initialize_dependency_ui"),
-        ("Download UI", "smartcash.ui.dataset.downloader.downloader_initializer", "initialize_downloader_ui"),
-        ("Split UI", "smartcash.ui.dataset.split.split_initializer", "initialize_split_ui"),
-        ("Preprocess UI", "smartcash.ui.dataset.preprocess.preprocess_initializer", "initialize_preprocess_ui"),
-        ("Augment UI", "smartcash.ui.dataset.augment.augment_initializer", "initialize_augment_ui"),
-        ("Visualize UI", "smartcash.ui.dataset.visualization.visualization_initializer", "initialize_visualization_ui"),
-        ("Pretrained UI", "smartcash.ui.model.pretrained.pretrained_initializer", "initialize_pretrained_ui"),
-        ("Backbone UI", "smartcash.ui.model.backbone.backbone_initializer", "initialize_backbone_ui"),
-        ("Train UI", "smartcash.ui.model.train.training_initializer", "initialize_training_ui"),
-        ("Evaluate UI", "smartcash.ui.model.evaluate.evaluation_initializer", "initialize_evaluation_ui")
+        ("Colab UI", "smartcash.ui.setup.colab", "create_colab_display"),
+        ("Dependency UI", "smartcash.ui.setup.dependency", "create_dependency_display"),
+        ("Download UI", "smartcash.ui.dataset.downloader", "create_downloader_display"),
+        ("Split UI", "smartcash.ui.dataset.split", "create_split_display"),
+        ("Preprocess UI", "smartcash.ui.dataset.preprocessing", "create_preprocessing_display"),
+        ("Augment UI", "smartcash.ui.dataset.augmentation", "create_augmentation_display"),
+        ("Visualize UI", "smartcash.ui.dataset.visualization", "create_visualization_display"),
+        ("Pretrained UI", "smartcash.ui.model.pretrained", "create_pretrained_display"),
+        ("Backbone UI", "smartcash.ui.model.backbone", "create_backbone_display"),
+        ("Train UI", "smartcash.ui.model.training", "create_training_display"),
+        ("Evaluate UI", "smartcash.ui.model.evaluation", "create_evaluation_display")
     ]
     
     results = []
     
     for name, module_path, function_name in tests:
-        print(f"\\n📦 Testing {name}...")
+        print(f"\n📦 Testing {name}...")
         
         # Suppress early logging
         original_level, original_smartcash_level = suppress_early_logging()
         
         try:
             with capture_stdout_stderr() as (stdout_capture, stderr_capture):
-                # Import and call the function
+                # Import and call the factory function
                 module = __import__(module_path, fromlist=[function_name])
-                initialize_func = getattr(module, function_name)
+                create_display_func = getattr(module, function_name)
                 
-                # Call the function - should display UI, not return it
-                result = initialize_func()
+                # Create and call the display function
+                display_func = create_display_func()
+                if not callable(display_func):
+                    raise ValueError(f"{function_name}() did not return a callable")
+                
+                # Call the display function - should display UI
+                result = display_func()
                 
             # Restore logging
             restore_logging(original_level, original_smartcash_level)
@@ -172,6 +177,7 @@ def test_direct_function_calls():
             captured_stdout = stdout_capture.getvalue()
             captured_stderr = stderr_capture.getvalue()
             
+            print(f"   Display function: {function_name}")
             print(f"   Return value: {type(result)} - {'✅ None (good)' if result is None else '⚠️ Non-None'}")
             print(f"   Stdout: {len(captured_stdout)} chars")
             print(f"   Stderr: {len(captured_stderr)} chars")

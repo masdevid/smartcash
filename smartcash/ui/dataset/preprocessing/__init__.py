@@ -1,12 +1,29 @@
-# -*- coding: utf-8 -*-
 """
-:mod:`smartcash.ui.dataset.preprocessing`
+Preprocessing Module - Data handling and processing for preprocessing
 
-Package for the preprocessing module.
-
-This package contains the UI and logic for the data preprocessing module.
+file_path: /Users/masdevid/Projects/smartcash/smartcash/ui/dataset/preprocessing/__init__.py
 """
 
 from .preprocessing_uimodule import PreprocessingUIModule
+from .preprocessing_ui_factory import PreprocessingUIFactory, create_preprocessing_display
 
-__all__ = ["PreprocessingUIModule"]
+def initialize_preprocessing_ui(config=None, **kwargs):
+    """
+    Initialize and display the preprocessing UI.
+    
+    Args:
+        config: Optional configuration dict
+        **kwargs: Additional arguments for UI initialization
+        
+    Returns:
+        The created UI module or None if failed
+    """
+    return PreprocessingUIFactory.create_and_display_preprocessing(config=config, **kwargs)
+
+# Export main classes and functions
+__all__ = [
+    'PreprocessingUIModule',
+    'PreprocessingUIFactory',
+    'initialize_preprocessing_ui',
+    'create_preprocessing_display'
+]

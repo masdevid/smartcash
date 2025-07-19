@@ -3,11 +3,9 @@ Factory untuk membuat dan menampilkan modul UI Training.
 
 File ini menyediakan factory khusus untuk membuat dan menampilkan
 modul UI Training menggunakan BaseUIModule dan UI Factory pattern.
-
-file_path: /Users/masdevid/Projects/smartcash/smartcash/ui/model/training/training_ui_factory.py
 """
 
-from typing import Dict, Any, Optional, Callable
+from typing import Dict, Any, Optional
 from smartcash.ui.core.ui_factory import UIFactory
 from smartcash.ui.model.training.training_uimodule import TrainingUIModule
 from smartcash.ui.logger import get_module_logger
@@ -34,12 +32,12 @@ class TrainingUIFactory(UIFactory):
         Args:
             config: Konfigurasi opsional untuk modul
             **kwargs: Argumen tambahan untuk inisialisasi modul
-            
+                
         Returns:
             Instance TrainingUIModule yang sudah diinisialisasi
         """
         try:
-            logger.debug("Membuat instance TrainingUIModule")
+            logger.debug(f"Membuat instance TrainingUIModule")
             
             # Create instance directly since TrainingUIModule handles its own initialization
             module = TrainingUIModule()
@@ -50,7 +48,7 @@ class TrainingUIFactory(UIFactory):
             else:
                 module.initialize(**kwargs)
             
-            logger.debug("✅ Berhasil membuat instance TrainingUIModule")
+            logger.debug(f"✅ Berhasil membuat instance TrainingUIModule")
             return module
             
         except Exception as e:
@@ -70,12 +68,12 @@ class TrainingUIFactory(UIFactory):
             config: Konfigurasi opsional untuk modul
             **kwargs: Argumen tambahan untuk inisialisasi modul
                 - auto_display: Boolean, apakah akan menampilkan UI secara otomatis (default: True)
-            
+                
         Returns:
-            Dict berisi informasi modul atau None jika gagal
+            Dict berisi informasi modul atau error message
         """
         try:
-            logger.debug("Membuat dan menampilkan Training UI")
+            logger.debug(f"Membuat dan menampilkan Training UI")
             
             # Get auto_display flag from kwargs (default to True if not specified)
             auto_display = kwargs.pop('auto_display', True)
@@ -85,15 +83,15 @@ class TrainingUIFactory(UIFactory):
             
             # Display the UI if auto_display is True
             if auto_display:
-                logger.debug("Displaying Training UI...")
+                logger.debug(f"Displaying Training UI...")
                 display_result = module.display_ui()
                 if not display_result.get('success', False):
                     error_msg = display_result.get('message', 'Gagal menampilkan UI')
                     logger.error(error_msg)
                     return {'success': False, 'message': error_msg}
-                logger.debug("✅ Training UI displayed successfully")
+                logger.debug(f"✅ Training UI displayed successfully")
             else:
-                logger.debug("✅ Training UI module created (auto-display disabled)")
+                logger.debug(f"✅ Training UI module created (auto-display disabled)")
             
             # Return the module to allow for more flexible usage
             return module
@@ -104,20 +102,20 @@ class TrainingUIFactory(UIFactory):
             return {'success': False, 'message': error_msg}
 
 
-# Fungsi utilitas untuk kemudahan penggunaan
-def create_training_display(**kwargs) -> Callable[[Optional[Dict[str, Any]]], Dict[str, Any]]:
+def create_training_display(**kwargs) -> callable:
     """
-    Buat fungsi display untuk modul Training UI.
+    Create a display function for the training UI.
     
-    Contoh penggunaan:
-        from smartcash.ui.model.training import create_training_display
-        show_training = create_training_display()
-        show_training(config=my_config)
+    This is a convenience function that returns a callable that can be used
+    to display the training UI with the given configuration.
     
     Args:
-        **kwargs: Argumen tambahan untuk TrainingUIFactory.create_training_display
+        **kwargs: Configuration options for the training UI
         
     Returns:
-        Fungsi yang dapat dipanggil untuk menampilkan modul Training UI
+        A callable that will display the training UI when called
     """
-    return TrainingUIFactory.create_training_display(**kwargs)
+    def display_fn():
+        return TrainingUIFactory.create_and_display_training(**kwargs)
+    
+    return display_fn

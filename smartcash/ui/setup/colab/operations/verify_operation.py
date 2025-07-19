@@ -242,7 +242,7 @@ class VerifyOperation(BaseColabOperation):
                     os.remove(test_file)
                     write_access = True
                 except Exception as e:
-                    self.logger.warning(f"Failed to verify write access to {mydrive_path}: {str(e)}")
+                    self.log(f"Failed to verify write access to {mydrive_path}: {str(e)}", 'warning')
         
         return {
             'mounted': drive_mounted,
@@ -270,6 +270,6 @@ class VerifyOperation(BaseColabOperation):
             return self.format_system_info(env_info)
             
         except Exception as e:
-            self.logger.warning(f"Error getting enhanced system info: {str(e)}")
+            self.log(f"Error getting enhanced system info: {str(e)}", 'warning')
             return {'error': str(e)}
     

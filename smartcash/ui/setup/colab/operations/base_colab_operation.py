@@ -30,9 +30,6 @@ class BaseColabOperation(LoggingMixin, OperationMixin):
         # Initialize mixins
         super().__init__()
         
-        # Setup logger
-        self.logger = get_module_logger(f"smartcash.ui.setup.colab.operations.{operation_name}")
-        
         # Core operation state
         self.config = config
         self.operation_container = operation_container
@@ -45,17 +42,17 @@ class BaseColabOperation(LoggingMixin, OperationMixin):
         if operation_container:
             self._operation_container = operation_container
         
-        self.logger.debug(f"✅ {operation_name} initialized")
+        self.log(f"✅ {operation_name} initialized", 'debug')
     
     def initialize(self) -> None:
         """Initialize the operation."""
         operation_display_name = self.module_name.replace('_', ' ').title()
-        self.logger.info(f"🚀 Initializing {operation_display_name}")
+        self.log(f"🚀 Initializing {operation_display_name}", 'info')
         
         # Call subclass-specific initialization if needed
         self._initialize_operation()
         
-        self.logger.info(f"✅ {operation_display_name} initialization complete")
+        self.log(f"✅ {operation_display_name} initialization complete", 'info')
     
     def _initialize_operation(self) -> None:
         """Override in subclasses for specific initialization logic."""
@@ -106,7 +103,7 @@ class BaseColabOperation(LoggingMixin, OperationMixin):
             
             # Also log to the standard logger
             if hasattr(self, 'logger'):
-                self.logger.error(full_error_msg, exc_info=True)
+                self.log(full_error_msg, 'error', exc_info=True)
             
             # Return detailed error information
             return self.create_error_result(
@@ -168,12 +165,12 @@ class BaseColabOperation(LoggingMixin, OperationMixin):
                 else:
                     progress_callback(progress, message)
         except Exception as e:
-            self.logger.warning(f"Progress update failed: {e}")
+            self.log(f"Progress update failed: {e}", 'warning')
             # Try with just the basic callback as last resort
             try:
                 progress_callback(progress, message)
             except Exception as e2:
-                self.logger.warning(f"Fallback progress update also failed: {e2}")
+                self.log(f"Fallback progress update also failed: {e2}", 'warning')
     
     def create_success_result(self, message: str, **additional_data) -> Dict[str, Any]:
         """Create standardized success result.
@@ -227,9 +224,9 @@ class BaseColabOperation(LoggingMixin, OperationMixin):
         # Also log to the standard logger
         if hasattr(self, 'logger'):
             if 'traceback' in additional_data:
-                self.logger.error(f"Operasi gagal: {error}\n{additional_data['traceback']}")
+                self.log(f"Operasi gagal: {error}\n{additional_data['traceback']}", 'error')
             else:
-                self.logger.error(f"Operasi gagal: {error}")
+                self.log(f"Operasi gagal: {error}", 'error')
                 
         # Update progress tracker error state if available
         if hasattr(self, 'operation_container') and self.operation_container:
@@ -247,7 +244,7 @@ class BaseColabOperation(LoggingMixin, OperationMixin):
                     self.update_progress_safe(self.operation_container.get('update_progress'), 
                                           100, error_display)
             except Exception as e:
-                self.logger.warning(f"Failed to update progress tracker error state: {e}")
+                self.log(f"Failed to update progress tracker error state: {e}", 'warning')
         
         return result
     
@@ -268,7 +265,7 @@ class BaseColabOperation(LoggingMixin, OperationMixin):
             os.remove(test_file)
             return True
         except Exception as e:
-            self.logger.warning(f"Write access test failed for {directory_path}: {e}")
+            self.log(f"Write access test failed for {directory_path}: {e}", 'warning')
             return False
     
     def ensure_directory_exists(self, directory_path: str) -> bool:
@@ -283,10 +280,10 @@ class BaseColabOperation(LoggingMixin, OperationMixin):
         try:
             if not os.path.exists(directory_path):
                 os.makedirs(directory_path, exist_ok=True)
-                self.logger.info(f"📁 Created directory: {directory_path}")
+                self.log(f"📁 Created directory: {directory_path}", 'info')
             return True
         except Exception as e:
-            self.logger.error(f"❌ Failed to create directory {directory_path}: {e}")
+            self.log(f"❌ Failed to create directory {directory_path}: {e}", 'error')
             return False
     
     def get_environment_config(self) -> Dict[str, Any]:
@@ -327,7 +324,7 @@ class BaseColabOperation(LoggingMixin, OperationMixin):
         
         all_exist = len(missing_items) == 0
         
-        self.logger.info(f"✅ {len(existing_items)}/{len(items)} {item_type}s exist")
+        self.log(f"✅ {len(existing_items)}/{len(items)} {item_type}s exist", 'info')
         
         return {
             'all_exist': all_exist,
@@ -349,10 +346,10 @@ class BaseColabOperation(LoggingMixin, OperationMixin):
         """
         try:
             env_info = detect_environment_info(check_drive=check_drive)
-            self.logger.debug(f"Environment detected: {env_info.get('runtime', {}).get('type', 'unknown')}")
+            self.log(f"Environment detected: {env_info.get('runtime', {}).get('type', 'unknown')}", 'debug')
             return env_info
         except Exception as e:
-            self.logger.error(f"Environment detection failed: {e}")
+            self.log(f"Environment detection failed: {e}", 'error')
             return {
                 'runtime': {'type': 'unknown'},
                 'error': str(e)
@@ -436,13 +433,13 @@ class BaseColabOperation(LoggingMixin, OperationMixin):
                 if not os.path.exists(directory):
                     os.makedirs(directory, exist_ok=True)
                     created_dirs.append(directory)
-                    self.logger.info(f"📁 Created directory: {directory}")
+                    self.log(f"📁 Created directory: {directory}", 'info')
                 else:
                     created_dirs.append(directory)  # Already exists
                     
             except Exception as e:
                 failed_dirs.append(directory)
-                self.logger.error(f"❌ Failed to create directory {directory}: {e}")
+                self.log(f"❌ Failed to create directory {directory}: {e}", 'error')
         
         return created_dirs, failed_dirs
     
@@ -483,7 +480,7 @@ class BaseColabOperation(LoggingMixin, OperationMixin):
             elif not valid:
                 issues.append(f"Symlink invalid: {target}")
         
-        self.logger.info(f"✅ {valid_count}/{len(symlink_map)} symlinks verified")
+        self.log(f"✅ {valid_count}/{len(symlink_map)} symlinks verified", 'info')
         
         return {
             'symlink_status': symlink_status,
@@ -528,7 +525,7 @@ class BaseColabOperation(LoggingMixin, OperationMixin):
             elif 'ROOT' in var and not valid_path:
                 issues.append(f"Environment variable path invalid: {var} = {value}")
         
-        self.logger.info(f"✅ Environment variables verified")
+        self.log("✅ Environment variables verified", 'info')
         
         return {
             'env_vars_status': env_vars_status,
@@ -563,9 +560,9 @@ class BaseColabOperation(LoggingMixin, OperationMixin):
                 f.write('test')
             os.remove(test_file)
             write_access = True
-            self.logger.info(f"✅ Drive write access verified: {drive_path}")
+            self.log(f"✅ Drive write access verified: {drive_path}", 'info')
         except Exception as e:
-            self.logger.warning(f"⚠️ Drive write access limited: {e}")
+            self.log(f"⚠️ Drive write access limited: {e}", 'warning')
         
         return {
             'accessible': os.path.exists(drive_path),

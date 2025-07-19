@@ -92,7 +92,7 @@ class ColabOperationFactory:
             import traceback
             error_traceback = traceback.format_exc()
             error_msg = f"Failed to execute {operation_type}.{method_name}: {e}\n\nTraceback:\n{error_traceback}"
-            self.logger.error(error_msg)
+            self.log(error_msg, 'error')
             return {
                 'success': False, 
                 'error': str(e),

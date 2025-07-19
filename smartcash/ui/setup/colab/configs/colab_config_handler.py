@@ -39,7 +39,8 @@ class ColabConfigHandler(LoggingMixin, ConfigurationMixin):
         self.parent_module = 'setup'
         
         # Initialize with default config
-        self.config = get_default_colab_config()
+        self._config = get_default_colab_config()
+        self.config = self._config  # Keep backwards compatibility
         
         # Initialize colab-specific data
         self._available_environments = get_available_environments()
@@ -62,13 +63,7 @@ class ColabConfigHandler(LoggingMixin, ConfigurationMixin):
             handler.update_config(config)
         return handler
     
-    def get_config(self) -> Dict[str, Any]:
-        """Get current configuration.
-        
-        Returns:
-            Current configuration dictionary
-        """
-        return self.config
+    # get_config() is provided by ConfigurationMixin
     
     def extract_config_from_ui(self) -> Dict[str, Any]:
         """Extract configuration from UI components (required by ConfigurationMixin).
@@ -80,55 +75,17 @@ class ColabConfigHandler(LoggingMixin, ConfigurationMixin):
             Current configuration dictionary
         """
         # For Colab, we use in-memory configuration
-        return self.config.copy()
+        return self._config.copy()
     
-    def save_config(self) -> Dict[str, Any]:
-        """Save configuration (required by BaseUIModule).
-        
-        For Colab module, configuration is kept in-memory only and doesn't
-        need to be persisted to files.
-        
-        Returns:
-            Success result dictionary
-        """
-        try:
-            # For Colab, we don't save to files - configuration is ephemeral
-            result = {
-                'success': True,
-                'message': 'Konfigurasi disimpan dalam memori (tidak perlu persistensi untuk Colab)'
-            }
-            
-            self.log("✅ Konfigurasi Colab disimpan", 'info')
-            
-            return result
-            
-        except Exception as e:
-            error_msg = f"Gagal menyimpan konfigurasi Colab: {str(e)}"
-            self.log(f"❌ {error_msg}", 'error')
-            return {
-                'success': False,
-                'message': error_msg
-            }
+    # save_config() is provided by ConfigurationMixin
     
-    def update_config(self, new_config: Dict[str, Any], merge: bool = True) -> None:
-        """Update configuration with new values.
+    def update_config(self, config: Dict[str, Any]) -> None:
+        """Update configuration with deep merge.
         
         Args:
-            new_config: Dictionary containing new configuration values
-            merge: If True, merge with existing config. If False, replace entire config.
+            config: New configuration to merge
         """
-        try:
-            if merge:
-                # Deep merge with existing config
-                self._deep_merge(self.config, new_config)
-            else:
-                # Replace entire config
-                self.config = new_config
-                
-            self.logger.debug(f"✅ Configuration updated")
-            
-        except Exception as e:
-            self.logger.error(f"❌ Failed to update configuration: {e}")
+        self._deep_merge(self._config, config)
     
     def _deep_merge(self, target: Dict[str, Any], source: Dict[str, Any]) -> None:
         """Deep merge source dict into target dict."""
@@ -184,7 +141,10 @@ class ColabConfigHandler(LoggingMixin, ConfigurationMixin):
             Dict with operation result
         """
         try:
-            self.config = get_default_colab_config()
+            # Call parent's reset_config first
+            result = super().reset_config()
+            
+            # Additional reset logic specific to Colab
             self._detect_environment()  # Re-detect environment after reset
             
             self.log_with_status(
@@ -194,11 +154,7 @@ class ColabConfigHandler(LoggingMixin, ConfigurationMixin):
                 status_level='success'
             )
             
-            return {
-                'success': True,
-                'message': 'Configuration reset to defaults',
-                'config': self.config
-            }
+            return result
             
         except Exception as e:
             error_msg = f"Gagal mereset konfigurasi Colab: {str(e)}"

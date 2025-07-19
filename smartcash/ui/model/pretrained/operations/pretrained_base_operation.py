@@ -6,9 +6,11 @@ from abc import ABC, abstractmethod
 from typing import Dict, Any
 import os
 from smartcash.ui.model.pretrained.constants import EXPECTED_FILE_SIZES, PretrainedModelType
+from smartcash.ui.core.mixins.logging_mixin import LoggingMixin
+from smartcash.ui.core.mixins.operation_mixin import OperationMixin
 
 
-class PretrainedBaseOperation(ABC):
+class PretrainedBaseOperation(OperationMixin, LoggingMixin, ABC):
     """Base class for all pretrained model operations."""
     
     def __init__(self, ui_components: Dict[str, Any], config: Dict[str, Any]):
@@ -22,15 +24,7 @@ class PretrainedBaseOperation(ABC):
         self.config = config
         self.models_dir = config.get('models_dir', '/data/pretrained')
         
-    def log(self, message: str, level: str = 'info'):
-        """Log a message using the operation container."""
-        try:
-            operation_container = self.ui_components.get('operation_container')
-            if operation_container and hasattr(operation_container, 'log'):
-                operation_container.log(message, level)
-        except Exception:
-            # Fallback to print if logging fails
-            print(f"[{level.upper()}] {message}")
+    # Logging is now handled by LoggingMixin
     
     @abstractmethod
     def execute_operation(self) -> Dict[str, Any]:

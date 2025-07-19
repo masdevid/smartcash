@@ -6,12 +6,13 @@ from abc import ABC, abstractmethod
 from typing import Any, Callable, Dict, Optional, TYPE_CHECKING
 
 from smartcash.ui.core.mixins.operation_mixin import OperationMixin
+from smartcash.ui.core.mixins.logging_mixin import LoggingMixin
 
 if TYPE_CHECKING:
     from smartcash.ui.model.backbone.backbone_uimodule import BackboneUIModule
 
 
-class BaseBackboneOperation(OperationMixin, ABC):
+class BaseBackboneOperation(OperationMixin, LoggingMixin, ABC):
     """
     Abstract base class for backbone operation handlers.
 

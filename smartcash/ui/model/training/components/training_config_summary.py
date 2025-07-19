@@ -23,8 +23,6 @@ def create_config_summary(config: Dict[str, Any]) -> widgets.Widget:
     try:
         if not isinstance(config, dict):
             raise ValueError(f"Expected config to be a dictionary, got {type(config).__name__}")
-            
-        logger.debug(f"Creating config summary with config keys: {list(config.keys())}")
         
         training_config = config.get('training', {})
         model_selection = config.get('model_selection', {})

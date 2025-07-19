@@ -16,9 +16,9 @@ def initialize_visualization_ui(config=None, **kwargs):
         **kwargs: Additional arguments for UI initialization
         
     Returns:
-        The created UI module or None if failed
+        None (displays the UI using IPython.display)
     """
-    return VisualizationUIFactory.create_and_display_visualization(config=config, **kwargs)
+    VisualizationUIFactory.create_and_display_visualization(config=config, **kwargs)
 
 # Export main classes and functions
 __all__ = [

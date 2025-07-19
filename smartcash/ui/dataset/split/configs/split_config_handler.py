@@ -4,12 +4,13 @@ Description: Configuration handler for split module following UIModule pattern
 """
 
 from typing import Dict, Any, Optional
-from smartcash.ui.core.handlers.config_handler import ConfigurableHandler
 from smartcash.ui.logger import get_module_logger
+from smartcash.ui.core.mixins.configuration_mixin import ConfigurationMixin
+from smartcash.ui.core.mixins.logging_mixin import LoggingMixin
 from .split_defaults import get_default_split_config, VALIDATION_RULES
 
 
-class SplitConfigHandler(ConfigurableHandler):
+class SplitConfigHandler(LoggingMixin, ConfigurationMixin):
     """
     Configuration handler for split module.
     
@@ -28,18 +29,26 @@ class SplitConfigHandler(ConfigurableHandler):
         Args:
             config: Optional initial configuration
         """
-        super().__init__(
-            module_name='split',
-            default_config=get_default_split_config()
-        )
+        # Initialize mixins
+        LoggingMixin.__init__(self)
+        ConfigurationMixin.__init__(self)
         
-        self.logger = get_module_logger("smartcash.ui.dataset.split.config")
+        # Set up logger
+        self.logger = get_module_logger("smartcash.ui.dataset.split.configs")
+        
+        # Initialize configuration
+        self.module_name = 'split'
+        self.parent_module = 'dataset'
+        
+        # Load default configuration
+        self._default_config = get_default_split_config()
+        self._config = self._default_config.copy()
         self._validation_rules = VALIDATION_RULES
         self._ui_components = None  # Will be set by the module
         
-        # Load initial configuration
+        # Update with provided config if any (avoid calling _initialize_config_handler to prevent recursion)
         if config:
-            self.update_config(config)
+            self._config.update(config)  # Use simple dict update to avoid recursion
     
     def set_ui_components(self, ui_components: Dict[str, Any]) -> None:
         """Set UI components for config extraction and updates."""
@@ -271,3 +280,13 @@ class SplitConfigHandler(ConfigurableHandler):
                 widget.value = value
         except Exception as e:
             self.logger.debug(f"Could not set {widget_name} value: {e}")
+    
+    # ==================== ABSTRACT METHOD IMPLEMENTATIONS ====================
+    
+    def get_default_config(self) -> Dict[str, Any]:
+        """Get default configuration for split module."""
+        return get_default_split_config()
+    
+    def create_config_handler(self, config: Dict[str, Any]) -> 'SplitConfigHandler':
+        """Create config handler instance for split module."""
+        return SplitConfigHandler(config)

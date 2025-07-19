@@ -5,13 +5,14 @@ Description: Base class for training operation handlers.
 from abc import ABC, abstractmethod
 from typing import Any, Callable, Dict, Optional, TYPE_CHECKING
 
+from smartcash.ui.core.mixins.logging_mixin import LoggingMixin
 from smartcash.ui.core.mixins.operation_mixin import OperationMixin
 
 if TYPE_CHECKING:
     from smartcash.ui.model.training.training_uimodule import TrainingUIModule
 
 
-class BaseTrainingOperation(OperationMixin, ABC):
+class BaseTrainingOperation(OperationMixin, LoggingMixin, ABC):
     """
     Abstract base class for training operation handlers.
 

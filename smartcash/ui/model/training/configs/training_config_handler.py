@@ -5,6 +5,8 @@ Configuration handler for training module using BaseUIModule pattern.
 
 from typing import Dict, Any, Optional, List
 from smartcash.ui.logger import get_module_logger
+from smartcash.ui.core.mixins.configuration_mixin import ConfigurationMixin
+from smartcash.ui.core.mixins.logging_mixin import LoggingMixin
 from .training_defaults import (
     get_default_training_config, 
     get_available_optimizers, 
@@ -13,7 +15,7 @@ from .training_defaults import (
 )
 
 
-class TrainingConfigHandler:
+class TrainingConfigHandler(LoggingMixin, ConfigurationMixin):
     """
     Configuration handler for training module using BaseUIModule pattern.
     
@@ -32,16 +34,28 @@ class TrainingConfigHandler:
         Args:
             config: Optional initial configuration
         """
+        # Initialize mixins
+        LoggingMixin.__init__(self)
+        ConfigurationMixin.__init__(self)
+        
+        # Set up logger
         self.logger = get_module_logger("smartcash.ui.model.training.configs")
         
-        # Set configuration namespace
+        # Initialize configuration
         self.module_name = 'training'
         self.parent_module = 'model'
         
-        # Initialize with default or provided config
-        self._config = config or get_default_training_config()
+        # Load default configuration
+        self._default_config = get_default_training_config()
+        self._config = self._default_config.copy()
+        
+        # Initialize available options
         self.available_optimizers = get_available_optimizers()
         self.available_schedulers = get_available_schedulers()
+        
+        # Update with provided config if any (avoid _initialize_config_handler to prevent recursion)
+        if config:
+            self._config.update(config)  # Use simple dict update to avoid recursion
         
         # Config sections that require UI synchronization
         self.ui_sync_sections = ['training', 'model_selection', 'monitoring', 'charts', 'ui']
@@ -327,3 +341,9 @@ class TrainingConfigHandler:
             error_msg = f"Failed to select model from backbone: {e}"
             self.logger.error(error_msg)
             return {'success': False, 'message': error_msg}
+    
+    # ==================== ABSTRACT METHOD IMPLEMENTATIONS ====================
+    
+    def create_config_handler(self, config: Dict[str, Any]) -> 'TrainingConfigHandler':
+        """Create config handler instance for training module."""
+        return TrainingConfigHandler(config)

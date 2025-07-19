@@ -16,9 +16,9 @@ def initialize_preprocessing_ui(config=None, **kwargs):
         **kwargs: Additional arguments for UI initialization
         
     Returns:
-        The created UI module or None if failed
+        None (displays the UI using IPython.display)
     """
-    return PreprocessingUIFactory.create_and_display_preprocessing(config=config, **kwargs)
+    PreprocessingUIFactory.create_and_display_preprocessing(config=config, **kwargs)
 
 # Export main classes and functions
 __all__ = [

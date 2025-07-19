@@ -9,9 +9,11 @@ without persistence capabilities.
 from typing import Dict, Any, Optional, List
 from dataclasses import asdict
 from smartcash.common.logger import get_module_logger
+from smartcash.ui.core.mixins.configuration_mixin import ConfigurationMixin
+from smartcash.ui.core.mixins.logging_mixin import LoggingMixin
 from .visualization_defaults import DEFAULT_CONFIG
 
-class VisualizationConfigHandler:
+class VisualizationConfigHandler(LoggingMixin, ConfigurationMixin):
     """Simple configuration handler for visualization settings.
     
     This handler manages configuration for the visualization module with
@@ -20,15 +22,28 @@ class VisualizationConfigHandler:
     
     def __init__(self, config: Optional[Dict[str, Any]] = None):
         """Initialize with optional configuration overrides."""
+        # Initialize mixins
+        LoggingMixin.__init__(self)
+        ConfigurationMixin.__init__(self)
+        
+        # Set up logger
         self.logger = get_module_logger("smartcash.ui.dataset.visualization.config")
+        
+        # Initialize configuration
+        self.module_name = 'visualization'
+        self.parent_module = 'dataset'
         
         # Convert defaults to dict if needed
         self._defaults = self._convert_to_dict(DEFAULT_CONFIG)
+        self._default_config = self._defaults
         
         # Initialize with provided config or defaults
         initial_config = config if config is not None else {}
         self._config = self._initialize_config(initial_config)
-    
+        
+        # Initialize validation rules
+        self._validation_rules = self._get_validation_rules()
+        
     def _convert_to_dict(self, obj) -> Dict[str, Any]:
         """Convert an object to a dictionary if it's not already one."""
         if isinstance(obj, dict):
@@ -94,3 +109,24 @@ class VisualizationConfigHandler:
     def __repr__(self) -> str:
         """Technical string representation."""
         return f"{self.__class__.__name__}(config={self._config})"
+    
+    # ==================== ABSTRACT METHOD IMPLEMENTATIONS ====================
+    
+    def get_default_config(self) -> Dict[str, Any]:
+        """Get default configuration for visualization module."""
+        return self._defaults.copy()
+    
+    def create_config_handler(self, config: Dict[str, Any]) -> 'VisualizationConfigHandler':
+        """Create config handler instance for visualization module."""
+        return VisualizationConfigHandler(config)
+    
+    def _get_validation_rules(self) -> Dict[str, Any]:
+        """Get validation rules for configuration."""
+        return {
+            'figsize_width': {'type': (int, float), 'min': 1, 'max': 50},
+            'figsize_height': {'type': (int, float), 'min': 1, 'max': 50},
+            'plot_limit': {'type': int, 'min': 1, 'max': 1000},
+            'save_plots': {'type': bool},
+            'plot_format': {'type': str, 'choices': ['png', 'jpg', 'svg', 'pdf']},
+            'show_progress': {'type': bool}
+        }

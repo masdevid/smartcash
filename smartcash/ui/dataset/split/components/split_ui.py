@@ -253,6 +253,7 @@ def create_split_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> Dict[s
         'header_container': header,
         'main_container': main_container.container,  # Use the actual widget, not the MainContainer object
         'container': main_container.container,  # For backward compatibility
+        'ui': main_container.container,  # Add 'ui' key for display mixin compatibility
         
         # UI Components
         'summary_content': summary_content,

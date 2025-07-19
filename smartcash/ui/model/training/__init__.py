@@ -16,9 +16,9 @@ def initialize_training_ui(config=None, **kwargs):
         **kwargs: Additional arguments for UI initialization
         
     Returns:
-        The created UI module or None if failed
+        None (displays the UI using IPython.display)
     """
-    return TrainingUIFactory.create_and_display_training(config=config, **kwargs)
+    TrainingUIFactory.create_and_display_training(config=config, **kwargs)
 
 # Export main classes and functions
 __all__ = [

@@ -5,11 +5,13 @@ Configuration handler for backbone module using BaseUIModule pattern (simplified
 
 from typing import Dict, Any, Optional, List
 from smartcash.ui.logger import get_module_logger
+from smartcash.ui.core.mixins.configuration_mixin import ConfigurationMixin
+from smartcash.ui.core.mixins.logging_mixin import LoggingMixin
 from .backbone_defaults import get_default_backbone_config, get_available_backbones
 from ..constants import VALIDATION_CONFIG, BackboneType
 
 
-class BackboneConfigHandler:
+class BackboneConfigHandler(LoggingMixin, ConfigurationMixin):
     """
     Configuration handler for backbone module using BaseUIModule pattern.
     
@@ -28,15 +30,26 @@ class BackboneConfigHandler:
         Args:
             config: Optional initial configuration
         """
-        self.logger = get_module_logger("smartcash.ui.model.backbone.configs")
+        # Initialize mixins
+        LoggingMixin.__init__(self)
+        ConfigurationMixin.__init__(self)
         
-        # Set configuration namespace
+        # Set up logger
+        self.logger = get_module_logger("smartcash.ui.model.backbone.config")
+        
+        # Initialize configuration
         self.module_name = 'backbone'
         self.parent_module = 'model'
         
-        # Initialize with default or provided config
-        self._config = config or get_default_backbone_config()
-        self.available_backbones = get_available_backbones()
+        # Load default config
+        self._default_config = get_default_backbone_config()
+        self._config = self._default_config.copy()
+        self._available_backbones = get_available_backbones()
+        self.available_backbones = self._available_backbones
+        
+        # Update with provided config if any (avoid _initialize_config_handler to prevent recursion)
+        if config:
+            self._config.update(config)  # Use simple dict update to avoid recursion
         
         # Config sections that require UI synchronization
         self.ui_sync_sections = ['backbone', 'model', 'ui']
@@ -258,3 +271,9 @@ class BackboneConfigHandler:
             errors.append(f"Validation error: {str(e)}")
         
         return errors
+    
+    # ==================== ABSTRACT METHOD IMPLEMENTATIONS ====================
+    
+    def create_config_handler(self, config: Dict[str, Any]) -> 'BackboneConfigHandler':
+        """Create config handler instance for backbone module."""
+        return BackboneConfigHandler(config)

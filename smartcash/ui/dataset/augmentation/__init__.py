@@ -16,9 +16,9 @@ def initialize_augmentation_ui(config=None, **kwargs):
         **kwargs: Additional arguments for UI initialization
         
     Returns:
-        The created UI module or None if failed
+        None (displays the UI using IPython.display)
     """
-    return AugmentationUIFactory.create_and_display_augmentation(config=config, **kwargs)
+    AugmentationUIFactory.create_and_display_augmentation(config=config, **kwargs)
 
 # Export main classes and functions
 __all__ = [

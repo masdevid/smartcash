@@ -16,9 +16,9 @@ def initialize_dependency_ui(config=None, **kwargs):
         **kwargs: Additional arguments for UI initialization
         
     Returns:
-        The created UI module or None if failed
+        None (displays the UI using IPython.display)
     """
-    return DependencyUIFactory.create_and_display_dependency(config=config, **kwargs)
+    DependencyUIFactory.create_and_display_dependency(config=config, **kwargs)
 
 # Export main classes and functions
 __all__ = [

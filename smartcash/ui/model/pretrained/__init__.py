@@ -16,9 +16,9 @@ def initialize_pretrained_ui(config=None, **kwargs):
         **kwargs: Additional arguments for UI initialization
         
     Returns:
-        The created UI module or None if failed
+        None (displays the UI using IPython.display)
     """
-    return PretrainedUIFactory.create_and_display_pretrained(config=config, **kwargs)
+    PretrainedUIFactory.create_and_display_pretrained(config=config, **kwargs)
 
 # Export main classes and functions
 __all__ = [

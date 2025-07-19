@@ -60,7 +60,7 @@ class SplitUIFactory(UIFactory):
         cls,
         config: Optional[Dict[str, Any]] = None,
         **kwargs
-    ) -> Dict[str, Any]:
+    ) -> None:
         """
         Buat dan tampilkan modul Split UI.
         
@@ -70,7 +70,7 @@ class SplitUIFactory(UIFactory):
                 - auto_display: Boolean, apakah akan menampilkan UI secara otomatis (default: True)
                 
         Returns:
-            Dict berisi informasi modul atau error message
+            None (displays the UI using IPython.display)
         """
         try:
             logger.debug(f"Membuat dan menampilkan Split UI")
@@ -88,18 +88,20 @@ class SplitUIFactory(UIFactory):
                 if not display_result.get('success', False):
                     error_msg = display_result.get('message', 'Gagal menampilkan UI')
                     logger.error(error_msg)
-                    return {'success': False, 'message': error_msg}
+                    raise RuntimeError(error_msg)
                 logger.debug(f"✅ Split UI displayed successfully")
             else:
                 logger.debug(f"✅ Split UI module created (auto-display disabled)")
             
-            # Return the module to allow for more flexible usage
-            return module
+            # Use IPython.display.display() instead of returning the module
+            from IPython.display import display
+            display(module)
+            return None
             
         except Exception as e:
             error_msg = f"Gagal membuat dan menampilkan Split UI: {str(e)}"
             logger.error(error_msg, exc_info=True)
-            return {'success': False, 'message': error_msg}
+            raise
 
 
 def create_split_display(**kwargs) -> callable:
@@ -116,6 +118,7 @@ def create_split_display(**kwargs) -> callable:
         A callable that will display the split UI when called
     """
     def display_fn():
-        return SplitUIFactory.create_and_display_split(**kwargs)
+        SplitUIFactory.create_and_display_split(**kwargs)
+        return None
     
     return display_fn

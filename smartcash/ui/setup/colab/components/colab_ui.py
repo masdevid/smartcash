@@ -143,8 +143,9 @@ def _create_colab_ui_components(config: Dict[str, Any]) -> Tuple[Dict[str, Any],
     
     # Update component references
     ui_components.update({
-        'main_container': main_container,
+        'main_container': main_container.container,  # Use the actual widget, not the MainContainer object
         'main_layout': main_container.container,
+        'ui': main_container.container,  # Add 'ui' key for display mixin compatibility
         'summary_container': summary_container  # Keep reference to summary container
     })
     

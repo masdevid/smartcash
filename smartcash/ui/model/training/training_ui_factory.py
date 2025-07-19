@@ -83,16 +83,19 @@ class TrainingUIFactory(UIFactory):
             # Buat instance modul
             module = cls.create_training_module(config=config, **kwargs)
             
-            # Let the module handle its own display logic
+            # Display the UI if auto_display is True
             if auto_display:
-                # Just get the main container without displaying it here
-                # The module will handle display through its own display_ui method
-                logger.debug("✅ Training UI module created and ready for display")
+                logger.debug("Displaying Training UI...")
+                display_result = module.display_ui()
+                if not display_result.get('success', False):
+                    error_msg = display_result.get('message', 'Gagal menampilkan UI')
+                    logger.error(error_msg)
+                    return {'success': False, 'message': error_msg}
+                logger.debug("✅ Training UI displayed successfully")
             else:
                 logger.debug("✅ Training UI module created (auto-display disabled)")
             
-            # Return the module itself to allow for more flexible usage
-            # The caller can choose to display it or access components directly
+            # Return the module to allow for more flexible usage
             return module
             
         except Exception as e:

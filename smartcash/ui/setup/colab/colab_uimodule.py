@@ -563,8 +563,9 @@ class ColabUIModule(BaseUIModule):
     
     def _handle_mount_drive(self, button=None) -> Dict[str, Any]:  # noqa: ARG002
         """Handle Google Drive mounting using factory pattern."""
-        def post_success_callback(result):  # noqa: ARG001
-            if self._environment_manager:
+        def post_success_callback(result):
+            # Use result parameter to avoid unused variable warning
+            if result and self._environment_manager:
                 self._environment_paths = get_paths_for_environment(is_colab=True, is_drive_mounted=True)
         
         return self._execute_factory_operation(

@@ -42,9 +42,6 @@ class PreprocessingUIModule(BaseUIModule):
             enable_environment=enable_environment
         )
         
-        # Initialize log buffer for pre-operation-container logs
-        self._log_buffer = []
-        
         # Operation container reference for logging
         self._operation_container = None
         
@@ -84,35 +81,6 @@ class PreprocessingUIModule(BaseUIModule):
         handlers.update(preprocessing_handlers)
         return handlers
         
-    def _setup_operation_container(self) -> bool:
-        """
-        Set up the operation container for the module.
-        
-        Returns:
-            bool: True if setup was successful, False otherwise
-        """
-        try:
-            # Get the operation container from UI components
-            if not hasattr(self, '_ui_components') or not self._ui_components:
-                self.logger.error("UI components not available for operation container setup")
-                return False
-                
-            # Store reference to operation container
-            self._operation_container = self._ui_components.get('operation_container')
-            
-            if not self._operation_container:
-                self.logger.warning("Operation container not found in UI components")
-                return False
-                
-            # Flush any buffered logs to the operation container
-            self._flush_log_buffer()
-            
-            self.logger.debug("✅ Operation container setup complete")
-            return True
-            
-        except Exception as e:
-            self.logger.error(f"Failed to setup operation container: {e}", exc_info=True)
-            return False
 
     @suppress_ui_init_logs(duration=3.0)
     def initialize(self, config: Optional[Dict[str, Any]] = None, **kwargs) -> bool:
@@ -139,13 +107,14 @@ class PreprocessingUIModule(BaseUIModule):
                 if self._config_handler and hasattr(self._config_handler, 'set_ui_components'):
                     self._config_handler.set_ui_components(self._ui_components)
                 
-                # Setup operation container reference for logging
-                self._setup_operation_container()
+                # Set operation container reference for operation handlers 
+                operation_container = self._ui_components.get('operation_container')
+                if isinstance(operation_container, dict):
+                    self._operation_container = operation_container.get('container') or operation_container
+                else:
+                    self._operation_container = operation_container
                 
                 # Button handlers are already set up by the base class
-                
-                # Flush any buffered logs to operation container
-                self._flush_log_buffer()
                 
                 # Log initialization completion (Operation Checklist 3.2)
                 self.log("🧹 Preprocessing module siap digunakan", 'info')
@@ -406,29 +375,6 @@ class PreprocessingUIModule(BaseUIModule):
         except Exception as e:
             return {'success': False, 'message': f"Error in cleanup operation: {e}"}
 
-    def _flush_log_buffer(self) -> None:
-        """Flush buffered logs to operation container."""
-        try:
-            if not hasattr(self, '_log_buffer') or not self._log_buffer:
-                return
-                
-            # Ensure operation container is available
-            if not hasattr(self, '_operation_container') or not self._operation_container:
-                self.logger.warning("⚠️ Operation container not available for log buffer flush")
-                return
-            
-            # Flush all buffered logs
-            for log_entry in self._log_buffer:
-                message, level = log_entry
-                self.log(message, level)
-            
-            # Clear the buffer after flushing
-            buffered_logs = len(self._log_buffer)
-            self._log_buffer.clear()
-            self.logger.debug(f"✅ Flushed {buffered_logs} logs to operation container")
-            
-        except Exception as e:
-            self.logger.error(f"Failed to flush log buffer: {e}")
 
 
 # ==================== MODULE INITIALIZATION ====================

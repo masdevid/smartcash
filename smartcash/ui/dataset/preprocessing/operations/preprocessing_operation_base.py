@@ -36,6 +36,29 @@ class BasePreprocessingOperation(OperationMixin, ABC):
 
         self.config = config
         self.callbacks = callbacks or {}
+        
+        # Set up direct reference to operation container for consistent logging
+        self._operation_container = ui_module._operation_container
+
+    def log_operation(self, message: str, level: str = "info") -> None:
+        """
+        Override OperationMixin's log_operation to use UI module's logging system directly.
+        
+        This ensures logs appear in the operation container without duplication.
+        
+        Args:
+            message: Log message
+            level: Log level (info, warning, error, success)
+        """
+        try:
+            # Use the UI module's log method directly to avoid duplication
+            if hasattr(self._ui_module, 'log'):
+                self._ui_module.log(message, level)
+            else:
+                # Fallback to logger
+                getattr(self.logger, level, self.logger.info)(message)
+        except Exception as e:
+            self.logger.debug(f"Failed to log operation message: {e}")
 
     def _get_callback(self, name: str) -> Optional[Callable]:
         """Safely retrieves a callback by name."""

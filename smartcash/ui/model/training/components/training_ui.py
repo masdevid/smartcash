@@ -176,7 +176,7 @@ def create_training_ui(config: Dict[str, Any]) -> Dict[str, Any]:
         
         # Prepare UI components dictionary
         ui_components = {
-            'main_container': main_container,  # main_container is already the VBox widget
+            'main_container': main_container,
             'header_container': header_container,
             'form_container': form_container,
             'action_container': action_container_result,  # Store full result for button access

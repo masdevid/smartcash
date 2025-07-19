@@ -47,110 +47,82 @@ def create_config_summary(config: Dict[str, Any]) -> widgets.Widget:
         def format_bool(value):
             return "✅ Enabled" if value else "❌ Disabled"
         
-        # Model configuration summary
-        model_info = f"""
-        <div style="background: #e3f2fd; padding: 12px; border-radius: 6px; margin-bottom: 10px;">
-            <h5 style="margin: 0 0 8px 0; color: #1976d2;">🏗️ Model Configuration</h5>
-            <div style="font-size: 13px; color: #424242;">
-                <strong>Source:</strong> {html.escape(str(model_selection.get('source', 'backbone')))} |
-                <strong>Backbone:</strong> {html.escape(str(model_selection.get('backbone_type', 'Not Selected')))} |
-                <strong>Classes:</strong> {model_selection.get('num_classes', 7)} |
-                <strong>Input Size:</strong> {model_selection.get('input_size', 640)}px
+        # Create 4-column card layout for configuration summary
+        model_card = f"""
+        <div style="flex: 1; background: #e3f2fd; padding: 16px; border-radius: 8px; margin: 5px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); min-width: 200px;">
+            <div style="text-align: center; margin-bottom: 12px;">
+                <div style="font-size: 24px; margin-bottom: 4px;">🏗️</div>
+                <h5 style="margin: 0; color: #1976d2; font-size: 14px; font-weight: 600;">Model Configuration</h5>
             </div>
-            {f'<div style="font-size: 12px; color: #666; margin-top: 4px;"><strong>Checkpoint:</strong> {html.escape(str(model_selection.get("checkpoint_path", "None")))}</div>' if model_selection.get('checkpoint_path') else ''}
-        </div>
-        """
-        
-        # Training configuration summary
-        training_info = f"""
-        <div style="background: #f3e5f5; padding: 12px; border-radius: 6px; margin-bottom: 10px;">
-            <h5 style="margin: 0 0 8px 0; color: #7b1fa2;">🚀 Training Parameters</h5>
-            <div style="font-size: 13px; color: #424242;">
-                <strong>Epochs:</strong> {training_config.get('epochs', 100)} |
-                <strong>Batch Size:</strong> {training_config.get('batch_size', 16)} |
-                <strong>Learning Rate:</strong> {training_config.get('learning_rate', 0.001):.4f} |
-                <strong>Optimizer:</strong> {html.escape(str(training_config.get('optimizer', 'adam')).title())}
-            </div>
-            <div style="font-size: 12px; color: #666; margin-top: 4px;">
-                <strong>Scheduler:</strong> {html.escape(str(training_config.get('scheduler', 'cosine')).title())} |
-                <strong>Weight Decay:</strong> {training_config.get('weight_decay', 0.0005):.4f} |
-                <strong>Mixed Precision:</strong> {format_bool(training_config.get('mixed_precision', True))}
+            <div style="font-size: 12px; color: #424242; line-height: 1.4;">
+                <div style="margin-bottom: 6px;"><strong>Backbone:</strong><br>{html.escape(str(model_selection.get('backbone_type', 'Not Selected')))}</div>
+                <div style="margin-bottom: 6px;"><strong>Classes:</strong> {model_selection.get('num_classes', 7)}</div>
+                <div style="margin-bottom: 6px;"><strong>Input Size:</strong> {model_selection.get('input_size', 640)}px</div>
+                <div><strong>Source:</strong> {html.escape(str(model_selection.get('source', 'backbone')))}</div>
             </div>
         </div>
         """
         
-        # Data configuration summary
-        data_info = f"""
-        <div style="background: #e8f5e8; padding: 12px; border-radius: 6px; margin-bottom: 10px;">
-            <h5 style="margin: 0 0 8px 0; color: #388e3c;">📊 Data Configuration</h5>
-            <div style="font-size: 13px; color: #424242;">
-                <strong>Train Split:</strong> {data_config.get('train_split', 0.8):.1%} |
-                <strong>Val Split:</strong> {data_config.get('val_split', 0.2):.1%} |
-                <strong>Workers:</strong> {data_config.get('workers', 4)} |
-                <strong>Augmentation:</strong> {format_bool(data_config.get('augmentation', {}).get('enabled', True))}
+        training_card = f"""
+        <div style="flex: 1; background: #f3e5f5; padding: 16px; border-radius: 8px; margin: 5px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); min-width: 200px;">
+            <div style="text-align: center; margin-bottom: 12px;">
+                <div style="font-size: 24px; margin-bottom: 4px;">🚀</div>
+                <h5 style="margin: 0; color: #7b1fa2; font-size: 14px; font-weight: 600;">Training Parameters</h5>
+            </div>
+            <div style="font-size: 12px; color: #424242; line-height: 1.4;">
+                <div style="margin-bottom: 6px;"><strong>Epochs:</strong> {training_config.get('epochs', 100)}</div>
+                <div style="margin-bottom: 6px;"><strong>Batch Size:</strong> {training_config.get('batch_size', 16)}</div>
+                <div style="margin-bottom: 6px;"><strong>Learning Rate:</strong> {training_config.get('learning_rate', 0.001):.4f}</div>
+                <div><strong>Optimizer:</strong> {html.escape(str(training_config.get('optimizer', 'adam')).title())}</div>
             </div>
         </div>
         """
         
-        # Early stopping and monitoring configuration
-        early_stopping = training_config.get('early_stopping', {})
-        monitoring_info = f"""
-        <div style="background: #fff3e0; padding: 12px; border-radius: 6px; margin-bottom: 10px;">
-            <h5 style="margin: 0 0 8px 0; color: #f57c00;">⚙️ Advanced Settings</h5>
-            <div style="font-size: 13px; color: #424242;">
-                <strong>Early Stopping:</strong> {format_bool(early_stopping.get('enabled', True))} |
-                <strong>Patience:</strong> {early_stopping.get('patience', 15)} epochs |
-                <strong>Save Period:</strong> {training_config.get('save_period', 10)} epochs
+        data_card = f"""
+        <div style="flex: 1; background: #e8f5e8; padding: 16px; border-radius: 8px; margin: 5px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); min-width: 200px;">
+            <div style="text-align: center; margin-bottom: 12px;">
+                <div style="font-size: 24px; margin-bottom: 4px;">📊</div>
+                <h5 style="margin: 0; color: #388e3c; font-size: 14px; font-weight: 600;">Data Configuration</h5>
             </div>
-            <div style="font-size: 12px; color: #666; margin-top: 4px;">
-                <strong>Primary Metric:</strong> {monitoring_config.get('primary_metric', 'mAP@0.5')} |
-                <strong>Charts:</strong> {format_bool(config.get('charts', {}).get('enabled', True))}
+            <div style="font-size: 12px; color: #424242; line-height: 1.4;">
+                <div style="margin-bottom: 6px;"><strong>Train Split:</strong> {data_config.get('train_split', 0.8):.1%}</div>
+                <div style="margin-bottom: 6px;"><strong>Val Split:</strong> {data_config.get('val_split', 0.2):.1%}</div>
+                <div style="margin-bottom: 6px;"><strong>Workers:</strong> {data_config.get('workers', 4)}</div>
+                <div><strong>Augmentation:</strong> {format_bool(data_config.get('augmentation', {}).get('enabled', True))}</div>
             </div>
         </div>
         """
         
-        # Output configuration
-        output_config = config.get('output', {})
-        output_info = f"""
-        <div style="background: #fce4ec; padding: 12px; border-radius: 6px; margin-bottom: 10px;">
-            <h5 style="margin: 0 0 8px 0; color: #c2185b;">💾 Output Settings</h5>
-            <div style="font-size: 13px; color: #424242;">
-                <strong>Save Directory:</strong> {html.escape(str(output_config.get('save_dir', 'runs/training')))} |
-                <strong>Name:</strong> {html.escape(str(output_config.get('name', 'smartcash_training')))}
+        monitoring_card = f"""
+        <div style="flex: 1; background: #fff3e0; padding: 16px; border-radius: 8px; margin: 5px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); min-width: 200px;">
+            <div style="text-align: center; margin-bottom: 12px;">
+                <div style="font-size: 24px; margin-bottom: 4px;">⚙️</div>
+                <h5 style="margin: 0; color: #f57c00; font-size: 14px; font-weight: 600;">Advanced Settings</h5>
             </div>
-            <div style="font-size: 12px; color: #666; margin-top: 4px;">
-                <strong>Save TXT:</strong> {format_bool(output_config.get('save_txt', True))} |
-                <strong>Save Config:</strong> {format_bool(output_config.get('save_conf', True))}
-            </div>
-        </div>
-        """
-        
-        # Device configuration
-        device_config = config.get('device', {})
-        device_info = f"""
-        <div style="background: #e1f5fe; padding: 12px; border-radius: 6px; margin-bottom: 10px;">
-            <h5 style="margin: 0 0 8px 0; color: #0277bd;">🖥️ Device Settings</h5>
-            <div style="font-size: 13px; color: #424242;">
-                <strong>Auto Detect:</strong> {format_bool(device_config.get('auto_detect', True))} |
-                <strong>Preferred:</strong> {html.escape(str(device_config.get('preferred', 'auto')).upper())}
+            <div style="font-size: 12px; color: #424242; line-height: 1.4;">
+                <div style="margin-bottom: 6px;"><strong>Early Stopping:</strong> {format_bool(training_config.get('early_stopping', {}).get('enabled', True))}</div>
+                <div style="margin-bottom: 6px;"><strong>Patience:</strong> {training_config.get('early_stopping', {}).get('patience', 15)} epochs</div>
+                <div style="margin-bottom: 6px;"><strong>Mixed Precision:</strong> {format_bool(training_config.get('mixed_precision', True))}</div>
+                <div><strong>Save Period:</strong> {training_config.get('save_period', 10)} epochs</div>
             </div>
         </div>
         """
         
-        # Create complete summary HTML
+        # Create complete summary HTML with 4-column card layout
         summary_html = f"""
         <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 100%; overflow-x: auto;">
-            <h4 style="margin-top: 0; color: #333; text-align: center;">📋 Training Configuration Summary</h4>
-            {model_info}
-            {training_info}
-            {data_info}
-            {monitoring_info}
-            {output_info}
-            {device_info}
-            <div style="text-align: center; padding: 8px; background: #f5f5f5; border-radius: 4px; margin-top: 10px;">
-                <small style="color: #666;">
-                    Configuration updated: {_get_current_timestamp()} | 
-                    Total Sections: {len([x for x in [training_config, model_selection, data_config] if x])}
+            <h4 style="margin-top: 0; color: #333; text-align: center; margin-bottom: 20px;">📋 Training Configuration Summary</h4>
+            <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: stretch; margin-bottom: 20px;">
+                {model_card}
+                {training_card}
+                {data_card}
+                {monitoring_card}
+            </div>
+            <div style="text-align: center; padding: 12px; background: #f8f9fa; border-radius: 6px; border: 1px solid #e9ecef;">
+                <small style="color: #6c757d;">
+                    <strong>Last Updated:</strong> {_get_current_timestamp()} | 
+                    <strong>Device:</strong> {html.escape(str(config.get('device', {}).get('preferred', 'auto')).upper())} | 
+                    <strong>Output Dir:</strong> {html.escape(str(config.get('output', {}).get('save_dir', 'runs/training')))}
                 </small>
             </div>
         </div>

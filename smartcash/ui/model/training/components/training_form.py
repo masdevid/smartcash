@@ -190,61 +190,116 @@ def create_training_form(training_config: Dict[str, Any], ui_config: Dict[str, A
             style={'description_width': '200px'}
         )
         
-        # Create form sections
-        model_section = widgets.VBox([
-            widgets.HTML("<h4>🏗️ Model Configuration</h4>"),
-            model_source_dropdown,
-            checkpoint_path_text
-        ])
+        # Create 3-column layout sections for single accordion
         
-        training_section = widgets.VBox([
-            widgets.HTML("<h4>🚀 Training Parameters</h4>"),
-            epochs_input,
-            batch_size_input,
-            learning_rate_input,
-            optimizer_dropdown,
-            scheduler_dropdown,
-            weight_decay_input
-        ])
+        # Row 1: Model Configuration (3 columns)
+        model_row = widgets.HBox([
+            widgets.VBox([
+                widgets.HTML("<h5 style='color: #007bff; margin: 0 0 10px 0;'>🏗️ Model Source</h5>"),
+                model_source_dropdown
+            ], layout=widgets.Layout(flex='1', margin='0 10px')),
+            widgets.VBox([
+                widgets.HTML("<h5 style='color: #007bff; margin: 0 0 10px 0;'>📁 Checkpoint Path</h5>"),
+                checkpoint_path_text
+            ], layout=widgets.Layout(flex='1', margin='0 10px')),
+            widgets.VBox([
+                widgets.HTML("<h5 style='color: #007bff; margin: 0 0 10px 0;'>ℹ️ Model Info</h5>"),
+                widgets.HTML(
+                    '<div style="padding: 8px; background: #f8f9fa; border-radius: 4px; font-size: 12px; color: #6c757d;">'
+                    'Select backbone or load from checkpoint for training'
+                    '</div>'
+                )
+            ], layout=widgets.Layout(flex='1', margin='0 10px'))
+        ], layout=widgets.Layout(width='100%', margin='0 0 15px 0'))
         
-        advanced_section = widgets.VBox([
-            widgets.HTML("<h4>⚙️ Advanced Options</h4>"),
-            mixed_precision_checkbox,
-            early_stopping_checkbox,
-            early_stopping_patience,
-            save_period_slider
-        ])
+        # Row 2: Core Training Parameters (3 columns)
+        training_row = widgets.HBox([
+            widgets.VBox([
+                widgets.HTML("<h5 style='color: #28a745; margin: 0 0 10px 0;'>📊 Epochs</h5>"),
+                epochs_input,
+                widgets.HTML("<h5 style='color: #28a745; margin: 15px 0 10px 0;'>⚙️ Optimizer</h5>"),
+                optimizer_dropdown
+            ], layout=widgets.Layout(flex='1', margin='0 10px')),
+            widgets.VBox([
+                widgets.HTML("<h5 style='color: #28a745; margin: 0 0 10px 0;'>📦 Batch Size</h5>"),
+                batch_size_input,
+                widgets.HTML("<h5 style='color: #28a745; margin: 15px 0 10px 0;'>📈 LR Scheduler</h5>"),
+                scheduler_dropdown
+            ], layout=widgets.Layout(flex='1', margin='0 10px')),
+            widgets.VBox([
+                widgets.HTML("<h5 style='color: #28a745; margin: 0 0 10px 0;'>🎯 Learning Rate</h5>"),
+                learning_rate_input,
+                widgets.HTML("<h5 style='color: #28a745; margin: 15px 0 10px 0;'>⚖️ Weight Decay</h5>"),
+                weight_decay_input
+            ], layout=widgets.Layout(flex='1', margin='0 10px'))
+        ], layout=widgets.Layout(width='100%', margin='0 0 15px 0'))
         
-        data_section = widgets.VBox([
-            widgets.HTML("<h4>📊 Data Configuration</h4>"),
-            val_split_slider,
-            workers_slider
-        ])
+        # Row 3: Data & Validation (3 columns)
+        data_row = widgets.HBox([
+            widgets.VBox([
+                widgets.HTML("<h5 style='color: #fd7e14; margin: 0 0 10px 0;'>📊 Validation Split</h5>"),
+                val_split_slider,
+                widgets.HTML("<h5 style='color: #fd7e14; margin: 15px 0 10px 0;'>🔧 Mixed Precision</h5>"),
+                mixed_precision_checkbox
+            ], layout=widgets.Layout(flex='1', margin='0 10px')),
+            widgets.VBox([
+                widgets.HTML("<h5 style='color: #fd7e14; margin: 0 0 10px 0;'>👥 Data Workers</h5>"),
+                workers_slider,
+                widgets.HTML("<h5 style='color: #fd7e14; margin: 15px 0 10px 0;'>⏹️ Early Stopping</h5>"),
+                early_stopping_checkbox
+            ], layout=widgets.Layout(flex='1', margin='0 10px')),
+            widgets.VBox([
+                widgets.HTML("<h5 style='color: #fd7e14; margin: 0 0 10px 0;'>💾 Save Period</h5>"),
+                save_period_slider,
+                widgets.HTML("<h5 style='color: #fd7e14; margin: 15px 0 10px 0;'>⏳ ES Patience</h5>"),
+                early_stopping_patience
+            ], layout=widgets.Layout(flex='1', margin='0 10px'))
+        ], layout=widgets.Layout(width='100%', margin='0 0 15px 0'))
         
-        ui_section = widgets.VBox([
-            widgets.HTML("<h4>🎨 UI Options</h4>"),
-            show_advanced_checkbox,
-            enable_charts_checkbox
-        ])
+        # Row 4: UI & Advanced Options (3 columns)
+        ui_row = widgets.HBox([
+            widgets.VBox([
+                widgets.HTML("<h5 style='color: #6f42c1; margin: 0 0 10px 0;'>🎨 Show Advanced</h5>"),
+                show_advanced_checkbox
+            ], layout=widgets.Layout(flex='1', margin='0 10px')),
+            widgets.VBox([
+                widgets.HTML("<h5 style='color: #6f42c1; margin: 0 0 10px 0;'>📈 Live Charts</h5>"),
+                enable_charts_checkbox
+            ], layout=widgets.Layout(flex='1', margin='0 10px')),
+            widgets.VBox([
+                widgets.HTML("<h5 style='color: #6f42c1; margin: 0 0 10px 0;'>ℹ️ Configuration</h5>"),
+                widgets.HTML(
+                    '<div style="padding: 8px; background: #f8f9fa; border-radius: 4px; font-size: 12px; color: #6c757d;">'
+                    'UI preferences and display options'
+                    '</div>'
+                )
+            ], layout=widgets.Layout(flex='1', margin='0 10px'))
+        ], layout=widgets.Layout(width='100%', margin='0 0 15px 0'))
         
-        # Create main form with accordion
-        sections = [
-            model_section,
-            training_section,
-            data_section,
-            advanced_section,
-            ui_section
-        ]
+        # Create single comprehensive section with all rows
+        comprehensive_section = widgets.VBox([
+            widgets.HTML(
+                '<h4 style="margin: 0 0 20px 0; padding: 15px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); '
+                'color: white; text-align: center; border-radius: 8px; box-shadow: 0 3px 6px rgba(0,0,0,0.16);">'
+                '⚙️ Comprehensive Training Configuration'
+                '</h4>'
+            ),
+            widgets.HTML('<h4 style="color: #007bff; border-bottom: 2px solid #007bff; padding-bottom: 5px; margin: 20px 0 15px 0;">🏗️ Model & Source Configuration</h4>'),
+            model_row,
+            widgets.HTML('<h4 style="color: #28a745; border-bottom: 2px solid #28a745; padding-bottom: 5px; margin: 20px 0 15px 0;">🚀 Core Training Parameters</h4>'),
+            training_row,
+            widgets.HTML('<h4 style="color: #fd7e14; border-bottom: 2px solid #fd7e14; padding-bottom: 5px; margin: 20px 0 15px 0;">📊 Data & Advanced Settings</h4>'),
+            data_row,
+            widgets.HTML('<h4 style="color: #6f42c1; border-bottom: 2px solid #6f42c1; padding-bottom: 5px; margin: 20px 0 15px 0;">🎨 UI & Display Options</h4>'),
+            ui_row
+        ], layout=widgets.Layout(width='100%', padding='15px'))
         
-        form_accordion = widgets.Accordion(children=sections)
-        form_accordion.set_title(0, "🏗️ Model Configuration")
-        form_accordion.set_title(1, "🚀 Training Parameters")
-        form_accordion.set_title(2, "📊 Data Configuration")
-        form_accordion.set_title(3, "⚙️ Advanced Options")
-        form_accordion.set_title(4, "🎨 UI Options")
+        # Create single accordion with comprehensive section
+        form_accordion = widgets.Accordion(children=[comprehensive_section])
+        form_accordion.set_title(0, "⚙️ Complete Training Configuration")
         
         # Set initial accordion state
-        form_accordion.selected_index = 1  # Open training parameters by default
+        form_accordion.selected_index = 0  # Open the comprehensive configuration by default
         
         # Store widget references for form value extraction
         form_widgets = {

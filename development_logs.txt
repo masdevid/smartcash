@@ -1,0 +1,9 @@
+Training UI updates:
+- Training Configuration Summary make it 4 column cards based UI
+- 📊 Training Results & Performance Metrics:
+    - Accuracy, Precision, Recall, F1
+    - mAP, Loss
+- Training Forms:
+    - Single Accordion for all forms
+    - Use 3 column layouts
+    

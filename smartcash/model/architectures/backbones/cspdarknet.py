@@ -21,17 +21,24 @@ from smartcash.model.architectures.backbones.base import BaseBackbone
 from smartcash.model.config.model_constants import YOLOV5_CONFIG, YOLO_CHANNELS
 
 class CSPDarknet(BaseBackbone):
-    """CSPDarknet backbone untuk YOLOv5 dengan download otomatis dan validasi feature maps."""
+    """Enhanced CSPDarknet backbone dengan multi-layer detection support dan model building capabilities."""
     
-    def __init__(self, pretrained: bool = True, model_size: str = 'yolov5s', weights_path: Optional[str] = None, fallback_to_local: bool = True, pretrained_dir: str = './pretrained', testing_mode: bool = False, logger: Optional[SmartCashLogger] = None):
+    def __init__(self, pretrained: bool = True, model_size: str = 'yolov5s', weights_path: Optional[str] = None, 
+                 fallback_to_local: bool = True, pretrained_dir: str = './pretrained', testing_mode: bool = False, 
+                 build_mode: str = 'detection', multi_layer_heads: bool = False, 
+                 logger: Optional[SmartCashLogger] = None):
         """Inisialisasi CSPDarknet backbone dengan konfigurasi model dan pretrained weights."""
         super().__init__(logger=logger)
+        
+        self.build_mode = build_mode
+        self.multi_layer_heads = multi_layer_heads
         
         # Validasi model size
         if model_size not in YOLOV5_CONFIG: raise BackboneError(f"❌ Model size {model_size} tidak didukung. Pilihan yang tersedia: {list(YOLOV5_CONFIG.keys())}")
             
         self.model_size, self.config, self.pretrained_dir = model_size, YOLOV5_CONFIG[model_size], Path(pretrained_dir)
         self.feature_indices, self.expected_channels = self.config['feature_indices'], self.config['expected_channels']
+        self.out_channels = self.expected_channels  # Ensure out_channels is set for BaseBackbone compatibility
         self.testing_mode = testing_mode
         
         try:
@@ -46,7 +53,7 @@ class CSPDarknet(BaseBackbone):
             # Verifikasi struktur model
             self._verify_model_structure()
                 
-            self.logger.success(
+            self.logger.info(
                 f"✨ CSPDarknet backbone berhasil diinisialisasi:\n"
                 f"   • Model size: {model_size}\n"
                 f"   • Pretrained: {pretrained}\n"
@@ -338,10 +345,80 @@ class CSPDarknet(BaseBackbone):
             'variant': self.model_size,
             'out_channels': self.expected_channels,
             'feature_stages': self.feature_indices,
-            'pretrained': self.pretrained,
+            'pretrained': not self.testing_mode,
+            'build_mode': self.build_mode,
+            'multi_layer_heads': self.multi_layer_heads,
             'num_parameters': sum(p.numel() for p in self.parameters()),
-            'trainable_parameters': sum(p.numel() for p in self.parameters() if p.requires_grad)
+            'trainable_parameters': sum(p.numel() for p in self.parameters() if p.requires_grad),
+            'feature_count': len(self.expected_channels),
+            'fpn_compatible': len(self.expected_channels) == 3
         }
+    
+    def build_for_yolo(self, head_config: Dict[str, Any] = None) -> Dict[str, Any]:
+        """Build CSPDarknet backbone specifically for YOLO architecture with multi-layer support"""
+        try:
+            # Setup multi-layer detection heads configuration
+            if self.multi_layer_heads:
+                layer_specs = {
+                    'layer_1': {'classes': ['001', '002', '005', '010', '020', '050', '100'], 'description': 'Full banknote detection'},
+                    'layer_2': {'classes': ['l2_001', 'l2_002', 'l2_005', 'l2_010', 'l2_020', 'l2_050', 'l2_100'], 'description': 'Nominal-defining features'},
+                    'layer_3': {'classes': ['l3_sign', 'l3_text', 'l3_thread'], 'description': 'Common features'}
+                }
+            else:
+                layer_specs = {
+                    'layer_1': {'classes': ['001', '002', '005', '010', '020', '050', '100'], 'description': 'Single layer detection'}
+                }
+            
+            build_result = {
+                'backbone': self,
+                'backbone_info': self.get_info(),
+                'output_channels': self.expected_channels,
+                'feature_shapes': self.get_output_shapes(),
+                'layer_specifications': layer_specs,
+                'recommended_neck': 'FPN-PAN',
+                'compatible_heads': ['YOLOv5Head', 'MultiLayerHead'],
+                'phase_training': {
+                    'phase_1': 'Freeze backbone, train detection heads only',
+                    'phase_2': 'Unfreeze entire model for fine-tuning'
+                },
+                'optimizer_config': {
+                    'backbone_lr': 1e-5,
+                    'head_lr': 1e-3,
+                    'differential_lr': True
+                },
+                'success': True
+            }
+            
+            self.logger.info(f"✅ CSPDarknet backbone built for YOLO with {len(layer_specs)} detection layers")
+            return build_result
+            
+        except Exception as e:
+            error_msg = f"Failed to build CSPDarknet for YOLO: {str(e)}"
+            self.logger.error(error_msg)
+            return {'success': False, 'error': error_msg}
+    
+    def prepare_for_training(self, freeze_backbone: bool = True) -> Dict[str, Any]:
+        """Prepare backbone for training with specified freeze configuration"""
+        try:
+            if freeze_backbone:
+                self.freeze()
+                self.logger.info("❄️ Backbone frozen for phase 1 training")
+            else:
+                self.unfreeze()
+                self.logger.info("🔥 Backbone unfrozen for phase 2 fine-tuning")
+            
+            return {
+                'frozen': freeze_backbone,
+                'trainable_params': sum(p.numel() for p in self.parameters() if p.requires_grad),
+                'total_params': sum(p.numel() for p in self.parameters()),
+                'phase': 'phase_1' if freeze_backbone else 'phase_2',
+                'success': True
+            }
+            
+        except Exception as e:
+            error_msg = f"Failed to prepare backbone for training: {str(e)}"
+            self.logger.error(error_msg)
+            return {'success': False, 'error': error_msg}
     
     def get_output_channels(self) -> List[int]: return self.expected_channels
     
@@ -353,7 +430,7 @@ class CSPDarknet(BaseBackbone):
             missing_keys, unexpected_keys = super().load_state_dict(state_dict, strict=strict)
             if missing_keys and self.logger: self.logger.warning(f"⚠️ Missing keys: {missing_keys}")
             if unexpected_keys and self.logger: self.logger.warning(f"⚠️ Unexpected keys: {unexpected_keys}")
-            self.logger.success("✅ Berhasil memuat state dictionary")
+            self.logger.info("✅ Berhasil memuat state dictionary")
         except Exception as e:
             self.logger.error(f"❌ Gagal memuat state dictionary: {str(e)}")
             raise BackboneError(f"Gagal memuat state dictionary: {str(e)}")

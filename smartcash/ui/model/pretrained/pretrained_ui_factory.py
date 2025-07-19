@@ -62,39 +62,47 @@ class PretrainedUIFactory(UIFactory):
         cls,
         config: Optional[Dict[str, Any]] = None,
         **kwargs
-    ) -> Optional[Dict[str, Any]]:
+    ) -> Dict[str, Any]:
         """
         Buat dan tampilkan modul Pretrained UI.
         
         Args:
             config: Konfigurasi opsional untuk modul
             **kwargs: Argumen tambahan untuk inisialisasi modul
+                - auto_display: Boolean, apakah akan menampilkan UI secara otomatis (default: True)
             
         Returns:
-            Dict berisi informasi modul atau None jika gagal
+            Dict berisi informasi modul atau error message
         """
         try:
             logger.debug("Membuat dan menampilkan Pretrained UI")
             
+            # Get auto_display flag from kwargs (default to True if not specified)
+            auto_display = kwargs.pop('auto_display', True)
+            
             # Buat instance modul
             module = cls.create_pretrained_module(config=config, **kwargs)
             
-            # Tampilkan UI
-            display_result = module.display_ui()
+            # Hanya tampilkan UI jika auto_display=True
+            if auto_display:
+                display_result = module.display_ui()
+                
+                if display_result and not display_result.get('success', False):
+                    error_msg = display_result.get('message', 'Gagal menampilkan UI')
+                    logger.error(error_msg)
+                    return {'success': False, 'message': error_msg}
+                
+                logger.debug("✅ Berhasil membuat dan menampilkan Pretrained UI")
+            else:
+                logger.debug("✅ Berhasil membuat Pretrained UI (tampilan otomatis dinonaktifkan)")
             
-            if display_result and not display_result.get('success', False):
-                error_msg = display_result.get('message', 'Gagal menampilkan UI')
-                logger.error(error_msg)
-                return {'success': False, 'message': error_msg}
-            
-            logger.debug("✅ Berhasil membuat dan menampilkan Pretrained UI")
             # Return the UI component directly
             return module.get_ui_components().get('main_container')
             
         except Exception as e:
             error_msg = f"Gagal membuat dan menampilkan Pretrained UI: {str(e)}"
             logger.error(error_msg, exc_info=True)
-            return None
+            return {'success': False, 'message': error_msg}
 
 
 # Fungsi utilitas untuk kemudahan penggunaan

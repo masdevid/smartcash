@@ -6,5 +6,7 @@ NOTE: Cell Code should remain minimal (import and run initializer only).
 """
 
 from smartcash.ui.model.training import TrainingUIFactory
-# initialize_training_ui(display=True)
-TrainingUIFactory.create_and_display_training()
+
+# Create and display the training UI
+# Note: auto_display=False is used to prevent double display since the module handles its own display
+TrainingUIFactory.create_and_display_training(auto_display=False)

@@ -1,49 +1,29 @@
 """
-Evaluation Module - New Core Pattern
-Comprehensive model evaluation across 2×4 research scenarios (2 scenarios × 4 models = 8 tests)
+Evaluation Module - Comprehensive model evaluation across research scenarios
 
-This module provides comprehensive model evaluation capabilities with:
-- Position variation scenario testing
-- Lighting variation scenario testing
-- 2 backbone types × 2 layer modes = 4 model combinations
-- Total: 8 evaluation tests with complete metrics analysis
+file_path: /Users/masdevid/Projects/smartcash/smartcash/ui/model/evaluation/__init__.py
 """
 
-from .evaluation_uimodule import EvaluationUIModule, initialize_evaluation_ui
-from .components.evaluation_ui import create_evaluation_ui
-from .constants import (
-    UI_CONFIG,
-    RESEARCH_SCENARIOS,
-    MODEL_COMBINATIONS,
-    EVALUATION_MATRIX,
-    EVALUATION_METRICS
-)
+from .evaluation_uimodule import EvaluationUIModule
+from .evaluation_ui_factory import EvaluationUIFactory, create_evaluation_display
 
-__version__ = "2.0.0"
-__author__ = "SmartCash Team"
+def initialize_evaluation_ui(config=None, **kwargs):
+    """
+    Initialize and display the evaluation UI.
+    
+    Args:
+        config: Optional configuration dict
+        **kwargs: Additional arguments for UI initialization
+        
+    Returns:
+        The created UI module or None if failed
+    """
+    return EvaluationUIFactory.create_and_display_evaluation(config=config, **kwargs)
 
 # Export main classes and functions
 __all__ = [
     'EvaluationUIModule',
-    'UI_CONFIG',
-    'RESEARCH_SCENARIOS',
-    'MODEL_COMBINATIONS',
-    'EVALUATION_MATRIX',
-    'EVALUATION_METRICS',
-    'create_evaluation_module',
-    'initialize_evaluation_ui'
+    'EvaluationUIFactory',
+    'initialize_evaluation_ui',
+    'create_evaluation_display'
 ]
-
-def create_evaluation_module(config=None):
-    """
-    Create and initialize evaluation UI module.
-    
-    Args:
-        config: Optional configuration override
-        
-    Returns:
-        Initialized EvaluationUIModule instance
-    """
-    module = EvaluationUIModule()
-    module.initialize(config)
-    return module

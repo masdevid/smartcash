@@ -23,7 +23,7 @@ class CheckpointManager:
         # Checkpoint configuration
         checkpoint_config = config.get('checkpoint', {})
         self.save_dir = Path(checkpoint_config.get('save_dir', '/data/checkpoints'))
-        self.format_template = checkpoint_config.get('format', 'best_{model_name}_{backbone}_{layer_mode}_{date}.pt')
+        self.format_template = checkpoint_config.get('format', 'best_{model_name}_{backbone}_{date:%Y%m%d}.pt')
         self.max_checkpoints = checkpoint_config.get('max_checkpoints', 5)
         self.auto_cleanup = checkpoint_config.get('auto_cleanup', True)
         
@@ -194,12 +194,13 @@ class CheckpointManager:
         model_config = self.config.get('model', {})
         
         # Template variables
+        current_date = datetime.now()
         variables = {
             'model_name': model_config.get('model_name', 'smartcash'),
             'backbone': model_config.get('backbone', 'unknown'),
             'layer_mode': model_config.get('layer_mode', 'single'),
-            'date': datetime.now().strftime('%m%d%Y'),
-            'time': datetime.now().strftime('%H%M'),
+            'date': current_date,  # Pass datetime object for strftime formatting
+            'time': current_date.strftime('%H%M'),
             'epoch': kwargs.get('epoch', 0)
         }
         
@@ -213,7 +214,8 @@ class CheckpointManager:
             filename = self.format_template.format(**variables)
         except KeyError as e:
             self.logger.warning(f"⚠️ Template variable missing: {e}, using default")
-            filename = f"checkpoint_{variables['backbone']}_{variables['date']}.pt"
+            date_str = current_date.strftime('%Y%m%d')
+            filename = f"best_{variables['model_name']}_{variables['backbone']}_{date_str}.pt"
         
         return filename
     

@@ -65,6 +65,7 @@ validation:
   metrics:
     - 'mAP@0.5'           # Mean Average Precision at 0.5 IoU
     - 'mAP@0.5:0.95'      # Mean Average Precision across IoUs 0.5-0.95
+    - 'accuracy'          # Accuracy
     - 'precision'         # Precision
     - 'recall'            # Recall
     - 'f1'                # F1 Score
@@ -74,7 +75,7 @@ validation:
 checkpoint:
   # Checkpoint Saving
   save_dir: 'data/checkpoints'  # Directory to save checkpoints
-  format: 'best_{model_name}_{backbone}_{layer_mode}_{date:%Y%m%d}.pt'  # Checkpoint filename format
+  format: 'best_{model_name}_{backbone}_{date:%Y%m%d}.pt'  # Checkpoint filename format
   
   # Checkpoint Management
   max_checkpoints: 5    # Maximum number of checkpoints to keep

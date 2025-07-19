@@ -1,48 +1,48 @@
 """
-Factory untuk membuat dan menampilkan modul UI Training.
+Factory untuk membuat dan menampilkan modul UI Evaluation.
 
 File ini menyediakan factory khusus untuk membuat dan menampilkan
-modul UI Training menggunakan BaseUIModule dan UI Factory pattern.
+modul UI Evaluation menggunakan BaseUIModule dan UI Factory pattern.
 
-file_path: /Users/masdevid/Projects/smartcash/smartcash/ui/model/training/training_ui_factory.py
+file_path: /Users/masdevid/Projects/smartcash/smartcash/ui/model/evaluation/evaluation_ui_factory.py
 """
 
-from typing import Dict, Any, Optional, Callable
+from typing import Dict, Any, Optional
 from smartcash.ui.core.ui_factory import UIFactory
-from smartcash.ui.model.training.training_uimodule import TrainingUIModule
+from smartcash.ui.model.evaluation.evaluation_uimodule import EvaluationUIModule
 from smartcash.ui.logger import get_module_logger
 
 logger = get_module_logger(__name__)
 
-class TrainingUIFactory(UIFactory):
+class EvaluationUIFactory(UIFactory):
     """
-    Factory untuk membuat dan menampilkan modul UI Training.
+    Factory untuk membuat dan menampilkan modul UI Evaluation.
     
     Kelas ini menyediakan method khusus untuk membuat dan menampilkan
-    modul UI Training dengan konfigurasi default yang sesuai.
+    modul UI Evaluation dengan konfigurasi default yang sesuai.
     """
     
     @classmethod
-    def create_training_module(
+    def create_evaluation_module(
         cls,
         config: Optional[Dict[str, Any]] = None,
         **kwargs
-    ) -> TrainingUIModule:
+    ) -> EvaluationUIModule:
         """
-        Buat instance TrainingUIModule dengan konfigurasi yang diberikan.
+        Buat instance EvaluationUIModule dengan konfigurasi yang diberikan.
         
         Args:
             config: Konfigurasi opsional untuk modul
             **kwargs: Argumen tambahan untuk inisialisasi modul
             
         Returns:
-            Instance TrainingUIModule yang sudah diinisialisasi
+            Instance EvaluationUIModule yang sudah diinisialisasi
         """
         try:
-            logger.debug("Membuat instance TrainingUIModule")
+            logger.debug("Membuat instance EvaluationUIModule")
             
-            # Create instance directly since TrainingUIModule handles its own initialization
-            module = TrainingUIModule()
+            # Create instance directly since EvaluationUIModule handles its own initialization
+            module = EvaluationUIModule()
             
             # Initialize with config if provided
             if config is not None:
@@ -50,21 +50,21 @@ class TrainingUIFactory(UIFactory):
             else:
                 module.initialize(**kwargs)
             
-            logger.debug("✅ Berhasil membuat instance TrainingUIModule")
+            logger.debug("✅ Berhasil membuat instance EvaluationUIModule")
             return module
             
         except Exception as e:
-            logger.error(f"Gagal membuat TrainingUIModule: {e}", exc_info=True)
+            logger.error(f"Gagal membuat EvaluationUIModule: {e}", exc_info=True)
             raise
     
     @classmethod
-    def create_and_display_training(
+    def create_and_display_evaluation(
         cls,
         config: Optional[Dict[str, Any]] = None,
         **kwargs
     ) -> Dict[str, Any]:
         """
-        Buat dan tampilkan modul Training UI.
+        Buat dan tampilkan modul Evaluation UI.
         
         Args:
             config: Konfigurasi opsional untuk modul
@@ -72,16 +72,16 @@ class TrainingUIFactory(UIFactory):
                 - auto_display: Boolean, apakah akan menampilkan UI secara otomatis (default: True)
             
         Returns:
-            Dict berisi informasi modul atau None jika gagal
+            Dict berisi informasi modul atau error message
         """
         try:
-            logger.debug("Membuat dan menampilkan Training UI")
+            logger.debug("Membuat dan menampilkan Evaluation UI")
             
             # Get auto_display flag from kwargs (default to True if not specified)
             auto_display = kwargs.pop('auto_display', True)
             
             # Buat instance modul
-            module = cls.create_training_module(config=config, **kwargs)
+            module = cls.create_evaluation_module(config=config, **kwargs)
             
             # Hanya tampilkan UI jika auto_display=True
             if auto_display:
@@ -92,33 +92,33 @@ class TrainingUIFactory(UIFactory):
                     logger.error(error_msg)
                     return {'success': False, 'message': error_msg}
                 
-                logger.debug("✅ Berhasil membuat dan menampilkan Training UI")
+                logger.debug("✅ Berhasil membuat dan menampilkan Evaluation UI")
             else:
-                logger.debug("✅ Berhasil membuat Training UI (tampilan otomatis dinonaktifkan)")
+                logger.debug("✅ Berhasil membuat Evaluation UI (tampilan otomatis dinonaktifkan)")
             
             # Return the UI component directly
             return module.get_ui_components().get('main_container')
             
         except Exception as e:
-            error_msg = f"Gagal membuat dan menampilkan Training UI: {str(e)}"
+            error_msg = f"Gagal membuat dan menampilkan Evaluation UI: {str(e)}"
             logger.error(error_msg, exc_info=True)
             return {'success': False, 'message': error_msg}
 
 
-# Fungsi utilitas untuk kemudahan penggunaan
-def create_training_display(**kwargs) -> Callable[[Optional[Dict[str, Any]]], Dict[str, Any]]:
+def create_evaluation_display(**kwargs) -> callable:
     """
-    Buat fungsi display untuk modul Training UI.
+    Create a display function for the evaluation UI.
     
-    Contoh penggunaan:
-        from smartcash.ui.model.training import create_training_display
-        show_training = create_training_display()
-        show_training(config=my_config)
+    This is a convenience function that returns a callable that can be used
+    to display the evaluation UI with the given configuration.
     
     Args:
-        **kwargs: Argumen tambahan untuk TrainingUIFactory.create_training_display
+        **kwargs: Configuration options for the evaluation UI
         
     Returns:
-        Fungsi yang dapat dipanggil untuk menampilkan modul Training UI
+        A callable that will display the evaluation UI when called
     """
-    return TrainingUIFactory.create_training_display(**kwargs)
+    def display_fn():
+        return EvaluationUIFactory.create_and_display_evaluation(**kwargs)
+    
+    return display_fn

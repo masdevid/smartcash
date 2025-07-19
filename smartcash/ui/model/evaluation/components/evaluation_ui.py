@@ -99,6 +99,7 @@ def create_evaluation_ui(config: Dict[str, Any]) -> Dict[str, Any]:
         
         return {
             'main_container': main_widget,
+            'ui': main_widget,  # Add 'ui' key pointing to the actual widget
             'header_container': header_container,
             'main_form_row': main_form_row,
             'action_container': action_container,

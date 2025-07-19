@@ -53,7 +53,6 @@ def create_training_ui(config: Dict[str, Any]) -> Dict[str, Any]:
         Dictionary containing all UI components
     """
     logger = get_module_logger("smartcash.ui.model.training.components")
-    logger.debug("Creating training UI components with BaseUIModule container structure...")
     
     try:
         # Extract configurations
@@ -170,6 +169,7 @@ def create_training_ui(config: Dict[str, Any]) -> Dict[str, Any]:
         # Prepare UI components dictionary
         ui_components = {
             'main_container': main_container,
+            'ui': main_container,  # Add 'ui' key pointing to the actual widget
             'header_container': header_container,
             'form_container': form_container,
             'action_container': action_container_result,  # Store full result for button access

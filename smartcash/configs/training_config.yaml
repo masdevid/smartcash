@@ -1,0 +1,118 @@
+# SmartCash Training Configuration
+# Minimal configuration that matches the actual codebase structure
+
+training:
+  # Core training parameters
+  epochs: 100
+  batch_size: 16
+  learning_rate: 0.001
+  weight_decay: 0.0005
+  
+  # Optimizer settings
+  optimizer: adam  # Supported: adam, adamw, sgd, rmsprop
+  scheduler: cosine  # Supported: cosine, step, plateau, exponential, multistep, cyclic, none
+  warmup_epochs: 3  # Optional warmup period
+  mixed_precision: true  # Enable mixed precision training
+  gradient_clip: 10.0  # Clip gradients to this value, 0 to disable
+  
+  # Data loading configuration
+  data:
+    num_workers: 4  # Number of data loading workers
+    pin_memory: true  # Pin memory for faster GPU transfer
+    persistent_workers: true  # Keep workers alive between epochs
+    prefetch_factor: 2  # Number of batches to prefetch per worker
+    drop_last: true  # Drop last incomplete batch
+  
+    mixed_precision: true
+  # Loss function configuration
+  loss:
+    box_weight: 0.05  # Bounding box loss weight
+    obj_weight: 1.0    # Objectness loss weight
+    cls_weight: 0.5    # Classification loss weight
+    focal_loss: false  # Use focal loss if true
+    label_smoothing: 0.0  # Label smoothing epsilon
+  
+  # Early stopping configuration
+  early_stopping:
+    enabled: true
+    patience: 15  # Epochs to wait before stopping
+    metric: val_map50  # Metric to monitor (e.g., val_loss, val_map50)
+    mode: max  # One of: min, max
+    min_delta: 0.001  # Minimum change to qualify as improvement
+
+# Paths configuration - sync with other config files
+paths:
+  pretrained_models: 'data/pretrained'        # Sync with pretrained_config.yaml:9
+  checkpoints: 'data/checkpoints'             # Sync with evaluation_config.yaml:16
+  training_outputs: 'runs/train'              # Training outputs directory
+  
+# Multi-layer architecture configuration (from MODEL_ARC.md)
+architecture:
+  backbone:
+    types: ['EfficientNet-B4', 'CSPDarknet']  # MODEL_ARC.md:20
+    pretrained: true
+    source: 'data/pretrained'                 # MODEL_ARC.md:22
+  
+  neck:
+    type: 'PAN/FPN'                          # MODEL_ARC.md:25
+    compatible_with: 'YOLOv5'                # MODEL_ARC.md:26
+    pretrained: true                         # MODEL_ARC.md:27
+  
+  heads:                                     # MODEL_ARC.md:29-45
+    - name: 'layer_1_head'
+      description: 'Detects full note bounding boxes'
+      init: 'from_scratch'
+    - name: 'layer_2_head'  
+      description: 'Detects denomination-specific visual markers'
+      init: 'from_scratch'
+    - name: 'layer_3_head'
+      description: 'Detects common features across all notes'
+      init: 'from_scratch'
+
+# Multi-task loss configuration (from MODEL_ARC.md:96-97)
+multi_task_loss:
+  enabled: true
+  uncertainty_weighting: true                # MODEL_ARC.md:97
+  loss_function: 'total_loss = λ1 * loss_layer1 + λ2 * loss_layer2 + λ3 * loss_layer3'
+
+# Two-phase training strategy (from MODEL_ARC.md:93-95)
+training_phases:
+  phase_1:
+    description: 'Freeze backbone, train detection heads only'  # MODEL_ARC.md:94
+    epochs: 50
+    freeze_backbone: true
+    learning_rates:                          # MODEL_ARC.md:102-105
+      backbone: 1e-5
+      head: 1e-3
+  
+  phase_2:
+    description: 'Unfreeze entire model for fine-tuning'      # MODEL_ARC.md:95
+    epochs: 50  
+    freeze_backbone: false
+    learning_rates:
+      backbone: 1e-5
+      head: 1e-4
+
+# Class layers configuration (from MODEL_ARC.md:58-76)
+class_layers:
+  layer_1:
+    description: 'Full banknote detection (main object)'      # MODEL_ARC.md:61
+    classes: ['001', '002', '005', '010', '020', '050', '100'] # MODEL_ARC.md:63
+    examples: ['100K IDR', '50K IDR']                          # MODEL_ARC.md:62
+  
+  layer_2:
+    description: 'Nominal-defining features (unique visual cues)' # MODEL_ARC.md:66
+    classes: ['l2_001', 'l2_002', 'l2_005', 'l2_010', 'l2_020', 'l2_050', 'l2_100'] # MODEL_ARC.md:68
+    examples: ['Large printed number', 'Portrait', 'Watermark', 'Braile'] # MODEL_ARC.md:67
+  
+  layer_3:
+    description: 'Common features (shared among notes)'       # MODEL_ARC.md:71
+    classes: ['l3_sign', 'l3_text', 'l3_thread']             # MODEL_ARC.md:73
+    examples: ['BI Logo', 'Serial Number & Micro Text', 'Security Thread'] # MODEL_ARC.md:72
+
+# Checkpoint configuration
+checkpoints:
+  format: 'best_{model_name}_{backbone}_{date:%Y%m%d}.pt'    # MODEL_ARC.md:185
+  save_dir: 'data/checkpoints'                               # Sync with other configs
+  auto_cleanup: true
+  preserve_metadata: true                                    # MODEL_ARC.md:187

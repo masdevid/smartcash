@@ -1,0 +1,40 @@
+# File: smartcash/configs/dependency_config.yaml
+# Deskripsi: Konfigurasi sederhana untuk dependency management - hanya menyimpan selected_packages
+# Catatan: Default packages tidak bisa dihapus dari config, hanya diubah statusnya
+
+module_name: dependency
+version: "1.0.0"
+created_by: SmartCash
+description: "Dependency management configuration"
+
+# Selected packages - bisa ditambah/dikurangi melalui UI
+selected_packages: []
+
+# Custom packages yang ditambahkan manual
+custom_packages: ""
+
+# Uninstalled default packages (tracking which defaults were uninstalled)
+uninstalled_defaults: []
+
+# Install options
+install_options:
+  use_venv: true
+  venv_path: ".venv"
+  python_path: "python"
+  package_manager: "pip"
+  upgrade_strategy: "eager"
+  timeout: 300
+  retries: 3
+  parallel_workers: 4
+  force_reinstall: false
+  use_cache: true
+  trusted_hosts:
+    - "pypi.org"
+    - "files.pythonhosted.org"
+
+# UI settings
+ui_settings:
+  auto_check_updates: true
+  show_progress: true
+  log_level: "info"
+  compact_view: false

@@ -1,0 +1,72 @@
+# File: configs/pretrained_config.yaml
+# Deskripsi: Updated configuration untuk pretrained models SmartCash
+
+# Inherit dari base_config.yaml
+_base_: 'base_config.yaml'
+
+# Konfigurasi model pre-trained (updated paths dan sources)
+pretrained_models:
+  models_dir: '/data/pretrained'  # Updated: lokasi models di /data/pretrained
+  drive_models_dir: '/content/drive/MyDrive/SmartCash/pretrained'  # Updated: drive path
+  
+  # Konfigurasi model yang tersedia (updated untuk consistency)
+  models:
+    yolov5s:
+      name: 'YOLOv5s'
+      source: 'ultralytics'  # Added: source identification
+      url: 'https://github.com/ultralytics/yolov5/releases/download/v6.2/yolov5s.pt'
+      filename: 'yolov5s.pt'
+      min_size_mb: 10
+      description: 'YOLOv5s object detection backbone dari Ultralytics'
+      architecture: 'CSPDarknet'  # Added: architecture info
+      input_size: [640, 640]      # Added: input resolution
+      output_channels: [128, 256, 512]  # Added: feature map channels
+      
+    efficientnet_b4:
+      name: 'EfficientNet-B4'
+      source: 'timm'  # Added: source identification  
+      url: 'https://huggingface.co/timm/efficientnet_b4.ra2_in1k/resolve/main/pytorch_model.bin'
+      filename: 'efficientnet_b4_timm.bin'  # Updated: more descriptive filename
+      min_size_mb: 60
+      description: 'EfficientNet-B4 feature extraction backbone dari TIMM'
+      architecture: 'EfficientNet'  # Added: architecture info
+      input_size: [640, 640]        # Added: input resolution
+      output_channels: [56, 160, 448]  # Added: raw channels (akan di-adapt ke [128, 256, 512])
+
+# Progress step definitions (enhanced untuk better UX)
+progress:
+  steps:
+    init: {value: 0, label: 'Inisialisasi'}
+    check_models: {value: 20, label: 'Memeriksa model tersedia'}
+    download_start: {value: 30, label: 'Memulai download'}
+    download_progress: {value: 50, label: 'Mengunduh model'}
+    sync_start: {value: 80, label: 'Memulai sinkronisasi'}
+    sync_complete: {value: 95, label: 'Sinkronisasi selesai'}
+    complete: {value: 100, label: 'Proses selesai'}
+
+# Download configuration (new section)
+download:
+  timeout: 300  # 5 minutes timeout
+  chunk_size: 8192  # Download chunk size
+  retry_attempts: 3  # Retry attempts untuk failed downloads
+  verify_ssl: true  # SSL verification
+
+# Model variants untuk user customization (new section)
+model_variants:
+  yolov5_options:
+    - {key: 'yolov5n', name: 'YOLOv5n (Nano)', size_mb: 2}
+    - {key: 'yolov5s', name: 'YOLOv5s (Small)', size_mb: 10}  # Default
+    - {key: 'yolov5m', name: 'YOLOv5m (Medium)', size_mb: 40}
+    - {key: 'yolov5l', name: 'YOLOv5l (Large)', size_mb: 90}
+  
+  efficientnet_options:
+    - {key: 'efficientnet_b0', name: 'EfficientNet-B0', size_mb: 20}
+    - {key: 'efficientnet_b4', name: 'EfficientNet-B4', size_mb: 60}  # Default
+    - {key: 'efficientnet_b7', name: 'EfficientNet-B7', size_mb: 250}
+
+# Integration dengan model training (reference untuk model module)
+integration:
+  model_builder: 'smartcash.model.core.model_builder'
+  backbone_factory: 'smartcash.model.utils.backbone_factory'
+  checkpoint_dir: '/data/checkpoints'
+  compatible_formats: ['.pt', '.bin', '.pth']

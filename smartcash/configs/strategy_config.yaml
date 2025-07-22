@@ -1,0 +1,54 @@
+# File: configs/strategy_config.yaml
+# Deskripsi: Strategy config yang align dengan backend, hapus overlap dengan hyperparameters
+
+# ========================================
+# VALIDATION STRATEGY - Backend Used
+# ========================================
+validation:
+  frequency: 1                    # val_frequency_slider
+  iou_thres: 0.6                 # iou_thres_slider
+  conf_thres: 0.001              # conf_thres_slider
+  max_detections: 300            # max_detections_slider
+
+# ========================================
+# TRAINING UTILITIES - Backend Used
+# ========================================
+training_utils:
+  experiment_name: 'efficient_optimized_single'  # experiment_name_text
+  checkpoint_dir: '/content/runs/train/checkpoints'  # checkpoint_dir_text
+  tensorboard: true              # tensorboard_checkbox
+  log_metrics_every: 10          # log_metrics_slider
+  visualize_batch_every: 100     # visualize_batch_slider
+  layer_mode: 'single'           # layer_mode_dropdown
+
+# ========================================
+# MULTI-SCALE TRAINING - Backend Used
+# ========================================
+multi_scale:
+  enabled: true                  # multi_scale_checkbox
+  img_size_min: 320             # img_size_min_slider
+  img_size_max: 640             # img_size_max_slider
+  step_size: 32                 # Backend computed
+
+# ========================================
+# MODEL INFO - Backend Reference
+# ========================================
+model:
+  model_type: 'efficient_optimized'  # Dynamic experiment name generation
+
+# ========================================
+# METADATA
+# ========================================
+config_version: '2.1'
+description: 'Strategy config fokus validation & training utilities'
+module_name: 'strategy'
+
+# ========================================
+# OBSOLETE FIELDS - DIHAPUS
+# ========================================
+# gradient_clipping: OVERLAP dengan hyperparameters_config.yaml
+# image_size: KONFLIK dengan multi_scale (gunakan img_size_min/max)
+# early_stopping: Sudah di hyperparameters_config.yaml
+# optimizer: Sudah di hyperparameters_config.yaml
+# scheduler: Sudah di hyperparameters_config.yaml
+# save_best: Sudah di hyperparameters_config.yaml checkpoint section

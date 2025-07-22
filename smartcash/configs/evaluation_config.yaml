@@ -1,0 +1,114 @@
+# Evaluation Configuration
+# ---------------------
+# Configuration for model evaluation pipeline
+
+evaluation:
+  # Data paths - configurable and environment aware
+  data:
+    test_dir: 'data/preprocessed/test'         # Source test data
+    evaluation_dir: 'data/evaluation'         # Base output directory
+    results_dir: 'data/evaluation/results'    # Results storage
+    
+  # Checkpoint discovery configuration
+  checkpoints:
+    # Discovery paths (configurable, not hardcoded)
+    discovery_paths:
+      - 'data/checkpoints'                     # Primary checkpoint directory
+      - 'runs/train/*/weights'                 # YOLOv5 training output pattern
+      - 'experiments/*/checkpoints'            # Alternative experiment directory
+    
+    # Checkpoint filename patterns (regex)
+    filename_patterns:
+      - 'best_*.pt'                           # Standard best model format
+      - 'best_{model}_{backbone}_{mode}_{date}.pt'  # Enhanced format
+      - 'last.pt'                             # Latest checkpoint fallback
+      - 'epoch_*.pt'                          # Epoch-based checkpoints
+    
+    # Selection criteria
+    auto_select_best: true
+    sort_by: 'val_map'                        # Options: val_map, val_loss, performance_score
+    max_checkpoints: 10
+    min_val_map: 0.3                          # Minimum mAP threshold
+    
+    # Validation requirements
+    required_keys: ['model_state_dict', 'config']
+    supported_backbones: ['cspdarknet', 'efficientnet_b4', 'yolov5']
+    
+  # Evaluation scenarios
+  scenarios:
+    position_variation:                       # Position variation analysis
+      name: 'Position Variation'
+      enabled: true
+      augmentation_config:
+        num_variations: 5
+        scenario_type: 'geometric'
+
+    lighting_variation:                       # Lighting condition analysis
+      name: 'Lighting Variation'
+      enabled: true
+      augmentation_config:
+        num_variations: 5
+        scenario_type: 'photometric'
+
+  # Metrics configuration - comprehensive evaluation
+  metrics:
+    primary: ['map', 'precision_recall', 'inference_time']
+    
+    map:                                      # Mean Average Precision
+      enabled: true
+      iou_thresholds: [0.5, 0.75, 0.9]      # Multiple IoU thresholds
+      confidence_threshold: 0.25
+
+    precision_recall:                         # Precision/Recall metrics
+      enabled: true
+      confidence_threshold: 0.25
+      iou_threshold: 0.5
+      per_class: true
+
+    f1_score:                                # F1 Score calculation
+      enabled: true
+      beta: 1.0
+      per_class: true
+
+    inference_time:                          # Timing metrics
+      enabled: true
+      warmup_runs: 5
+      timing_runs: 100
+
+  # Execution configuration
+  execution:
+    run_mode: 'all_scenarios'                # Options: all_scenarios, position_only, lighting_only
+    parallel_execution: false                # Sequential execution for stability
+    save_intermediate_results: true
+    timeout_per_scenario: 1800               # 30 minutes timeout per scenario
+    
+  # Model selection from UI - sync with backbone_config.yaml and training_config.yaml
+  models:
+    backbone: 'efficientnet_b4'              # Sync with backbone_config.yaml:10
+    layer_mode: 'full_layers'                # full_layers or last_layer  
+    auto_select_best: true                   # Auto-select best model per backbone
+    pretrained_source: 'data/pretrained'    # Sync with pretrained_config.yaml:9
+    
+  # Output configuration
+  output:
+    save_dir: 'runs/evaluation'              # Base evaluation output directory
+    save_predictions: true
+    save_metrics: true
+    save_visualizations: false               # Disabled for performance
+    export_formats: ['json', 'csv']          # Output formats
+    
+  # Analysis modules
+  analysis:
+    currency_analysis:                       # Currency-specific metrics
+      enabled: true
+      primary_layer: 'banknote'
+      confidence_threshold: 0.3
+
+    class_analysis:                          # Class-wise metrics
+      enabled: true
+      compute_confusion_matrix: true
+      
+  # Progress reporting
+  progress:
+    update_frequency: 10                     # Update every 10 processed items
+    log_level: 'INFO'                       # DEBUG, INFO, WARNING, ERROR

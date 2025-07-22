@@ -5,9 +5,10 @@ Streamlined factory yang menyediakan pembuatan dan tampilan modul visualization
 dengan penanganan data kosong yang robust dan performa yang dioptimasi.
 """
 
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, Callable
 from smartcash.ui.core.ui_factory import UIFactory
 from smartcash.ui.dataset.visualization.visualization_uimodule import VisualizationUIModule
+from smartcash.ui.core.utils import create_ui_factory_method, create_display_function
 from smartcash.common.logger import get_module_logger
 
 class VisualizationUIFactory(UIFactory):
@@ -18,8 +19,7 @@ class VisualizationUIFactory(UIFactory):
     dan error handling yang lebih baik.
     
     Features (compliant with optimization.md):
-    - 🚀 Cache lifecycle management for component reuse
-    - 📊 Singleton pattern to prevent duplication  
+    - 🚀 Leverages parent's cache lifecycle management for component reuse
     - 💾 Lazy loading of UI components
     - 🧹 Proper widget lifecycle cleanup
     - 📝 Minimal logging for performance
@@ -28,10 +28,6 @@ class VisualizationUIFactory(UIFactory):
     # Singleton pattern implementation
     _instance = None
     _initialized = False
-    
-    # Cache lifecycle management
-    _component_cache = {}
-    _cache_valid = False
     
     def __new__(cls):
         """Singleton pattern to prevent duplication."""
@@ -54,6 +50,26 @@ class VisualizationUIFactory(UIFactory):
         instance._initialized = False
     
     @classmethod
+    def _create_module_instance(cls, config: Optional[Dict[str, Any]] = None, **kwargs) -> VisualizationUIModule:
+        """
+        Create a new instance of VisualizationUIModule.
+        
+        Args:
+            config: Konfigurasi opsional untuk modul
+            **kwargs: Additional arguments for module initialization
+                
+        Returns:
+            New VisualizationUIModule instance
+        """
+        module = VisualizationUIModule()
+        
+        # Apply config if provided
+        if config is not None and hasattr(module, 'update_config'):
+            module.update_config(config)
+            
+        return module
+    
+    @classmethod
     def create_visualization_module(
         cls,
         config: Optional[Dict[str, Any]] = None,
@@ -71,45 +87,11 @@ class VisualizationUIFactory(UIFactory):
         Returns:
             Fully initialized VisualizationUIModule with placeholder support and caching
         """
-        logger = get_module_logger(__name__)
-        instance = cls()
-        
-        try:
-            # Cache lifecycle management - Creation phase
-            cache_key = f"visualization_module_{hash(str(config))}"
-            
-            # Check cache validity
-            if not force_refresh and instance._cache_valid and cache_key in instance._component_cache:
-                cached_module = instance._component_cache[cache_key]
-                if cached_module and hasattr(cached_module, '_is_initialized') and cached_module._is_initialized:
-                    # Cache hit - return cached instance
-                    return cached_module
-            
-            # Cache miss or invalid - create new instance
-            module = VisualizationUIModule()
-            
-            # Apply config if provided
-            if config is not None and hasattr(module, 'update_config'):
-                module.update_config(config)
-            
-            # Initialize with validation
-            if not module.initialize():
-                # Cache invalidation on error
-                instance._invalidate_cache()
-                raise RuntimeError("Module initialization failed")
-            
-            # Ensure cards are displayed even if no backend data
-            cls._ensure_placeholder_cards(module)
-            
-            # Cache lifecycle management - Store successful creation
-            instance._component_cache[cache_key] = module
-            instance._cache_valid = True
-                
-            return module
-            
-        except Exception as e:
-            # Minimal error handling - let the exception propagate with context
-            raise RuntimeError(f"Failed to create VisualizationUIModule: {e}") from e
+        return create_ui_factory_method(
+            module_class=VisualizationUIModule,
+            module_name="Visualization",
+            create_module_func=cls._create_module_instance
+        )(config=config, force_refresh=force_refresh, **kwargs)
     
     @classmethod
     def _ensure_placeholder_cards(cls, module: VisualizationUIModule) -> None:

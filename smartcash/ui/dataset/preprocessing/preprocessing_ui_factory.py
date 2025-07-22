@@ -5,9 +5,10 @@ File ini menyediakan factory khusus untuk membuat dan menampilkan
 modul UI Preprocessing menggunakan BaseUIModule dan UI Factory pattern.
 """
 
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, Callable
 from smartcash.ui.core.ui_factory import UIFactory
 from smartcash.ui.dataset.preprocessing.preprocessing_uimodule import PreprocessingUIModule
+from smartcash.ui.core.utils import create_ui_factory_method, create_display_function
 from smartcash.ui.logger import get_module_logger
 
 class PreprocessingUIFactory(UIFactory):
@@ -18,26 +19,33 @@ class PreprocessingUIFactory(UIFactory):
     modul UI Preprocessing dengan konfigurasi default yang sesuai.
     
     Features (compliant with optimization.md):
-    - 🚀 Cache lifecycle management for component reuse
-    - 📊 Singleton pattern to prevent duplication  
+    - 🚀 Leverages parent's cache lifecycle management for component reuse
     - 💾 Lazy loading of UI components
     - 🧹 Proper widget lifecycle cleanup
     - 📝 Minimal logging for performance
     """
     
-    # Singleton pattern implementation
-    _instance = None
-    _initialized = False
-    
-    # Cache lifecycle management
-    _component_cache = {}
-    _cache_valid = False
-    
-    def __new__(cls):
-        """Singleton pattern to prevent duplication."""
-        if cls._instance is None:
-            cls._instance = super().__new__(cls)
-        return cls._instance
+    @classmethod
+    def _create_module_instance(cls, config: Optional[Dict[str, Any]] = None, **kwargs) -> PreprocessingUIModule:
+        """
+        Create a new instance of PreprocessingUIModule.
+        
+        Args:
+            config: Konfigurasi opsional untuk modul
+            **kwargs: Additional arguments for module initialization
+                - enable_environment: Boolean, whether to enable environment configuration (default: True)
+                
+        Returns:
+            New PreprocessingUIModule instance
+        """
+        enable_environment = kwargs.get('enable_environment', True)
+        module = PreprocessingUIModule(enable_environment=enable_environment)
+        
+        # Apply config if provided
+        if config is not None and hasattr(module, 'update_config'):
+            module.update_config(config)
+            
+        return module
     
     @classmethod
     def create_preprocessing_module(
@@ -53,79 +61,16 @@ class PreprocessingUIFactory(UIFactory):
             config: Konfigurasi opsional untuk modul
             force_refresh: Force refresh cache if True
             **kwargs: Argumen tambahan untuk inisialisasi modul
+                - enable_environment: Boolean, whether to enable environment configuration (default: True)
                 
         Returns:
             Instance PreprocessingUIModule yang sudah diinisialisasi dengan caching
         """
-        logger = get_module_logger(__name__)
-        instance = cls()
-        
-        try:
-            # Cache lifecycle management - Creation phase
-            cache_key = f"preprocessing_module_{hash(str(config))}"
-            
-            # Check cache validity
-            if not force_refresh and instance._cache_valid and cache_key in instance._component_cache:
-                cached_module = instance._component_cache[cache_key]
-                if cached_module and hasattr(cached_module, '_is_initialized') and cached_module._is_initialized:
-                    # Cache hit - return cached instance
-                    return cached_module
-            
-            # Cache miss or invalid - create new instance
-            enable_environment = kwargs.get('enable_environment', True)
-            module = PreprocessingUIModule(enable_environment=enable_environment)
-            
-            # Minimal logging for performance
-            if config is not None and hasattr(module, 'update_config'):
-                module.update_config(config)
-            
-            # Initialize with validation
-            initialization_result = module.initialize()
-            if not initialization_result:
-                # Cache invalidation on error
-                instance._invalidate_cache()
-                raise RuntimeError("Module initialization failed")
-            
-            # Cache lifecycle management - Store successful creation
-            instance._component_cache[cache_key] = module
-            instance._cache_valid = True
-            
-            return module
-            
-        except Exception as e:
-            # Cache lifecycle management - Invalidation on error
-            instance._invalidate_cache()
-            
-            # Critical errors always logged
-            error_msg = f"Failed to create PreprocessingUIModule: {e}"
-            logger.error(error_msg, exc_info=True)
-            raise
-    
-    def _invalidate_cache(self) -> None:
-        """Cache lifecycle management - Invalidation phase."""
-        self._cache_valid = False
-        
-        # Widget lifecycle - Proper cleanup of cached components
-        for module in self._component_cache.values():
-            try:
-                if hasattr(module, 'cleanup'):
-                    module.cleanup()
-                # Additional IPython widget cleanup
-                if hasattr(module, '_ui_components') and module._ui_components:
-                    for component in module._ui_components.values():
-                        if hasattr(component, 'close'):
-                            component.close()
-            except Exception:
-                pass  # Ignore cleanup errors
-        
-        # Cache cleanup
-        self._component_cache.clear()
-    
-    @classmethod
-    def clear_cache(cls) -> None:
-        """Cache lifecycle management - Manual cleanup."""
-        instance = cls()
-        instance._invalidate_cache()
+        return create_ui_factory_method(
+            module_class=PreprocessingUIModule,
+            module_name="Preprocessing",
+            create_module_func=cls._create_module_instance
+        )(config=config, force_refresh=force_refresh, **kwargs)
     
     @classmethod
     def create_and_display_preprocessing(
@@ -134,42 +79,26 @@ class PreprocessingUIFactory(UIFactory):
         **kwargs
     ) -> None:
         """
-        Buat dan tampilkan modul Preprocessing UI dengan optimized performance.
+        Buat dan tampilkan modul Preprocessing UI.
         
         Args:
             config: Konfigurasi opsional untuk modul
             **kwargs: Argumen tambahan untuk inisialisasi modul
                 - auto_display: Boolean, apakah akan menampilkan UI secara otomatis (default: True)
-                - force_refresh: Force cache refresh (default: False)
+                - force_refresh: Boolean, apakah akan memaksa refresh cache (default: False)
+                - enable_environment: Boolean, whether to enable environment configuration (default: True)
                 
         Returns:
             None (displays the UI using IPython.display)
         """
-        from smartcash.ui.core import ui_utils
-        logger = get_module_logger(__name__)
-
-        try:
-            # Lazy loading - create module only when needed
-            module = cls.create_preprocessing_module(config=config, **kwargs)
-            
-            # Memory management - display with minimal resource usage
-            ui_utils.display_ui_module(
-                module=module,
-                module_name="Preprocessing",
-                **kwargs
-            )
-
-            # Return None explicitly to avoid displaying module object
-            return None
-            
-        except Exception as e:
-            # Critical errors always logged
-            error_msg = f"Failed to create and display Preprocessing UI: {str(e)}"
-            if 'module' in locals() and hasattr(module, 'log_error'):
-                module.log_error(error_msg)
-            else:
-                logger.error(error_msg, exc_info=True)
-            raise
+        display_fn = create_display_function(
+            factory_class=cls,
+            create_method_name='create_preprocessing_module',
+            module_name='Preprocessing',
+            config=config,
+            **kwargs
+        )
+        return display_fn()
 
 
 def create_preprocessing_display(**kwargs) -> callable:

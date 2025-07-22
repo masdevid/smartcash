@@ -5,10 +5,10 @@ File ini menyediakan factory khusus untuk membuat dan menampilkan
 modul UI Backbone menggunakan BaseUIModule dan UI Factory pattern.
 """
 
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, Callable
 from smartcash.ui.core.ui_factory import UIFactory
 from smartcash.ui.model.backbone.backbone_uimodule import BackboneUIModule
-from smartcash.ui.logger import get_module_logger
+from smartcash.ui.core.utils import create_ui_factory_method, create_display_function
 
 class BackboneUIFactory(UIFactory):
     """
@@ -18,40 +18,31 @@ class BackboneUIFactory(UIFactory):
     modul UI Backbone dengan konfigurasi default yang sesuai.
     
     Features (compliant with optimization.md):
-    - 🚀 Cache lifecycle management for component reuse
-    - 📊 Singleton pattern to prevent duplication  
+    - 🚀 Leverages parent's cache lifecycle management for component reuse
     - 💾 Lazy loading of UI components
     - 🧹 Proper widget lifecycle cleanup
     - 📝 Minimal logging for performance
     """
     
-    # Singleton pattern implementation
-    _instance = None
-    _initialized = False
-    
-    # Cache lifecycle management
-    _component_cache = {}
-    _cache_valid = False
-    
-    def __new__(cls):
-        """Singleton pattern to prevent duplication."""
-        if cls._instance is None:
-            cls._instance = super().__new__(cls)
-        return cls._instance
-        
-    def _invalidate_cache(self):
-        """Invalidate the component cache and mark as invalid."""
-        self._component_cache.clear()
-        self._cache_valid = False
-        if hasattr(self, '_instance'):
-            self._instance = None
-    
     @classmethod
-    def reset_cache(cls):
-        """Explicitly clear the factory singleton cache and invalidate all components."""
-        instance = cls()
-        instance._invalidate_cache()
-        instance._initialized = False
+    def _create_module_instance(cls, config: Optional[Dict[str, Any]] = None, **kwargs) -> BackboneUIModule:
+        """
+        Create a new instance of BackboneUIModule.
+        
+        Args:
+            config: Konfigurasi opsional untuk modul
+            **kwargs: Additional arguments for module initialization
+                
+        Returns:
+            New BackboneUIModule instance
+        """
+        module = BackboneUIModule()
+        
+        # Apply config if provided
+        if config is not None and hasattr(module, 'update_config'):
+            module.update_config(config)
+            
+        return module
     
     @classmethod
     def create_backbone_module(
@@ -71,56 +62,11 @@ class BackboneUIFactory(UIFactory):
         Returns:
             Instance BackboneUIModule yang sudah diinisialisasi dengan caching
         """
-        logger = get_module_logger(__name__)
-        instance = cls()
-        
-        try:
-            # Cache lifecycle management - Creation phase
-            cache_key = f"backbone_module_{hash(str(config))}"
-            
-            # Check cache validity
-            if not force_refresh and instance._cache_valid and cache_key in instance._component_cache:
-                cached_module = instance._component_cache[cache_key]
-                if cached_module and hasattr(cached_module, '_is_initialized') and cached_module._is_initialized:
-                    # Cache hit - return cached instance
-                    if hasattr(cached_module, 'log_debug'):
-                        cached_module.log_debug("✅ Menggunakan instance BackboneUIModule dari cache")
-                    else:
-                        logger.debug("✅ Menggunakan instance BackboneUIModule dari cache")
-                    return cached_module
-            
-            # Cache miss or invalid - create new instance
-            module = BackboneUIModule()
-            
-            # Apply config if provided
-            if config is not None and hasattr(module, 'update_config'):
-                module.update_config(config)
-            
-            # Initialize with validation
-            initialization_result = module.initialize()
-            if not initialization_result:
-                # Cache invalidation on error
-                instance._invalidate_cache()
-                raise RuntimeError("Module initialization failed")
-            
-            # Cache lifecycle management - Store successful creation
-            instance._component_cache[cache_key] = module
-            instance._cache_valid = True
-                
-            return module
-            
-        except Exception as e:
-            # Cache lifecycle management - Invalidation on error
-            if 'instance' in locals():
-                instance._invalidate_cache()
-                
-            # Critical errors always logged
-            error_msg = f"Gagal membuat BackboneUIModule: {e}"
-            if 'module' in locals() and hasattr(module, 'log_error'):
-                module.log_error(error_msg)
-            else:
-                logger.error(error_msg, exc_info=True)
-            raise
+        return create_ui_factory_method(
+            module_class=BackboneUIModule,
+            module_name="Backbone",
+            create_module_func=cls._create_module_instance
+        )(config=config, force_refresh=force_refresh, **kwargs)
     
     @classmethod
     def create_and_display_backbone(
@@ -140,38 +86,14 @@ class BackboneUIFactory(UIFactory):
         Returns:
             None (displays the UI using IPython.display)
         """
-        from smartcash.ui.core import ui_utils
-        logger = get_module_logger(__name__)
-        
-        try:
-            # Get force_refresh from kwargs if provided
-            force_refresh = kwargs.pop('force_refresh', False)
-            
-            # Buat instance modul dengan manajemen cache
-            module = cls.create_backbone_module(
-                config=config,
-                force_refresh=force_refresh,
-                **kwargs
-            )
-            
-            # Tampilkan UI menggunakan utility yang konsisten
-            ui_utils.display_ui_module(
-                module=module,
-                module_name="Backbone",
-                **kwargs
-            )
-            
-            # Return None explicitly to avoid displaying module object
-            return None
-            
-        except Exception as e:
-            error_msg = f"Gagal membuat dan menampilkan Backbone UI: {str(e)}"
-            # Try to log to module first, fallback to factory logger
-            if 'module' in locals() and hasattr(module, 'log_error'):
-                module.log_error(error_msg)
-            else:
-                logger.error(error_msg, exc_info=True)
-            raise
+        display_fn = create_display_function(
+            factory_class=cls,
+            create_method_name='create_backbone_module',
+            module_name='Backbone',
+            config=config,
+            **kwargs
+        )
+        return display_fn()
 
 
 def create_backbone_display(**kwargs) -> callable:

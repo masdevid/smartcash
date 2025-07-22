@@ -8,6 +8,10 @@ Updated 22 Juli 2025, 20:
 - Model Data: `/content/data/models` or `/data/models (Symlink|Local)`
 
 # GENERAL - ✅ COMPLETED
+- [NEW] Dynamic Button Registration debug log re-appear each operation started, polluting operation logs. It should only check once on init.
+- [NEW] Each time operation started, it should clear operation logs.
+- [NEW] Header Container -> Indicator -> not updated based on detected environment
+- [NEW] Confirm Dialog on Preprocessing, Augmentation, Downloader still not working
 - ✅ Saat inisialisasi beberapa modul prosesnya cukup lama, dan progress tracker seperti diinisialisasi 2-3 kali sebelum seluruh UI terrender. 
   → FIXED: Implemented cache lifecycle management in UIFactory with validation, invalidation, and cleanup
 - ✅ Perlu adanya initialization yang lebih baik untuk meningkatkan performa dengan tetap memunculkan semua UI component.
@@ -15,7 +19,9 @@ Updated 22 Juli 2025, 20:
 - ✅ Enable Environment = True untuk semua modul kecuali pretrained. Saat ini indikator environment hanya modul colab saja yang berhasil mendeteksi lingkungan sebagai "Colab", modul lain masih "Local"
   → FIXED: Updated all modules to enable environment detection, fixed EnvironmentMixin inheritance in BaseUIModule
 
+
 # COLAB MODULE - ✅ FIXED BUTTON STATE & LOGGING
+- [NEW] Environment container indeed exist on main_container dict, but it's not displayed. 
 - ✅ Environemnt Container tidak muncul.
   → FIXED: Environment Container properly integrated in main container assembly
 - ✅ Hapus Footer Container
@@ -55,6 +61,8 @@ Updated 22 Juli 2025, 20:
   → FIXED: Added missing extract_config_from_ui() method to DownloaderConfigHandler
 
 # PREPROCESSING MODULE - ✅ FIXED LOGGING & BUTTON STATE
+- [NEW] Summary Container indeed exist, but it's never updated after operation finished. It should display summary response from backend.
+- [NEW] Logs still not appear, ensure preprocessing operation using LoggingMixing log_*. Check possibility of namespace missmatch. 
 - ✅ Log masih tidak muncul di Operation Container padahal berulang kali melakukan pengujian berhasil tapi saat di colab tidak muncul.
   → FIXED: Enhanced LoggingMixin bridge setup with proactive backend logger capture
 - ✅ Saat klik reset, logs `INFO - ✅ Config updated in PreprocessingConfigHandler` muncul di luar Operation Container (Tanda kalau operation container belum terhubung dengan benar)
@@ -67,19 +75,22 @@ Updated 22 Juli 2025, 20:
 # SPLIT MODULE
 
 # AUGMENTATION MODULE - ✅ FIXED LOGGING
-- [ ] Saat dilingukan colab dan sudah mounted, 
-- [ ] WARNING:smartcash.dataset.augmentor.utils.config_validator:⚠️ Config validation warnings: Missing section: data, Missing section: augmentation, Missing section: preprocessing   
-- [ ] Preview image tidak muncul padahal gambar ada di `/content/data/aug_preview.jpg`
+- [NEW] Summary Container indeed exist, but it's never updated after operation finished. It should display summary response from backend.
+- [NEW] ERROR:smartcash.dataset.augmentor.core.engine:Error creating preview: 'SmartCashLogger' object has no attribute 'success'
+- [NEW] Error in confirmation dialog: OperationContainer.show_dialog() got an unexpected keyword argument 'dialog_type'
+- [NEW] ❌ Tidak ada konfigurasi cleanup yang ditemukan: Tidak ada konfigurasi cleanup yang ditemukan
+- [NEW] WARNING:smartcash.dataset.augmentor.utils.config_validator:⚠️ Config validation warnings: Missing section: data, Missing section: augmentation, Missing section: preprocessing   
+- ✅ Saat dilingkupi colab dan sudah mounted, preview image tidak muncul padahal gambar ada di `/content/data/aug_preview.jpg`
 - ✅ Log dari backend masih leaked diluar Operation Container
   → FIXED: Backend augmentation service logs now captured in Operation Container with namespace filtering
 - ✅ Seharusnya ada Summary Container yang menampilkan Summary dari Backend
   → FIXED: Summary Container already properly integrated in augmentation_ui.py, added required_components in augmentation_uimodule.py
 
 # PRETRAINED MODULE
-- [ ] Muncul tqdm di console dari `model.safetensors: 100%` saat proses download
+- [NEW] Muncul tqdm di console dari `model.safetensors: 100%` saat proses download
 
 # BACKBONE MODULE - ✅ FIXED LOGGING
-- [ ] Saat build berhasil beri informasi dimana lokasi model disimpan
+- [NEW] Saat build berhasil beri informasi dimana lokasi model disimpan
 - ✅ Failed to reset configuration: Invalid configuration updates provided
   → FIXED: Enhanced configuration validation with proper type checking in BackboneConfigHandler
 - ✅ Failed to save configuration: 'BackboneConfigHandler' object has no attribute 'extract_config_from_ui'
@@ -92,18 +103,20 @@ Updated 22 Juli 2025, 20:
   → FIXED: Enhanced model discovery with relaxed validation requirements and fallback file system scan
 
 # TRAINING MODULE - ✅ FIXED LOGGING
+- [NEW] Should Check Wether Python Package needed for training is installed
+- [NEW] Training finished at "starting" phase. Got Training ID but no further visible training process. Is this because backend using threading and not reporting any progress/live chart update?
 - ✅ Log backend masih leak diluar operation container
   → FIXED: Backend training service logs now captured in Operation Container
 
 # EVALUATION MODULE - ✅ FIXED LOGGING
-- [ ] Gunakan satu tombol refresh models yang ada di action button saja, hapus button yang ada di form
+- [NEW] There's redundant refresh button on form
 - ✅ Log backend masih leak diluar operation container
   → FIXED: Backend evaluation service logs now captured in Operation Container
 
 
 # VISUALIZATION MODULE - ✅ FIXED LOGGING
-- [ ] Dashboard cards tidak tampil
-- [ ] Gagal memuat sampel data preprocessed: Direktori dataset tidak ditemukan di konfigurasi
-- [ ] Gagal memuat sampel data augmented: Direktori dataset tidak ditemukan di konfigurasi
+- [NEW] Dashboard cards tidak tampil
+- [NEW] Gagal memuat sampel data preprocessed: Direktori dataset tidak ditemukan di konfigurasi
+- [NEW] Gagal memuat sampel data augmented: Direktori dataset tidak ditemukan di konfigurasi
 - ✅ Log backend masih leak diluar operation container
   → FIXED: Backend visualization service logs now captured in Operation Container

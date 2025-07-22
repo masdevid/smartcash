@@ -5,9 +5,10 @@ File ini menyediakan factory khusus untuk membuat dan menampilkan
 modul UI Colab menggunakan BaseUIModule dan UI Factory pattern.
 """
 
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, Callable
 from smartcash.ui.core.ui_factory import UIFactory
 from smartcash.ui.setup.colab.colab_uimodule import ColabUIModule
+from smartcash.ui.core.utils import create_ui_factory_method, create_display_function
 from smartcash.ui.logger import get_module_logger
 
 class ColabUIFactory(UIFactory):
@@ -16,62 +17,57 @@ class ColabUIFactory(UIFactory):
     
     Kelas ini menyediakan method khusus untuk membuat dan menampilkan
     modul UI Colab dengan konfigurasi default yang sesuai.
+    
+    Features (compliant with optimization.md):
+    - Leverages parent's cache lifecycle management for component reuse
+    - Lazy loading of UI components
+    - Proper widget lifecycle cleanup
+    - Minimal logging for performance
     """
     
-    _instance = None
-    _initialized = False
+    @classmethod
+    def _create_module_instance(cls, config: Optional[Dict[str, Any]] = None, **kwargs) -> ColabUIModule:
+        """
+        Create a new instance of ColabUIModule.
+        
+        Args:
+            config: Konfigurasi opsional untuk modul
+            **kwargs: Additional arguments for module initialization
+                
+        Returns:
+            New ColabUIModule instance
+        """
+        module = ColabUIModule()
+        
+        # Initialize the module with config if provided
+        if config is not None and hasattr(module, 'update_config'):
+            module.update_config(config)
+            
+        return module
     
     @classmethod
     def create_colab_module(
         cls,
         config: Optional[Dict[str, Any]] = None,
+        force_refresh: bool = False,
         **kwargs
     ) -> ColabUIModule:
         """
-        Buat atau dapatkan instance ColabUIModule yang sudah ada.
+        Buat instance ColabUIModule dengan cache lifecycle management.
         
         Args:
             config: Konfigurasi opsional untuk modul
+            force_refresh: Force refresh cache if True
             **kwargs: Argumen tambahan untuk inisialisasi modul
                 
         Returns:
-            Instance ColabUIModule yang sudah diinisialisasi
+            Instance ColabUIModule yang sudah diinisialisasi dengan caching
         """
-        # Return existing instance if available
-        if cls._instance is not None and cls._initialized:
-            if config is not None and hasattr(cls._instance, 'update_config'):
-                cls._instance.update_config(config)
-            return cls._instance
-            
-        try:
-            # Create new instance if none exists
-            if cls._instance is None:
-                cls._instance = ColabUIModule()
-                cls._instance.log_debug("Membuat instance ColabUIModule baru")
-            
-            # Update config if provided
-            if config is not None and hasattr(cls._instance, 'update_config'):
-                cls._instance.update_config(config)
-            
-            # Initialize only once
-            if not cls._initialized:
-                cls._instance.log_debug("Menginisialisasi ColabUIModule...")
-                initialization_result = cls._instance.initialize()
-                if not initialization_result:
-                    raise RuntimeError("Module initialization failed")
-                cls._initialized = True
-                cls._instance.log_debug("✅ Berhasil menginisialisasi ColabUIModule")
-            
-            return cls._instance
-            
-        except Exception as e:
-            # Try to log to module first, fallback to factory logger
-            error_msg = f"Gagal membuat ColabUIModule: {e}"
-            if 'module' in locals() and hasattr(module, 'log_error'):
-                module.log_error(error_msg)
-            else:
-                logger.error(error_msg, exc_info=True)
-            raise
+        return create_ui_factory_method(
+            module_class=ColabUIModule,
+            module_name="Colab",
+            create_module_func=cls._create_module_instance
+        )(config=config, force_refresh=force_refresh, **kwargs)
     
     @classmethod
     def create_and_display_colab(
@@ -86,33 +82,19 @@ class ColabUIFactory(UIFactory):
             config: Konfigurasi opsional untuk modul
             **kwargs: Argumen tambahan untuk inisialisasi modul
                 - auto_display: Boolean, apakah akan menampilkan UI secara otomatis (default: True)
+                - force_refresh: Boolean, apakah akan memaksa refresh cache (default: False)
                 
         Returns:
             None (displays the UI using IPython.display)
         """
-        from smartcash.ui.core import ui_utils
-        
-        try:
-            # Buat instance modul (akan mengembalikan instance yang sudah ada jika tersedia)
-            module = cls.create_colab_module(config=config, **kwargs)
-            
-            # Tampilkan UI menggunakan utility yang konsisten
-            ui_utils.display_ui_module(
-                module=module,
-                module_name="Colab",
-                **kwargs
-            )
-            # Return None explicitly to avoid displaying module object
-            return None
-            
-        except Exception as e:
-            error_msg = f"Gagal membuat dan menampilkan Colab UI: {str(e)}"
-            # Try to log to module first, fallback to factory logger
-            if 'module' in locals() and hasattr(module, 'log_error'):
-                module.log_error(error_msg)
-            else:
-                logger.error(error_msg, exc_info=True)
-            raise
+        display_fn = create_display_function(
+            factory_class=cls,
+            create_method_name='create_colab_module',
+            module_name='Colab',
+            config=config,
+            **kwargs
+        )
+        return display_fn()
 
 
 def create_colab_display(**kwargs) -> callable:

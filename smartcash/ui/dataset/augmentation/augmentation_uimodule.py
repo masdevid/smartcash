@@ -292,11 +292,10 @@ class AugmentationUIModule(BaseUIModule):
                 dialog_result = operation_container['show_dialog'](
                     title=title,
                     message=message,
-                    dialog_type='confirm',
-                    buttons=[
-                        {'text': confirm_text, 'style': 'primary', 'value': True},
-                        {'text': cancel_text, 'style': 'secondary', 'value': False}
-                    ]
+                    on_confirm=lambda: True,
+                    on_cancel=lambda: False,
+                    confirm_text=confirm_text,
+                    cancel_text=cancel_text
                 )
                 return dialog_result
             else:

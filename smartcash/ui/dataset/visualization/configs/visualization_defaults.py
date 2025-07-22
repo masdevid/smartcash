@@ -38,6 +38,9 @@ def get_default_visualization_config() -> Dict[str, Any]:
             'cache_dir': './.cache/visualization'
         },
         
+        # Data directory configuration
+        'data_dir': 'data',  # Default data directory
+        
         # UI components visibility
         'ui': {
             'show_statistics': True,

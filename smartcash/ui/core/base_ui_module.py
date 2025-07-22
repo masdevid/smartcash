@@ -378,7 +378,12 @@ class BaseUIModule(
         try:
             # Log environment info if environment support is enabled
             if self.has_environment_support:
+                # Refresh environment detection to ensure latest values
+                self.refresh_environment_detection()
+                
+                # Update header indicator with current environment
                 self.update_header_indicator()
+                
                 # Safely access environment_paths attributes
                 if hasattr(self, 'environment_paths') and self.environment_paths is not None:
                     if hasattr(self.environment_paths, 'data_root') and self.environment_paths.data_root:
@@ -395,11 +400,25 @@ class BaseUIModule(
             self.log_error(f"⚠️ Terjadi kesalahan saat inisialisasi: {str(e)}")
      
     def update_header_indicator(self) -> None:
-        if hasattr(self, 'header') and hasattr(self.header, 'update'):
-            self.header.update(
-                environment=self._environment,
-                config_path=self._config_path
-            )
+        """Update header container environment indicator with current detected environment."""
+        try:
+            if hasattr(self, '_ui_components') and self._ui_components:
+                header_container = self._ui_components.get('header_container')
+                if header_container and hasattr(header_container, 'update'):
+                    # Get current environment info
+                    env_info = self.get_environment_info() if hasattr(self, 'get_environment_info') else {}
+                    
+                    # Update the header environment indicator
+                    header_container.update(
+                        environment=self._environment,
+                        config_path=self._config_path
+                    )
+                    
+                    self.log_debug(f"Header environment indicator updated: {self._environment}")
+                else:
+                    self.log_debug("Header container not found or no update method available")
+        except Exception as e:
+            self.log_debug(f"Failed to update header environment indicator: {e}")
     def _initialize_progress_display(self) -> None:
         """
         Initialize progress display components.
@@ -763,6 +782,9 @@ class BaseUIModule(
             # This prevents backend service logs from leaking to console
             self._ensure_logging_bridge_ready()
             
+            # Clear operation logs at start of each operation
+            self._clear_operation_logs()
+            
             # Check if we should reduce logging for one-click operations
             reduce_logging = hasattr(self, 'should_reduce_operation_logging') and self.should_reduce_operation_logging(operation_name)
             
@@ -826,6 +848,22 @@ class BaseUIModule(
             # Re-enable only the specific button that was disabled
             if button_id:
                 self.enable_all_buttons(button_id=button_id)
+
+    def _clear_operation_logs(self) -> None:
+        """Clear operation container logs at the start of each operation."""
+        try:
+            operation_container = self.get_component('operation_container')
+            if operation_container and isinstance(operation_container, dict):
+                # Try to clear logs if the operation container has a clear method
+                if 'clear_logs' in operation_container and callable(operation_container['clear_logs']):
+                    operation_container['clear_logs']()
+                elif 'log_accordion' in operation_container:
+                    log_accordion = operation_container['log_accordion']
+                    if hasattr(log_accordion, 'clear'):
+                        log_accordion.clear()
+        except Exception as e:
+            # Ignore errors in log clearing - it's not critical
+            pass
 
     def _ensure_logging_bridge_ready(self) -> None:
         """

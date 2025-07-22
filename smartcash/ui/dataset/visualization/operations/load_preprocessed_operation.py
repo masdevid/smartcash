@@ -51,10 +51,12 @@ class LoadPreprocessedOperation(VisualizationBaseOperation):
         self.logger.info("Memulai proses memuat sampel data preprocessed...")
         
         try:
-            # Dapatkan direktori data dari konfigurasi
-            data_dir = self._ui_module._config.get('data_dir')
+            # Dapatkan direktori data dari konfigurasi dengan fallback
+            data_dir = self._ui_module._config.get('data_dir', 'data')
             if not data_dir:
-                raise ValueError("Direktori dataset tidak ditemukan di konfigurasi")
+                # Fallback to default data directory
+                data_dir = 'data'
+                self.logger.warning("Using default data directory: 'data'")
             
             # Dapatkan layanan sampel
             samples_service = self.get_backend_api('samples_service')

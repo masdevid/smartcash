@@ -8,10 +8,18 @@ Updated 22 Juli 2025, 20:
 - Model Data: `/content/data/models` or `/data/models (Symlink|Local)`
 
 # GENERAL - ✅ COMPLETED
-- [NEW] Dynamic Button Registration debug log re-appear each operation started, polluting operation logs. It should only check once on init.
-- [NEW] Each time operation started, it should clear operation logs.
-- [NEW] Header Container -> Indicator -> not updated based on detected environment
-- [NEW] Confirm Dialog on Preprocessing, Augmentation, Downloader still not working
+- ✅ Dynamic Button Registration debug log re-appear each operation started, polluting operation logs. It should only check once on init.
+  → FIXED: Added _button_discovery_logged flag to prevent repeated debug logging
+- ✅ Each time operation started, it should clear operation logs.
+  → FIXED: Added _clear_operation_logs() method called at start of each operation
+- ✅ Button state management - labels should not change when disabled during operations
+  → FIXED: Removed description update logic, buttons stay disabled but keep original labels
+- ✅ Header Container -> Indicator -> not updated based on detected environment
+  → FIXED: Enhanced update_header_indicator() method and called refresh_environment_detection() after UI initialization
+- ✅ Confirm Dialog on Preprocessing, Augmentation, Downloader still not working
+  → FIXED: Removed invalid 'dialog_type' parameter and fixed show_dialog call parameters
+- ✅ SmartCashLogger missing 'success' method causing backend errors
+  → FIXED: Added success() method to SmartCashLogger that logs as INFO level
 - ✅ Saat inisialisasi beberapa modul prosesnya cukup lama, dan progress tracker seperti diinisialisasi 2-3 kali sebelum seluruh UI terrender. 
   → FIXED: Implemented cache lifecycle management in UIFactory with validation, invalidation, and cleanup
 - ✅ Perlu adanya initialization yang lebih baik untuk meningkatkan performa dengan tetap memunculkan semua UI component.
@@ -115,8 +123,11 @@ Updated 22 Juli 2025, 20:
 
 
 # VISUALIZATION MODULE - ✅ FIXED LOGGING
-- [NEW] Dashboard cards tidak tampil
-- [NEW] Gagal memuat sampel data preprocessed: Direktori dataset tidak ditemukan di konfigurasi
-- [NEW] Gagal memuat sampel data augmented: Direktori dataset tidak ditemukan di konfigurasi
+- ✅ Dashboard cards tidak tampil
+  → FIXED: Fixed dashboard container initialization and proper cards integration in _initialize_dashboard method
+- ✅ Gagal memuat sampel data preprocessed: Direktori dataset tidak ditemukan di konfigurasi
+  → FIXED: Added data_dir to default config and added fallback logic in load operations
+- ✅ Gagal memuat sampel data augmented: Direktori dataset tidak ditemukan di konfigurasi
+  → FIXED: Added data_dir to default config and added fallback logic in load operations
 - ✅ Log backend masih leak diluar operation container
   → FIXED: Backend visualization service logs now captured in Operation Container

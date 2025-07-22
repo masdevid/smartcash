@@ -135,6 +135,10 @@ class SmartCashLogger:
         """Log critical message"""
         self.logger.critical(message, **kwargs)
     
+    def success(self, message: str, **kwargs):
+        """Log success message as INFO level with success styling"""
+        self.logger.info(message, **kwargs)
+    
     def exception(self, message: str, **kwargs):
         """Log exception with traceback"""
         if 'exc_info' not in kwargs:

@@ -228,14 +228,17 @@ class ButtonHandlerMixin:
                 continue
             buttons[key] = widget
         
-        # Log the buttons we found for debugging (optimized for one-click mode)
-        if buttons:
+        # Log the buttons we found for debugging (optimized for one-click mode) - only once during init
+        if buttons and not hasattr(self, '_button_discovery_logged'):
             if hasattr(self, 'log_info'):
                 # In one-click mode, just log that buttons were found
                 if len(buttons) == 1 and any(self._is_primary_button(widget) for widget in buttons.values()):
                     self.log_info(f"🔧 Found one-click button: {list(buttons.keys())[0]}")
                 else:
                     self.log_info(f"🔧 Found {len(buttons)} button(s) in UI components: {list(buttons.keys())}")
+                
+                # Mark as logged to prevent spam
+                self._button_discovery_logged = True
             
             # Detailed logging only in debug mode and non-one-click scenarios
             if hasattr(self, 'log_debug'):
@@ -653,10 +656,8 @@ class ButtonHandlerMixin:
                         button.disabled = True
                         button_states[btn_id]['modified'] = True
                     
-                    # Update description only for operation buttons, not save/reset
-                    if btn_id not in ['save', 'reset'] and btn_id != button_id:
-                        button_states[btn_id]['original_description'] = button.description
-                        button.description = message
+                    # DO NOT change button labels - keep original description
+                    # Users requested buttons to stay disabled but keep original text
             
             # Store the button states for later restoration
             if not hasattr(self, '_button_states_backup'):

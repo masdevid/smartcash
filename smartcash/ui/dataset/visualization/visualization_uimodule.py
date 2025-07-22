@@ -146,8 +146,15 @@ class VisualizationUIModule(BaseUIModule):
         self._dashboard_cards = create_visualization_stats_dashboard()
         
         # Add container cards to layout
-        if 'containers' in self.components and 'dashboard_container' in self.components['containers']:
-            self.components['containers']['dashboard_container'].children = [self._dashboard_cards.get_container()]
+        dashboard_container = None
+        if 'dashboard' in self.components:
+            dashboard_container = self.components['dashboard']
+        elif 'containers' in self.components and 'dashboard_container' in self.components['containers']:
+            dashboard_container = self.components['containers']['dashboard_container']
+            
+        if dashboard_container:
+            dashboard_container.children = [self._dashboard_cards.get_container()]
+            self.log_debug("✅ Dashboard cards initialized and added to container")
         
         # Initialize with empty stats (will be updated by refresh operation)
         self._update_dashboard_stats()

@@ -422,12 +422,31 @@ class AugmentationUIModule(BaseUIModule):
     
     def _update_operation_summary(self, content: str) -> None:
         """Updates the operation summary container with new content."""
-        updater = self.get_component('operation_summary_updater')
-        if updater and callable(updater):
-            self.log(f"Memperbarui ringkasan operasi.", 'debug')
-            updater(content, title="Ringkasan Operasi", icon="📊", visible=True)
-        else:
-            self.log("Komponen updater ringkasan operasi tidak ditemukan atau tidak dapat dipanggil.", 'warning')
+        try:
+            # Get summary container from UI components
+            summary_container = self.get_component('summary_container')
+            if summary_container and hasattr(summary_container, 'set_content'):
+                # Update summary container with backend response
+                formatted_content = f"""
+                <div style="padding: 10px; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">
+                    <h4 style="color: #2c3e50; margin: 0 0 10px 0;">📊 Augmentation Summary</h4>
+                    <div style="background: #f8f9fa; padding: 10px; border-radius: 5px; border-left: 4px solid #f39c12;">
+                        {content}
+                    </div>
+                </div>
+                """
+                summary_container.set_content(formatted_content)
+                self.log_debug("✅ Summary container updated with augmentation results")
+            else:
+                # Fallback: try operation_summary_updater method
+                updater = self.get_component('operation_summary_updater')
+                if updater and callable(updater):
+                    self.log(f"Memperbarui ringkasan operasi.", 'debug')
+                    updater(content, title="Ringkasan Operasi", icon="📊", visible=True)
+                else:
+                    self.log("Summary container tidak ditemukan atau tidak dapat dipanggil.", 'warning')
+        except Exception as e:
+            self.log_error(f"Failed to update operation summary: {e}")
     
     def _update_operation_phase(self, phase: str, message: str = "") -> None:
         """Updates the operation phase for progress tracking."""

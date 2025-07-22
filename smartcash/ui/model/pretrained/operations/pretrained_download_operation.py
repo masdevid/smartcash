@@ -3,9 +3,12 @@ Download operation for pretrained models.
 """
 
 import os
+import sys
 import time
 import urllib.request
+from contextlib import contextmanager
 from typing import Dict, Any
+import io
 
 from .pretrained_base_operation import PretrainedBaseOperation
 from smartcash.ui.model.pretrained.constants import DEFAULT_MODEL_URLS, PretrainedModelType
@@ -13,6 +16,24 @@ from smartcash.ui.model.pretrained.constants import DEFAULT_MODEL_URLS, Pretrain
 
 class PretrainedDownloadOperation(PretrainedBaseOperation):
     """Download operation for pretrained models."""
+    
+    @contextmanager
+    def _suppress_console_output(self):
+        """Context manager to suppress console output during downloads."""
+        try:
+            # Save original stdout and stderr
+            original_stdout = sys.stdout
+            original_stderr = sys.stderr
+            
+            # Redirect to null
+            sys.stdout = io.StringIO()
+            sys.stderr = io.StringIO()
+            
+            yield
+        finally:
+            # Restore original stdout and stderr
+            sys.stdout = original_stdout
+            sys.stderr = original_stderr
     
     def execute_operation(self) -> Dict[str, Any]:
         """Execute download operation with actual model downloads."""
@@ -39,7 +60,8 @@ class PretrainedDownloadOperation(PretrainedBaseOperation):
                 
                 if yolo_url:
                     start_time = time.time()
-                    urllib.request.urlretrieve(yolo_url, yolo_path)
+                    with self._suppress_console_output():
+                        urllib.request.urlretrieve(yolo_url, yolo_path)
                     end_time = time.time()
                     
                     # Get file size in MB
@@ -67,7 +89,8 @@ class PretrainedDownloadOperation(PretrainedBaseOperation):
                 if efficientnet_url:
                     # Download from custom URL
                     start_time = time.time()
-                    urllib.request.urlretrieve(efficientnet_url, efficientnet_path)
+                    with self._suppress_console_output():
+                        urllib.request.urlretrieve(efficientnet_url, efficientnet_path)
                     end_time = time.time()
                     
                     # Get file size and timing
@@ -84,8 +107,9 @@ class PretrainedDownloadOperation(PretrainedBaseOperation):
                         import torch
                         
                         start_time = time.time()
-                        model = timm.create_model('efficientnet_b4', pretrained=True)
-                        torch.save(model.state_dict(), efficientnet_path)
+                        with self._suppress_console_output():
+                            model = timm.create_model('efficientnet_b4', pretrained=True)
+                            torch.save(model.state_dict(), efficientnet_path)
                         end_time = time.time()
                         
                         # Get file size and timing

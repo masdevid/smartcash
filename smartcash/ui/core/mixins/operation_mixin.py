@@ -298,6 +298,68 @@ class OperationMixin:
             if hasattr(self, 'logger'):
                 self.logger.debug(f"Failed to update progress: {e}")
     
+    def update_triple_progress(self, overall_step: int = None, overall_message: str = "", 
+                             phase_step: int = None, phase_message: str = "",
+                             current_step: int = None, current_message: str = "") -> None:
+        """
+        Update triple progress display for granular training progress tracking.
+        
+        Args:
+            overall_step: Overall progress value (0-100)
+            overall_message: Overall progress message
+            phase_step: Phase progress value (0-100) 
+            phase_message: Phase progress message
+            current_step: Current step progress value (0-100)
+            current_message: Current step progress message
+        """
+        try:
+            # Delegate to operation_container for triple progress updates
+            if hasattr(self, '_ui_components') and self._ui_components:
+                operation_container = self._ui_components.get('operation_container')
+                if operation_container:
+                    # Handle operation_container as OperationContainer object
+                    if hasattr(operation_container, 'update_triple_progress'):
+                        operation_container.update_triple_progress(
+                            overall_step, overall_message,
+                            phase_step, phase_message, 
+                            current_step, current_message
+                        )
+                        return
+                    # Handle operation_container as dict with triple progress support
+                    elif isinstance(operation_container, dict) and 'update_triple_progress' in operation_container:
+                        operation_container['update_triple_progress'](
+                            overall_step, overall_message,
+                            phase_step, phase_message,
+                            current_step, current_message
+                        )
+                        return
+                    # Fallback to individual progress updates
+                    elif hasattr(operation_container, 'update_progress') or 'update_progress' in operation_container:
+                        update_fn = (operation_container.update_progress if hasattr(operation_container, 'update_progress') 
+                                   else operation_container['update_progress'])
+                        
+                        # Update all three progress levels
+                        if overall_step is not None:
+                            update_fn(overall_step, overall_message, 'primary')
+                        if phase_step is not None:
+                            update_fn(phase_step, phase_message, 'secondary') 
+                        if current_step is not None:
+                            update_fn(current_step, current_message, 'tertiary')
+                        return
+            
+            # Fallback logging
+            if hasattr(self, 'logger'):
+                if overall_step is not None:
+                    self.logger.debug(f"[Overall Progress] {overall_step}% - {overall_message}")
+                if phase_step is not None:
+                    self.logger.debug(f"[Phase Progress] {phase_step}% - {phase_message}")
+                if current_step is not None:
+                    self.logger.debug(f"[Current Progress] {current_step}% - {current_message}")
+                
+        except Exception as e:
+            if hasattr(self, 'logger'):
+                self.logger.debug(f"Failed to update triple progress: {e}")
+    
     def log_operation(self, message: str, level: str = "info") -> None:
         """
         Log operation message - delegates to operation_container.

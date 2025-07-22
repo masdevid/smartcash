@@ -190,9 +190,61 @@ class BackboneBuildOperationHandler(BaseBackboneOperation, ColabSecretsMixin):
                         desc = layer_spec.get('description', '')
                         self.log_operation(f"   • {layer_name}: {len(classes)} kelas - {desc}", level='info')
                 
+                # Save model using CheckpointManager
+                model_path = None
+                try:
+                    self.log_operation("💾 Menyimpan model...", level='info')
+                    from smartcash.model.core.checkpoint_manager import CheckpointManager
+                    from smartcash.model.utils.progress_bridge import ModelProgressBridge
+                    
+                    # Create progress bridge for checkpoint manager
+                    def checkpoint_progress_callback(*args, **kwargs):
+                        # Route progress to our logging system
+                        if len(args) >= 2:
+                            message = args[1] if isinstance(args[1], str) else ""
+                            if message:
+                                self.log_operation(f"💾 {message}", level='info')
+                    
+                    progress_bridge = ModelProgressBridge(progress_callback=checkpoint_progress_callback)
+                    
+                    # Prepare checkpoint config
+                    checkpoint_config = {
+                        'checkpoint': {
+                            'save_dir': self.config.get('save_dir', 'data/models'),
+                            'format': 'backbone_{model_name}_{backbone}_{date:%Y%m%d_%H%M}.pt',
+                            'max_checkpoints': 10,
+                            'auto_cleanup': False  # Keep all backbone builds
+                        },
+                        'model': {
+                            'model_name': 'smartcash',
+                            'backbone': model_type,
+                            'layer_mode': 'multi' if use_multi_layer else 'single'
+                        }
+                    }
+                    
+                    # Create checkpoint manager and save model
+                    checkpoint_manager = CheckpointManager(checkpoint_config, progress_bridge)
+                    model_path = checkpoint_manager.save_checkpoint(
+                        model=model,
+                        metrics={'build_success': True},
+                        model_name='smartcash',
+                        backbone=model_type,
+                        layer_mode='multi' if use_multi_layer else 'single'
+                    )
+                    
+                    self.log_operation(f"✅ Model berhasil disimpan di: {model_path}", level='success')
+                    
+                except Exception as save_error:
+                    self.log_operation(f"⚠️ Gagal menyimpan model: {save_error}", level='warning')
+                    model_path = None
+                
+                # Add model path to build result for summary
+                build_result['model_path'] = model_path
+                
                 # Format summary with enhanced information
                 summary = self._format_enhanced_build_summary(build_result, use_multi_layer)
-                self.log_operation("✅ Model backbone berhasil dibangun dengan dukungan multi-layer", level='success')
+                location_info = f" dan disimpan di: {model_path}" if model_path else ""
+                self.log_operation(f"✅ Model backbone berhasil dibangun dengan dukungan multi-layer{location_info}", level='success')
                 self._execute_callback('on_success', summary)
                 
                 # Log parameter count
@@ -307,6 +359,9 @@ class BackboneBuildOperationHandler(BaseBackboneOperation, ColabSecretsMixin):
                 summary += f"- **{layer_name}**: {len(classes)} kelas - {desc}\n"
             
             summary += f"""
+### Model Storage
+- **Saved Location**: {build_result.get('model_path', 'Model tidak disimpan - terjadi error saat save')}
+
 ### Training Strategy
 - **Phase 1**: Freeze backbone, train detection heads only (Learning Rate: 1e-3)
 - **Phase 2**: Unfreeze entire model for fine-tuning (Learning Rate: 1e-5)
@@ -314,6 +369,9 @@ class BackboneBuildOperationHandler(BaseBackboneOperation, ColabSecretsMixin):
 """
         else:
             summary += f"""
+### Model Storage
+- **Saved Location**: {build_result.get('model_path', 'Model tidak disimpan - terjadi error saat save')}
+
 ### Single Layer Detection
 - **Classes**: 7 (IDR denominations: 001, 002, 005, 010, 020, 050, 100)
 - **Detection Type**: Standard YOLO detection head

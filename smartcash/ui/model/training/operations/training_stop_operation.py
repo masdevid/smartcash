@@ -22,8 +22,11 @@ class TrainingStopOperationHandler(BaseTrainingOperation):
         """Execute the training stop operation."""
         self.log_operation("🛑 Menghentikan proses training...", level='info')
         
-        # Start dual progress tracking: 4 overall steps
-        self.start_dual_progress("Training Stop", total_steps=4)
+        # Start triple progress tracking: 4 overall steps with granular stop phases
+        if hasattr(self, 'start_triple_progress'):
+            self.start_triple_progress("Training Stop", total_steps=4)
+        else:
+            self.start_dual_progress("Training Stop", total_steps=4)
         
         try:
             # Step 1: Signal training process to stop
@@ -94,8 +97,17 @@ class TrainingStopOperationHandler(BaseTrainingOperation):
                 message="Resources dibersihkan"
             )
             
+            # Update button states back to normal
+            self._update_training_button_states(training_active=False)
+            
+            # Clear training state
+            self._clear_training_state()
+            
             # Complete the operation
-            self.complete_dual_progress("Training berhasil dihentikan")
+            if hasattr(self, 'complete_triple_progress'):
+                self.complete_triple_progress("Training berhasil dihentikan")
+            else:
+                self.complete_dual_progress("Training berhasil dihentikan")
             
             # Execute success callback
             self._execute_callback('on_success', "Training stopped successfully with state preserved")
@@ -109,11 +121,58 @@ class TrainingStopOperationHandler(BaseTrainingOperation):
             }
             
         except Exception as e:
+            # Ensure buttons are reset on error
+            self._update_training_button_states(training_active=False)
+            self._clear_training_state()
+            
             error_message = f"Training stop operation failed: {str(e)}"
-            self.error_dual_progress(error_message)
+            if hasattr(self, 'error_triple_progress'):
+                self.error_triple_progress(error_message)
+            else:
+                self.error_dual_progress(error_message)
             self._execute_callback('on_failure', error_message)
             return {'success': False, 'message': error_message}
 
+    def _update_training_button_states(self, training_active: bool) -> None:
+        """Update button states based on training status."""
+        try:
+            # Get buttons from UI components
+            buttons = {}
+            if hasattr(self, '_ui_components') and self._ui_components:
+                action_container = self._ui_components.get('action_container')
+                if isinstance(action_container, dict) and 'buttons' in action_container:
+                    buttons = action_container['buttons']
+            
+            if not training_active:
+                # Enable start and resume, disable stop
+                if 'start_training' in buttons:
+                    buttons['start_training'].disabled = False
+                if 'resume_training' in buttons:
+                    buttons['resume_training'].disabled = False
+                if 'stop_training' in buttons:
+                    buttons['stop_training'].disabled = True
+                    
+                self.log_operation("⚙️ Training buttons reset: Start/Resume enabled", 'info')
+                
+        except Exception as e:
+            self.log_operation(f"⚠️ Failed to update button states: {e}", 'warning')
+    
+    def _clear_training_state(self) -> None:
+        """Clear stored training state."""
+        try:
+            # Clear from UI module
+            if hasattr(self._ui_module, '_training_state'):
+                self._ui_module._training_state = {'phase': 'stopped'}
+            
+            # Clear from config
+            if 'training_state' in self.config:
+                del self.config['training_state']
+            
+            self.log_operation("💾 Training state cleared", 'info')
+            
+        except Exception as e:
+            self.log_operation(f"⚠️ Failed to clear training state: {e}", 'warning')
+    
     def _send_stop_signal(self) -> Dict[str, Any]:
         """Send stop signal to training process."""
         try:

@@ -13,7 +13,41 @@ def get_default_augmentation_config() -> Dict[str, Any]:
         Dictionary containing default configuration values
     """
     return {
-        # General settings
+        # Data configuration section (required by backend validator)
+        'data': {
+            'input_dir': 'data',
+            'output_dir': 'data/augmented',
+            'splits': ['train', 'valid', 'test'],
+            'formats': ['jpg', 'png', 'jpeg']
+        },
+        
+        # Augmentation configuration section (required by backend validator)
+        'augmentation': {
+            'enabled': True,
+            'augmentation_type': 'basic',  # basic, advanced, custom
+            'intensity': 0.5,  # 0.0 to 1.0
+            'random_seed': 42,
+            'preserve_original': True,
+            'create_subfolders': True
+        },
+        
+        # Preprocessing integration section (required by backend validator)
+        'preprocessing': {
+            'apply_before_augmentation': True,
+            'resize_before_augment': False,
+            'normalize_before_augment': False
+        },
+        
+        # Cleanup configuration section
+        'cleanup': {
+            'enabled': True,
+            'remove_augmented_files': True,
+            'remove_preview_files': True,
+            'preserve_original_structure': True,
+            'confirmation_required': True
+        },
+        
+        # General settings (kept for backward compatibility)
         'enabled': True,
         'augmentation_type': 'basic',  # basic, advanced, custom
         'intensity': 0.5,  # 0.0 to 1.0

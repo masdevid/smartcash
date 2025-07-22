@@ -188,16 +188,8 @@ def _create_main_form_layout(config: Dict[str, Any]) -> widgets.Widget:
     right_column_items = []
     right_column_items.append(widgets.HTML("<h3>🤖 Available Best Models</h3>"))
     
-    # Refresh button
-    refresh_button = widgets.Button(
-        description="🔄 Refresh Models",
-        tooltip="Refresh available models list",
-        button_style='info',
-        layout=widgets.Layout(width='150px', height='32px', margin='0 0 15px 0')
-    )
-    right_column_items.append(refresh_button)
-    
     # Model selection checkboxes (using proper checkpoint format)
+    # Note: Refresh functionality is available through the action container button
     model_checkboxes = _create_model_selection_checkboxes(config)
     right_column_items.extend(model_checkboxes)
     
@@ -222,7 +214,7 @@ def _create_main_form_layout(config: Dict[str, Any]) -> widgets.Widget:
     # Store widget references for form value extraction
     main_layout._scenario_checkboxes = {scenario: cb for scenario, cb in zip(RESEARCH_SCENARIOS.keys(), scenario_checkboxes)}
     main_layout._metrics_checkboxes = {metric: cb for metric, cb in zip(EVALUATION_METRICS.keys(), metrics_checkboxes)}
-    main_layout._refresh_button = refresh_button
+    # Note: refresh_button removed - functionality available through action container
     
     return main_layout
 

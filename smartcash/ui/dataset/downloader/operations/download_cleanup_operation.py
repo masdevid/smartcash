@@ -293,7 +293,7 @@ class DownloadCleanupOperation(DownloaderBaseOperation):
             self.update_progress(20, "🗑️ Memulai pembersihan dataset...")
             
             try:
-                cleanup_result = cleanup_service.cleanup_dataset()
+                cleanup_result = cleanup_service.cleanup_dataset_files(targets_result)
             except Exception as e:
                 return self._handle_error("Cleanup gagal", e)
             

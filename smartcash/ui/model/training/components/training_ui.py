@@ -132,13 +132,14 @@ def create_training_ui(config: Dict[str, Any]) -> Dict[str, Any]:
         # 5. Create metrics results summary panel
         metrics_summary = create_metrics_results_panel()
         
-        # 6. Create operation container for progress tracking and logs
+        # 6. Create operation container for progress tracking and logs with triple progress bars
         operation_container_result = create_operation_container(
             show_progress=True,
             show_dialog=True,
             show_logs=True,
-            progress_levels='dual',
+            progress_levels='triple',  # Enable triple progress bars for granular tracking
             log_module_name=UI_CONFIG['module_name'],
+            log_namespace_filter='training',  # Filter logs by training namespace
             log_height="150px",
             log_entry_style='compact',
             collapsible=True,

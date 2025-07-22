@@ -39,6 +39,7 @@ class MainContainer:
         action_container: Optional[widgets.Widget] = None,
         footer_container: Optional[widgets.Widget] = None,
         operation_container: Optional[widgets.Widget] = None,
+        environment_container: Optional[widgets.Widget] = None,
         # New flexible container system
         components: Optional[List[ContainerConfig]] = None,
         **style_options
@@ -98,11 +99,19 @@ class MainContainer:
                     'visible': True
                 })
                 
+            if environment_container:
+                components.append({
+                    'type': 'environment',
+                    'component': environment_container,
+                    'order': 4,
+                    'visible': True
+                })
+                
             if footer_container:
                 components.append({
                     'type': 'footer',
                     'component': footer_container,
-                    'order': 4,
+                    'order': 5,
                     'visible': True
                 })
         
@@ -367,6 +376,7 @@ def create_main_container(
     action_container: Optional[widgets.Widget] = None,
     footer_container: Optional[widgets.Widget] = None,
     operation_container: Optional[widgets.Widget] = None,
+    environment_container: Optional[widgets.Widget] = None,
     # New flexible container system
     components: Optional[List[ContainerConfig]] = None,
     **style_options
@@ -409,6 +419,7 @@ def create_main_container(
         action_container=action_container,
         footer_container=footer_container,
         operation_container=operation_container,
+        environment_container=environment_container,
         components=components,
         **style_options
     )

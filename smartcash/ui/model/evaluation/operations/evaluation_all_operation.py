@@ -145,9 +145,8 @@ class EvaluationAllOperation(EvaluationBaseOperation):
                 self.start_scenario(scenario, i, self._total_scenarios)
                 
                 try:
-                    # TODO: Call actual backend evaluation here
-                    # For now, simulate the evaluation process
-                    scenario_result = self._evaluate_scenario(scenario, model_name, backbone, layer_mode)
+                    # Call actual backend evaluation service
+                    scenario_result = self._evaluate_scenario_with_backend(scenario, model_name, backbone, layer_mode)
                     
                     results[scenario] = scenario_result
                     
@@ -185,9 +184,9 @@ class EvaluationAllOperation(EvaluationBaseOperation):
             self.complete_operation(success=False, message=str(e))
             return {'success': False, 'error': str(e)}
 
-    def _evaluate_scenario(self, scenario: str, model_name: str, backbone: str, layer_mode: str) -> Dict[str, Any]:
+    def _evaluate_scenario_with_backend(self, scenario: str, model_name: str, backbone: str, layer_mode: str) -> Dict[str, Any]:
         """
-        Evaluate a specific scenario.
+        Evaluate a specific scenario using real backend service.
         
         Args:
             scenario: Scenario name ('position' or 'lighting')
@@ -201,44 +200,92 @@ class EvaluationAllOperation(EvaluationBaseOperation):
         try:
             self._ui_module.log_info(f"🔄 Evaluating {scenario} scenario with model: {model_name}")
             
-            # Phase 1: Model loading
-            self.update_current_progress(10, f"Loading model: {model_name}")
+            # Import backend evaluation service
+            from smartcash.model.evaluation import run_evaluation_pipeline
+            from smartcash.model.api.core import create_model_api
             
-            # Phase 2: Dataset preparation  
-            self.update_current_progress(25, f"Preparing {scenario} test dataset")
+            # Create progress callback for backend
+            def progress_callback(current_step: int, total_steps: int, message: str, **kwargs):
+                percentage = (current_step / total_steps * 100) if total_steps > 0 else 0
+                self.update_current_progress(int(percentage), message)
+                
+            # Create model API
+            model_api = create_model_api()
             
-            # Phase 3: Running evaluation
-            self.update_current_progress(50, f"Running {scenario} evaluation tests")
+            # Map scenario names to backend format
+            scenario_mapping = {
+                'position': 'position_variation',
+                'lighting': 'lighting_variation'
+            }
             
-            # Phase 4: Computing metrics
-            self.update_current_progress(75, f"Computing {scenario} metrics")
+            backend_scenario = scenario_mapping.get(scenario, scenario)
             
-            # Phase 5: Finalizing results
-            self.update_current_progress(90, f"Finalizing {scenario} results")
-            
-            # TODO: Replace with actual backend call
-            # result = backend.evaluate_model(model_name, scenario, config)
-            
-            # Mock result for now
-            result = {
-                'success': True,
-                'scenario': scenario,
-                'model_evaluated': model_name,
-                'backbone': backbone,
-                'layer_mode': layer_mode,
-                'average_map': 0.823 if scenario == 'position' else 0.801,
-                'metrics': {
-                    'mAP@0.5': 0.823 if scenario == 'position' else 0.801,
-                    'precision': 0.845 if scenario == 'position' else 0.788,
-                    'recall': 0.790 if scenario == 'position' else 0.812
+            # Create evaluation config
+            eval_config = {
+                'evaluation': {
+                    'scenarios': [backend_scenario],
+                    'model_filter': {
+                        'backbone': backbone,
+                        'layer_mode': layer_mode
+                    },
+                    'output_dir': 'data/evaluation_results'
                 }
             }
             
-            self.update_current_progress(100, f"✅ {scenario} evaluation completed")
-            self._ui_module.log_success(f"✅ {scenario} scenario completed successfully")
+            # Get UI components for progress tracking
+            ui_components = getattr(self, '_ui_components', {})
+            
+            # Run evaluation with backend
+            self.update_current_progress(10, f"Initializing {scenario} evaluation")
+            
+            evaluation_result = run_evaluation_pipeline(
+                scenarios=[backend_scenario],
+                checkpoints=None,  # Let backend select best checkpoints
+                model_api=model_api,
+                config=eval_config,
+                progress_callback=progress_callback,
+                ui_components=ui_components
+            )
+            
+            # Process backend results
+            if evaluation_result.get('success', False):
+                scenario_results = evaluation_result.get('scenario_results', {})
+                scenario_data = scenario_results.get(backend_scenario, {})
+                
+                result = {
+                    'success': True,
+                    'scenario': scenario,
+                    'model_evaluated': model_name,
+                    'backbone': backbone,
+                    'layer_mode': layer_mode,
+                    'average_map': scenario_data.get('average_mAP', 0.0),
+                    'metrics': scenario_data.get('metrics', {}),
+                    'inference_time': scenario_data.get('average_inference_time', 0.0),
+                    'total_images': scenario_data.get('images_processed', 0)
+                }
+                
+                self.update_current_progress(100, f"✅ {scenario} evaluation completed")
+                self._ui_module.log_success(f"✅ {scenario} scenario completed with mAP: {result['average_map']:.3f}")
+            else:
+                # Handle backend evaluation failure
+                error_msg = evaluation_result.get('message', 'Backend evaluation failed')
+                result = {
+                    'success': False,
+                    'error': error_msg,
+                    'scenario': scenario,
+                    'model_evaluated': model_name
+                }
+                
+                self.update_current_progress(100, f"❌ {scenario} evaluation failed")
+                self._ui_module.log_error(f"❌ {scenario} scenario failed: {error_msg}")
             
             return result
             
         except Exception as e:
             self._ui_module.log_error(f"❌ {scenario} scenario evaluation failed: {e}")
-            return {'success': False, 'error': str(e)}
+            return {
+                'success': False,
+                'scenario': scenario,
+                'model_evaluated': model_name,
+                'error': str(e)
+            }

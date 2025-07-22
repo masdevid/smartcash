@@ -39,6 +39,9 @@ class BasePreprocessingOperation(OperationMixin, LoggingMixin, ABC):
         
         # Set up direct reference to operation container for consistent logging
         self._operation_container = ui_module._ui_components.get('operation_container')
+        
+        # Set module namespace for logging filtering
+        self._module_namespace = 'preprocessing'
 
     def _get_callback(self, name: str) -> Optional[Callable]:
         """Safely retrieves a callback by name."""

@@ -284,11 +284,30 @@ class PreprocessingUIModule(BaseUIModule):
 
     def _update_operation_summary(self, content: str) -> None:
         """Updates the operation summary container with new content."""
-        updater = self.get_component('operation_summary_updater')
-        if updater and callable(updater):
-            updater(content)
-        else:
-            self.log_warning("Komponen updater ringkasan operasi tidak ditemukan atau tidak dapat dipanggil.")
+        try:
+            # Get summary container from UI components
+            summary_container = self.get_component('summary_container')
+            if summary_container and hasattr(summary_container, 'set_content'):
+                # Update summary container with backend response
+                formatted_content = f"""
+                <div style="padding: 10px; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">
+                    <h4 style="color: #2c3e50; margin: 0 0 10px 0;">📊 Operation Summary</h4>
+                    <div style="background: #f8f9fa; padding: 10px; border-radius: 5px; border-left: 4px solid #28a745;">
+                        {content}
+                    </div>
+                </div>
+                """
+                summary_container.set_content(formatted_content)
+                self.log_debug("✅ Summary container updated with operation results")
+            else:
+                # Fallback: try operation_summary_updater method
+                updater = self.get_component('operation_summary_updater')
+                if updater and callable(updater):
+                    updater(content)
+                else:
+                    self.log_warning("Summary container tidak ditemukan atau tidak dapat dipanggil.")
+        except Exception as e:
+            self.log_error(f"Failed to update operation summary: {e}")
 
     def _execute_check_operation(self) -> Dict[str, Any]:
         """Execute the check operation using operation handler."""

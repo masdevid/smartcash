@@ -38,7 +38,8 @@ class TrainingUIModule(ModelConfigSyncMixin, BackendServiceMixin, BaseUIModule, 
         """Initialize training UI module."""
         super().__init__(
             module_name='training',
-            parent_module='model'
+            parent_module='model',
+            enable_environment=True
         )
         
         self.logger = get_module_logger("smartcash.ui.model.training")

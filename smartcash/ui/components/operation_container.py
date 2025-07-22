@@ -689,6 +689,12 @@ class OperationContainer(BaseUIComponent):
             if not hasattr(self.log_accordion, '_initialized') or not self.log_accordion._initialized:
                 self.log_accordion.initialize()
             
+            # Apply namespace filtering if configured
+            if self.log_namespace_filter and namespace:
+                # Only show logs that match the namespace filter
+                if not namespace.lower().startswith(self.log_namespace_filter.lower()):
+                    return  # Skip logs that don't match the filter
+            
             # Add timestamp and namespace formatting if provided
             if namespace:
                 formatted_message = f"[{namespace}] {message}"
@@ -1047,10 +1053,28 @@ class OperationContainer(BaseUIComponent):
                         
                         ui_level = level_mapping.get(record.levelno, LogLevel.INFO)
                         
-                        # Extract namespace from logger name
-                        namespace = record.name if record.name != 'root' else None
+                        # Extract namespace from logger name and map to module namespace
+                        namespace = None
+                        if record.name and record.name != 'root':
+                            # Map backend logger names to module namespaces
+                            logger_name = record.name.lower()
+                            if 'preprocessor' in logger_name:
+                                namespace = 'preprocessing'
+                            elif 'augmentor' in logger_name:
+                                namespace = 'augmentation'
+                            elif 'backbone' in logger_name:
+                                namespace = 'backbone'
+                            elif 'trainer' in logger_name:
+                                namespace = 'training'
+                            elif 'evaluator' in logger_name:
+                                namespace = 'evaluation'
+                            elif 'visualizer' in logger_name:
+                                namespace = 'visualization'
+                            else:
+                                # Use the module name from the operation container if available
+                                namespace = getattr(self.operation_container, 'log_namespace_filter', None) or record.name
                         
-                        # Log to operation container
+                        # Log to operation container with proper namespace
                         self.operation_container.log(message, ui_level, namespace)
                         
                     except Exception:

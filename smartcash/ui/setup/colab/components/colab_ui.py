@@ -125,19 +125,14 @@ def _create_colab_ui_components(config: Dict[str, Any]) -> Tuple[Dict[str, Any],
     environment_container = _create_environment_container(config)
     ui_components['environment_container'] = environment_container
     
-    # 7. Create footer with info box
-    footer_container = _create_footer()
-    ui_components['footer_container'] = footer_container
-    
-    # 8. Assemble main container
+    # 7. Assemble main container with Environment Container replacing Footer Container
     main_container = _assemble_main_container(
         header_container=header,
         form_container=form_widgets.get('form_ui') or form_widgets.get('container'),
         action_container=action_container,
         summary_container=summary_container.container,
         operation_container=operation_container,
-        environment_container=environment_container,
-        footer_container=footer_container
+        environment_container=environment_container
     )
     
     # Update component references
@@ -173,13 +168,14 @@ def _create_footer():
         PanelConfig(panel_type=PanelType.INFO_ACCORDION, title="💡 Setup Tips", content=_create_module_tips_box().value, style="info", flex="1", min_width="50%", open_by_default=False)
     ])
 
-def _assemble_main_container(header_container, form_container, action_container, summary_container, operation_container, environment_container, footer_container):
+def _assemble_main_container(header_container, form_container, action_container, summary_container, operation_container, environment_container):
     return create_main_container(
         header_container=header_container.container,
         form_container=form_container,
         action_container=action_container['container'],
+        summary_container=summary_container,
         operation_container=operation_container['container'],
-        footer_container=footer_container.container
+        environment_container=environment_container.get('container') if isinstance(environment_container, dict) else environment_container
     )
 
 
@@ -220,11 +216,11 @@ def create_colab_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> Dict[s
     _ui_components_cache = ui_components
     
     # Create container variables in function scope (required by validator)
-    header_container = ui_components['header_container']
-    form_container = ui_components['form_container']
-    action_container = ui_components['action_container']
-    operation_container = ui_components['operation_container']
-    footer_container = ui_components['footer_container']
+    header_container = ui_components.get('header_container')
+    form_container = ui_components.get('form_container')
+    action_container = ui_components.get('action_container')
+    operation_container = ui_components.get('operation_container')
+    environment_container = ui_components.get('environment_container')
     
     # Create UI components dictionary matching BaseUIModule expectations
     ui_components_final = {
@@ -233,8 +229,7 @@ def create_colab_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> Dict[s
         'form_container': form_container,
         'action_container': action_container,
         'operation_container': operation_container,
-        'footer_container': footer_container,
-        'environment_container': ui_components.get('environment_container'),
+        'environment_container': environment_container,
         'colab_setup': ui_components.get('colab_setup'),
         'save': ui_components.get('save'),
         'reset': ui_components.get('reset'),

@@ -11,6 +11,9 @@ import io
 import sys
 import traceback
 from typing import Dict, Any, Optional, Type, Callable, TypeVar
+import weakref
+import threading
+from contextlib import contextmanager
 
 from smartcash.ui.core.base_ui_module import BaseUIModule
 from smartcash.ui.core.errors.handlers import get_error_handler
@@ -26,7 +29,103 @@ class UIFactory:
     
     Factory ini menyediakan cara standar untuk membuat dan menampilkan
     komponen UI dengan penanganan error dan logging yang konsisten.
+    
+    Implements cache lifecycle management as per optimization.md:
+    1. Creation: Components cached on first successful creation
+    2. Validation: Cache validated before reuse to ensure integrity
+    3. Invalidation: Cache cleared on errors or explicit reset
+    4. Cleanup: Factory handles both instance and global cache clearing
     """
+    
+    # Cache lifecycle management (optimization.md compliance)
+    _module_cache: Dict[str, weakref.ref] = {}
+    _cache_lock = threading.RLock()
+    _cache_validation_enabled = True
+    
+    @classmethod
+    def _get_cache_key(cls, module_class: Type[T], module_name: str, parent_module: str = None) -> str:
+        """Generate unique cache key for module instance."""
+        base_key = f"{module_class.__name__}:{module_name}"
+        return f"{parent_module}:{base_key}" if parent_module else base_key
+    
+    @classmethod
+    def _validate_cached_module(cls, module: BaseUIModule) -> bool:
+        """Validate cached module integrity before reuse."""
+        if not cls._cache_validation_enabled:
+            return True
+            
+        try:
+            # Check if module has required attributes and methods
+            required_attrs = ['module_name', 'initialize', 'display_ui']
+            for attr in required_attrs:
+                if not hasattr(module, attr):
+                    return False
+            
+            # Check if module is properly initialized
+            if hasattr(module, '_initialized') and not module._initialized:
+                return False
+                
+            return True
+            
+        except Exception:
+            return False
+    
+    @classmethod
+    def _cache_module(cls, cache_key: str, module: BaseUIModule) -> None:
+        """Cache module instance using weak reference."""
+        with cls._cache_lock:
+            def cleanup_callback(ref):
+                # Remove from cache when module is garbage collected
+                cls._module_cache.pop(cache_key, None)
+            
+            cls._module_cache[cache_key] = weakref.ref(module, cleanup_callback)
+    
+    @classmethod
+    def _get_cached_module(cls, cache_key: str) -> Optional[BaseUIModule]:
+        """Retrieve and validate cached module instance."""
+        with cls._cache_lock:
+            if cache_key not in cls._module_cache:
+                return None
+                
+            module_ref = cls._module_cache[cache_key]
+            module = module_ref()
+            
+            # Clean up if module was garbage collected
+            if module is None:
+                del cls._module_cache[cache_key]
+                return None
+            
+            # Validate cached module integrity
+            if not cls._validate_cached_module(module):
+                del cls._module_cache[cache_key]
+                return None
+                
+            return module
+    
+    @classmethod
+    def _invalidate_cache(cls, cache_key: str = None) -> None:
+        """Invalidate cache (specific key or all)."""
+        with cls._cache_lock:
+            if cache_key:
+                cls._module_cache.pop(cache_key, None)
+            else:
+                cls._module_cache.clear()
+    
+    @classmethod
+    def clear_all_cache(cls) -> None:
+        """Clear all cached module instances."""
+        cls._invalidate_cache()
+    
+    @classmethod
+    @contextmanager
+    def disable_cache_validation(cls):
+        """Context manager to temporarily disable cache validation."""
+        original_state = cls._cache_validation_enabled
+        cls._cache_validation_enabled = False
+        try:
+            yield
+        finally:
+            cls._cache_validation_enabled = original_state
     
     @classmethod
     def _suppress_console_errors(cls):
@@ -105,16 +204,18 @@ class UIFactory:
         module_name: str,
         parent_module: str = None,
         config: Optional[Dict[str, Any]] = None,
+        enable_cache: bool = True,
         **kwargs
     ) -> T:
         """
-        Membuat instance modul UI baru.
+        Membuat instance modul UI baru dengan cache lifecycle management.
         
         Args:
             module_class: Kelas modul UI yang akan dibuat
             module_name: Nama modul
             parent_module: Nama modul induk (opsional)
             config: Konfigurasi awal untuk modul
+            enable_cache: Enable caching for this module instance
             **kwargs: Argumen tambahan untuk inisialisasi modul
             
         Returns:
@@ -124,9 +225,24 @@ class UIFactory:
             UIError: Jika terjadi kesalahan saat membuat modul
         """
         logger = get_module_logger("smartcash.ui.core.ui_factory")
+        cache_key = cls._get_cache_key(module_class, module_name, parent_module)
         
         try:
-            # Buat instance modul
+            # Try to get cached module first (if caching enabled)
+            if enable_cache:
+                cached_module = cls._get_cached_module(cache_key)
+                if cached_module is not None:
+                    # Update config if provided
+                    if config and hasattr(cached_module, 'update_config'):
+                        cached_module.update_config(config)
+                    
+                    # Minimal logging for performance (optimization.md)
+                    if hasattr(cached_module, 'log_debug'):
+                        cached_module.log_debug(f"🔄 Cache hit: Menggunakan instance {getattr(cached_module, 'full_module_name', module_name)}")
+                    
+                    return cached_module
+            
+            # Create new instance if not cached or caching disabled
             with cls._suppress_console_errors():
                 module = module_class(
                     module_name=module_name,
@@ -134,25 +250,40 @@ class UIFactory:
                     **kwargs
                 )
                 
-                # Inisialisasi konfigurasi jika disediakan
+                # Initialize module
+                if hasattr(module, 'initialize'):
+                    init_result = module.initialize()
+                    if init_result is False:
+                        raise RuntimeError("Module initialization failed")
+                
+                # Update config if provided
                 if config and hasattr(module, 'update_config'):
                     module.update_config(config)
                 
-                # Log to module's operation container if available, otherwise use standard logger
+                # Cache successful creation (if enabled)
+                if enable_cache:
+                    cls._cache_module(cache_key, module)
+                
+                # Informative success message (optimization.md)
                 full_name = getattr(module, 'full_module_name', module_name)
-                if hasattr(module, 'log_debug'):
-                    module.log_debug(f"✅ Modul {full_name} berhasil dibuat via UIFactory")
+                if hasattr(module, 'log_info'):
+                    module.log_info(f"✅ Created {full_name} (cached: {enable_cache})")
                 else:
-                    logger.debug(f"✅ Modul {full_name} berhasil dibuat")
+                    logger.info(f"✅ Created {full_name}")
                     
                 return module
             
         except Exception as e:
+            # Invalidate cache on error (optimization.md)
+            if enable_cache:
+                cls._invalidate_cache(cache_key)
+            
             context = {
                 'module_class': module_class.__name__,
                 'module_name': module_name,
                 'parent_module': parent_module,
-                'operation': 'create_module'
+                'operation': 'create_module',
+                'cache_key': cache_key
             }
             
             cls._handle_ui_error(
@@ -171,16 +302,18 @@ class UIFactory:
         module_name: str,
         parent_module: str = None,
         config: Optional[Dict[str, Any]] = None,
+        enable_cache: bool = True,
         **kwargs
     ) -> Optional[Dict[str, Any]]:
         """
-        Membuat dan menampilkan modul UI dalam satu langkah.
+        Membuat dan menampilkan modul UI dalam satu langkah dengan caching support.
         
         Args:
             module_class: Kelas modul UI yang akan dibuat
             module_name: Nama modul
             parent_module: Nama modul induk (opsional)
             config: Konfigurasi awal untuk modul
+            enable_cache: Enable caching for this module instance
             **kwargs: Argumen tambahan untuk inisialisasi modul
             
         Returns:
@@ -189,26 +322,33 @@ class UIFactory:
         Notes:
             - Menekan output error standar Python
             - Menampilkan error menggunakan komponen UI yang lebih informatif
+            - Implements cache lifecycle management per optimization.md
         """
         logger = get_module_logger("smartcash.ui.core.ui_factory")
+        cache_key = cls._get_cache_key(module_class, module_name, parent_module)
         
         try:
             with cls._suppress_console_errors():
-                # Buat instance modul
+                # Create module with caching support
                 module = cls.create_module(
                     module_class=module_class,
                     module_name=module_name,
                     parent_module=parent_module,
                     config=config,
+                    enable_cache=enable_cache,
                     **kwargs
                 )
                 
-                # Tampilkan UI
+                # Display UI
                 if hasattr(module, 'display_ui'):
                     display_result = module.display_ui()
                     if display_result and not display_result.get('success', False):
                         error_msg = display_result.get('message', 'Gagal menampilkan UI')
                         error = Exception(error_msg)
+                        
+                        # Invalidate cache on display error
+                        if enable_cache:
+                            cls._invalidate_cache(cache_key)
                         
                         cls._handle_ui_error(
                             error=error,
@@ -218,7 +358,8 @@ class UIFactory:
                                 'module_class': module.__class__.__name__,
                                 'module_name': getattr(module, 'module_name', 'unknown'),
                                 'parent_module': getattr(module, 'parent_module', None),
-                                'operation': 'display_ui'
+                                'operation': 'display_ui',
+                                'cache_key': cache_key
                             }
                         )
                         
@@ -229,6 +370,10 @@ class UIFactory:
                 return None
                 
         except Exception as e:
+            # Invalidate cache on any error
+            if enable_cache:
+                cls._invalidate_cache(cache_key)
+                
             cls._handle_ui_error(
                 error=e,
                 error_message=f"Gagal menampilkan modul {module_name}",
@@ -237,7 +382,8 @@ class UIFactory:
                     'module_class': module_class.__name__,
                     'module_name': module_name,
                     'parent_module': parent_module,
-                    'operation': 'create_and_display'
+                    'operation': 'create_and_display',
+                    'cache_key': cache_key
                 }
             )
             

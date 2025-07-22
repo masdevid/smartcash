@@ -99,6 +99,87 @@ class ButtonHandlerMixin:
             return name[:-7]  # Remove '_button' suffix
         return name
         
+    def _extract_buttons_from_container(self, container, recursive: bool = False) -> Dict[str, Any]:
+        """Extract button widgets from a container object.
+        
+        Args:
+            container: Container object to extract buttons from
+            recursive: Whether to recursively search nested containers
+            
+        Returns:
+            Dictionary of button name to button widget mappings
+        """
+        buttons = {}
+        
+        if not container:
+            return buttons
+        
+        # Method 1: If container is a dictionary with a 'buttons' key
+        if isinstance(container, dict) and 'buttons' in container:
+            if isinstance(container['buttons'], dict):
+                buttons.update(container['buttons'])
+                
+        # Method 2: If container is an object with a 'buttons' attribute
+        elif hasattr(container, 'buttons'):
+            container_buttons = getattr(container, 'buttons', {})
+            if isinstance(container_buttons, dict):
+                buttons.update(container_buttons)
+                
+        # Method 3: If container has a get_buttons method
+        if hasattr(container, 'get_buttons'):
+            try:
+                container_buttons = container.get_buttons()
+                if container_buttons and isinstance(container_buttons, dict):
+                    buttons.update(container_buttons)
+            except Exception:
+                pass  # Ignore errors from get_buttons method
+                
+        # Method 4: If container is an ActionContainer object, try to access internal buttons
+        if hasattr(container, 'buttons') and hasattr(container.buttons, 'get'):
+            try:
+                # Handle ActionContainer.buttons which might have primary/action structure
+                container_buttons = getattr(container, 'buttons', {})
+                if isinstance(container_buttons, dict):
+                    # Check for primary button
+                    if 'primary' in container_buttons and container_buttons['primary']:
+                        buttons['primary'] = container_buttons['primary']
+                    
+                    # Check for action buttons
+                    if 'action' in container_buttons:
+                        action_buttons = container_buttons['action']
+                        if isinstance(action_buttons, dict):
+                            buttons.update(action_buttons)
+                        elif hasattr(action_buttons, 'on_click'):
+                            buttons['action'] = action_buttons
+                            
+                    # Check for save/reset buttons
+                    if 'save_reset' in container_buttons:
+                        buttons['save'] = getattr(container, 'save_button', None)
+                        buttons['reset'] = getattr(container, 'reset_button', None)
+                        
+                    # Check for individual save/reset buttons
+                    if 'save' in container_buttons and container_buttons['save']:
+                        buttons['save'] = container_buttons['save']
+                    if 'reset' in container_buttons and container_buttons['reset']:
+                        buttons['reset'] = container_buttons['reset']
+                        
+            except Exception:
+                pass  # Ignore errors during button extraction
+        
+        # Method 5: Recursive search if requested
+        if recursive and isinstance(container, dict):
+            for key, value in container.items():
+                if key != 'buttons' and (isinstance(value, dict) or hasattr(value, 'buttons')):
+                    nested_buttons = self._extract_buttons_from_container(value, recursive=False)
+                    for btn_name, btn_widget in nested_buttons.items():
+                        # Prefix with container key to avoid conflicts
+                        prefixed_name = f"{key}_{btn_name}" if btn_name not in buttons else btn_name
+                        buttons[prefixed_name] = btn_widget
+                        
+        # Filter out None values and non-button widgets
+        return {name: widget for name, widget in buttons.items() 
+                if widget is not None and hasattr(widget, 'on_click')}
+        
     def _discover_button_widgets(self) -> Dict[str, Any]:
         """Discover available button widgets from UI components.
         
@@ -112,40 +193,38 @@ class ButtonHandlerMixin:
         for container_key in ['actions', 'action_container']:
             action_container = self._ui_components.get(container_key)
             if action_container:
-                container_buttons = {}
-                # If action_container is a dictionary with a 'buttons' key
-                if isinstance(action_container, dict) and 'buttons' in action_container:
-                    if isinstance(action_container['buttons'], dict):
-                        container_buttons = action_container['buttons']
-                # If action_container is an object with a 'buttons' attribute
-                elif hasattr(action_container, 'buttons') and isinstance(action_container.buttons, dict):
-                    container_buttons = action_container.buttons
+                container_buttons = self._extract_buttons_from_container(action_container)
                 
                 # Add buttons with normalized names, preferring non-suffixed names
                 for btn_name, btn_widget in container_buttons.items():
+                    if btn_widget and hasattr(btn_widget, 'on_click'):
+                        normalized_name = self._normalize_button_name(btn_name)
+                        # Only add if we don't already have this button (prefer first occurrence)
+                        if normalized_name not in buttons:
+                            buttons[normalized_name] = btn_widget
+        
+        # Method 2: Look for buttons in form container (common pattern)
+        form_container = self._ui_components.get('form_container')
+        if form_container:
+            form_buttons = self._extract_buttons_from_container(form_container, recursive=True)
+            for btn_name, btn_widget in form_buttons.items():
+                if btn_widget and hasattr(btn_widget, 'on_click'):
                     normalized_name = self._normalize_button_name(btn_name)
-                    # Only add if we don't already have this button (prefer first occurrence)
                     if normalized_name not in buttons:
                         buttons[normalized_name] = btn_widget
-                # If action_container has a get_buttons method
-                if hasattr(action_container, 'get_buttons'):
-                    container_buttons = action_container.get_buttons()
-                    if container_buttons and isinstance(container_buttons, dict):
-                        for btn_name, btn_widget in container_buttons.items():
-                            normalized_name = self._normalize_button_name(btn_name)
-                            if normalized_name not in buttons:
-                                buttons[normalized_name] = btn_widget
         
-        # Method 2: Look for buttons in components
+        # Method 3: Look for buttons in components
         if 'components' in self._ui_components and hasattr(self._ui_components['components'], 'get'):
             components = self._ui_components['components']
             for key, widget in components.items():
                 if hasattr(widget, 'on_click'):
                     buttons[key] = widget
         
-        # Method 3: Look for direct button widgets in _ui_components
+        # Method 4: Look for direct button widgets in _ui_components (skip containers)
+        container_keys = ['action_container', 'actions', 'form_container', 'header_container', 
+                         'operation_container', 'main_container', 'footer_container']
         for key, widget in self._ui_components.items():
-            if key in ['action_container', 'actions'] or not hasattr(widget, 'on_click'):
+            if key in container_keys or not hasattr(widget, 'on_click'):
                 continue
             buttons[key] = widget
         

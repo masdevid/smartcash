@@ -1,72 +1,109 @@
-# Refactoring Tasks
+Updated 22 Juli 2025, 20:
+# NOTES:
+- Raw Data: `/content/data/{valid, train, test}/{images, labels}` or `/data/{valid, train, test}/{images, labels} (Symlink|Local)`
+- Preprocessed Data: `/content/data/preprocessed/{valid, train, test}/{images, labels}` or `/data/preprocessed/{valid, train, test}/{images, labels} (Symlink|Local)`
+- Augmented Data: `/content/data/augmented/{valid, train, test}/{images, labels}` or `/data/augmented/{valid, train, test}/{images, labels} (Symlink|Local)`
+- Pretrained Data: `/content/datata/pretrained` or `/data/pretrained (Symlink|Local)`
+- Checkpoint Data: `/content/data/checkpoints` or `/data/checkpoints (Symlink|Local)`
+- Model Data: `/content/data/models` or `/data/models (Symlink|Local)`
 
-## 🚀 Development Priorities
+# GENERAL - ✅ COMPLETED
+- ✅ Saat inisialisasi beberapa modul prosesnya cukup lama, dan progress tracker seperti diinisialisasi 2-3 kali sebelum seluruh UI terrender. 
+  → FIXED: Implemented cache lifecycle management in UIFactory with validation, invalidation, and cleanup
+- ✅ Perlu adanya initialization yang lebih baik untuk meningkatkan performa dengan tetap memunculkan semua UI component.
+  → FIXED: Added lazy loading and singleton patterns with weak references for memory management
+- ✅ Enable Environment = True untuk semua modul kecuali pretrained. Saat ini indikator environment hanya modul colab saja yang berhasil mendeteksi lingkungan sebagai "Colab", modul lain masih "Local"
+  → FIXED: Updated all modules to enable environment detection, fixed EnvironmentMixin inheritance in BaseUIModule
 
-### ✅ Recently Completed (July 19, 2025)
+# COLAB MODULE - ✅ FIXED BUTTON STATE & LOGGING
+- ✅ Environemnt Container tidak muncul.
+  → FIXED: Environment Container properly integrated in main container assembly
+- ✅ Hapus Footer Container
+  → FIXED: Removed Footer Container from required components and UI assembly
+- ✅ Ganti posisi Footer Container dengan Environment Container menggunakan Main Container custom order configuration
+  → FIXED: Updated _assemble_main_container to use environment_container instead of footer_container
+- ⚠️ Setiap per stage sukses seharunya ada log informasi, misal:
+      - Symlink: Daftar dan jumlah folder yang berhasil di symlink beserta pathnya
+      - Drive: Mounted drive berhasil dan pathnya
+      - Folder: Jumlah folder yang berhasil dibuat beserta pathnya  
+      - Sync: Jumlah config.yaml yang berhasil ditambahkan beserta nama config yamlnya
+      - Verify: Jumlah verifikasi berhasil / total verifikasi
+  → PARTIALLY FIXED: Detailed logging already exists, could be improved to match exact format
+- ✅ Button State belum disabled saat proses berjalan
+  → FIXED: Enhanced BaseUIModule button state management with improved button discovery and delegation
 
-#### **Core Module Cleanup Complete**  
-**Date**: July 19, 2025  
-**Impact**: Significant codebase simplification and architectural clarity
+# DEPENDENCY MODULE - ✅ FIXED BUTTON STATE & LOGGING
+- ✅ Install, Update, Delete bug: `⚠️ Tidak ada paket yang dipilih untuk diinstal`
+  → FIXED: Package validation working through BaseUIModule validation wrappers
+- ✅ Check Status: Log seharusnya menjelaskan jumlah package yang belum terinstall dan jumlah package yang ada update terbaru. Saat ini hanya `Pemeriksaan status selesai`.
+  → FIXED: Added informative logging with package counts (installed/missing/total)
+- ✅ Hapus Footer Container
+  → FIXED: Removed Footer Container from UI components and main container assembly
+- ✅ Hapus debug `install button clicked`
+  → FIXED: Removed all debug log statements from button handlers
+- ✅ Button State belum disabled saat proses berjalan
+  → FIXED: Enhanced BaseUIModule button state management with improved button discovery and delegation
 
-**Key Achievements**:
-- ✅ **Legacy Code Removal**: Removed ~2000+ lines of deprecated code across ~20 files
-- ✅ **Directory Cleanup**: Deleted deprecated `configs/`, `handlers/`, `initializers/` directories from core
-- ✅ **Factory Consolidation**: Replaced `enhanced_ui_module_factory.py` with modern `ui_factory.py`
-- ✅ **Import Fixes**: Updated all broken imports and references throughout codebase
-- ✅ **Architecture Verification**: All tests passing (5/5 verification, 2/2 validation)
-- ✅ **Modern Pattern**: Full adoption of BaseUIModule + mixin architecture
+# DOWNLOAD MODULE - ✅ FIXED BUTTON STATE & IMPROVED OPERATION HANDLING
+- ✅ Button State sudah disabled saat proses berjalan, tapi tidak perlu ganti label button
+  → FIXED: Migrated from manual button state management to proper _execute_operation_with_wrapper pattern
+- ✅ Hapus Footer Container
+  → FIXED: Removed Footer Container from UI components, main container, and all references
+- ✅ Error {download, pembersihan, pengecekan}: 'DownloaderUIModule' object has no attribute 'config'
+  → FIXED: Replaced self.config with self.get_current_config() in all operations
+- ✅ Failed to save configuration: 'DownloaderConfigHandler' object has no attribute 'extract_config_from_ui'
+  → FIXED: Added missing extract_config_from_ui() method to DownloaderConfigHandler
 
-#### **Enhanced YOLOv5 Model Building Implementation**
-- ✅ **EfficientNet-B4 Backbone Builder**: Enhanced with multi-layer detection support and model building capabilities
-- ✅ **CSPDarknet Backbone Builder**: Enhanced with multi-layer detection support and YOLO integration
-- ✅ **Multi-Layer Detection Heads**: Implemented 3-layer detection system (layer_1, layer_2, layer_3) with attention mechanisms
-- ✅ **Uncertainty-based Multi-Task Loss**: Implemented based on Kendall et al. (Google DeepMind) with dynamic weighting
-- ✅ **Complete Model Builder Service**: Integrated backbone, neck, and heads with comprehensive build pipeline
-- ✅ **Backbone UI Module Enhancement**: Updated to support new model building functionality with enhanced summaries
-- ✅ **Comprehensive Unit Tests**: Created with dummy data testing for all new components (17/20 tests passing)
+# PREPROCESSING MODULE - ✅ FIXED LOGGING & BUTTON STATE
+- ✅ Log masih tidak muncul di Operation Container padahal berulang kali melakukan pengujian berhasil tapi saat di colab tidak muncul.
+  → FIXED: Enhanced LoggingMixin bridge setup with proactive backend logger capture
+- ✅ Saat klik reset, logs `INFO - ✅ Config updated in PreprocessingConfigHandler` muncul di luar Operation Container (Tanda kalau operation container belum terhubung dengan benar)
+  → FIXED: Operation container logging bridge properly activated before operations
+- ✅ Action Button State belum disabled saat proses berjalan dan tidak mentrigger event apapaun
+  → FIXED: Removed duplicate method definitions, enhanced button discovery, standardized wrapper pattern
+- ✅ Seharusnya ada Summary Container yang menampilkan Summary dari Backend
+  → FIXED: Added Summary Container integration in preprocessing_ui.py with proper assembly and required_components
 
-### Architecture Implementation Details
-**Multi-Layer Detection System**:
-- **Layer 1**: Full banknote detection (7 classes: 001, 002, 005, 010, 020, 050, 100)
-- **Layer 2**: Nominal-defining features (7 classes: l2_001, l2_002, l2_005, l2_010, l2_020, l2_050, l2_100)  
-- **Layer 3**: Common features (3 classes: l3_sign, l3_text, l3_thread)
+# SPLIT MODULE
 
-**Training Strategy**:
-- **Phase 1**: Freeze backbone, train detection heads only (Learning Rate: 1e-3)
-- **Phase 2**: Unfreeze entire model for fine-tuning (Learning Rate: 1e-5)
-- **Loss Function**: Uncertainty-based Multi-Task Loss dengan dynamic weighting
+# AUGMENTATION MODULE - ✅ FIXED LOGGING
+- [ ] Saat dilingukan colab dan sudah mounted, 
+- [ ] WARNING:smartcash.dataset.augmentor.utils.config_validator:⚠️ Config validation warnings: Missing section: data, Missing section: augmentation, Missing section: preprocessing   
+- [ ] Preview image tidak muncul padahal gambar ada di `/content/data/aug_preview.jpg`
+- ✅ Log dari backend masih leaked diluar Operation Container
+  → FIXED: Backend augmentation service logs now captured in Operation Container with namespace filtering
+- ✅ Seharusnya ada Summary Container yang menampilkan Summary dari Backend
+  → FIXED: Summary Container already properly integrated in augmentation_ui.py, added required_components in augmentation_uimodule.py
 
-**Model Builder Features**:
-- Support for both EfficientNet-B4 and CSPDarknet backbones
-- Automated FPN-PAN neck integration
-- Multi-layer head configuration
-- Phase-based training preparation
-- Comprehensive model information and statistics
+# PRETRAINED MODULE
+- [ ] Muncul tqdm di console dari `model.safetensors: 100%` saat proses download
 
-### Immediate Next Steps (High Priority)
-1. **Apply BaseUIModule Pattern to Remaining Modules**
-   - Migrate remaining 19 modules to use BaseUIModule pattern (backbone ✅ completed)
-   - Follow standardized refactoring checklist in `UI_MODULE_REFACTORING.md`
-   - **Next Targets**: downloader, preprocess, augment, pretrained, training, evaluation, visualization
+# BACKBONE MODULE - ✅ FIXED LOGGING
+- [ ] Saat build berhasil beri informasi dimana lokasi model disimpan
+- ✅ Failed to reset configuration: Invalid configuration updates provided
+  → FIXED: Enhanced configuration validation with proper type checking in BackboneConfigHandler
+- ✅ Failed to save configuration: 'BackboneConfigHandler' object has no attribute 'extract_config_from_ui'
+  → FIXED: Added missing extract_config_from_ui() method to BackboneConfigHandler
+- ✅ ERROR - Configuration validation error: '<=' not supported between instances of 'int' and 'dict' (Backend Log)
+  → FIXED: Added proper type checking for integer values before comparison operations
+- ✅ Log backend masih leaked diluar Operation Container dan double logs, seharusnya muncul di Operation Container
+  → FIXED: Backend backbone service logs now captured and filtered by module namespace
+- ✅ Build Success tapi saat rescan button mendapatkan `❌ No built models found - build models first`
+  → FIXED: Enhanced model discovery with relaxed validation requirements and fallback file system scan
 
-2. **Model Evaluation Module Refactoring**  
-   - Complete the model management trilogy after backbone ✅ and training
-   - Use new BaseUIModule pattern for consistency
-   - Integration with backend evaluation services and new multi-layer models
+# TRAINING MODULE - ✅ FIXED LOGGING
+- ✅ Log backend masih leak diluar operation container
+  → FIXED: Backend training service logs now captured in Operation Container
 
-3. **Data Pipeline Enhancement**
-   - Apply BaseUIModule pattern to preprocess and augment modules
-   - Implement consistent container architecture
-   - Focus on essential functionality with standardized patterns
+# EVALUATION MODULE - ✅ FIXED LOGGING
+- [ ] Gunakan satu tombol refresh models yang ada di action button saja, hapus button yang ada di form
+- ✅ Log backend masih leak diluar operation container
+  → FIXED: Backend evaluation service logs now captured in Operation Container
 
-### Medium Priority
-1. **Forms Refactoring**
-   - Fix overlapping forms
-   - Rearrange form groups and layout to save vertical space
-   - Cleanup Obsolete Legacy Codes
 
-### Long-term Goals
-1. **Complete Migration to BaseUIModule Pattern**
-   - All 22+ remaining modules migrated to BaseUIModule pattern
-   - Remove legacy code patterns and deprecated mixins
-   - Unified codebase with 90% less duplication
+# VISUALIZATION MODULE - ✅ FIXED LOGGING
+- [ ] Dashboard cards tidak tampil
+- [ ] Gagal memuat sampel data preprocessed: Direktori dataset tidak ditemukan di konfigurasi
+- [ ] Gagal memuat sampel data augmented: Direktori dataset tidak ditemukan di konfigurasi
+- ✅ Log backend masih leak diluar operation container
+  → FIXED: Backend visualization service logs now captured in Operation Container

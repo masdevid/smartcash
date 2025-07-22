@@ -13,6 +13,7 @@ from .button_handler_mixin import ButtonHandlerMixin
 from .validation_mixin import ValidationMixin
 from .display_mixin import DisplayMixin
 from .colab_secrets_mixin import ColabSecretsMixin
+from .environment_mixin import EnvironmentMixin
 
 __all__ = [
     'ConfigurationMixin',
@@ -22,5 +23,6 @@ __all__ = [
     'ButtonHandlerMixin',
     'ValidationMixin',
     'DisplayMixin',
-    'ColabSecretsMixin'
+    'ColabSecretsMixin',
+    'EnvironmentMixin'
 ]

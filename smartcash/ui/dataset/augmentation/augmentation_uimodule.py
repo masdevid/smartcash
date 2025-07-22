@@ -32,9 +32,19 @@ class AugmentationUIModule(BaseUIModule):
         """Initialize the Augmentation UIModule."""
         super().__init__(
             module_name='augmentation',
-            parent_module='dataset'
+            parent_module='dataset',
+            enable_environment=True
         )
         self.log_debug("AugmentationUIModule diinisialisasi.")
+        
+        self._required_components = [
+            'main_container',
+            'header_container',
+            'form_container',
+            'action_container',
+            'summary_container',
+            'operation_container'
+        ]
         
         # Initialize resources dictionary for cleanup tracking
         self._resources = {}

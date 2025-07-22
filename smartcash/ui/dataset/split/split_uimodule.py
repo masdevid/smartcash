@@ -28,7 +28,8 @@ class SplitUIModule(BaseUIModule):
         """Initialize split UI module following latest mixin pattern."""
         super().__init__(
             module_name='split',
-            parent_module='dataset'
+            parent_module='dataset',
+            enable_environment=True
         )
         # Required UI components for validation
         self._required_components = [

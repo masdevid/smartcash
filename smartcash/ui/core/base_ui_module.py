@@ -14,7 +14,8 @@ from smartcash.ui.core.mixins import (
     LoggingMixin,
     ButtonHandlerMixin,
     ValidationMixin,
-    DisplayMixin
+    DisplayMixin,
+    EnvironmentMixin
 )
 
 # Default configuration paths
@@ -39,6 +40,7 @@ class BaseUIModule(
     ButtonHandlerMixin,
     ValidationMixin,
     DisplayMixin,
+    EnvironmentMixin,
     ABC
 ):
     """
@@ -59,30 +61,12 @@ class BaseUIModule(
     @property
     def has_environment_support(self) -> bool:
         """Check if environment features are enabled."""
-        return self._enable_environment and hasattr(self, '_environment_paths')
-    
-    @property
-    def environment_paths(self) -> Optional[Dict[str, str]]:
-        """Get environment paths if environment support is enabled."""
-        if not self.has_environment_support:
-            self.log_warning("Environment support is not enabled for this module")
-            return None
-        return getattr(self, '_environment_paths', None)
-    
-    @property
-    def is_colab(self) -> Optional[bool]:
-        """Check if running in Google Colab (if environment support is enabled)."""
-        return getattr(self, '_is_colab', None) if self.has_environment_support else None
-    
-    @property
-    def is_drive_mounted(self) -> Optional[bool]:
-        """Check if Google Drive is mounted (if environment support is enabled)."""
-        return getattr(self, '_is_drive_mounted', None) if self.has_environment_support else None
+        return self._enable_environment
     
     def __init__(self, 
                  module_name: str, 
                  parent_module: str = None, 
-                 enable_environment: bool = False,
+                 enable_environment: bool = True,
                  show_environment_indicator: bool = True,
                  config_type: str = 'default',
                  **kwargs):
@@ -110,39 +94,11 @@ class BaseUIModule(
         self._ui_components = {}
         # Initialize components first
         self.initialize_components()
-        # Initialize environment support if enabled
+        # Initialize environment support flag
         self._enable_environment = enable_environment
-        self._environment_mixin = None
-        # Initial environment detection (will be refined after mixin setup)
+        # Environment detection is handled by EnvironmentMixin
         self._environment = self._detect_environment()
         self._config_path = self._get_default_config_path()
-        
-        if self._enable_environment:
-            try:
-                from smartcash.ui.core.mixins.environment_mixin import EnvironmentMixin
-                # Store the mixin instance to maintain its state
-                self._environment_mixin = EnvironmentMixin()
-                # Copy over environment-related attributes and methods
-                for attr in dir(self._environment_mixin):
-                    if not attr.startswith('__') and not hasattr(self, attr):
-                        setattr(self, attr, getattr(self._environment_mixin, attr))
-                
-                # Refresh environment detection now that mixin is available
-                # This ensures we use the most comprehensive detection available
-                self._environment = self._detect_environment()
-                self._config_path = self._get_default_config_path()
-                
-                # Update environment based on mixin if available
-                if hasattr(self, 'get_environment_info'):
-                    env_info = self.get_environment_info()
-                    detected_env = env_info.get('environment_type', self._environment)
-                    if detected_env != self._environment:
-                        self._environment = detected_env
-                        self._config_path = self._get_default_config_path()
-                
-            except ImportError as e:
-                self.log_warning(f"Could not initialize environment mixin: {e}")
-                self._enable_environment = False
         
         
         self._required_components = getattr(self, '_required_components', [])
@@ -690,6 +646,94 @@ class BaseUIModule(
             'initialized': self._is_initialized
         }
         
+    def _extract_button_id(self, button: Any, operation_name: str) -> Optional[str]:
+        """
+        Extract button ID from button widget with improved detection logic.
+        
+        Args:
+            button: Button widget that triggered the operation
+            operation_name: Name of the operation (fallback for ID generation)
+            
+        Returns:
+            Button ID string or None if not determinable
+        """
+        if button is None:
+            return None
+            
+        # Method 1: Check for explicit button ID attribute
+        for attr in ['button_id', 'id', '_button_id']:
+            if hasattr(button, attr):
+                button_id = getattr(button, attr)
+                if button_id and isinstance(button_id, str):
+                    return self._normalize_button_id(button_id)
+        
+        # Method 2: Look for button in action container and find matching ID
+        if hasattr(self, '_ui_components') and self._ui_components:
+            action_container = self._ui_components.get('action_container')
+            if action_container:
+                buttons = {}
+                
+                # Extract buttons from action container
+                if isinstance(action_container, dict) and 'buttons' in action_container:
+                    buttons = action_container['buttons']
+                elif hasattr(action_container, 'buttons'):
+                    buttons = getattr(action_container, 'buttons', {})
+                
+                # Find matching button by reference
+                for btn_id, btn_widget in buttons.items():
+                    if btn_widget is button:
+                        return self._normalize_button_id(btn_id)
+        
+        # Method 3: Extract from button description (fallback)
+        if hasattr(button, 'description') and button.description:
+            desc = button.description.strip()
+            # Remove emoji and common prefixes
+            import re
+            # Remove emoji (Unicode > 127)
+            desc_clean = ''.join(char for char in desc if ord(char) <= 127)
+            desc_clean = desc_clean.strip()
+            
+            # Remove common button text patterns
+            patterns_to_remove = [
+                r'^(run|execute|start|begin)\s+',
+                r'\s+(button|btn)$',
+                r'^(button|btn)\s+',
+            ]
+            for pattern in patterns_to_remove:
+                desc_clean = re.sub(pattern, '', desc_clean, flags=re.IGNORECASE)
+            
+            if desc_clean:
+                return self._normalize_button_id(desc_clean)
+        
+        # Method 4: Fallback to operation name
+        return self._normalize_button_id(operation_name)
+    
+    def _normalize_button_id(self, button_id: str) -> str:
+        """Normalize button ID by removing common suffixes and prefixes."""
+        if not button_id:
+            return 'unknown'
+            
+        button_id = str(button_id).strip().lower()
+        
+        # Remove common suffixes
+        for suffix in ['_button', '_btn', 'button', 'btn']:
+            if button_id.endswith(suffix):
+                button_id = button_id[:-len(suffix)]
+                break
+        
+        # Remove common prefixes  
+        for prefix in ['btn_', 'button_']:
+            if button_id.startswith(prefix):
+                button_id = button_id[len(prefix):]
+                break
+                
+        # Clean up spaces and special characters
+        import re
+        button_id = re.sub(r'[^\w]+', '_', button_id)
+        button_id = button_id.strip('_')
+        
+        return button_id or 'unknown'
+        
     def _execute_operation_with_wrapper(self, 
                                        operation_name: str,
                                        operation_func: callable,
@@ -711,10 +755,14 @@ class BaseUIModule(
         Returns:
             Operation result dictionary
         """
-        # Extract button ID for individual button management
-        button_id = getattr(button, 'description', operation_name.lower()).lower().replace(' ', '_')
+        # Extract button ID for individual button management with improved detection
+        button_id = self._extract_button_id(button, operation_name)
         
         try:
+            # CRITICAL: Ensure logging bridge is ready BEFORE any operation executes
+            # This prevents backend service logs from leaking to console
+            self._ensure_logging_bridge_ready()
+            
             # Check if we should reduce logging for one-click operations
             reduce_logging = hasattr(self, 'should_reduce_operation_logging') and self.should_reduce_operation_logging(operation_name)
             
@@ -779,28 +827,50 @@ class BaseUIModule(
             if button_id:
                 self.enable_all_buttons(button_id=button_id)
 
+    def _ensure_logging_bridge_ready(self) -> None:
+        """
+        Ensure logging bridge is ready before operations execute.
+        
+        This is critical to prevent backend service logs from leaking to console.
+        Must be called before any operation that might use backend services.
+        """
+        try:
+            # Check if operation container exists and bridge is setup
+            if (hasattr(self, '_ui_components') and 
+                'operation_container' in self._ui_components and
+                not getattr(self, '_ui_logging_bridge_setup', False)):
+                
+                self._setup_ui_logging_bridge(self._ui_components['operation_container'])
+                self.log_debug("✅ Logging bridge activated before operation")
+                
+        except Exception as e:
+            self.log_debug(f"Could not ensure logging bridge ready: {e}")
+
     def _detect_environment(self) -> str:
         """
-        Detect the current environment (local, colab, etc.).
-        
-        Uses comprehensive detection from smartcash.common.environment for reliability.
+        Detect the current environment using EnvironmentMixin.
         
         Returns:
             String indicating the environment type
         """
         try:
-            # Use comprehensive colab detection from common module
-            from smartcash.common.environment import is_colab_environment
-            
-            if is_colab_environment():
-                return 'colab'
+            if self.has_environment_support and hasattr(self, 'get_environment_info'):
+                # Use EnvironmentMixin's comprehensive environment detection
+                env_info = self.get_environment_info()
+                return env_info.get('environment_type', 'local')
             else:
-                # Check if running in Jupyter
-                import sys
-                if 'ipykernel' in sys.modules:
-                    return 'jupyter'
+                # Fallback to basic detection if environment support is disabled
+                from smartcash.common.environment import is_colab_environment
+                
+                if is_colab_environment():
+                    return 'colab'
                 else:
-                    return 'local'
+                    # Check if running in Jupyter
+                    import sys
+                    if 'ipykernel' in sys.modules:
+                        return 'jupyter'
+                    else:
+                        return 'local'
         except Exception as e:
             # Log the error if logger is available
             if hasattr(self, 'log_warning'):

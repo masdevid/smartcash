@@ -72,7 +72,7 @@ class PreprocessingUIFactory(UIFactory):
                     return cached_module
             
             # Cache miss or invalid - create new instance
-            enable_environment = kwargs.get('enable_environment', False)
+            enable_environment = kwargs.get('enable_environment', True)
             module = PreprocessingUIModule(enable_environment=enable_environment)
             
             # Minimal logging for performance

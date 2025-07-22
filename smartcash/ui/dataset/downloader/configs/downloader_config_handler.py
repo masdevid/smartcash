@@ -39,6 +39,7 @@ class DownloaderConfigHandler:
         self._api_key_initialized = False
         
         self.logger.info("✅ Downloader config handler initialized")
+        self._ui_components = None
 
     # --- Core Configuration Methods ---
 
@@ -186,6 +187,29 @@ class DownloaderConfigHandler:
         except Exception as e:
             self.logger.error(f"Error extracting config: {e}")
             return {}
+    
+    def extract_config_from_ui(self) -> Dict[str, Any]:
+        """
+        Extract configuration from UI components.
+        
+        Returns:
+            Extracted configuration dictionary
+        """
+        try:
+            if not self._ui_components:
+                self.logger.debug("No UI components available for extraction - using current config")
+                return self.get_current_config()
+            
+            # Use existing extract_config method
+            return self.extract_config(self._ui_components)
+            
+        except Exception as e:
+            self.logger.error(f"Error extracting config from UI: {e}")
+            return self.get_current_config()
+    
+    def set_ui_components(self, ui_components: Dict[str, Any]) -> None:
+        """Set the UI components for this config handler."""
+        self._ui_components = ui_components
     
     def validate_config(self, config: Dict[str, Any]) -> Dict[str, Any]:
         """

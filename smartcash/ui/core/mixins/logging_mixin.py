@@ -160,20 +160,23 @@ class LoggingMixin:
             if hasattr(self, '_ui_components') and self._ui_components:
                 operation_container = self._ui_components.get('operation_container')
                 if operation_container:
+                    # Convert string level to LogLevel enum if needed
+                    ui_level = self._convert_to_ui_level(level)
+                    
                     # Handle dict-style operation container
                     if isinstance(operation_container, dict):
                         if 'log_message' in operation_container:
-                            operation_container['log_message'](message, level, namespace)
+                            operation_container['log_message'](message, ui_level, namespace)
                             return
                         elif 'log' in operation_container:  # For backward compatibility
-                            operation_container['log'](message, level, namespace)
+                            operation_container['log'](message, ui_level, namespace)
                             return
                     # Handle object-style operation container
                     elif hasattr(operation_container, 'log_message'):
-                        operation_container.log_message(message, level, namespace)
+                        operation_container.log_message(message, ui_level, namespace)
                         return
                     elif hasattr(operation_container, 'log'):  # For backward compatibility
-                        operation_container.log(message, level, namespace)
+                        operation_container.log(message, ui_level, namespace)
                         return
             
             # Fallback to standard logger (use debug to minimize console output)
@@ -189,6 +192,24 @@ class LoggingMixin:
             else:
                 # Suppress print during normal operation to avoid console spam
                 pass
+    
+    def _convert_to_ui_level(self, level: str):
+        """Convert string level to LogLevel enum for UI components."""
+        try:
+            from smartcash.ui.components.log_accordion import LogLevel
+            
+            level_mapping = {
+                'debug': LogLevel.DEBUG,
+                'info': LogLevel.INFO,
+                'warning': LogLevel.WARNING,
+                'error': LogLevel.ERROR,
+                'critical': LogLevel.ERROR,
+                'success': LogLevel.INFO  # Map success to info level
+            }
+            
+            return level_mapping.get(level.lower(), LogLevel.INFO)
+        except ImportError:
+            return level  # Return original level if LogLevel not available
     
     def log_exception(self, message: str, exception: Exception) -> None:
         """Log exception with full traceback.
@@ -217,26 +238,36 @@ class LoggingMixin:
             if getattr(self, '_ui_logging_bridge_setup', False):
                 return
                 
-            # Setup logging bridge to capture backend service logs
+            # CRITICAL: Setup operation container logging bridge FIRST
+            # This must happen before any backend operations begin
             if hasattr(operation_container, 'setup_logging_bridge'):
                 operation_container.setup_logging_bridge()
-                self.log_debug("✅ Backend logging bridge activated")
+                self.log_debug("✅ Operation container logging bridge activated")
                 
-            # Setup logger handlers to redirect to UI
+            # CRITICAL: Activate SmartCashLogger UI mode globally
+            # This prevents backend services from logging to console
+            try:
+                from smartcash.common.logger import SmartCashLogger
+                # Get UI handler from operation container for SmartCashLogger
+                if hasattr(operation_container, '_ui_handler'):
+                    SmartCashLogger.set_ui_mode(True, operation_container._ui_handler)
+                    self.log_debug("✅ SmartCashLogger UI mode activated globally")
+                else:
+                    # Fallback: just activate UI mode to disable console
+                    SmartCashLogger.set_ui_mode(True, None)
+                    self.log_debug("✅ SmartCashLogger console output disabled")
+            except ImportError:
+                self.log_debug("SmartCashLogger not available for UI mode activation")
+            except Exception as e:
+                self.log_debug(f"Failed to activate SmartCashLogger UI mode: {e}")
+            
+            # Capture module-specific loggers
             if hasattr(self, 'logger') and hasattr(operation_container, 'capture_logs'):
                 operation_container.capture_logs(self.logger)
                 self.log_debug("✅ Module logger captured")
             
-            # Capture common backend loggers
-            try:
-                import logging
-                # Capture smartcash common loggers
-                smartcash_logger = logging.getLogger('smartcash')
-                if smartcash_logger and hasattr(operation_container, 'capture_logs'):
-                    operation_container.capture_logs(smartcash_logger)
-                    self.log_debug("✅ SmartCash common logger captured")
-            except Exception as e:
-                self.log_debug(f"Could not capture smartcash logger: {e}")
+            # Proactively capture ALL backend service loggers before they're used
+            self._capture_backend_loggers(operation_container)
             
             # Configure UILogger to use operation container (universal solution)
             if hasattr(self, 'logger') and hasattr(self.logger, 'ui_components'):
@@ -244,12 +275,113 @@ class LoggingMixin:
                 
             self._ui_logging_bridge_setup = True
             
-            if hasattr(self, 'logger'):
-                self.logger.debug("✅ UI logging bridge setup complete")
+            # Final verification
+            self.log_debug("✅ UI logging bridge setup complete - backend logs will be captured")
                 
         except Exception as e:
             if hasattr(self, 'logger'):
                 self.logger.error(f"Failed to setup UI logging bridge: {e}")
+    
+    def _capture_backend_loggers(self, operation_container: Any) -> None:
+        """
+        Proactively capture ALL backend service loggers before they're used.
+        
+        This is critical to prevent logging leaks - we capture loggers for all
+        backend services that might be called during operations.
+        
+        Args:
+            operation_container: Operation container to capture logs to
+        """
+        try:
+            import logging
+            
+            if not hasattr(operation_container, 'capture_logs'):
+                return
+            
+            # Define backend logger patterns to capture based on module type
+            backend_patterns = []
+            
+            # Determine module type and capture appropriate backend loggers
+            if hasattr(self, 'module_name'):
+                module_name = self.module_name.lower()
+                
+                if 'preprocessing' in module_name:
+                    backend_patterns.extend([
+                        'smartcash.dataset.preprocessor',
+                        'smartcash.dataset.preprocessor.api',
+                        'smartcash.dataset.preprocessor.service',
+                        'smartcash.dataset.preprocessor.api.preprocessing_api',
+                        'smartcash.dataset.preprocessor.core',
+                        'smartcash.dataset.preprocessor.utils',
+                        'smartcash.dataset.preprocessor.validation'
+                    ])
+                elif 'augmentation' in module_name:
+                    backend_patterns.extend([
+                        'smartcash.dataset.augmentor',
+                        'smartcash.dataset.augmentor.api',
+                        'smartcash.dataset.augmentor.service',
+                        'smartcash.dataset.augmentor.core',
+                        'smartcash.dataset.augmentor.utils'
+                    ])
+                elif 'backbone' in module_name:
+                    backend_patterns.extend([
+                        'smartcash.model.backbone',
+                        'smartcash.model.backbone.api',
+                        'smartcash.model.backbone.service',
+                        'smartcash.model.backbone.builder'
+                    ])
+                elif 'training' in module_name:
+                    backend_patterns.extend([
+                        'smartcash.model.trainer',
+                        'smartcash.model.trainer.api',
+                        'smartcash.model.trainer.service',
+                        'smartcash.model.trainer.core'
+                    ])
+                elif 'evaluation' in module_name:
+                    backend_patterns.extend([
+                        'smartcash.model.evaluator',
+                        'smartcash.model.evaluator.api',
+                        'smartcash.model.evaluator.service'
+                    ])
+                elif 'visualization' in module_name:
+                    backend_patterns.extend([
+                        'smartcash.dataset.visualizer',
+                        'smartcash.dataset.visualizer.api',
+                        'smartcash.dataset.visualizer.service'
+                    ])
+            
+            # Always capture common SmartCash loggers
+            backend_patterns.extend([
+                'smartcash',
+                'smartcash.common',
+                'smartcash.common.logger',
+                'smartcash.dataset',
+                'smartcash.model'
+            ])
+            
+            # Capture loggers by pattern
+            captured_count = 0
+            for pattern in backend_patterns:
+                try:
+                    backend_logger = logging.getLogger(pattern)
+                    operation_container.capture_logs(backend_logger)
+                    captured_count += 1
+                except Exception as e:
+                    self.log_debug(f"Could not capture logger '{pattern}': {e}")
+            
+            self.log_debug(f"✅ Captured {captured_count} backend loggers proactively")
+            
+            # Also capture any existing SmartCash loggers that might already be initialized
+            try:
+                for name, logger in logging.Logger.manager.loggerDict.items():
+                    if isinstance(logger, logging.Logger) and 'smartcash' in name.lower():
+                        operation_container.capture_logs(logger)
+                        self.log_debug(f"✅ Captured existing logger: {name}")
+            except Exception as e:
+                self.log_debug(f"Could not capture existing SmartCash loggers: {e}")
+                
+        except Exception as e:
+            self.log_debug(f"Failed to capture backend loggers: {e}")
     
     def _configure_uilogger_bridge(self, operation_container: Any) -> None:
         """

@@ -142,8 +142,6 @@ class DependencyUIModule(BaseUIModule):
     
     def _operation_install_packages(self, button=None) -> Dict[str, Any]:
         """Handle package installation operation using common wrapper."""
-        self.log_debug(f"🔄 Install button clicked. Button: {button}")
-        
         def validate_packages():
             """Validate packages before installation."""
             packages = self._get_selected_packages()
@@ -168,7 +166,6 @@ class DependencyUIModule(BaseUIModule):
     
     def _operation_uninstall_packages(self, button=None) -> Dict[str, Any]:
         """Handle package uninstallation operation using common wrapper."""
-        self.log_debug(f"🔄 Uninstall button clicked. Button: {button}")
         
         def validate_packages():
             """Validate packages before uninstallation."""
@@ -194,7 +191,6 @@ class DependencyUIModule(BaseUIModule):
     
     def _operation_update_packages(self, button=None) -> Dict[str, Any]:
         """Handle package update operation using common wrapper."""
-        self.log_debug(f"🔄 Update button clicked. Button: {button}")
         
         def validate_packages():
             """Validate packages before update."""
@@ -225,7 +221,25 @@ class DependencyUIModule(BaseUIModule):
             return {'valid': True}
         
         def execute_check_status():
-            return self._execute_check_status_operation()
+            result = self._execute_check_status_operation()
+            if result.get('success') and 'summary' in result:
+                summary = result['summary']
+                total = summary.get('total', 0)
+                installed = summary.get('installed', 0)
+                missing = summary.get('missing', 0)
+                
+                # Create informative success message per TASK.md requirements
+                if missing > 0 and installed > 0:
+                    result['informative_message'] = f"📊 Status: {installed} paket terinstal, {missing} paket belum terinstal dari total {total} paket"
+                elif missing == 0 and total > 0:
+                    result['informative_message'] = f"✅ Semua {total} paket sudah terinstal"
+                elif total == 0:
+                    result['informative_message'] = "ℹ️ Tidak ada paket yang dipilih untuk diperiksa"
+                else:
+                    result['informative_message'] = f"❌ Semua {total} paket belum terinstal"
+                    
+                self.log_info(result['informative_message'])
+            return result
         
         return self._execute_operation_with_wrapper(
             operation_name="Cek Status Paket",

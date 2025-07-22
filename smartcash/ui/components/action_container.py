@@ -504,7 +504,7 @@ class ActionContainer:
             self.update_phase_property('error', 'tooltip', message)
         self.set_phase('error')
     
-    def enable_all(self) -> None:
+    def enable_all(self, button_states: Dict[str, Any] = None) -> None:
         """Enable all buttons in the container.
         
         DEPRECATED: Use module-level button state management instead.
@@ -514,27 +514,33 @@ class ActionContainer:
         # Try to delegate to parent module's ButtonHandlerMixin first
         if hasattr(self, '_parent_module') and self._parent_module:
             if hasattr(self._parent_module, 'enable_all_buttons'):
-                self._parent_module.enable_all_buttons()
+                self._parent_module.enable_all_buttons(button_states=button_states)
                 return
         
         # Fallback to direct manipulation (deprecated pattern)
         self.set_all_buttons_enabled(True)
     
-    def disable_all(self) -> None:
+    def disable_all(self, message: str = "⏳ Operation in progress...") -> Dict[str, Any]:
         """Disable all buttons in the container.
         
         DEPRECATED: Use module-level button state management instead.
         This method is kept for backward compatibility but delegates
         to ButtonHandlerMixin when available.
+        
+        Args:
+            message: Message to show on operation buttons
+            
+        Returns:
+            Button states for restoration (if using delegation)
         """
         # Try to delegate to parent module's ButtonHandlerMixin first
         if hasattr(self, '_parent_module') and self._parent_module:
             if hasattr(self._parent_module, 'disable_all_buttons'):
-                self._parent_module.disable_all_buttons()
-                return
+                return self._parent_module.disable_all_buttons(message=message)
         
         # Fallback to direct manipulation (deprecated pattern)
         self.set_all_buttons_enabled(False)
+        return {}
     
     def set_parent_module(self, parent_module) -> None:
         """Link this ActionContainer to its parent module.

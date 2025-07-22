@@ -28,16 +28,18 @@ class EnvironmentMixin:
     def __init__(self, *args, **kwargs):
         """Initialize environment mixin.
         
-        Note: This mixin doesn't call super().__init__() to avoid MRO issues.
-        The parent class should be properly initialized before this mixin.
+        Properly calls super().__init__() to respect MRO.
         """
-        # Initialize attributes without calling super() to avoid MRO issues
+        # Initialize attributes before calling super()
         self._environment_manager: Optional[EnvironmentManager] = None
         self._environment_paths = EnvironmentPaths()
         self._is_colab: Optional[bool] = None
         self._is_drive_mounted: Optional[bool] = None
         
-        # Automatically set up the environment
+        # Call super to maintain proper MRO
+        super().__init__(*args, **kwargs)
+        
+        # Set up the environment after parent initialization
         self._setup_environment()
     
     def _setup_environment(self) -> None:

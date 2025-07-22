@@ -21,7 +21,7 @@ class ColabUIModule(ModelConfigSyncMixin, BackendServiceMixin, BaseUIModule):
     
     def __init__(self, **kwargs):
         super().__init__(module_name='colab', parent_module='setup', enable_environment=True, **kwargs)
-        self._required_components = ['main_container', 'action_container', 'operation_container', 'footer_container']
+        self._required_components = ['main_container', 'action_container', 'operation_container', 'environment_container']
         self._initialized = False
         self._ui_components = None
         self._operation_sequence = ['init', 'drive', 'symlink', 'folders', 'config', 'env', 'verify']

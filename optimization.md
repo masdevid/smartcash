@@ -8,7 +8,7 @@
 - **Critical Errors**: Always logged
 - **Initialization**: Minimal logging for performance  
 - **Debug Information**: Disabled during normal operation
-- **Success Messages**: Minimal confirmation only
+- **Success Messages**: Informative messages (What, Where, How many?) instead of "success"
 
 ### Memory Management
 - **Singleton Pattern**: Single factory instance to prevent duplication

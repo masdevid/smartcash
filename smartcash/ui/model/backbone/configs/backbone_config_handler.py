@@ -186,6 +186,12 @@ class BackboneConfigHandler:
         input_size = backbone_config.get('input_size', 640)
         min_size = VALIDATION_CONFIG.get('min_input_size', 320)
         max_size = VALIDATION_CONFIG.get('max_input_size', 1280)
+        
+        # Ensure input_size is an integer
+        if not isinstance(input_size, int):
+            self.logger.error(f"input_size must be an integer, got {type(input_size)}: {input_size}")
+            return False
+            
         if not (min_size <= input_size <= max_size):
             self.logger.error(f"input_size must be between {min_size} and {max_size}")
             return False
@@ -194,6 +200,12 @@ class BackboneConfigHandler:
         num_classes = backbone_config.get('num_classes', 7)
         min_classes = VALIDATION_CONFIG.get('min_classes', 1)
         max_classes = VALIDATION_CONFIG.get('max_classes', 100)
+        
+        # Ensure num_classes is an integer
+        if not isinstance(num_classes, int):
+            self.logger.error(f"num_classes must be an integer, got {type(num_classes)}: {num_classes}")
+            return False
+            
         if not (min_classes <= num_classes <= max_classes):
             self.logger.error(f"num_classes must be between {min_classes} and {max_classes}")
             return False
@@ -277,6 +289,76 @@ class BackboneConfigHandler:
             errors.append(f"Validation error: {str(e)}")
         
         return errors
+    
+    def extract_config_from_ui(self) -> Dict[str, Any]:
+        """
+        Extract configuration from UI components.
+        
+        Returns:
+            Configuration dictionary extracted from UI
+        """
+        try:
+            if not hasattr(self, '_ui_components') or not self._ui_components:
+                self.logger.warning("No UI components available for config extraction")
+                return self.get_current_config()
+            
+            # Extract configuration from UI components
+            config = self.get_current_config().copy()
+            
+            # Get form widgets from UI components
+            form_widgets = self._ui_components.get('form_widgets')
+            if not form_widgets:
+                self.logger.warning("No form widgets available for config extraction")
+                return config
+            
+            # Update backbone section from form widgets
+            backbone_section = config.get('backbone', {})
+            
+            # Extract model type
+            model_type_widget = form_widgets.get('model_type')
+            if model_type_widget and hasattr(model_type_widget, 'value'):
+                backbone_section['model_type'] = model_type_widget.value
+            
+            # Extract pretrained flag
+            pretrained_widget = form_widgets.get('pretrained')
+            if pretrained_widget and hasattr(pretrained_widget, 'value'):
+                backbone_section['pretrained'] = pretrained_widget.value
+            
+            # Extract input size
+            input_size_widget = form_widgets.get('input_size')
+            if input_size_widget and hasattr(input_size_widget, 'value'):
+                backbone_section['input_size'] = input_size_widget.value
+            
+            # Extract number of classes
+            num_classes_widget = form_widgets.get('num_classes')
+            if num_classes_widget and hasattr(num_classes_widget, 'value'):
+                backbone_section['num_classes'] = num_classes_widget.value
+            
+            # Extract detection layers
+            detection_layers_widget = form_widgets.get('detection_layers')
+            if detection_layers_widget and hasattr(detection_layers_widget, 'value'):
+                # Handle different widget types for detection layers
+                if isinstance(detection_layers_widget.value, str):
+                    # If string, convert to list
+                    backbone_section['detection_layers'] = [int(x.strip()) for x in detection_layers_widget.value.split(',')]
+                elif isinstance(detection_layers_widget.value, (list, tuple)):
+                    backbone_section['detection_layers'] = list(detection_layers_widget.value)
+            
+            # Update config with extracted values
+            config['backbone'] = backbone_section
+            
+            # Update model section
+            model_section = config.get('model', {})
+            if backbone_section.get('model_type'):
+                model_section['backbone'] = backbone_section['model_type']
+            config['model'] = model_section
+            
+            self.logger.debug("✅ Configuration extracted from UI successfully")
+            return config
+            
+        except Exception as e:
+            self.logger.error(f"Failed to extract config from UI: {e}")
+            return self.get_current_config()
     
     # ==================== ABSTRACT METHOD IMPLEMENTATIONS ====================
     

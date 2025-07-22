@@ -149,10 +149,6 @@ class EnvironmentManager:
     def drive_path(self) -> Optional[Path]:
         return self._drive_path
     
-    @property
-    def is_drive_mounted(self) -> bool:
-        return self._drive_mounted
-    
     def get_dataset_path(self) -> Path:
         """FIXED: Get dataset path yang benar"""
         return self._data_path

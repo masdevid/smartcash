@@ -7,7 +7,7 @@ from typing import Dict, Any, Optional
 
 # Standard container imports
 from smartcash.ui.components import (create_header_container, create_form_container, create_action_container, 
-                                  create_operation_container, create_footer_container, create_main_container)
+                                  create_operation_container, create_main_container)
 from smartcash.ui.components.form_container import LayoutType
 from smartcash.ui.core.decorators import handle_ui_errors
 from smartcash.ui.dataset.downloader.constants import (
@@ -130,15 +130,6 @@ def create_downloader_ui_components(
         if hasattr(progress_tracker, 'start'):
             progress_tracker.start()
     
-    # 5. Create Footer Container
-    from smartcash.ui.info_boxes.download_info import get_download_info
-    footer_container = create_footer_container(
-        info_items=[get_download_info(open_by_default=False)],
-        tips=[
-            "💡 Pastikan koneksi internet stabil saat mendownload dataset",
-            "🔍 Selalu periksa status dataset sebelum mendownload"
-        ]
-    )
     
     # Extract and validate action buttons with safe access
     action_buttons = action_container.get('buttons', {})
@@ -157,7 +148,6 @@ def create_downloader_ui_components(
         'form_container': form_container,
         'action_container': action_container,  # Full action container with all methods
         'operation_container': operation_container,
-        'footer_container': footer_container,
         'ui_initialized': True,
         'module_name': UI_CONFIG['module_name'],
         'parent_module': UI_CONFIG['parent_module'],
@@ -172,8 +162,7 @@ def create_downloader_ui_components(
             {'component': header_container.container, 'type': 'header'},
             {'component': form_container['container'], 'type': 'form'},
             {'component': action_container['container'], 'type': 'action'},
-            {'component': operation_container['container'], 'type': 'operation'},
-            {'component': footer_container.container, 'type': 'footer'}
+            {'component': operation_container['container'], 'type': 'operation'}
         ],
         container_style={
             'width': '100%',
@@ -222,8 +211,7 @@ def create_downloader_ui_components(
             'header': header_container,
             'form': form_container,
             'action': action_container,
-            'operation': operation_container,
-            'footer': footer_container
+            'operation': operation_container
         },
         'ui_initialized': True,
         'module_name': UI_CONFIG['module_name'],
@@ -237,7 +225,6 @@ def create_downloader_ui_components(
         'form_container': form_container,
         'action_container': action_container,
         'operation_container': operation_container,
-        'footer_container': footer_container,
         
         # Add all button references with safe access and consistent naming
         'download': action_buttons.get('download') if action_buttons else None,

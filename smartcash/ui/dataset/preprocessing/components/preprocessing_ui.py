@@ -15,6 +15,7 @@ from smartcash.ui.components import (
     create_footer_container, 
     create_main_container
 )
+from smartcash.ui.components.summary_container import create_summary_container
 from smartcash.ui.components.form_container import LayoutType
 from smartcash.ui.core.decorators import handle_ui_errors
 
@@ -151,7 +152,16 @@ def create_preprocessing_ui_components(
         if hasattr(progress_tracker, 'start'):
             progress_tracker.start()
     
-    # 5. Create Footer Container
+    # 5. Create Summary Container  
+    summary_container = create_summary_container(
+        theme='default',
+        title='Preprocessing Summary',
+        icon='📊'
+    )
+    summary_content = "<div style='padding: 10px; width: 100%;'>Preprocessing summary will appear here...</div>"
+    summary_container.set_content(summary_content)
+    
+    # 6. Create Footer Container
     footer_container = create_footer_container(
         info_items=[{
             'title': '💡 Tips Preprocessing',
@@ -196,6 +206,7 @@ def create_preprocessing_ui_components(
             {'component': header_container.container, 'type': 'header'},
             {'component': form_container['container'], 'type': 'form'},
             {'component': action_container['container'], 'type': 'action'},
+            {'component': summary_container.container, 'type': 'summary'},
             {'component': operation_container['container'], 'type': 'operation'},
             {'component': footer_container.container, 'type': 'footer'}
         ]
@@ -231,6 +242,7 @@ def create_preprocessing_ui_components(
             'header': header_container,
             'form': form_container,
             'action': action_container,
+            'summary': summary_container,
             'operation': operation_container,
             'footer': footer_container
         },
@@ -245,6 +257,7 @@ def create_preprocessing_ui_components(
         'header_container': header_container,
         'form_container': form_container,
         'action_container': action_container,
+        'summary_container': summary_container,
         'operation_container': operation_container,  # Store full container dict for logging
         'footer_container': footer_container,
         

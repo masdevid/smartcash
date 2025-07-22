@@ -35,7 +35,7 @@ class BackboneUIModule(ModelDiscoveryMixin, ModelConfigSyncMixin, BackendService
         'operation_container'
     ]
 
-    def __init__(self, enable_environment: bool = False):
+    def __init__(self, enable_environment: bool = True):
         """
         Initialize the Backbone UI module.
         
@@ -707,22 +707,25 @@ class BackboneUIModule(ModelDiscoveryMixin, ModelConfigSyncMixin, BackendService
     def _check_built_models(self) -> Dict[str, Any]:
         """Check for built models by backbone type using mixin's configurable checkpoint discovery."""
         try:
-            # Use ModelDiscoveryMixin's discover_checkpoints method
+            # Use ModelDiscoveryMixin's discover_checkpoints method with relaxed validation
             discovered_checkpoints = self.discover_checkpoints(
                 discovery_paths=[
                     'data/checkpoints',                     # Primary checkpoint directory
                     'runs/train/*/weights',                 # YOLOv5 training output pattern  
-                    'experiments/*/checkpoints'             # Alternative experiment directory
+                    'experiments/*/checkpoints',            # Alternative experiment directory
+                    'data/models',                          # Models directory
+                    'models'                               # Alternative models directory
                 ],
                 filename_patterns=[
                     'best_*.pt',                           # Standard best model format
                     'last.pt',                             # Latest checkpoint fallback
-                    'epoch_*.pt'                           # Epoch-based checkpoints
+                    'epoch_*.pt',                          # Epoch-based checkpoints
+                    '*.pt',                                # Any PyTorch model files
+                    '*.pth'                                # Alternative PyTorch extension
                 ],
                 validation_requirements={
-                    'min_val_map': 0.3,
-                    'supported_backbones': ['cspdarknet', 'efficientnet_b4'],
-                    'required_keys': ['model_state_dict', 'config']
+                    # Relaxed validation - just check if file exists and is readable
+                    'required_keys': []  # Remove strict key requirements
                 }
             )
             
@@ -738,8 +741,55 @@ class BackboneUIModule(ModelDiscoveryMixin, ModelConfigSyncMixin, BackendService
             return built_models
             
         except Exception as e:
-            self.log_error(f"Failed to check built models: {e}")
-            return {}
+            self.log_error(f"ModelDiscoveryMixin failed: {e}, trying fallback method")
+            # Fallback: simple file system scan
+            return self._fallback_model_scan()
+
+    def _fallback_model_scan(self) -> Dict[str, Any]:
+        """Fallback method to scan for models using simple file system operations."""
+        import os
+        import glob
+        from pathlib import Path
+        
+        built_models = {}
+        
+        try:
+            # Common model directories
+            search_dirs = [
+                'data/checkpoints',
+                'data/models', 
+                'models',
+                'runs/train/*/weights'
+            ]
+            
+            model_extensions = ['*.pt', '*.pth']
+            found_files = []
+            
+            for search_dir in search_dirs:
+                if '*' in search_dir:
+                    # Handle wildcard patterns
+                    for pattern_dir in glob.glob(search_dir):
+                        if os.path.isdir(pattern_dir):
+                            for ext in model_extensions:
+                                found_files.extend(glob.glob(os.path.join(pattern_dir, ext)))
+                else:
+                    # Direct directory search
+                    if os.path.exists(search_dir):
+                        for ext in model_extensions:
+                            found_files.extend(glob.glob(os.path.join(search_dir, ext)))
+            
+            # Group files by assumed backbone type (simplified)
+            if found_files:
+                # For simplicity, group all found models under 'found' category
+                built_models['found'] = found_files
+                self.log_debug(f"Fallback scan found {len(found_files)} model files")
+            else:
+                self.log_debug("Fallback scan found no model files")
+            
+        except Exception as e:
+            self.log_error(f"Fallback model scan also failed: {e}")
+        
+        return built_models
 
     def _register_rescan_button(self) -> None:
         """Register rescan models button with BaseUIModule system."""
@@ -807,8 +857,11 @@ class BackboneUIModule(ModelDiscoveryMixin, ModelConfigSyncMixin, BackendService
         try:
             self.log("🔄 Rescanning for existing models...", 'info')
             self._perform_model_scan()
+            self.log("✅ Model rescan completed", 'success')
         except Exception as e:
             self.log(f"❌ Error during model rescan: {e}", 'error')
+            # Log additional debug information
+            self.log_error(f"Rescan error details: {e}", exc_info=True)
 
     def _perform_initial_model_scan(self) -> None:
         """Perform initial model scan during module initialization."""
@@ -831,6 +884,12 @@ class BackboneUIModule(ModelDiscoveryMixin, ModelConfigSyncMixin, BackendService
             
             # Count models for current backbone
             current_backbone_models = built_models.get(backbone_type, [])
+            
+            # If no models found for specific backbone, check 'found' category (fallback scan)
+            if not current_backbone_models and 'found' in built_models:
+                current_backbone_models = built_models['found']
+                self.log_debug(f"Using fallback 'found' models: {len(current_backbone_models)} files")
+            
             model_count = len(current_backbone_models)
             
             # Determine status

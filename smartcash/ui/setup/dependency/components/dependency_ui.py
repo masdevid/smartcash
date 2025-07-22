@@ -54,7 +54,6 @@ def create_dependency_ui_components(module_config: Optional[Dict[str, Any]] = No
     from smartcash.ui.components.form_container import create_form_container, LayoutType
     from smartcash.ui.components.action_container import create_action_container
     from smartcash.ui.components.operation_container import create_operation_container
-    from smartcash.ui.components.footer_container import create_footer_container
     from smartcash.ui.components.main_container import create_main_container
     
     # Ensure module_config is a dictionary
@@ -138,43 +137,12 @@ def create_dependency_ui_components(module_config: Optional[Dict[str, Any]] = No
         progress_levels='single'  # Single progress bar to prevent duplication
     )
     
-    # 5. Footer Container
-    from smartcash.ui.components.footer_container import PanelConfig, PanelType
-    
-    footer_container = create_footer_container(
-        panels=[
-            PanelConfig(
-                panel_type=PanelType.INFO_ACCORDION,
-                title="💡 Tips Manajemen Paket",
-                content="""
-                <div style="padding: 10px;">
-                    <ul>
-                        <li><strong>Tambah Paket:</strong> Tambahkan paket yang dipilih ke konfigurasi</li>
-                        <li><strong>Instal Terpilih:</strong> Instal paket yang dipilih dan paket tambahan</li>
-                        <li><strong>Cek Status:</strong> Verifikasi paket mana yang terinstal dan temukan yang hilang</li>
-                        <li><strong>Update Semua:</strong> Update semua paket terinstal ke versi terbaru</li>
-                        <li><strong>Uninstal:</strong> Hapus paket yang dipilih dari lingkungan</li>
-                    </ul>
-                </div>
-                """,
-                style="info",
-                open_by_default=False
-            )
-        ],
-        module_info={
-            'name': 'Dependency Management',
-            'version': '1.0.0',
-            'description': 'Kelola paket dan dependensi proyek SmartCash'
-        }
-    )
-    
-    # 6. Main Container - final assembly
+    # 5. Main Container - final assembly
     main_container = create_main_container(
         header_container=header_container.container,
         form_container=form_container['container'],
         action_container=action_container['container'],
-        operation_container=operation_container['container'],
-        footer_container=footer_container.container
+        operation_container=operation_container['container']
     )
     
     # Store components in optimized cache
@@ -184,7 +152,6 @@ def create_dependency_ui_components(module_config: Optional[Dict[str, Any]] = No
         'form_container': form_container,
         'action_container': action_container,
         'operation_container': operation_container,
-        'footer_container': footer_container,
         '_package_checkboxes': package_checkboxes,
         '_custom_packages': custom_packages
     }

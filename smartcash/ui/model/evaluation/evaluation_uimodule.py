@@ -15,7 +15,7 @@ class EvaluationUIModule(ModelDiscoveryMixin, ModelConfigSyncMixin, BackendServi
     """Evaluation UI Module for comprehensive model evaluation."""
     
     def __init__(self):
-        super().__init__(module_name='evaluation', parent_module='model')
+        super().__init__(module_name='evaluation', parent_module='model', enable_environment=True)
         self._required_components = ['main_container', 'action_container', 'operation_container', 'summary_container']
         self.evaluation_service = self.checkpoint_selector = self.progress_bridge = None
         self.report_generator = EvaluationReportGenerator()

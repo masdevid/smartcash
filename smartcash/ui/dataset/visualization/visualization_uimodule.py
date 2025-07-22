@@ -42,7 +42,7 @@ class VisualizationUIModule(BaseUIModule):
         'progress_container'
     ]
     
-    def __init__(self, enable_environment: bool = False):
+    def __init__(self, enable_environment: bool = True):
         """
         Inisialisasi modul UI Visualisasi.
         

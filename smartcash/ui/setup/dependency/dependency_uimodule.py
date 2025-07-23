@@ -43,6 +43,10 @@ class DependencyUIModule(BaseUIModule):
         self._initialized = False
         self._ui_components = None
         
+        # Operation overlap prevention
+        self._operation_running = False
+        self._current_operation = None
+        
         # Set required components for validation
         self._required_components = [
             'main_container',
@@ -132,21 +136,51 @@ class DependencyUIModule(BaseUIModule):
             # No additional setup needed for dependency module
             
             return True
-            
         except Exception as e:
             # Minimal error logging for performance
             self.log_error(f"Initialization failed: {str(e)}")
             return False
+    
+    # ==================== OPERATION OVERLAP PREVENTION ====================
+    
+    def _check_operation_overlap(self, operation_name: str) -> Dict[str, Any]:
+        """Check if another operation is currently running to prevent overlaps."""
+        if self._operation_running:
+            error_msg = f"Operasi {self._current_operation} sedang berjalan. Harap tunggu hingga selesai sebelum memulai operasi {operation_name}."
+            self.log_warning(f"⚠️ Operation overlap prevented: {operation_name} blocked by {self._current_operation}")
+            return {'valid': False, 'message': error_msg}
+        
+        # Lock the operation
+        self._operation_running = True
+        self._current_operation = operation_name
+        self.log_debug(f"🔒 Operation locked: {operation_name}")
+        return {'valid': True}
+    
+    def _release_operation_lock(self, operation_name: str = None):
+        """Release the operation lock after completion."""
+        if operation_name and operation_name != self._current_operation:
+            self.log_warning(f"⚠️ Operation lock mismatch: expected {self._current_operation}, got {operation_name}")
+        
+        self._operation_running = False
+        previous_operation = self._current_operation
+        self._current_operation = None
+        self.log_debug(f"🔓 Operation lock released: {previous_operation}")
                 
     # ==================== OPERATION HANDLERS ====================
     
     def _operation_install_packages(self, button=None) -> Dict[str, Any]:
         """Handle package installation operation using common wrapper."""
         def validate_packages():
-            """Validate packages before installation."""
+            """Validate packages and check for operation overlaps."""
+            # Check for operation overlap first
+            overlap_check = self._check_operation_overlap("Instalasi Paket")
+            if not overlap_check['valid']:
+                return overlap_check
+            
             packages = self._get_selected_packages()
             if not packages:
-                # Enhanced error message with debugging info
+                # Release lock if validation fails
+                self._release_operation_lock("Instalasi Paket")
                 error_msg = 'Tidak ada paket yang dipilih untuk diinstal. Pastikan Anda telah mencentang checkbox paket atau memasukkan paket kustom.'
                 self.log_error(f"❌ Validation failed: {error_msg}")
                 return {'valid': False, 'message': error_msg}
@@ -155,9 +189,14 @@ class DependencyUIModule(BaseUIModule):
             
         def execute_install():
             """Execute package installation."""
-            packages = self._get_selected_packages()
-            self.log(f"🔄 Memulai instalasi {len(packages)} paket...", 'info')
-            return self._execute_install_operation(packages)
+            try:
+                packages = self._get_selected_packages()
+                self.log(f"🔄 Memulai instalasi {len(packages)} paket...", 'info')
+                result = self._execute_install_operation(packages)
+                return result
+            finally:
+                # Always release the operation lock
+                self._release_operation_lock("Instalasi Paket")
             
         return self._execute_operation_with_wrapper(
             operation_name="Instalasi Paket",
@@ -172,10 +211,16 @@ class DependencyUIModule(BaseUIModule):
         """Handle package uninstallation operation using common wrapper."""
         
         def validate_packages():
-            """Validate packages before uninstallation."""
+            """Validate packages and check for operation overlaps."""
+            # Check for operation overlap first
+            overlap_check = self._check_operation_overlap("Penghapusan Paket")
+            if not overlap_check['valid']:
+                return overlap_check
+                
             packages = self._get_selected_packages()
             if not packages:
-                # Enhanced error message with debugging info
+                # Release lock if validation fails
+                self._release_operation_lock("Penghapusan Paket")
                 error_msg = 'Tidak ada paket yang dipilih untuk dihapus. Pastikan Anda telah mencentang checkbox paket atau memasukkan paket kustom.'
                 self.log_error(f"❌ Validation failed: {error_msg}")
                 return {'valid': False, 'message': error_msg}
@@ -184,9 +229,14 @@ class DependencyUIModule(BaseUIModule):
             
         def execute_uninstall():
             """Execute package uninstallation."""
-            packages = self._get_selected_packages()
-            self.log(f"🔄 Memulai penghapusan {len(packages)} paket...", 'info')
-            return self._execute_uninstall_operation(packages)
+            try:
+                packages = self._get_selected_packages()
+                self.log(f"🔄 Memulai penghapusan {len(packages)} paket...", 'info')
+                result = self._execute_uninstall_operation(packages)
+                return result
+            finally:
+                # Always release the operation lock
+                self._release_operation_lock("Penghapusan Paket")
             
         return self._execute_operation_with_wrapper(
             operation_name="Penghapusan Paket",
@@ -201,10 +251,16 @@ class DependencyUIModule(BaseUIModule):
         """Handle package update operation using common wrapper."""
         
         def validate_packages():
-            """Validate packages before update."""
+            """Validate packages and check for operation overlaps."""
+            # Check for operation overlap first
+            overlap_check = self._check_operation_overlap("Pembaruan Paket")
+            if not overlap_check['valid']:
+                return overlap_check
+                
             packages = self._get_selected_packages()
             if not packages:
-                # Enhanced error message with debugging info
+                # Release lock if validation fails
+                self._release_operation_lock("Pembaruan Paket")
                 error_msg = 'Tidak ada paket yang dipilih untuk diperbarui. Pastikan Anda telah mencentang checkbox paket atau memasukkan paket kustom.'
                 self.log_error(f"❌ Validation failed: {error_msg}")
                 return {'valid': False, 'message': error_msg}
@@ -213,9 +269,14 @@ class DependencyUIModule(BaseUIModule):
             
         def execute_update():
             """Execute package update."""
-            packages = self._get_selected_packages()
-            self.log(f"🔄 Memulai pembaruan {len(packages)} paket...", 'info')
-            return self._execute_update_operation(packages)
+            try:
+                packages = self._get_selected_packages()
+                self.log(f"🔄 Memulai pembaruan {len(packages)} paket...", 'info')
+                result = self._execute_update_operation(packages)
+                return result
+            finally:
+                # Always release the operation lock
+                self._release_operation_lock("Pembaruan Paket")
             
         return self._execute_operation_with_wrapper(
             operation_name="Pembaruan Paket",
@@ -230,28 +291,38 @@ class DependencyUIModule(BaseUIModule):
         """Handle package status check operation using common wrapper."""
         
         def validate_components():
+            """Validate components and check for operation overlaps."""
+            # Check for operation overlap first
+            overlap_check = self._check_operation_overlap("Pemeriksaan Status")
+            if not overlap_check['valid']:
+                return overlap_check
             return {'valid': True}
         
         def execute_check_status():
-            result = self._execute_check_status_operation()
-            if result.get('success') and 'summary' in result:
-                summary = result['summary']
-                total = summary.get('total', 0)
-                installed = summary.get('installed', 0)
-                missing = summary.get('missing', 0)
-                
-                # Create informative success message per TASK.md requirements
-                if missing > 0 and installed > 0:
-                    result['informative_message'] = f"📊 Status: {installed} paket terinstal, {missing} paket belum terinstal dari total {total} paket"
-                elif missing == 0 and total > 0:
-                    result['informative_message'] = f"✅ Semua {total} paket sudah terinstal"
-                elif total == 0:
-                    result['informative_message'] = "ℹ️ Tidak ada paket yang dipilih untuk diperiksa"
-                else:
-                    result['informative_message'] = f"❌ Semua {total} paket belum terinstal"
+            """Execute status check operation."""
+            try:
+                result = self._execute_check_status_operation()
+                if result.get('success') and 'summary' in result:
+                    summary = result['summary']
+                    total = summary.get('total', 0)
+                    installed = summary.get('installed', 0)
+                    missing = summary.get('missing', 0)
                     
-                self.log_info(result['informative_message'])
-            return result
+                    # Create informative success message per TASK.md requirements
+                    if missing > 0 and installed > 0:
+                        result['informative_message'] = f"📊 Status: {installed} paket terinstal, {missing} paket belum terinstal dari total {total} paket"
+                    elif missing == 0 and total > 0:
+                        result['informative_message'] = f"✅ Semua {total} paket sudah terinstal"
+                    elif total == 0:
+                        result['informative_message'] = "ℹ️ Tidak ada paket yang dipilih untuk diperiksa"
+                    else:
+                        result['informative_message'] = f"❌ Semua {total} paket belum terinstal"
+                        
+                    self.log_info(result['informative_message'])
+                return result
+            finally:
+                # Always release the operation lock
+                self._release_operation_lock("Pemeriksaan Status")
         
         return self._execute_operation_with_wrapper(
             operation_name="Cek Status Paket",

@@ -315,7 +315,8 @@ class DownloadCleanupOperation(DownloaderBaseOperation):
             
             self.log_operation_complete("Cleanup Dataset")
             
-            return {
+            # Create result dictionary
+            result = {
                 'success': True,
                 'message': f'Pembersihan selesai: {deleted_files} file dihapus ({freed_space} dibebaskan)',
                 'deleted_files': deleted_files,
@@ -324,8 +325,40 @@ class DownloadCleanupOperation(DownloaderBaseOperation):
                 'operation_id': self.operation_id
             }
             
+            # Execute summary callback with formatted summary
+            try:
+                summary_html = self._format_cleanup_summary(result)
+                self._execute_callback('on_success', summary_html)
+            except Exception as e:
+                self.logger.warning(f"Failed to update cleanup summary: {e}")
+            
+            return result
+            
         except Exception as e:
             return self._handle_error("Error tidak terduga saat cleanup", e)
+
+    def _format_cleanup_summary(self, result: Dict[str, Any]) -> str:
+        """Format cleanup operation result into HTML summary."""
+        deleted_files = result.get('deleted_files', 0)
+        freed_space = result.get('freed_space', '0B')
+        targets = result.get('targets', {})
+        
+        total_targets = targets.get('total_files', 0) if targets else 0
+        
+        return f"""
+### Ringkasan Operasi Cleanup Dataset
+
+| Kategori | Detail |
+| :--- | :--- |
+| **Status** | ✅ Berhasil |
+| **Files Deleted** | 🗑️ {deleted_files} file |
+| **Total Targets** | 📁 {total_targets} file |
+| **Freed Space** | 💾 {freed_space} |
+
+---
+
+**Dataset cleanup completed successfully!**
+"""
 
     def show_cleanup_confirmation(
         self, 

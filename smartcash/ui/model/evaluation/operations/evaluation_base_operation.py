@@ -219,6 +219,22 @@ class EvaluationBaseOperation(OperationMixin, LoggingMixin):
         except Exception as e:
             self.logger.error(f"Failed to complete operation: {e}")
 
+    def clear_operation_logs(self) -> None:
+        """Clear operation logs from the operation container before starting a new operation."""
+        try:
+            # Try to get operation container from UI module
+            operation_container = self._ui_module.get_component('operation_container')
+            if operation_container and hasattr(operation_container, 'clear_logs'):
+                operation_container.clear_logs()
+                self.logger.debug("✅ Evaluation operation logs cleared")
+            elif operation_container and hasattr(operation_container, 'clear'):
+                operation_container.clear()
+                self.logger.debug("✅ Evaluation operation container cleared")
+            else:
+                self.logger.debug("⚠️ No clear method available on evaluation operation container")
+        except Exception as e:
+            self.logger.error(f"Failed to clear evaluation operation logs: {e}")
+
     @abstractmethod
     def execute(self) -> Dict[str, Any]:
         """

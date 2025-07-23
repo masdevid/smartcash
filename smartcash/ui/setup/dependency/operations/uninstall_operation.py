@@ -99,20 +99,27 @@ class UninstallOperationHandler(BaseOperationHandler):
                 break
                 
             # Update progress using mixin method
-            self.update_progress(
-                (i / total) * 100,
-                f"Menguninstal paket {i}/{total}: {package}"
-            )
+            progress_value = int((i / total) * 100)
+            progress_message = f"Menguninstal paket {i}/{total}: {package}"
+            
+            # Small delay to make progress visible in UI
+            import time
+            time.sleep(0.05)
+            
+            self.update_progress(progress_value, progress_message)
             
             result = self._uninstall_single_package(package)
             results.append(result)
             
             # Show result status
             status = "✅" if result.get('success') else "❌"
-            self.update_progress(
-                (i / total) * 100,
-                f"Selesai {i}/{total}: {status} {package}"
-            )
+            final_progress = int((i / total) * 100)
+            final_message = f"Selesai {i}/{total}: {status} {package}"
+            
+            self.update_progress(final_progress, final_message)
+            
+            # Brief delay for status visibility
+            time.sleep(0.1)
         
         return results
     

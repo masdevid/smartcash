@@ -255,6 +255,15 @@ class DownloaderBaseOperation(OperationMixin, LoggingMixin, ColabSecretsMixin):
             'operation_id': self._operation_id
         }
     
+    def _execute_callback(self, callback_name: str, *args, **kwargs) -> None:
+        """Execute a callback if it exists."""
+        callback = self._callbacks.get(callback_name)
+        if callback and callable(callback):
+            try:
+                callback(*args, **kwargs)
+            except Exception as e:
+                self.logger.error(f"Error executing callback '{callback_name}': {e}")
+    
     @abstractmethod
     def execute(self) -> Dict[str, Any]:
         """

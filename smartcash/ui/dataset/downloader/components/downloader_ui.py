@@ -7,7 +7,7 @@ from typing import Dict, Any, Optional
 
 # Standard container imports
 from smartcash.ui.components import (create_header_container, create_form_container, create_action_container, 
-                                  create_operation_container, create_main_container)
+                                  create_operation_container, create_summary_container, create_main_container)
 from smartcash.ui.components.form_container import LayoutType
 from smartcash.ui.core.decorators import handle_ui_errors
 from smartcash.ui.dataset.downloader.constants import (
@@ -122,6 +122,15 @@ def create_downloader_ui_components(
     progress_tracker = operation_container.get('progress_tracker')
     log_accordion = operation_container.get('log_accordion')
     
+    # 5. Create Summary Container for operation results
+    summary_container = create_summary_container(
+        theme='default',
+        title='Download Summary',
+        icon='📊'
+    )
+    summary_content = "<div style='padding: 10px; width: 100%;'>Download operation summary will appear here...</div>"
+    summary_container.set_content(summary_content)
+    
     # Initialize progress tracker if available
     if progress_tracker and hasattr(progress_tracker, 'initialize'):
         progress_tracker.initialize()
@@ -146,6 +155,7 @@ def create_downloader_ui_components(
         'header_container': header_container,
         'form_container': form_container,
         'action_container': action_container,  # Full action container with all methods
+        'summary_container': summary_container,  # Operation summary container
         'operation_container': operation_container,
         'ui_initialized': True,
         'module_name': UI_CONFIG['module_name'],
@@ -161,6 +171,7 @@ def create_downloader_ui_components(
             {'component': header_container.container, 'type': 'header'},
             {'component': form_container['container'], 'type': 'form'},
             {'component': action_container['container'], 'type': 'action'},
+            {'component': summary_container.container, 'type': 'summary'},
             {'component': operation_container['container'], 'type': 'operation'}
         ],
         container_style={
@@ -210,6 +221,7 @@ def create_downloader_ui_components(
             'header': header_container,
             'form': form_container,
             'action': action_container,
+            'summary': summary_container,
             'operation': operation_container
         },
         'ui_initialized': True,
@@ -223,6 +235,7 @@ def create_downloader_ui_components(
         'header_container': header_container,
         'form_container': form_container,
         'action_container': action_container,
+        'summary_container': summary_container,
         'operation_container': operation_container,
         
         # Add all button references with safe access and consistent naming

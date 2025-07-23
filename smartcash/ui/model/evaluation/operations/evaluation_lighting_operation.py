@@ -111,6 +111,9 @@ class EvaluationLightingOperation(EvaluationBaseOperation):
             Dictionary containing evaluation results
         """
         try:
+            # Clear previous operation logs
+            self.clear_operation_logs()
+            
             self._ui_module.log_info("💡 Starting lighting variation scenario...")
             
             # Extract form values to get current model selection

@@ -140,24 +140,53 @@ class VisualizationUIModule(BaseUIModule):
     
     def _initialize_dashboard(self):
         """Initialize the dashboard with enhanced visualization stats cards."""
-        from .components.visualization_stats_cards import create_visualization_stats_dashboard
-        
-        # Create enhanced visualization stats dashboard
-        self._dashboard_cards = create_visualization_stats_dashboard()
-        
-        # Add container cards to layout
-        dashboard_container = None
-        if 'dashboard' in self.components:
-            dashboard_container = self.components['dashboard']
-        elif 'containers' in self.components and 'dashboard_container' in self.components['containers']:
-            dashboard_container = self.components['containers']['dashboard_container']
+        try:
+            from .components.visualization_stats_cards import create_visualization_stats_dashboard
             
-        if dashboard_container:
-            dashboard_container.children = [self._dashboard_cards.get_container()]
-            self.log_debug("✅ Dashboard cards initialized and added to container")
-        
-        # Initialize with empty stats (will be updated by refresh operation)
-        self._update_dashboard_stats()
+            # Create enhanced visualization stats dashboard
+            self._dashboard_cards = create_visualization_stats_dashboard()
+            self.log_debug("📊 Dashboard cards created successfully")
+            
+            # Find dashboard container in components structure
+            dashboard_container = None
+            
+            # Primary lookup: Check components dictionary for 'dashboard' key
+            if hasattr(self, 'components') and isinstance(self.components, dict):
+                dashboard_container = self.components.get('dashboard')
+                if dashboard_container:
+                    self.log_debug("✅ Found dashboard container in self.components['dashboard']")
+                else:
+                    self.log_debug(f"Available components keys: {list(self.components.keys())}")
+            
+            # Fallback: Check _ui_components (backward compatibility)
+            if not dashboard_container and hasattr(self, '_ui_components') and isinstance(self._ui_components, dict):
+                dashboard_container = self._ui_components.get('dashboard')
+                if dashboard_container:
+                    self.log_debug("✅ Found dashboard container in self._ui_components['dashboard']")
+                else:
+                    self.log_debug(f"Available _ui_components keys: {list(self._ui_components.keys())}")
+            
+            if dashboard_container:
+                # Add cards container to dashboard container
+                cards_container = self._dashboard_cards.get_container()
+                dashboard_container.children = [cards_container]
+                self.log_debug("✅ Dashboard cards initialized and added to container")
+                
+                # Initialize with empty stats (will be updated by refresh operation)
+                self._update_dashboard_stats()
+                
+            else:
+                self.log_warning("⚠️ Dashboard container not found - cards created but not displayed")
+                # Log available components for debugging
+                if hasattr(self, 'components'):
+                    available_components = list(self.components.keys()) if isinstance(self.components, dict) else "Not a dict"
+                    self.log_debug(f"Available components: {available_components}")
+                if hasattr(self, '_ui_components'):
+                    available_ui_components = list(self._ui_components.keys()) if isinstance(self._ui_components, dict) else "Not a dict"
+                    self.log_debug(f"Available UI components: {available_ui_components}")
+                    
+        except Exception as e:
+            self.log_error(f"❌ Failed to initialize dashboard: {e}", exc_info=True)
         
     def get_default_config(self) -> Dict[str, Any]:
         """

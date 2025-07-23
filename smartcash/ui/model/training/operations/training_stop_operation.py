@@ -20,6 +20,9 @@ class TrainingStopOperationHandler(BaseTrainingOperation):
 
     def execute(self) -> Dict[str, Any]:
         """Execute the training stop operation."""
+        # Clear previous operation logs
+        self.clear_operation_logs()
+        
         self.log_operation("🛑 Menghentikan proses training...", level='info')
         
         # Start triple progress tracking: 4 overall steps with granular stop phases

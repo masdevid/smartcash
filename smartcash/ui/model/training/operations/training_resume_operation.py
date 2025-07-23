@@ -21,6 +21,9 @@ class TrainingResumeOperationHandler(BaseTrainingOperation):
 
     def execute(self) -> Dict[str, Any]:
         """Execute the training resume operation."""
+        # Clear previous operation logs
+        self.clear_operation_logs()
+        
         self.log_operation("🔄 Melanjutkan proses training dari checkpoint...", level='info')
         
         # Start dual progress tracking: 5 overall steps

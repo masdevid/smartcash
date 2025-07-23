@@ -14,6 +14,9 @@ class BackboneValidateOperationHandler(BaseBackboneOperation):
 
     def execute(self) -> Dict[str, Any]:
         """Executes the validation check by calling the backend API."""
+        # Clear previous operation logs
+        self.clear_operation_logs()
+        
         self.log_operation("🔍 Memulai validasi konfigurasi backbone...", level='info')
         
         # Start dual progress tracking: 3 overall steps

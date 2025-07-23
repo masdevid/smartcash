@@ -41,6 +41,7 @@ class DownloaderUIModule(BaseUIModule):
             'header_container',
             'form_container', 
             'action_container',
+            'summary_container',
             'operation_container'
         ]
         
@@ -114,7 +115,9 @@ class DownloaderUIModule(BaseUIModule):
             current_config = self.get_current_config()
             merged_config = {**current_config, **ui_config}
             
-            operation = create_download_operation(self, merged_config)
+            # Create download operation with summary callback
+            callbacks = {'on_success': self._update_operation_summary}
+            operation = create_download_operation(self, merged_config, callbacks)
             result = operation.execute()
             
             if result.get("success", False):
@@ -143,9 +146,10 @@ class DownloaderUIModule(BaseUIModule):
         def execute_check():
             self.log("🔍 Memeriksa status dataset...", "info")
             
-            # Create check operation
+            # Create check operation with summary callback
             current_config = self.get_current_config()
-            operation = create_check_operation(self, current_config)
+            callbacks = {'on_success': self._update_operation_summary}
+            operation = create_check_operation(self, current_config, callbacks)
             result = operation.execute()
             
             if result.get("success", False):
@@ -174,9 +178,10 @@ class DownloaderUIModule(BaseUIModule):
         def execute_cleanup():
             self.log("🧹 Memulai pembersihan dataset...", "info")
             
-            # Create cleanup operation
+            # Create cleanup operation with summary callback
             current_config = self.get_current_config()
-            operation = create_cleanup_operation(self, current_config)
+            callbacks = {'on_success': self._update_operation_summary}
+            operation = create_cleanup_operation(self, current_config, callbacks)
             
             # Get cleanup targets first
             targets_result = operation.get_cleanup_targets()
@@ -218,6 +223,31 @@ class DownloaderUIModule(BaseUIModule):
         """Get list of selected packages from UI."""
         # Implementation here
         return []
+    
+    def _update_operation_summary(self, content: str) -> None:
+        """Update the operation summary container with new content."""
+        try:
+            summary_container = self.get_component('summary_container')
+            if summary_container and hasattr(summary_container, 'set_content'):
+                formatted_content = f"""
+                <div style="padding: 10px; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">
+                    <h4 style="color: #2c3e50; margin: 0 0 10px 0;">📊 Operation Summary</h4>
+                    <div style="background: #f8f9fa; padding: 10px; border-radius: 5px; border-left: 4px solid #28a745;">
+                        {content}
+                    </div>
+                </div>
+                """
+                summary_container.set_content(formatted_content)
+                self.log_debug("✅ Summary container updated with operation results")
+            else:
+                # Fallback to operation summary updater
+                updater = self.get_component('operation_summary_updater')
+                if updater and callable(updater):
+                    updater(content)
+                else:
+                    self.log_warning("Summary container tidak ditemukan atau tidak dapat dipanggil.")
+        except Exception as e:
+            self.log_error(f"Failed to update operation summary: {e}")
         
     def cleanup(self) -> None:
         """Widget lifecycle cleanup - optimization.md compliance."""

@@ -264,7 +264,8 @@ class DownloadOperation(DownloaderBaseOperation):
             
             self.log_operation_complete("Download Dataset")
             
-            return {
+            # Create result dictionary
+            result = {
                 'success': True,
                 'message': f'Dataset berhasil didownload: {file_count} file ({total_size})',
                 'download_path': download_path,
@@ -273,8 +274,39 @@ class DownloadOperation(DownloaderBaseOperation):
                 'operation_id': self.operation_id
             }
             
+            # Execute summary callback with formatted summary
+            try:
+                from ..components.operation_summary import update_download_summary
+                summary_html = self._format_download_summary(result)
+                self._execute_callback('on_success', summary_html)
+            except Exception as e:
+                self.logger.warning(f"Failed to update download summary: {e}")
+            
+            return result
+            
         except Exception as e:
             return self._handle_error("Error tidak terduga saat download", e)
+
+    def _format_download_summary(self, result: Dict[str, Any]) -> str:
+        """Format download operation result into HTML summary."""
+        file_count = result.get('file_count', 0)
+        total_size = result.get('total_size', '0B')
+        download_path = result.get('download_path', 'N/A')
+        
+        return f"""
+### Ringkasan Operasi Download
+
+| Kategori | Detail |
+| :--- | :--- |
+| **Status** | ✅ Berhasil |
+| **File Downloaded** | 📁 {file_count} file |
+| **Total Size** | 💾 {total_size} |
+| **Download Path** | 📂 {download_path} |
+
+---
+
+**Dataset berhasil didownload dan siap digunakan!**
+"""
 
     def _validate_and_prepare(self) -> Dict[str, Any]:
         """

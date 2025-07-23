@@ -23,6 +23,9 @@ class BackboneBuildOperationHandler(BaseBackboneOperation, ColabSecretsMixin):
 
     def execute(self) -> Dict[str, Any]:
         """Executes the model build by calling the backend API."""
+        # Clear previous operation logs
+        self.clear_operation_logs()
+        
         self.log_operation("🏗️ Memulai pembangunan model backbone...", level='info')
         
         # Start dual progress tracking: 4 overall steps

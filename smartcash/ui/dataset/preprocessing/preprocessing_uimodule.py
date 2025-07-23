@@ -34,6 +34,9 @@ class PreprocessingUIModule(BaseUIModule):
             'summary_container',
             'operation_container'
         ]
+        # Service readiness flag
+        self._service_ready = False
+        self._existing_data_found = False
 
     # BaseUIModule Required Methods
     def get_default_config(self) -> Dict[str, Any]:
@@ -47,6 +50,44 @@ class PreprocessingUIModule(BaseUIModule):
     def create_ui_components(self, config: Dict[str, Any]) -> Dict[str, Any]:
         """Create the UI components for the module."""
         return create_preprocessing_ui_components(config=config)
+
+    def _post_init_tasks(self) -> None:
+        """Run post-initialization tasks including service readiness check."""
+        try:
+            # Check service readiness using the new API
+            from smartcash.dataset.preprocessor.api import check_service_readiness, check_existing_data
+            
+            config = self.get_current_config()
+            data_dir = config.get('data', {}).get('dir', 'data')
+            
+            # Check service readiness
+            readiness_result = check_service_readiness(data_dir)
+            if readiness_result.get('success'):
+                self._service_ready = readiness_result.get('ready', False)
+                
+                # Check for existing data if service is ready
+                if self._service_ready:
+                    existing_data_result = check_existing_data(data_dir)
+                    if existing_data_result.get('success'):
+                        self._existing_data_found = existing_data_result.get('has_existing_data', False)
+                        
+                        # Log findings
+                        if self._existing_data_found:
+                            total_files = existing_data_result.get('total_existing_files', 0)
+                            self.log_info(f"🔍 Service ready with {total_files} existing preprocessed files found")
+                        else:
+                            self.log_info("🔍 Service ready, no existing preprocessed data found")
+                    else:
+                        self.log_warning("⚠️ Could not check for existing data")
+                else:
+                    self.log_info("ℹ️ Service not ready - preprocessed directory structure missing")
+            else:
+                self.log_warning(f"⚠️ Service readiness check failed: {readiness_result.get('message', 'Unknown error')}")
+                
+        except Exception as e:
+            self.log_error(f"❌ Post-init service readiness check failed: {e}")
+            self._service_ready = False
+            self._existing_data_found = False
 
     def _get_module_button_handlers(self) -> Dict[str, Any]:
         """Get module-specific button handlers."""
@@ -95,22 +136,38 @@ class PreprocessingUIModule(BaseUIModule):
 
     # Private Operation Execution Methods
     def _execute_preprocess_with_confirmation(self) -> Dict[str, Any]:
-        """Execute preprocessing with user confirmation."""
+        """Execute preprocessing with user confirmation, including existing data check."""
         try:
             preprocessed_files, raw_images = self._get_data_stats()
-            message = (
+            
+            # Build message based on existing data status
+            base_message = (
                 f"Anda akan memulai pra-pemrosesan data.\n\n"
                 f"- Gambar mentah terdeteksi: {raw_images}\n"
                 f"- File yang sudah diproses: {preprocessed_files}\n\n"
-                f"Proses ini mungkin menimpa file yang ada. Lanjutkan?"
             )
+            
+            # Add warning if existing data found
+            if self._existing_data_found and preprocessed_files > 0:
+                message = (
+                    base_message +
+                    f"⚠️ PERHATIAN: Ditemukan {preprocessed_files} file yang sudah diproses!\n"
+                    f"Proses ini akan menimpa file yang ada dan tidak dapat diurungkan.\n\n"
+                    f"Yakin ingin melanjutkan?"
+                )
+                danger_mode = True
+                confirm_text = "Ya, Timpa Data yang Ada"
+            else:
+                message = base_message + "Lanjutkan dengan pra-pemrosesan?"
+                danger_mode = False
+                confirm_text = "Lanjutkan"
             
             return self._show_confirmation_dialog(
                 title="Konfirmasi Pra-pemrosesan",
                 message=message,
                 confirm_action=self._execute_preprocess_operation,
-                confirm_text="Lanjutkan",
-                danger_mode=True
+                confirm_text=confirm_text,
+                danger_mode=danger_mode
             )
         except Exception as e:
             return {'success': False, 'message': f"Gagal memeriksa status data: {e}"}
@@ -194,13 +251,26 @@ class PreprocessingUIModule(BaseUIModule):
 
     # Validation Methods
     def _validate_ui_ready(self) -> Dict[str, Any]:
-        """Validate that UI components are ready."""
+        """Validate that UI components are ready and service is ready."""
         if not hasattr(self, '_ui_components') or not self._ui_components:
             return {'valid': False, 'message': "Komponen UI belum siap, silakan coba lagi"}
+        
+        if not self._service_ready:
+            return {
+                'valid': False, 
+                'message': "Service belum siap - struktur direktori preprocessing tidak ditemukan. Pastikan direktori data telah dibuat dengan benar."
+            }
+        
         return {'valid': True}
 
     def _validate_cleanup_available(self) -> Dict[str, Any]:
-        """Validate that cleanup is available."""
+        """Validate that cleanup is available and service is ready."""
+        if not self._service_ready:
+            return {
+                'valid': False, 
+                'message': "Service belum siap - tidak dapat melakukan cleanup. Pastikan direktori data telah dibuat dengan benar."
+            }
+            
         try:
             preprocessed_files, _ = self._get_data_stats()
             if preprocessed_files == 0:
@@ -270,23 +340,27 @@ class PreprocessingUIModule(BaseUIModule):
     def _update_operation_summary(self, content: str) -> None:
         """Update the operation summary container with new content."""
         try:
+            from smartcash.ui.core.ui_utils import format_operation_summary
+            
             summary_container = self.get_component('summary_container')
             if summary_container and hasattr(summary_container, 'set_content'):
-                formatted_content = f"""
-                <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">
-                    <h4 style="color: #2c3e50; margin: 0 0 10px 0;">📊 Operation Summary</h4>
-                    <div style="background: #f8f9fa; padding: 10px; border-radius: 5px; border-left: 4px solid #28a745;">
-                        {content}
-                    </div>
-                </div>
-                """
+                # Format content using core utility
+                formatted_content = format_operation_summary(
+                    content=content,
+                    title="Preprocessing Summary",
+                    icon="📊",
+                    border_color="#28a745"
+                )
                 summary_container.set_content(formatted_content)
                 self.log_debug("✅ Summary container updated with operation results")
             else:
                 # Fallback to operation summary updater
                 updater = self.get_component('operation_summary_updater')
                 if updater and callable(updater):
-                    updater(content)
+                    # Also convert content for updater using core utility
+                    from smartcash.ui.core.ui_utils import convert_summary_to_html
+                    html_content = convert_summary_to_html(content)
+                    updater(html_content)
                 else:
                     self.log_warning("Summary container tidak ditemukan atau tidak dapat dipanggil.")
         except Exception as e:

@@ -93,32 +93,57 @@ class CheckStatusOperationHandler(BaseOperationHandler):
             return {'success': False, 'error': error_msg}
     
     def _check_package_status(self, packages: List[str]) -> Dict[str, Dict[str, Any]]:
-        """Check status of multiple packages with progress tracking."""
+        """Check status of multiple packages with threadpool for faster response."""
         if not packages:
             return {}
             
         package_status = {}
         total = len(packages)
+        processed = 0
         
-        for i, package in enumerate(packages, 1):
-            if self._cancelled:
-                break
+        # Use threadpool for parallel package checking (faster response)
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+        import time
+        
+        # Limit concurrent workers to prevent overwhelming the system
+        max_workers = min(len(packages), 5)
+        
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            # Submit all package checks
+            futures = {
+                executor.submit(self._check_single_package, pkg): pkg
+                for pkg in packages
+            }
+            
+            # Process results as they complete
+            for future in as_completed(futures):
+                if self._cancelled:
+                    break
+                    
+                pkg = futures[future]
+                processed += 1
                 
-            # Update progress using mixin method
-            self.update_progress(
-                (i / total) * 100,
-                f"Memeriksa paket {i}/{total}: {package}"
-            )
-            
-            status = self._check_single_package(package)
-            package_status[package] = status
-            
-            # Show result status
-            status_icon = "✅" if status.get('installed') else "❌"
-            self.update_progress(
-                (i / total) * 100,
-                f"Selesai {i}/{total}: {status_icon} {package}"
-            )
+                try:
+                    status = future.result()
+                    package_status[pkg] = status
+                    
+                    # Update progress
+                    progress_value = int((processed / total) * 100)
+                    status_icon = "✅" if status.get('installed') else "❌"
+                    progress_message = f"Selesai {processed}/{total}: {status_icon} {pkg}"
+                    
+                    self.update_progress(progress_value, progress_message)
+                    
+                    # Brief delay for UI visibility
+                    time.sleep(0.02)
+                    
+                except Exception as e:
+                    self.log(f"Error checking {pkg}: {str(e)}", 'error')
+                    package_status[pkg] = {
+                        'installed': False,
+                        'version': None,
+                        'error': str(e)
+                    }
         
         return package_status
     

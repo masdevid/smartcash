@@ -104,3 +104,108 @@ def create_and_display_ui(
         error_msg = f"Gagal membuat {module_name}: {str(e)}"
         logger.error(error_msg, exc_info=True)
         raise
+
+
+def convert_summary_to_html(content: str) -> str:
+    """
+    Convert markdown-like content to proper HTML for Colab display.
+    
+    This utility function converts markdown-style content to HTML that renders
+    properly in Jupyter/Colab environments, with proper line breaks and styling.
+    
+    Args:
+        content: Raw content string (may contain markdown or plain text)
+        
+    Returns:
+        HTML formatted content with proper line breaks and styling
+        
+    Example:
+        >>> content = "## Results\\n- Success: 15 files\\n- **Total**: 100MB"
+        >>> html = convert_summary_to_html(content)
+        >>> # Returns formatted HTML with proper styling
+    """
+    if not content:
+        return "<p>No summary available</p>"
+    
+    # Handle different content types
+    html_lines = []
+    lines = content.split('\n')
+    
+    for line in lines:
+        line = line.strip()
+        if not line:
+            continue
+            
+        # Convert markdown headers to HTML
+        if line.startswith('### '):
+            html_lines.append(f'<h5 style="color: #2c3e50; margin: 10px 0 5px 0;">{line[4:]}</h5>')
+        elif line.startswith('## '):
+            html_lines.append(f'<h4 style="color: #2c3e50; margin: 15px 0 8px 0;">{line[3:]}</h4>')
+        elif line.startswith('# '):
+            html_lines.append(f'<h3 style="color: #2c3e50; margin: 20px 0 10px 0;">{line[2:]}</h3>')
+        
+        # Convert markdown lists to HTML
+        elif line.startswith('- '):
+            html_lines.append(f'<div style="margin: 3px 0; padding-left: 15px;">• {line[2:]}</div>')
+        elif line.startswith('* '):
+            html_lines.append(f'<div style="margin: 3px 0; padding-left: 15px;">• {line[2:]}</div>')
+        
+        # Convert markdown emphasis
+        elif '**' in line:
+            # Bold text - handle multiple bold sections
+            import re
+            line = re.sub(r'\*\*(.*?)\*\*', r'<strong>\1</strong>', line)
+            html_lines.append(f'<p style="margin: 5px 0;">{line}</p>')
+        
+        # Handle status indicators with colors
+        elif '✅' in line or '🟢' in line:
+            html_lines.append(f'<div style="margin: 5px 0; color: #28a745; font-weight: 500;">{line}</div>')
+        elif '❌' in line or '🔴' in line:
+            html_lines.append(f'<div style="margin: 5px 0; color: #dc3545; font-weight: 500;">{line}</div>')
+        elif '⚠️' in line or '🟡' in line:
+            html_lines.append(f'<div style="margin: 5px 0; color: #ffc107; font-weight: 500;">{line}</div>')
+        elif '📊' in line or '📈' in line or '📉' in line:
+            html_lines.append(f'<div style="margin: 5px 0; color: #17a2b8; font-weight: 500;">{line}</div>')
+        
+        # Regular text
+        else:
+            # Handle key-value pairs (common in summaries)
+            if ':' in line and not line.startswith('http'):
+                parts = line.split(':', 1)
+                if len(parts) == 2:
+                    key = parts[0].strip()
+                    value = parts[1].strip()
+                    html_lines.append(f'<div style="margin: 3px 0;"><strong>{key}:</strong> {value}</div>')
+                else:
+                    html_lines.append(f'<div style="margin: 5px 0;">{line}</div>')
+            else:
+                html_lines.append(f'<div style="margin: 5px 0;">{line}</div>')
+    
+    # Join with proper spacing
+    return '\n'.join(html_lines) if html_lines else "<p>No content to display</p>"
+
+
+def format_operation_summary(content: str, title: str = "Operation Summary", 
+                           icon: str = "📊", border_color: str = "#28a745") -> str:
+    """
+    Format operation summary content with consistent styling.
+    
+    Args:
+        content: Raw summary content
+        title: Summary title to display
+        icon: Icon to show in title
+        border_color: Left border color (default: green for success)
+        
+    Returns:
+        Formatted HTML content ready for display
+    """
+    html_content = convert_summary_to_html(content)
+    
+    return f"""
+    <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">
+        <h4 style="color: #2c3e50; margin: 0 0 10px 0;">{icon} {title}</h4>
+        <div style="background: #f8f9fa; padding: 15px; border-radius: 5px; border-left: 4px solid {border_color}; line-height: 1.6;">
+            {html_content}
+        </div>
+    </div>
+    """

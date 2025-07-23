@@ -20,6 +20,9 @@ class TrainingValidateOperationHandler(BaseTrainingOperation):
 
     def execute(self) -> Dict[str, Any]:
         """Execute the training validation operation."""
+        # Clear previous operation logs
+        self.clear_operation_logs()
+        
         self.log_operation("🔍 Memulai validasi model training...", level='info')
         
         # Start dual progress tracking: 4 overall steps

@@ -55,6 +55,9 @@ class BackboneUIModule(ModelDiscoveryMixin, ModelConfigSyncMixin, BackendService
         # Operation container reference for logging
         self._operation_container = None
         
+        # Button registration tracking
+        self._buttons_registered = False
+        
         self.log_debug("BackboneUIModule initialized.")
 
     def get_default_config(self) -> Dict[str, Any]:
@@ -111,6 +114,10 @@ class BackboneUIModule(ModelDiscoveryMixin, ModelConfigSyncMixin, BackendService
     
     def _register_module_button_handlers(self) -> None:
         """Register module-specific button handlers."""
+        if self._buttons_registered:
+            self.log_debug("⏭️ Skipping button registration - already registered")
+            return
+            
         try:
             # Get module-specific handlers
             module_handlers = self._get_module_button_handlers()
@@ -122,6 +129,9 @@ class BackboneUIModule(ModelDiscoveryMixin, ModelConfigSyncMixin, BackendService
             
             # Setup button handlers after registering them
             self._setup_button_handlers()
+            
+            # Mark as registered
+            self._buttons_registered = True
             
             self.log_info(f"🎯 Registered {len(module_handlers)} backbone button handlers")
             

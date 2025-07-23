@@ -44,6 +44,12 @@ from .cleanup_api import (
     cleanup_empty_directories
 )
 
+from .readiness_api import (
+    check_service_readiness,
+    check_existing_data,
+    get_preprocessing_directory_info
+)
+
 # Main API exports dengan focus pada core functionality
 __all__ = [
     # Core preprocessing
@@ -62,7 +68,12 @@ __all__ = [
     
     # Cleanup
     'cleanup_preprocessing_files',
-    'get_cleanup_preview'
+    'get_cleanup_preview',
+    
+    # Readiness checks
+    'check_service_readiness',
+    'check_existing_data',
+    'get_preprocessing_directory_info'
 ]
 
 # === Enhanced API dengan progress integration ===

@@ -103,6 +103,21 @@ class BaseBackboneOperation(OperationMixin, LoggingMixin, ABC):
                 message=final_message
             )
 
+    def clear_operation_logs(self) -> None:
+        """Clear operation logs from the operation container before starting a new operation."""
+        try:
+            operation_container = self._ui_components.get('operation_container')
+            if operation_container and hasattr(operation_container, 'clear_logs'):
+                operation_container.clear_logs()
+                self.logger.debug("✅ Operation logs cleared")
+            elif operation_container and hasattr(operation_container, 'clear'):
+                operation_container.clear()
+                self.logger.debug("✅ Operation container cleared")
+            else:
+                self.logger.debug("⚠️ No clear method available on operation container")
+        except Exception as e:
+            self.logger.error(f"Failed to clear operation logs: {e}")
+
     def error_dual_progress(self, error_message: str) -> None:
         """Mock dual progress error method."""
         self.log_operation(f"❌ {error_message}", 'error')

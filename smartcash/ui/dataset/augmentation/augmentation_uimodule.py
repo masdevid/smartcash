@@ -423,26 +423,28 @@ class AugmentationUIModule(BaseUIModule):
     def _update_operation_summary(self, content: str) -> None:
         """Updates the operation summary container with new content."""
         try:
+            from smartcash.ui.core.ui_utils import format_operation_summary
+            
             # Get summary container from UI components
             summary_container = self.get_component('summary_container')
             if summary_container and hasattr(summary_container, 'set_content'):
-                # Update summary container with backend response
-                formatted_content = f"""
-                <div style="padding: 10px; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">
-                    <h4 style="color: #2c3e50; margin: 0 0 10px 0;">📊 Augmentation Summary</h4>
-                    <div style="background: #f8f9fa; padding: 10px; border-radius: 5px; border-left: 4px solid #f39c12;">
-                        {content}
-                    </div>
-                </div>
-                """
+                # Format content using core utility with augmentation-specific styling
+                formatted_content = format_operation_summary(
+                    content=content,
+                    title="Augmentation Summary", 
+                    icon="📊",
+                    border_color="#f39c12"  # Orange color for augmentation
+                )
                 summary_container.set_content(formatted_content)
                 self.log_debug("✅ Summary container updated with augmentation results")
             else:
                 # Fallback: try operation_summary_updater method
                 updater = self.get_component('operation_summary_updater')
                 if updater and callable(updater):
+                    from smartcash.ui.core.ui_utils import convert_summary_to_html
+                    html_content = convert_summary_to_html(content)
                     self.log(f"Memperbarui ringkasan operasi.", 'debug')
-                    updater(content, title="Ringkasan Operasi", icon="📊", visible=True)
+                    updater(html_content, title="Ringkasan Operasi", icon="📊", visible=True)
                 else:
                     self.log("Summary container tidak ditemukan atau tidak dapat dipanggil.", 'warning')
         except Exception as e:

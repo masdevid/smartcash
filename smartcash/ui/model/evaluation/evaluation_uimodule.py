@@ -19,6 +19,9 @@ class EvaluationUIModule(ModelDiscoveryMixin, ModelConfigSyncMixin, BackendServi
         self._required_components = ['main_container', 'action_container', 'operation_container', 'summary_container']
         self.evaluation_service = self.checkpoint_selector = self.progress_bridge = None
         self.report_generator = EvaluationReportGenerator()
+        
+        # Button registration tracking
+        self._buttons_registered = False
     
     def get_default_config(self) -> Dict[str, Any]: return get_default_evaluation_config()
     def create_config_handler(self, config: Dict[str, Any]) -> EvaluationConfigHandler: return EvaluationConfigHandler(config=config)
@@ -30,12 +33,30 @@ class EvaluationUIModule(ModelDiscoveryMixin, ModelConfigSyncMixin, BackendServi
         """Get module-specific button handlers."""
         return {
             'run_evaluation': self._operation_run_evaluation,
-            'stop_evaluation': self._operation_stop_evaluation,
+            # 'stop_evaluation': self._operation_stop_evaluation,  # Commented out - no button widget exists
             'save': self._handle_save_config,
             'reset': self._handle_reset_config,
-            'export_results': self._operation_export_results,
+            # 'export_results': self._operation_export_results,  # Commented out - no button widget exists
             'refresh_models': self._handle_refresh_models
         }
+
+    def _register_dynamic_button_handlers(self) -> None:
+        """Register dynamic button handlers with duplicate prevention."""
+        if self._buttons_registered:
+            self.log_debug("⏭️ Skipping evaluation button registration - already registered")
+            return
+        
+        try:
+            # Call parent method to handle registration
+            if hasattr(super(), '_register_dynamic_button_handlers'):
+                super()._register_dynamic_button_handlers()
+            
+            # Mark as registered
+            self._buttons_registered = True
+            self.log_info("🎯 Evaluation button handlers registered successfully")
+            
+        except Exception as e:
+            self.log_error(f"Failed to register evaluation button handlers: {e}", exc_info=True)
     
     def _operation_run_evaluation(self, button=None) -> Dict[str, Any]:
         """Handle run evaluation operation."""

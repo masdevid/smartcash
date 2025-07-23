@@ -49,6 +49,9 @@ class TrainingUIModule(ModelConfigSyncMixin, BackendServiceMixin, BaseUIModule, 
         self._chart_updaters: Dict[str, Callable] = {}
         self._training_state = {'phase': 'idle'}
         
+        # Button registration tracking
+        self._buttons_registered = False
+        
         # Minimal logging for performance
         # Debug information disabled during normal operation
     
@@ -177,6 +180,24 @@ class TrainingUIModule(ModelConfigSyncMixin, BackendServiceMixin, BaseUIModule, 
             'save': self._handle_save_config,
             'reset': self._handle_reset_config
         }
+
+    def _register_dynamic_button_handlers(self) -> None:
+        """Register dynamic button handlers with duplicate prevention."""
+        if self._buttons_registered:
+            self.logger.debug("⏭️ Skipping training button registration - already registered")
+            return
+        
+        try:
+            # Call parent method to handle registration
+            if hasattr(super(), '_register_dynamic_button_handlers'):
+                super()._register_dynamic_button_handlers()
+            
+            # Mark as registered
+            self._buttons_registered = True
+            self.logger.info("🎯 Training button handlers registered successfully")
+            
+        except Exception as e:
+            self.logger.error(f"Failed to register training button handlers: {e}", exc_info=True)
     
     def _handle_start_training(self, button=None) -> None:
         """Handle start training button click."""

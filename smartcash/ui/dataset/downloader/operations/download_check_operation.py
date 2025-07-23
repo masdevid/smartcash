@@ -245,7 +245,8 @@ class DownloadCheckOperation(DownloaderBaseOperation):
             
             self.log_operation_complete("Check Dataset")
             
-            return {
+            # Create result dictionary
+            result = {
                 'success': True,
                 'message': f'Dataset ditemukan: {file_count} file ({total_size})',
                 'exists': True,
@@ -258,8 +259,49 @@ class DownloadCheckOperation(DownloaderBaseOperation):
                 'operation_id': self.operation_id
             }
             
+            # Execute summary callback with formatted summary
+            try:
+                summary_html = self._format_check_summary(result)
+                self._execute_callback('on_success', summary_html)
+            except Exception as e:
+                self.logger.warning(f"Failed to update check summary: {e}")
+            
+            return result
+            
         except Exception as e:
             return self._handle_error("Error tidak terduga saat check", e)
+
+    def _format_check_summary(self, result: Dict[str, Any]) -> str:
+        """Format check operation result into HTML summary."""
+        file_count = result.get('file_count', 0)
+        total_size = result.get('total_size', '0B')
+        dataset_path = result.get('dataset_path', 'N/A')
+        summary = result.get('summary', {})
+        issues = result.get('issues', [])
+        
+        # Format summary stats
+        total_images = summary.get('total_images', 0)
+        total_labels = summary.get('total_labels', 0)
+        
+        issues_text = f"⚠️ {len(issues)} issues found" if issues else "✅ No issues"
+        
+        return f"""
+### Ringkasan Operasi Check Dataset
+
+| Kategori | Detail |
+| :--- | :--- |
+| **Status** | ✅ Dataset Found |
+| **Total Files** | 📁 {file_count} file |
+| **Images** | 🖼️ {total_images} |
+| **Labels** | 🏷️ {total_labels} |
+| **Total Size** | 💾 {total_size} |
+| **Dataset Path** | 📂 {dataset_path} |
+| **Issues** | {issues_text} |
+
+---
+
+**Dataset check completed successfully!**
+"""
 
     def _create_dataset_scanner(self):
         """

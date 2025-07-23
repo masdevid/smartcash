@@ -20,6 +20,9 @@ class TrainingStartOperationHandler(BaseTrainingOperation):
 
     def execute(self) -> Dict[str, Any]:
         """Execute the training start operation."""
+        # Clear previous operation logs
+        self.clear_operation_logs()
+        
         self.log_operation("🚀 Memulai proses training...", level='info')
         
         # Start triple progress tracking: 5 overall steps

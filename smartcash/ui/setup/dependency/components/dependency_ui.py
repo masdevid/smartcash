@@ -145,15 +145,18 @@ def create_dependency_ui_components(module_config: Optional[Dict[str, Any]] = No
         operation_container=operation_container['container']
     )
     
-    # Store components in optimized cache
+    # Store components in optimized cache with consistent naming
     _ui_components_cache = {
         'main_container': main_container.container,  # Use the actual widget, not the MainContainer object
         'header_container': header_container,
         'form_container': form_container,
         'action_container': action_container,
         'operation_container': operation_container,
-        '_package_checkboxes': package_checkboxes,
-        '_custom_packages': custom_packages
+        '_package_checkboxes': package_checkboxes,  # Prefix with underscore for internal components
+        '_custom_packages': custom_packages,        # Prefix with underscore for internal components
+        # Also provide non-prefixed aliases for backward compatibility
+        'package_checkboxes': package_checkboxes,
+        'custom_packages': custom_packages
     }
     
     # Success with minimal logging

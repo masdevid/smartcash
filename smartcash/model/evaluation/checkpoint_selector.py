@@ -92,7 +92,14 @@ class CheckpointSelector:
             metadata = self._extract_checkpoint_metadata(checkpoint_path, checkpoint_data)
             
             self.logger.info(f"✅ Checkpoint selected: {metadata['display_name']}")
-            self.logger.info(f"   🎯 mAP: {metadata['metrics'].get('val_map', 'N/A'):.3f}")
+            
+            # Safe format for mAP value
+            val_map = metadata['metrics'].get('val_map', 0)
+            if isinstance(val_map, (int, float)):
+                self.logger.info(f"   🎯 mAP: {val_map:.3f}")
+            else:
+                self.logger.info(f"   🎯 mAP: {val_map}")
+            
             self.logger.info(f"   🏗️ Backbone: {metadata['backbone']}")
             
             return metadata

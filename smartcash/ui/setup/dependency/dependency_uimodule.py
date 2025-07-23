@@ -146,7 +146,11 @@ class DependencyUIModule(BaseUIModule):
             """Validate packages before installation."""
             packages = self._get_selected_packages()
             if not packages:
-                return {'valid': False, 'message': 'Tidak ada paket yang dipilih untuk diinstal'}
+                # Enhanced error message with debugging info
+                error_msg = 'Tidak ada paket yang dipilih untuk diinstal. Pastikan Anda telah mencentang checkbox paket atau memasukkan paket kustom.'
+                self.log_error(f"❌ Validation failed: {error_msg}")
+                return {'valid': False, 'message': error_msg}
+            self.log_info(f"✅ Validation passed: {len(packages)} paket dipilih untuk instalasi")
             return {'valid': True, 'packages': packages}
             
         def execute_install():
@@ -171,7 +175,11 @@ class DependencyUIModule(BaseUIModule):
             """Validate packages before uninstallation."""
             packages = self._get_selected_packages()
             if not packages:
-                return {'valid': False, 'message': 'Tidak ada paket yang dipilih untuk dihapus'}
+                # Enhanced error message with debugging info
+                error_msg = 'Tidak ada paket yang dipilih untuk dihapus. Pastikan Anda telah mencentang checkbox paket atau memasukkan paket kustom.'
+                self.log_error(f"❌ Validation failed: {error_msg}")
+                return {'valid': False, 'message': error_msg}
+            self.log_info(f"✅ Validation passed: {len(packages)} paket dipilih untuk penghapusan")
             return {'valid': True, 'packages': packages}
             
         def execute_uninstall():
@@ -196,7 +204,11 @@ class DependencyUIModule(BaseUIModule):
             """Validate packages before update."""
             packages = self._get_selected_packages()
             if not packages:
-                return {'valid': False, 'message': 'Tidak ada paket yang dipilih untuk diperbarui'}
+                # Enhanced error message with debugging info
+                error_msg = 'Tidak ada paket yang dipilih untuk diperbarui. Pastikan Anda telah mencentang checkbox paket atau memasukkan paket kustom.'
+                self.log_error(f"❌ Validation failed: {error_msg}")
+                return {'valid': False, 'message': error_msg}
+            self.log_info(f"✅ Validation passed: {len(packages)} paket dipilih untuk pembaruan")
             return {'valid': True, 'packages': packages}
             
         def execute_update():
@@ -346,10 +358,10 @@ class DependencyUIModule(BaseUIModule):
         selected_packages = []
         
         try:
-            # Get package checkboxes from UI components
-            if self._ui_components and 'package_checkboxes' in self._ui_components:
-                checkboxes = self._ui_components['package_checkboxes']
-                for _, checkbox_list in checkboxes.items():
+            # Get package checkboxes from UI components (fix: use correct key with underscore prefix)
+            if self._ui_components and '_package_checkboxes' in self._ui_components:
+                checkboxes = self._ui_components['_package_checkboxes']
+                for category_key, checkbox_list in checkboxes.items():
                     for checkbox in checkbox_list:
                         if hasattr(checkbox, 'value') and checkbox.value:  # If checkbox is checked
                             if hasattr(checkbox, 'package_name'):
@@ -359,17 +371,44 @@ class DependencyUIModule(BaseUIModule):
                                 desc = getattr(checkbox, 'description', '')
                                 if desc and '(' in desc:
                                     package_name = desc.split('(')[0].strip()
+                                else:
+                                    # If no parentheses, use the whole description
+                                    package_name = desc.strip()
+                                if package_name:
                                     selected_packages.append(package_name)
             
-            # Get custom packages
-            if self._ui_components and 'custom_packages' in self._ui_components:
-                custom_widget = self._ui_components['custom_packages']
+            # Get custom packages (fix: use correct key with underscore prefix)
+            if self._ui_components and '_custom_packages' in self._ui_components:
+                custom_widget = self._ui_components['_custom_packages']
                 if hasattr(custom_widget, 'value') and custom_widget.value.strip():
-                    custom_packages = [pkg.strip() for pkg in custom_widget.value.split(',') if pkg.strip()]
+                    # Support both comma and newline separated packages
+                    custom_text = custom_widget.value.strip()
+                    # Split by both comma and newline
+                    custom_packages = []
+                    for line in custom_text.split('\n'):
+                        line = line.strip()
+                        if line:
+                            # Also split by comma in case user uses comma separation
+                            for pkg in line.split(','):
+                                pkg = pkg.strip()
+                                if pkg:
+                                    custom_packages.append(pkg)
                     selected_packages.extend(custom_packages)
             
         except Exception as e:
             self.log(f"Failed to get selected packages: {e}", 'warning')
+            # Add debugging information
+            if self._ui_components:
+                available_keys = list(self._ui_components.keys())
+                self.log(f"Available UI component keys: {available_keys}", 'debug')
+            else:
+                self.log("UI components are None or empty", 'debug')
+        
+        # Add debug logging for selected packages
+        if selected_packages:
+            self.log(f"Found {len(selected_packages)} selected packages: {selected_packages}", 'debug')
+        else:
+            self.log("No packages selected", 'debug')
         
         return selected_packages
     

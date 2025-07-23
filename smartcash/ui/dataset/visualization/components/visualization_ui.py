@@ -196,7 +196,6 @@ def create_visualization_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -
         show_logs=True,
         progress_levels='single',
         log_module_name=UI_CONFIG['module_name'],
-        # log_namespace_filter='visualization',  # Temporarily disabled
         log_height="150px",
         collapsible=True,
         collapsed=False

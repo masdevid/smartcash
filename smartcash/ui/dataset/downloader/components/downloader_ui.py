@@ -113,7 +113,6 @@ def create_downloader_ui_components(
         show_logs=True,
         progress_levels='dual',
         log_module_name=UI_CONFIG['module_name'],
-        # log_namespace_filter='downloader',  # Temporarily disabled
         log_height="150px",
         collapsible=True,
         collapsed=False

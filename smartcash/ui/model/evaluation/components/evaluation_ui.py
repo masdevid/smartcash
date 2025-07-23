@@ -68,7 +68,6 @@ def create_evaluation_ui(config: Dict[str, Any]) -> Dict[str, Any]:
             show_logs=True,
             progress_levels=config.get('ui', {}).get('progress_levels', 'dual'),
             log_module_name=UI_CONFIG['module_name'],
-            log_namespace_filter='evaluation',  # Re-enabled for backend integration
             log_height="150px",
             collapsible=True,
             collapsed=False

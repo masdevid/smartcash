@@ -134,7 +134,6 @@ def create_preprocessing_ui_components(
         show_logs=True,
         progress_levels='dual',
         log_module_name=UI_CONFIG['module_name'],
-        log_namespace_filter='preprocessing',  # Enable namespace filtering
         log_height="150px",
         log_entry_style='compact',
         collapsible=True,

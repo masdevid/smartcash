@@ -273,7 +273,7 @@ class PreprocessingUIModule(BaseUIModule):
             summary_container = self.get_component('summary_container')
             if summary_container and hasattr(summary_container, 'set_content'):
                 formatted_content = f"""
-                <div style="padding: 10px; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">
+                <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">
                     <h4 style="color: #2c3e50; margin: 0 0 10px 0;">📊 Operation Summary</h4>
                     <div style="background: #f8f9fa; padding: 10px; border-radius: 5px; border-left: 4px solid #28a745;">
                         {content}

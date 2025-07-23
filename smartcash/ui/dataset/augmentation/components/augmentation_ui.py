@@ -130,7 +130,6 @@ def _create_operation_container() -> Dict[str, Any]:
         show_logs=True,
         progress_levels='dual',
         log_module_name="Augmentation",
-        # log_namespace_filter='augmentation',  # Temporarily disabled
         log_height="150px",
         collapsible=True,
         collapsed=False

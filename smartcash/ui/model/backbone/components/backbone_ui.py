@@ -162,7 +162,6 @@ def create_backbone_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> Dic
         show_logs=True,
         progress_levels='dual',
         log_module_name=UI_CONFIG['module_name'],
-        # log_namespace_filter='backbone',  # Temporarily disabled
         log_height="150px",
         collapsible=True,
         collapsed=False

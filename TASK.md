@@ -7,127 +7,41 @@ Updated 22 Juli 2025, 20:
 - Checkpoint Data: `/content/data/checkpoints` or `/data/checkpoints (Symlink|Local)`
 - Model Data: `/content/data/models` or `/data/models (Symlink|Local)`
 
-# GENERAL - ✅ COMPLETED
-- ✅ Dynamic Button Registration debug log re-appear each operation started, polluting operation logs. It should only check once on init.
-  → FIXED: Added _button_discovery_logged flag to prevent repeated debug logging
-- ✅ Each time operation started, it should clear operation logs.
-  → FIXED: Added _clear_operation_logs() method called at start of each operation
-- ✅ Button state management - labels should not change when disabled during operations
-  → FIXED: Removed description update logic, buttons stay disabled but keep original labels
-- ✅ Header Container -> Indicator -> not updated based on detected environment
-  → FIXED: Enhanced update_header_indicator() method and called refresh_environment_detection() after UI initialization
-- ✅ Confirm Dialog on Preprocessing, Augmentation, Downloader still not working
-  → FIXED: Removed invalid 'dialog_type' parameter and fixed show_dialog call parameters
-- ✅ SmartCashLogger missing 'success' method causing backend errors
-  → FIXED: Added success() method to SmartCashLogger that logs as INFO level
-- ✅ Saat inisialisasi beberapa modul prosesnya cukup lama, dan progress tracker seperti diinisialisasi 2-3 kali sebelum seluruh UI terrender. 
-  → FIXED: Implemented cache lifecycle management in UIFactory with validation, invalidation, and cleanup
-- ✅ Perlu adanya initialization yang lebih baik untuk meningkatkan performa dengan tetap memunculkan semua UI component.
-  → FIXED: Added lazy loading and singleton patterns with weak references for memory management
-- ✅ Enable Environment = True untuk semua modul kecuali pretrained. Saat ini indikator environment hanya modul colab saja yang berhasil mendeteksi lingkungan sebagai "Colab", modul lain masih "Local"
-  → FIXED: Updated all modules to enable environment detection, fixed EnvironmentMixin inheritance in BaseUIModule
+# GENERAL
+- Create Consistent Summary Format for Downloader, Preprocessing and Augmentation UI Module
 
+# COLAB MODULE
+- ✅ All Works
 
-# COLAB MODULE - ✅ FIXED BUTTON STATE & LOGGING
-- [NEW] Environment container indeed exist on main_container dict, but it's not displayed. 
-- ✅ Environemnt Container tidak muncul.
-  → FIXED: Environment Container properly integrated in main container assembly
-- ✅ Hapus Footer Container
-  → FIXED: Removed Footer Container from required components and UI assembly
-- ✅ Ganti posisi Footer Container dengan Environment Container menggunakan Main Container custom order configuration
-  → FIXED: Updated _assemble_main_container to use environment_container instead of footer_container
-- ⚠️ Setiap per stage sukses seharunya ada log informasi, misal:
-      - Symlink: Daftar dan jumlah folder yang berhasil di symlink beserta pathnya
-      - Drive: Mounted drive berhasil dan pathnya
-      - Folder: Jumlah folder yang berhasil dibuat beserta pathnya  
-      - Sync: Jumlah config.yaml yang berhasil ditambahkan beserta nama config yamlnya
-      - Verify: Jumlah verifikasi berhasil / total verifikasi
-  → PARTIALLY FIXED: Detailed logging already exists, could be improved to match exact format
-- ✅ Button State belum disabled saat proses berjalan
-  → FIXED: Enhanced BaseUIModule button state management with improved button discovery and delegation
+# DEPENDENCY MODULE
+- [ ] Install, Uninstall and updates process use synchronous 
+- [ ] Check missing packages and updates should use threadpool for faster response
+- [ ] Ensure no overlapping operations. 
 
-# DEPENDENCY MODULE - ✅ FIXED BUTTON STATE & LOGGING
-- ✅ Install, Update, Delete bug: `⚠️ Tidak ada paket yang dipilih untuk diinstal`
-  → FIXED: Package validation working through BaseUIModule validation wrappers
-- ✅ Check Status: Log seharusnya menjelaskan jumlah package yang belum terinstall dan jumlah package yang ada update terbaru. Saat ini hanya `Pemeriksaan status selesai`.
-  → FIXED: Added informative logging with package counts (installed/missing/total)
-- ✅ Hapus Footer Container
-  → FIXED: Removed Footer Container from UI components and main container assembly
-- ✅ Hapus debug `install button clicked`
-  → FIXED: Removed all debug log statements from button handlers
-- ✅ Button State belum disabled saat proses berjalan
-  → FIXED: Enhanced BaseUIModule button state management with improved button discovery and delegation
+# DOWNLOAD MODULE
+- [ ] Each operation done should update summary result 
 
-# DOWNLOAD MODULE - ✅ FIXED BUTTON STATE & IMPROVED OPERATION HANDLING
-- ✅ Button State sudah disabled saat proses berjalan, tapi tidak perlu ganti label button
-  → FIXED: Migrated from manual button state management to proper _execute_operation_with_wrapper pattern
-- ✅ Hapus Footer Container
-  → FIXED: Removed Footer Container from UI components, main container, and all references
-- ✅ Error {download, pembersihan, pengecekan}: 'DownloaderUIModule' object has no attribute 'config'
-  → FIXED: Replaced self.config with self.get_current_config() in all operations
-- ✅ Failed to save configuration: 'DownloaderConfigHandler' object has no attribute 'extract_config_from_ui'
-  → FIXED: Added missing extract_config_from_ui() method to DownloaderConfigHandler
-
-# PREPROCESSING MODULE - ✅ FIXED LOGGING & BUTTON STATE
-- [NEW] Summary Container indeed exist, but it's never updated after operation finished. It should display summary response from backend.
-- [NEW] Logs still not appear, ensure preprocessing operation using LoggingMixing log_*. Check possibility of namespace missmatch. 
-- ✅ Log masih tidak muncul di Operation Container padahal berulang kali melakukan pengujian berhasil tapi saat di colab tidak muncul.
-  → FIXED: Enhanced LoggingMixin bridge setup with proactive backend logger capture
-- ✅ Saat klik reset, logs `INFO - ✅ Config updated in PreprocessingConfigHandler` muncul di luar Operation Container (Tanda kalau operation container belum terhubung dengan benar)
-  → FIXED: Operation container logging bridge properly activated before operations
-- ✅ Action Button State belum disabled saat proses berjalan dan tidak mentrigger event apapaun
-  → FIXED: Removed duplicate method definitions, enhanced button discovery, standardized wrapper pattern
-- ✅ Seharusnya ada Summary Container yang menampilkan Summary dari Backend
-  → FIXED: Added Summary Container integration in preprocessing_ui.py with proper assembly and required_components
+# PREPROCESSING MODULE
+- [ ] Create quick backend service readiness check. Add new api on `smartcash/dataset/preprocessor/api` that do quick check (empty or not) on `/dataset/preprocessed/{train, valid, test}/{labels, images}`
+- [ ] Add post init hook using quick check api and set service ready flag in preprocessing ui module
+- [ ] Do not run download and cleanup operation if service not ready
+- [ ] If service ready, open confirmation dialog if existing data found
+- [ ] Operation summary missing new line formatting. 
 
 # SPLIT MODULE
+- ✅ All Works
 
-# AUGMENTATION MODULE - ✅ FIXED LOGGING
-- [NEW] Summary Container indeed exist, but it's never updated after operation finished. It should display summary response from backend.
-- [NEW] ERROR:smartcash.dataset.augmentor.core.engine:Error creating preview: 'SmartCashLogger' object has no attribute 'success'
-- [NEW] Error in confirmation dialog: OperationContainer.show_dialog() got an unexpected keyword argument 'dialog_type'
-- [NEW] ❌ Tidak ada konfigurasi cleanup yang ditemukan: Tidak ada konfigurasi cleanup yang ditemukan
-- [NEW] WARNING:smartcash.dataset.augmentor.utils.config_validator:⚠️ Config validation warnings: Missing section: data, Missing section: augmentation, Missing section: preprocessing   
-- ✅ Saat dilingkupi colab dan sudah mounted, preview image tidak muncul padahal gambar ada di `/content/data/aug_preview.jpg`
-- ✅ Log dari backend masih leaked diluar Operation Container
-  → FIXED: Backend augmentation service logs now captured in Operation Container with namespace filtering
-- ✅ Seharusnya ada Summary Container yang menampilkan Summary dari Backend
-  → FIXED: Summary Container already properly integrated in augmentation_ui.py, added required_components in augmentation_uimodule.py
+# AUGMENTATION MODULE
+- [ ] Summary Container on UI dictionary but not yet updated when operations done. Should be like preprocessing operation summary. 
 
 # PRETRAINED MODULE
-- [NEW] Muncul tqdm di console dari `model.safetensors: 100%` saat proses download
 
-# BACKBONE MODULE - ✅ FIXED LOGGING
-- [NEW] Saat build berhasil beri informasi dimana lokasi model disimpan
-- ✅ Failed to reset configuration: Invalid configuration updates provided
-  → FIXED: Enhanced configuration validation with proper type checking in BackboneConfigHandler
-- ✅ Failed to save configuration: 'BackboneConfigHandler' object has no attribute 'extract_config_from_ui'
-  → FIXED: Added missing extract_config_from_ui() method to BackboneConfigHandler
-- ✅ ERROR - Configuration validation error: '<=' not supported between instances of 'int' and 'dict' (Backend Log)
-  → FIXED: Added proper type checking for integer values before comparison operations
-- ✅ Log backend masih leaked diluar Operation Container dan double logs, seharusnya muncul di Operation Container
-  → FIXED: Backend backbone service logs now captured and filtered by module namespace
-- ✅ Build Success tapi saat rescan button mendapatkan `❌ No built models found - build models first`
-  → FIXED: Enhanced model discovery with relaxed validation requirements and fallback file system scan
-
-# TRAINING MODULE - ✅ FIXED LOGGING
-- [NEW] Should Check Wether Python Package needed for training is installed
-- [NEW] Training finished at "starting" phase. Got Training ID but no further visible training process. Is this because backend using threading and not reporting any progress/live chart update?
-- ✅ Log backend masih leak diluar operation container
-  → FIXED: Backend training service logs now captured in Operation Container
-
-# EVALUATION MODULE - ✅ FIXED LOGGING
-- [NEW] There's redundant refresh button on form
-- ✅ Log backend masih leak diluar operation container
-  → FIXED: Backend evaluation service logs now captured in Operation Container
+# BACKBONE MODULE
+- Dynamic Button Registration still poluting operation logs when it should run once on init. It happend during clicking action buttons.
 
 
-# VISUALIZATION MODULE - ✅ FIXED LOGGING
-- ✅ Dashboard cards tidak tampil
-  → FIXED: Fixed dashboard container initialization and proper cards integration in _initialize_dashboard method
-- ✅ Gagal memuat sampel data preprocessed: Direktori dataset tidak ditemukan di konfigurasi
-  → FIXED: Added data_dir to default config and added fallback logic in load operations
-- ✅ Gagal memuat sampel data augmented: Direktori dataset tidak ditemukan di konfigurasi
-  → FIXED: Added data_dir to default config and added fallback logic in load operations
-- ✅ Log backend masih leak diluar operation container
-  → FIXED: Backend visualization service logs now captured in Operation Container
+# TRAINING MODULE
+
+# EVALUATION MODULE
+
+# VISUALIZATION MODULE

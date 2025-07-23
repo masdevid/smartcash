@@ -139,7 +139,6 @@ def create_training_ui(config: Dict[str, Any]) -> Dict[str, Any]:
             show_logs=True,
             progress_levels='triple',  # Enable triple progress bars for granular tracking
             log_module_name=UI_CONFIG['module_name'],
-            log_namespace_filter='training',  # Filter logs by training namespace
             log_height="150px",
             log_entry_style='compact',
             collapsible=True,

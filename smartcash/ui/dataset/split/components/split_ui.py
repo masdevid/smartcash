@@ -210,7 +210,6 @@ def create_split_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> Dict[s
         show_logs=True,
         show_dialog=True,
         log_module_name=UI_CONFIG['module_name'],
-        # log_namespace_filter='split',  # Temporarily disabled
         log_height="150px",
         collapsible=True,
         collapsed=True,  # Start with logs collapsed

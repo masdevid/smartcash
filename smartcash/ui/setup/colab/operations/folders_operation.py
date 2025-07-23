@@ -1,326 +1,225 @@
 """
-Folders Operation (Optimized) - Enhanced Mixin Integration
-Create required folders in Colab with cross-module coordination.
+Folders Operation (Optimized) - Fast & Efficient Implementation
+Create required folders in Colab with optimized performance.
 """
 
 import os
+import concurrent.futures
 from typing import Dict, Any, Optional, Callable, List
+from pathlib import Path
 from smartcash.ui.components.operation_container import OperationContainer
 from ..constants import REQUIRED_FOLDERS
 from .base_colab_operation import BaseColabOperation
 
 
 class FoldersOperation(BaseColabOperation):
-    """Optimized folders operation with enhanced mixin integration."""
+    """Optimized folders operation with parallel processing and minimal overhead."""
     
     def __init__(self, operation_name: str, config: Dict[str, Any], operation_container: Optional[OperationContainer] = None, **kwargs):
         super().__init__(operation_name, config, operation_container, **kwargs)
+        self._created_folders = []
+        self._failed_folders = []
     
     def get_operations(self) -> Dict[str, Callable]:
         return {'create_folders': self.execute_create_folders}
     
     def execute_create_folders(self, progress_callback: Optional[Callable] = None) -> Dict[str, Any]:
-        """Create required folders with enhanced cross-module coordination."""
+        """Create required folders with optimized parallel processing."""
         def execute_operation():
-            progress_steps = self.get_progress_steps('folders')
+            # Step 1: Initialize (5%)
+            self.update_progress_safe(progress_callback, 5, "🔧 Initializing folder creation...", 10)
             
-            # Step 1: Initialize Folder Creation Process (Direct Implementation)
-            self.update_progress_safe(progress_callback, progress_steps[0]['progress'], progress_steps[0]['message'], progress_steps[0].get('phase_progress', 0))
+            # Step 2: Fast batch folder creation (90%)
+            self.update_progress_safe(progress_callback, 10, "📁 Creating folders in parallel...", 20)
             
-            # Direct folder management without backend services
-            self.log_info("Starting folder creation process...")
-            init_result = {'success': True, 'message': 'Folder creation initialized directly'}
+            start_time = self._get_current_time()
+            creation_result = self._create_folders_parallel()
+            end_time = self._get_current_time()
             
-            # Step 2: Prepare Folder Structure
-            self.update_progress_safe(progress_callback, progress_steps[1]['progress'], progress_steps[1]['message'], progress_steps[1].get('phase_progress', 0))
+            # Step 3: Quick verification (5%)
+            self.update_progress_safe(progress_callback, 95, "✅ Verifying folder structure...", 95)
+            verification_result = self._quick_verify_folders()
             
-            folder_plan = self._prepare_folder_structure()
-            if not folder_plan['success']:
-                return self.create_error_result(f"Folder planning failed: {folder_plan['error']}")
-            
-            # Step 3: Create Folders
-            self.update_progress_safe(progress_callback, progress_steps[2]['progress'], progress_steps[2]['message'], progress_steps[2].get('phase_progress', 0))
-            
-            creation_results = self._create_folders(folder_plan['folders'], progress_callback, progress_steps)
-            
-            # Step 4: Cross-Module Folder Sync
-            self.update_progress_safe(progress_callback, progress_steps[3]['progress'], progress_steps[3]['message'], progress_steps[3].get('phase_progress', 0))
-            
-            cross_module_sync = self._sync_folders_across_modules(creation_results)
-            
-            # Step 5: Verification and Permissions
-            self.update_progress_safe(progress_callback, progress_steps[4]['progress'], progress_steps[4]['message'], progress_steps[4].get('phase_progress', 0))
-            
-            verification_result = self._verify_folder_structure(folder_plan['folders'])
+            execution_time = end_time - start_time
             
             return self.create_success_result(
-                f'Created {len(creation_results["successful_folders"])}/{len(folder_plan["folders"])} folders',
-                creation_results=creation_results,
-                cross_module_sync=cross_module_sync,
-                verification_result=verification_result,
-                folder_plan=folder_plan
+                f'Created {creation_result["successful"]}/{len(REQUIRED_FOLDERS)} folders in {execution_time:.2f}s',
+                successful_folders=creation_result["successful"],
+                failed_folders=creation_result["failed"],
+                execution_time=execution_time,
+                verification=verification_result,
+                total_folders=len(REQUIRED_FOLDERS)
             )
         
         return self.execute_with_error_handling(execute_operation)
     
-    def _prepare_folder_structure(self) -> Dict[str, Any]:
-        """Prepare comprehensive folder structure plan."""
+    def _create_folders_parallel(self) -> Dict[str, Any]:
+        """Create folders using parallel processing for maximum speed."""
         try:
-            # Use ONLY the required folders from constants - no additional SmartCash folder!
-            # REQUIRED_FOLDERS already contains the correct paths like /content/configs, /content/models, etc.
-            all_folders = list(REQUIRED_FOLDERS)
-            
-            self.log_info(f"Creating {len(all_folders)} required folders (no /content/SmartCash code copy)")
-            
-            # Create folder metadata for required folders only
-            folder_metadata = []
-            for folder_path in all_folders:
-                folder_metadata.append({
-                    'path': folder_path,
-                    'name': os.path.basename(folder_path),
-                    'parent': os.path.dirname(folder_path),
-                    'required': True,  # All folders are now required folders
-                    'project_specific': False  # No additional project folders
-                })
-            
-            # Sort by hierarchy depth for proper creation order
-            folder_metadata.sort(key=lambda x: len(x['path'].split('/')))
-            
-            return {
-                'success': True,
-                'folders': folder_metadata,
-                'total_folders': len(folder_metadata),
-                'required_folders': len(folder_metadata),  # All are required now
-                'project_folders': 0  # No additional project folders
-            }
-        except Exception as e:
-            return {'success': False, 'error': str(e), 'folders': []}
-    
-    def _create_folders(self, folders: List[Dict], progress_callback: Optional[Callable], progress_steps: List) -> Dict[str, Any]:
-        """Create folders with detailed tracking and permissions."""
-        successful_folders = []
-        failed_folders = []
-        skipped_folders = []
-        
-        total_folders = len(folders)
-        
-        for i, folder_info in enumerate(folders):
-            # Update progress for each folder
-            folder_progress = int(progress_steps[2]['progress'] + (progress_steps[3]['progress'] - progress_steps[2]['progress']) * (i / total_folders))
-            self.update_progress_safe(progress_callback, folder_progress, f"Creating: {folder_info['name']}", 
-                                    int(progress_steps[2].get('phase_progress', 0) + (progress_steps[3].get('phase_progress', 0) - progress_steps[2].get('phase_progress', 0)) * (i / total_folders)))
-            
-            creation_result = self._create_single_folder(folder_info)
-            
-            if creation_result['status'] == 'created':
-                successful_folders.append(creation_result)
-                self.log_success(f"Created folder: {folder_info['path']}")
-            elif creation_result['status'] == 'exists':
-                skipped_folders.append(creation_result)
-                self.log_info(f"Folder already exists: {folder_info['path']}")
-            else:
-                failed_folders.append(creation_result)
-                self.log_error(f"Failed to create folder: {folder_info['path']} - {creation_result['error']}")
-        
-        return {
-            'successful_folders': successful_folders,
-            'failed_folders': failed_folders,
-            'skipped_folders': skipped_folders,
-            'total_processed': total_folders,
-            'success_rate': ((len(successful_folders) + len(skipped_folders)) / total_folders * 100) if total_folders > 0 else 0
-        }
-    
-    def _create_single_folder(self, folder_info: Dict) -> Dict[str, Any]:
-        """Create a single folder with enhanced error handling and permissions."""
-        try:
-            folder_path = folder_info['path']
-            
-            # Check if folder already exists
-            if os.path.exists(folder_path):
-                if os.path.isdir(folder_path):
-                    return {
-                        'status': 'exists',
-                        'path': folder_path,
-                        'name': folder_info['name'],
-                        'required': folder_info['required'],
-                        'writable': os.access(folder_path, os.W_OK)
-                    }
+            # Prepare folder data efficiently
+            folders_to_create = []
+            for folder_path in REQUIRED_FOLDERS:
+                if not os.path.exists(folder_path):
+                    folders_to_create.append(folder_path)
                 else:
-                    return {
-                        'status': 'failed',
+                    self._created_folders.append({
                         'path': folder_path,
-                        'name': folder_info['name'],
-                        'error': 'Path exists but is not a directory'
-                    }
+                        'status': 'exists',
+                        'name': os.path.basename(folder_path)
+                    })
             
-            # Create directory with parents
-            os.makedirs(folder_path, mode=0o755, exist_ok=True)
-            
-            # Verify creation and permissions
-            if os.path.exists(folder_path) and os.path.isdir(folder_path):
-                # Test write permissions
-                try:
-                    test_file = os.path.join(folder_path, '.smartcash_test')
-                    with open(test_file, 'w') as f:
-                        f.write('test')
-                    os.remove(test_file)
-                    writable = True
-                except (IOError, OSError):
-                    writable = False
-                
+            if not folders_to_create:
+                self.log_info("All folders already exist - skipping creation")
                 return {
-                    'status': 'created',
+                    'successful': len(REQUIRED_FOLDERS),
+                    'failed': 0,
+                    'skipped': len(REQUIRED_FOLDERS)
+                }
+            
+            # Parallel folder creation with ThreadPoolExecutor
+            successful_count = 0
+            failed_count = 0
+            
+            # Optimize thread count based on number of folders
+            max_workers = min(len(folders_to_create), 8)  # Cap at 8 threads
+            
+            with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+                # Submit all folder creation tasks
+                future_to_folder = {
+                    executor.submit(self._create_single_folder_fast, folder_path): folder_path 
+                    for folder_path in folders_to_create
+                }
+                
+                # Collect results as they complete
+                for future in concurrent.futures.as_completed(future_to_folder):
+                    folder_path = future_to_folder[future]
+                    try:
+                        result = future.result(timeout=5)  # 5 second timeout per folder
+                        if result['success']:
+                            successful_count += 1
+                            self._created_folders.append(result)
+                            self.log_debug(f"✅ Created: {os.path.basename(folder_path)}")
+                        else:
+                            failed_count += 1
+                            self._failed_folders.append(result)
+                            self.log_error(f"❌ Failed: {os.path.basename(folder_path)} - {result.get('error', 'Unknown error')}")
+                            
+                    except concurrent.futures.TimeoutError:
+                        failed_count += 1
+                        self._failed_folders.append({
+                            'path': folder_path,
+                            'success': False,
+                            'error': 'Creation timeout'
+                        })
+                        self.log_error(f"❌ Timeout: {os.path.basename(folder_path)}")
+                    except Exception as e:
+                        failed_count += 1
+                        self._failed_folders.append({
+                            'path': folder_path,
+                            'success': False,
+                            'error': str(e)
+                        })
+                        self.log_error(f"❌ Exception: {os.path.basename(folder_path)} - {e}")
+            
+            # Add existing folders to successful count
+            total_successful = successful_count + len([f for f in self._created_folders if f['status'] == 'exists'])
+            
+            self.log_info(f"Folder creation completed: {total_successful} successful, {failed_count} failed")
+            
+            return {
+                'successful': total_successful,
+                'failed': failed_count,
+                'created_new': successful_count,
+                'already_existed': len([f for f in self._created_folders if f['status'] == 'exists'])
+            }
+            
+        except Exception as e:
+            self.log_error(f"Parallel folder creation failed: {e}")
+            return {'successful': 0, 'failed': len(REQUIRED_FOLDERS), 'error': str(e)}
+    
+    def _create_single_folder_fast(self, folder_path: str) -> Dict[str, Any]:
+        """Create a single folder with minimal overhead."""
+        try:
+            # Use pathlib for better performance and error handling
+            path_obj = Path(folder_path)
+            
+            # Create directory with parents, no error if exists
+            path_obj.mkdir(parents=True, exist_ok=True)
+            
+            # Quick verification - just check if it exists and is directory
+            if path_obj.exists() and path_obj.is_dir():
+                return {
                     'path': folder_path,
-                    'name': folder_info['name'],
-                    'required': folder_info['required'],
-                    'writable': writable,
-                    'permissions': oct(os.stat(folder_path).st_mode)[-3:]
+                    'name': path_obj.name,
+                    'status': 'created',
+                    'success': True
                 }
             else:
                 return {
-                    'status': 'failed',
                     'path': folder_path,
-                    'name': folder_info['name'],
-                    'error': 'Directory creation verification failed'
+                    'name': path_obj.name,
+                    'success': False,
+                    'error': 'Creation verification failed'
                 }
+                
         except Exception as e:
             return {
-                'status': 'failed',
-                'path': folder_info.get('path', ''),
-                'name': folder_info.get('name', ''),
+                'path': folder_path,
+                'name': os.path.basename(folder_path),
+                'success': False,
                 'error': str(e)
             }
     
-    def _sync_folders_across_modules(self, creation_results: Dict) -> Dict[str, Any]:
-        """Sync folder structure information across modules."""
+    def _quick_verify_folders(self) -> Dict[str, Any]:
+        """Quick verification of essential folders only."""
         try:
-            # Prepare sync data
-            successful_folders = creation_results['successful_folders']
-            folder_paths = [folder['path'] for folder in successful_folders]
+            # Quick batch verification using pathlib
+            missing_folders = []
+            existing_folders = []
             
-            sync_data = {
-                'folders_created': len(successful_folders),
-                'folder_paths': folder_paths,
-                'folders_structure_ready': True,
-                'creation_timestamp': self._get_current_timestamp()
-            }
-            
-            # Log folder creation completion (no complex module sync needed)
-            self.log_info(f"Folders created: {sync_data['folders_created']} folders")
-            self.log_info(f"Folder structure ready: {sync_data['folders_structure_ready']}")
-            cross_sync_result = {'success': True, 'message': 'Folder creation logged successfully'}
-            
-            # Basic validation for COLAB folder setup
-            cross_validation = {'valid': True, 'warnings': [], 'message': 'Folder setup validation passed'}
-            
-            return {
-                'success': True,
-                'sync_data': sync_data,
-                'cross_sync_result': cross_sync_result,
-                'cross_validation': cross_validation
-            }
-        except Exception as e:
-            return {'success': False, 'error': str(e)}
-    
-    def _verify_folder_structure(self, planned_folders: List[Dict]) -> Dict[str, Any]:
-        """Verify folder structure integrity and accessibility."""
-        try:
-            verification_results = []
-            critical_issues = []
-            warnings = []
-            
-            for folder_info in planned_folders:
-                folder_path = folder_info['path']
-                folder_name = folder_info['name']
-                is_required = folder_info['required']
-                
-                verification = {
-                    'path': folder_path,
-                    'name': folder_name,
-                    'required': is_required
-                }
-                
-                if os.path.exists(folder_path):
-                    if os.path.isdir(folder_path):
-                        # Check permissions
-                        readable = os.access(folder_path, os.R_OK)
-                        writable = os.access(folder_path, os.W_OK)
-                        
-                        verification.update({
-                            'status': 'exists',
-                            'readable': readable,
-                            'writable': writable,
-                            'size_mb': self._get_folder_size(folder_path)
-                        })
-                        
-                        if not readable or not writable:
-                            if is_required:
-                                critical_issues.append(f"Required folder {folder_name} has insufficient permissions")
-                            else:
-                                warnings.append(f"Folder {folder_name} has limited permissions")
-                    else:
-                        verification.update({'status': 'not_directory'})
-                        if is_required:
-                            critical_issues.append(f"Required path {folder_name} exists but is not a directory")
+            for folder_path in REQUIRED_FOLDERS:
+                path_obj = Path(folder_path)
+                if path_obj.exists() and path_obj.is_dir():
+                    existing_folders.append(folder_path)
                 else:
-                    verification.update({'status': 'missing'})
-                    if is_required:
-                        critical_issues.append(f"Required folder {folder_name} is missing")
-                    else:
-                        warnings.append(f"Optional folder {folder_name} is missing")
-                
-                verification_results.append(verification)
+                    missing_folders.append(folder_path)
             
-            # Overall assessment
-            total_folders = len(planned_folders)
-            existing_folders = len([v for v in verification_results if v.get('status') == 'exists'])
-            required_folders = len([f for f in planned_folders if f['required']])
-            existing_required = len([v for v in verification_results if v.get('status') == 'exists' and v.get('required')])
-            
-            overall_success = len(critical_issues) == 0 and existing_required == required_folders
+            success_rate = (len(existing_folders) / len(REQUIRED_FOLDERS)) * 100
             
             return {
-                'success': overall_success,
-                'verification_results': verification_results,
-                'critical_issues': critical_issues,
-                'warnings': warnings,
-                'summary': {
-                    'total_folders': total_folders,
-                    'existing_folders': existing_folders,
-                    'required_folders': required_folders,
-                    'existing_required': existing_required,
-                    'completion_rate': (existing_folders / total_folders * 100) if total_folders > 0 else 0
-                }
+                'success': len(missing_folders) == 0,
+                'existing_folders': len(existing_folders),
+                'missing_folders': len(missing_folders),
+                'total_folders': len(REQUIRED_FOLDERS),
+                'success_rate': success_rate,
+                'critical_missing': missing_folders if missing_folders else []
             }
+            
         except Exception as e:
-            return {'success': False, 'error': str(e), 'verification_results': []}
+            return {
+                'success': False,
+                'error': str(e)
+            }
     
-    def _get_folder_size(self, folder_path: str) -> float:
-        """Get folder size in MB."""
-        try:
-            total_size = 0
-            for dirpath, dirnames, filenames in os.walk(folder_path):  # noqa: F841
-                for filename in filenames:
-                    filepath = os.path.join(dirpath, filename)
-                    try:
-                        total_size += os.path.getsize(filepath)
-                    except (OSError, IOError):
-                        pass
-            return round(total_size / (1024 * 1024), 2)
-        except Exception:
-            return 0.0
-    
-    def _get_current_timestamp(self) -> str:
-        """Get current timestamp for sync tracking."""
-        from datetime import datetime
-        return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    def _get_current_time(self) -> float:
+        """Get current time for performance measurement."""
+        import time
+        return time.time()
     
     def get_progress_steps(self, operation_type: str = 'folders') -> list:
-        """Get optimized progress steps for folders operation."""
+        """Get optimized progress steps for fast folder creation."""
         return [
-            {'progress': 10, 'message': '🔧 Initializing services...', 'phase_progress': 20},
-            {'progress': 25, 'message': '📋 Planning folder structure...', 'phase_progress': 30},
-            {'progress': 40, 'message': '📁 Creating folders...', 'phase_progress': 70},
-            {'progress': 80, 'message': '🔗 Cross-module sync...', 'phase_progress': 90},
+            {'progress': 5, 'message': '🔧 Initializing...', 'phase_progress': 10},
+            {'progress': 10, 'message': '📁 Creating folders...', 'phase_progress': 20},
+            {'progress': 95, 'message': '✅ Verifying...', 'phase_progress': 95},
             {'progress': 100, 'message': '✅ Folders ready', 'phase_progress': 100}
         ]
+    
+    def get_folder_creation_status(self) -> Dict[str, Any]:
+        """Get current status of folder creation operation."""
+        return {
+            'created_folders': len(self._created_folders),
+            'failed_folders': len(self._failed_folders),
+            'total_required': len(REQUIRED_FOLDERS),
+            'success_rate': (len(self._created_folders) / len(REQUIRED_FOLDERS) * 100) if REQUIRED_FOLDERS else 0
+        }

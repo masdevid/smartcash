@@ -31,3 +31,4 @@ thop>=0.1.1
 tensorboard>=2.19.0
 python-dotenv>=1.0.1
 pytz>=2023.3  # For timezone support
+markdown>=3.5.0  # For markdown parsing and rendering

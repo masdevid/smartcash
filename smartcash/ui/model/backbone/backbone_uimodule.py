@@ -715,45 +715,157 @@ class BackboneUIModule(ModelDiscoveryMixin, ModelConfigSyncMixin, BackendService
             self.log_error(f"Failed to update built model indicators: {e}")
 
     def _check_built_models(self) -> Dict[str, Any]:
-        """Check for built models by backbone type using mixin's configurable checkpoint discovery."""
+        """Check for built models by backbone type using optimized parallel discovery."""
         try:
-            # Use ModelDiscoveryMixin's discover_checkpoints method with relaxed validation
-            discovered_checkpoints = self.discover_checkpoints(
-                discovery_paths=[
-                    'data/checkpoints',                     # Primary checkpoint directory
-                    'runs/train/*/weights',                 # YOLOv5 training output pattern  
-                    'experiments/*/checkpoints',            # Alternative experiment directory
-                    'data/models',                          # Models directory
-                    'models'                               # Alternative models directory
-                ],
-                filename_patterns=[
-                    'best_*.pt',                           # Standard best model format
-                    'last.pt',                             # Latest checkpoint fallback
-                    'epoch_*.pt',                          # Epoch-based checkpoints
-                    '*.pt',                                # Any PyTorch model files
-                    '*.pth'                                # Alternative PyTorch extension
-                ],
-                validation_requirements={
-                    # Relaxed validation - just check if file exists and is readable
-                    'required_keys': []  # Remove strict key requirements
+            from concurrent.futures import ThreadPoolExecutor, as_completed
+            import threading
+            
+            # Define search paths with priorities - enhanced for both EfficientNet and CSPDarkNet
+            search_configs = [
+                {
+                    'paths': ['data/models', 'data/checkpoints'],
+                    'patterns': [
+                        '*backbone*smartcash*efficientnet*.pt', '*backbone*smartcash*efficientnet*.pth',  # EfficientNet format
+                        '*backbone*smartcash*cspdarknet*.pt', '*backbone*smartcash*cspdarknet*.pth',     # CSPDarkNet format
+                        '*backbone*.pt', '*backbone*.pth',                                               # General backbone files
+                        '*smartcash*.pt', '*smartcash*.pth'                                              # SmartCash models
+                    ],
+                    'priority': 1
+                },
+                {
+                    'paths': ['runs/train/*/weights'],
+                    'patterns': ['best.pt', 'last.pt', 'epoch_*.pt'],
+                    'priority': 2
+                },
+                {
+                    'paths': ['experiments/*/checkpoints', 'models'],
+                    'patterns': [
+                        '*efficientnet*.pt', '*efficientnet*.pth',   # EfficientNet models
+                        '*cspdarknet*.pt', '*cspdarknet*.pth',       # CSPDarkNet models
+                        '*yolov5*.pt', '*yolov5*.pth',               # YOLOv5 models
+                        '*.pt', '*.pth'                              # Any PyTorch model files
+                    ],
+                    'priority': 3
                 }
-            )
+            ]
             
-            # Group by backbone type
             built_models = {}
-            for checkpoint in discovered_checkpoints:
-                backbone_type = checkpoint.get('backbone', 'unknown')
-                if backbone_type not in built_models:
-                    built_models[backbone_type] = []
-                built_models[backbone_type].append(checkpoint['path'])
+            thread_lock = threading.Lock()
             
-            self.log_debug(f"Found {len(discovered_checkpoints)} built models across {len(built_models)} backbone types")
+            def scan_path_pattern(path_pattern, file_patterns):
+                """Scan a single path pattern for model files."""
+                local_models = {}
+                try:
+                    import glob
+                    from pathlib import Path
+                    
+                    # Handle wildcard patterns
+                    if '*' in path_pattern:
+                        expanded_paths = glob.glob(path_pattern)
+                        paths_to_scan = [Path(p) for p in expanded_paths if Path(p).exists()]
+                    else:
+                        paths_to_scan = [Path(path_pattern)] if Path(path_pattern).exists() else []
+                    
+                    for scan_path in paths_to_scan:
+                        if not scan_path.exists():
+                            continue
+                            
+                        for pattern in file_patterns:
+                            model_files = list(scan_path.glob(pattern))
+                            
+                            for model_file in model_files:
+                                # Quick metadata extraction without deep validation
+                                metadata = self._extract_quick_metadata(str(model_file))
+                                backbone_type = metadata.get('backbone', 'found')
+                                
+                                if backbone_type not in local_models:
+                                    local_models[backbone_type] = []
+                                local_models[backbone_type].append(str(model_file))
+                                
+                except Exception as e:
+                    self.log_debug(f"Error scanning {path_pattern}: {e}")
+                
+                return local_models
+            
+            # Use ThreadPoolExecutor for parallel discovery
+            with ThreadPoolExecutor(max_workers=4, thread_name_prefix="ModelScan") as executor:
+                # Submit all scan tasks
+                future_to_config = {}
+                for config in search_configs:
+                    for path in config['paths']:
+                        future = executor.submit(scan_path_pattern, path, config['patterns'])
+                        future_to_config[future] = {'path': path, 'priority': config['priority']}
+                
+                # Collect results as they complete
+                for future in as_completed(future_to_config, timeout=10):  # 10 second timeout
+                    try:
+                        scan_result = future.result(timeout=5)  # 5 second per task timeout
+                        
+                        # Merge results thread-safely
+                        with thread_lock:
+                            for backbone_type, model_paths in scan_result.items():
+                                if backbone_type not in built_models:
+                                    built_models[backbone_type] = []
+                                built_models[backbone_type].extend(model_paths)
+                                
+                    except Exception as e:
+                        config_info = future_to_config[future]
+                        self.log_debug(f"Scan task failed for {config_info['path']}: {e}")
+            
+            # Remove duplicates and sort by modification time
+            for backbone_type in built_models:
+                unique_paths = list(set(built_models[backbone_type]))
+                # Sort by modification time (newest first), limit to 10 most recent
+                try:
+                    unique_paths.sort(key=lambda x: Path(x).stat().st_mtime, reverse=True)
+                    built_models[backbone_type] = unique_paths[:10]
+                except Exception:
+                    built_models[backbone_type] = unique_paths[:10]
+            
+            total_models = sum(len(models) for models in built_models.values())
+            self.log_debug(f"Parallel scan found {total_models} built models across {len(built_models)} backbone types")
             return built_models
             
         except Exception as e:
-            self.log_error(f"ModelDiscoveryMixin failed: {e}, trying fallback method")
+            self.log_error(f"Parallel model discovery failed: {e}, trying fallback method")
             # Fallback: simple file system scan
             return self._fallback_model_scan()
+
+    def _extract_quick_metadata(self, filepath: str) -> Dict[str, Any]:
+        """Quick metadata extraction without deep file validation."""
+        from pathlib import Path
+        
+        filename = Path(filepath).name
+        metadata = {'backbone': 'found', 'path': filepath}
+        filename_lower = filename.lower()
+        
+        # Enhanced backbone type detection for both EfficientNet and CSPDarkNet models
+        # Handle patterns like:
+        # - backbone_smartcash_efficientnet_b4_20250723_1209.pt (EfficientNet example)  
+        # - backbone_smartcash_cspdarknet_20250723_1209.pt (CSPDarkNet example)
+        # - best_smartcash_cspdarknet_multi_20240101.pt (Training output example)
+        
+        if ('backbone' in filename_lower and 'smartcash' in filename_lower and 
+            'efficientnet' in filename_lower):
+            metadata['backbone'] = 'efficientnet_b4'
+        elif ('backbone' in filename_lower and 'smartcash' in filename_lower and 
+              'cspdarknet' in filename_lower):
+            metadata['backbone'] = 'cspdarknet'
+        elif ('smartcash' in filename_lower and 'cspdarknet' in filename_lower):
+            # Handle cases like best_smartcash_cspdarknet_multi_20240101.pt
+            metadata['backbone'] = 'cspdarknet'
+        elif ('smartcash' in filename_lower and 'efficientnet' in filename_lower):
+            # Handle cases like best_smartcash_efficientnet_b4_multi_20240101.pt
+            metadata['backbone'] = 'efficientnet_b4'
+        elif 'efficientnet' in filename_lower or ('b4' in filename_lower and 'backbone' in filename_lower):
+            metadata['backbone'] = 'efficientnet_b4'
+        elif 'cspdarknet' in filename_lower or ('yolov5' in filename_lower and 'smartcash' in filename_lower):
+            metadata['backbone'] = 'cspdarknet'
+        elif 'yolov5' in filename_lower and ('backbone' in filename_lower or 'smartcash' in filename_lower):
+            # Handle YOLOv5-based models
+            metadata['backbone'] = 'cspdarknet'
+        
+        return metadata
 
     def _fallback_model_scan(self) -> Dict[str, Any]:
         """Fallback method to scan for models using simple file system operations."""

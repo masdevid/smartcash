@@ -190,7 +190,7 @@ class TrainingStartOperationHandler(BaseTrainingOperation):
             return None
 
     def _select_model_from_backbone(self) -> Dict[str, Any]:
-        """Select model based on current backbone configuration."""
+        """Select model based on current backbone configuration and verify models exist."""
         try:
             # Get backbone configuration from shared config or backbone module
             backbone_config = self._get_backbone_configuration()
@@ -201,6 +201,22 @@ class TrainingStartOperationHandler(BaseTrainingOperation):
                     'message': 'No backbone configuration found. Please configure backbone first.'
                 }
             
+            # Check if models are actually built before proceeding
+            if backbone_config.get('models_built') is False:
+                error_msg = backbone_config.get('error', 'No built backbone models found')
+                return {
+                    'success': False,
+                    'message': f'Cannot start training: {error_msg}. Please build models in the backbone module first.'
+                }
+                
+            # Check if we have available models
+            available_models = backbone_config.get('available_models', {})
+            if not available_models:
+                return {
+                    'success': False,
+                    'message': 'No built backbone models found. Please build models in the backbone module first.'
+                }
+            
             # Use config handler to select model
             config_handler = getattr(self._ui_module, '_config_handler', None)
             if config_handler and hasattr(config_handler, 'select_model_from_backbone'):
@@ -208,11 +224,18 @@ class TrainingStartOperationHandler(BaseTrainingOperation):
                 
                 if model_selection_result['success']:
                     model_info = model_selection_result['model_selection']
+                    backbone_type = model_info.get('backbone_type')
+                    model_count = len(available_models.get(backbone_type, []))
+                    
                     self.log_operation(
-                        f"🏗️ Model selected: {model_info.get('backbone_type')} "
-                        f"({model_info.get('num_classes')} classes)", 
-                        'info'
+                        f"🏗️ Model selected: {backbone_type} "
+                        f"({model_info.get('num_classes')} classes, {model_count} built models available)", 
+                        'success'
                     )
+                    
+                    # Add model availability info to the result
+                    model_selection_result['available_model_count'] = model_count
+                    model_selection_result['model_paths'] = available_models.get(backbone_type, [])
                     
                 return model_selection_result
             else:
@@ -228,7 +251,7 @@ class TrainingStartOperationHandler(BaseTrainingOperation):
             }
 
     def _get_backbone_configuration(self) -> Dict[str, Any]:
-        """Get current backbone configuration."""
+        """Get current backbone configuration and verify built models exist."""
         try:
             # Try to get from backbone module if available
             from smartcash.ui.model.backbone.backbone_uimodule import get_backbone_uimodule
@@ -236,11 +259,81 @@ class TrainingStartOperationHandler(BaseTrainingOperation):
             backbone_module = get_backbone_uimodule(auto_initialize=False)
             if backbone_module and hasattr(backbone_module, 'get_current_config'):
                 backbone_config = backbone_module.get_current_config()
-                self.log_operation("✅ Backbone configuration retrieved", 'success')
-                return backbone_config
+                
+                # Check if backbone models are actually built
+                if hasattr(backbone_module, '_check_built_models'):
+                    built_models = backbone_module._check_built_models()
+                    total_built = sum(len(models) for models in built_models.values())
+                    
+                    if total_built > 0:
+                        self.log_operation(f"✅ Found {total_built} built backbone models", 'success')
+                        # Add model availability info to config
+                        backbone_config['available_models'] = built_models
+                        return backbone_config
+                    else:
+                        self.log_operation("⚠️ No built backbone models found", 'warning')
+                        # Still return config but mark as models not built
+                        backbone_config['models_built'] = False
+                        return backbone_config
+                else:
+                    self.log_operation("✅ Backbone configuration retrieved (model check not available)", 'success')
+                    return backbone_config
             else:
-                # Fallback to default backbone config
-                self.log_operation("⚠️ Using default backbone configuration", 'warning')
+                # Try to discover models manually if backbone module not available
+                self.log_operation("⚠️ Backbone module not available, discovering models manually", 'warning')
+                return self._discover_backbone_models_manually()
+                
+        except Exception as e:
+            self.log_operation(f"⚠️ Error getting backbone config: {e}", 'warning')
+            # Try manual discovery as fallback
+            return self._discover_backbone_models_manually()
+
+    def _discover_backbone_models_manually(self) -> Dict[str, Any]:
+        """Manually discover backbone models when backbone module is not available."""
+        try:
+            from pathlib import Path
+            import glob
+            
+            # Search for backbone model files
+            search_paths = [
+                'data/models/*backbone*smartcash*.pt',
+                'data/models/*backbone*smartcash*.pth', 
+                'data/checkpoints/*backbone*.pt',
+                'data/checkpoints/*backbone*.pth'
+            ]
+            
+            found_models = []
+            for pattern in search_paths:
+                found_models.extend(glob.glob(pattern))
+            
+            if found_models:
+                # Try to determine backbone type from first found model
+                first_model = Path(found_models[0]).name.lower()
+                
+                if 'efficientnet' in first_model:
+                    backbone_type = 'efficientnet_b4'
+                elif 'cspdarknet' in first_model:
+                    backbone_type = 'cspdarknet'
+                else:
+                    backbone_type = 'efficientnet_b4'  # Default
+                
+                self.log_operation(f"✅ Discovered {len(found_models)} backbone models, using {backbone_type}", 'success')
+                
+                return {
+                    'backbone': {
+                        'model_type': backbone_type,
+                        'input_size': 640,
+                        'num_classes': 7,
+                        'feature_optimization': False
+                    },
+                    'model': {
+                        'model_name': 'smartcash_training_model'
+                    },
+                    'available_models': {backbone_type: found_models},
+                    'models_built': True
+                }
+            else:
+                self.log_operation("❌ No backbone models found - please build models in backbone module first", 'error')
                 return {
                     'backbone': {
                         'model_type': 'efficientnet_b4',
@@ -250,11 +343,13 @@ class TrainingStartOperationHandler(BaseTrainingOperation):
                     },
                     'model': {
                         'model_name': 'smartcash_training_model'
-                    }
+                    },
+                    'models_built': False,
+                    'error': 'No built models found'
                 }
                 
         except Exception as e:
-            self.log_operation(f"⚠️ Error getting backbone config: {e}", 'warning')
+            self.log_operation(f"❌ Manual model discovery failed: {e}", 'error')
             return {}
 
     def _setup_live_charts(self) -> Dict[str, Any]:
@@ -321,36 +416,87 @@ class TrainingStartOperationHandler(BaseTrainingOperation):
             }
 
     def _check_training_packages(self) -> Dict[str, Any]:
-        """Check if required training packages are installed."""
+        """Check if required training packages are installed using parallel processing."""
         try:
+            import importlib
+            import time
+            from concurrent.futures import ThreadPoolExecutor, as_completed
+            
             # Define required packages for training
             required_packages = [
                 'torch', 'torchvision', 'ultralytics', 'timm', 
                 'scikit-learn', 'tensorboard', 'thop'
             ]
             
-            # Import dependency service
-            from smartcash.ui.setup.dependency.services.package_status_tracker import PackageStatusTracker
+            start_time = time.time()
+            self.log_operation(f"📦 Checking {len(required_packages)} required packages in parallel...", 'info')
             
-            # Create package tracker
-            package_tracker = PackageStatusTracker({}, self.logger if hasattr(self, 'logger') else None)
+            def check_single_package(package_name: str) -> Dict[str, Any]:
+                """Check a single package installation status."""
+                try:
+                    module = importlib.import_module(package_name)
+                    version = getattr(module, '__version__', 'unknown')
+                    return {
+                        'package': package_name,
+                        'installed': True,
+                        'version': version,
+                        'status': 'success'
+                    }
+                except ImportError:
+                    return {
+                        'package': package_name,
+                        'installed': False,
+                        'version': None,
+                        'status': 'missing'
+                    }
+                except Exception as e:
+                    return {
+                        'package': package_name,
+                        'installed': False,
+                        'version': None,
+                        'status': 'error',
+                        'error': str(e)
+                    }
             
-            # Check all required packages
-            self.log_operation(f"📦 Checking {len(required_packages)} required packages...", 'info')
-            package_results = package_tracker.check_multiple_packages(required_packages)
-            
-            # Analyze results
+            # Use ThreadPoolExecutor for parallel package checking
+            package_results = {}
             missing_packages = []
             installed_packages = []
             
-            for package_name, result in package_results.items():
-                if result.get('installed', False):
-                    version = result.get('version', 'unknown')
-                    installed_packages.append(f"{package_name} ({version})")
-                    self.log_operation(f"✅ {package_name} ({version}) - Installed", 'info')
-                else:
-                    missing_packages.append(package_name)
-                    self.log_operation(f"❌ {package_name} - Not installed", 'warning')
+            with ThreadPoolExecutor(max_workers=4, thread_name_prefix="PkgCheck") as executor:
+                # Submit all package checks
+                future_to_package = {
+                    executor.submit(check_single_package, pkg): pkg 
+                    for pkg in required_packages
+                }
+                
+                # Collect results as they complete
+                for future in as_completed(future_to_package, timeout=15):  # 15 second timeout
+                    try:
+                        result = future.result(timeout=3)  # 3 second per package timeout
+                        package_name = result['package']
+                        package_results[package_name] = result
+                        
+                        if result['installed']:
+                            version = result['version']
+                            installed_packages.append(f"{package_name} ({version})")
+                            self.log_operation(f"✅ {package_name} ({version}) - Installed", 'info')
+                        else:
+                            missing_packages.append(package_name)
+                            status = result['status']
+                            if status == 'error':
+                                error_detail = result.get('error', 'unknown error')
+                                self.log_operation(f"❌ {package_name} - Error: {error_detail}", 'warning')
+                            else:
+                                self.log_operation(f"❌ {package_name} - Not installed", 'warning')
+                                
+                    except Exception as e:
+                        package_name = future_to_package[future]
+                        missing_packages.append(package_name)
+                        self.log_operation(f"❌ {package_name} - Check failed: {e}", 'warning')
+            
+            check_time = time.time() - start_time
+            self.log_operation(f"⏱️ Package check completed in {check_time:.2f} seconds", 'info')
             
             # Check if any packages are missing
             if missing_packages:
@@ -361,15 +507,17 @@ class TrainingStartOperationHandler(BaseTrainingOperation):
                     'success': False,
                     'message': error_message,
                     'missing_packages': missing_packages,
-                    'installed_packages': installed_packages
+                    'installed_packages': installed_packages,
+                    'check_time': check_time
                 }
             
             # All packages are installed
-            self.log_operation(f"✅ All {len(required_packages)} training packages are installed", 'success')
+            self.log_operation(f"✅ All {len(required_packages)} training packages are installed ({check_time:.2f}s)", 'success')
             return {
                 'success': True,
                 'message': 'All required training packages are available',
-                'installed_packages': installed_packages
+                'installed_packages': installed_packages,
+                'check_time': check_time
             }
             
         except Exception as e:

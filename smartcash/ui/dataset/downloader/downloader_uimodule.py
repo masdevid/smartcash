@@ -135,9 +135,8 @@ class DownloaderUIModule(BaseUIModule):
             
             if result.get("success", False):
                 file_count = result.get("file_count", 0)
-                total_size = result.get("total_size", "0B")
-                success_message = f"Pengecekan selesai: {file_count} file ({total_size})"
-                return {'success': True, 'message': success_message, 'file_count': file_count, 'total_size': total_size}
+                success_message = f"Pengecekan selesai: {file_count} file"
+                return {'success': True, 'message': success_message, 'file_count': file_count}
             else:
                 error_msg = result.get("error", "Pengecekan gagal")
                 return {'success': False, 'message': error_msg}
@@ -322,15 +321,13 @@ class DownloaderUIModule(BaseUIModule):
             if split_data.get('images', 0) > 0 or split_data.get('labels', 0) > 0:
                 images = split_data.get('images', 0)
                 labels = split_data.get('labels', 0)
-                size = split_data.get('size_formatted', '0B')
-                details.append(f"• {split_name.title()}: {images} gambar, {labels} label ({size})")
+                details.append(f"• {split_name.title()}: {images} gambar, {labels} label")
         
         # Add downloads information
         downloads = existing_data.get('downloads', {})
         if downloads.get('file_count', 0) > 0:
             file_count = downloads.get('file_count', 0)
-            size = downloads.get('size_formatted', '0B')
-            details.append(f"• Downloads: {file_count} file ({size})")
+            details.append(f"• Downloads: {file_count} file")
         
         return '\n'.join(details) if details else "• Data terdeteksi tetapi detail tidak tersedia"
 
@@ -341,10 +338,9 @@ class DownloaderUIModule(BaseUIModule):
         for target_name, target_info in targets.items():
             file_count = target_info.get('file_count', 0)
             if file_count > 0:
-                size_formatted = target_info.get('size_formatted', '0B')
                 # Make target names more user-friendly
                 friendly_name = target_name.replace('_', ' ').title()
-                details.append(f"• {friendly_name}: {file_count:,} file ({size_formatted})")
+                details.append(f"• {friendly_name}: {file_count:,} file")
         
         return '\n'.join(details) if details else "• Tidak ada detail target tersedia"
 
@@ -365,9 +361,8 @@ class DownloaderUIModule(BaseUIModule):
             
             if result.get("success", False):
                 file_count = result.get("file_count", 0)
-                total_size = result.get("total_size", "0B")
-                success_message = f"Download selesai: {file_count} file ({total_size})"
-                return {'success': True, 'message': success_message, 'file_count': file_count, 'total_size': total_size}
+                success_message = f"Download selesai: {file_count} file"
+                return {'success': True, 'message': success_message, 'file_count': file_count}
             else:
                 error_msg = result.get("error", "Download gagal")
                 return {'success': False, 'message': error_msg}

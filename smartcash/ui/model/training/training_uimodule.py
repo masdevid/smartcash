@@ -52,34 +52,31 @@ class TrainingUIModule(ModelConfigSyncMixin, BackendServiceMixin, BaseUIModule, 
         # Button registration tracking
         self._buttons_registered = False
         
+        # Training-specific state for button dependencies
+        self._has_model = False
+        self._has_checkpoint = False
+        self._is_training_active = False
+        
+        # Setup training-specific button dependencies
+        self._setup_training_button_dependencies()
+        
+        # Initialize training state from available data
+        self._initialize_training_state()
+        
         # Minimal logging for performance
         # Debug information disabled during normal operation
     
     def create_config_handler(self, config: Optional[Dict[str, Any]] = None) -> TrainingConfigHandler:
-        """Create configuration handler."""
-        merged_config = self._merge_with_defaults(config)
+        """Create configuration handler with proper delegation."""
+        # Use ConfigurationMixin's merge functionality instead of duplicating logic
+        merged_config = config or get_default_training_config()
         config_handler = TrainingConfigHandler(merged_config)
-        config_handler.set_ui_components(self._ui_components)
+        if hasattr(self, '_ui_components') and self._ui_components:
+            config_handler.set_ui_components(self._ui_components)
         return config_handler
     
-    def _merge_with_defaults(self, config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-        """Merge provided config with defaults."""
-        default_config = get_default_training_config()
-        
-        if config:
-            # Deep merge logic
-            merged = default_config.copy()
-            for key, value in config.items():
-                if key in merged and isinstance(merged[key], dict) and isinstance(value, dict):
-                    merged[key].update(value)
-                else:
-                    merged[key] = value
-            return merged
-        
-        return default_config
-    
     def get_default_config(self) -> Dict[str, Any]:
-        """Get default configuration."""
+        """Get default configuration - delegates to defaults module."""
         return get_default_training_config()
     
     def create_ui_components(self, config: Dict[str, Any]) -> Dict[str, Any]:
@@ -199,46 +196,204 @@ class TrainingUIModule(ModelConfigSyncMixin, BackendServiceMixin, BaseUIModule, 
         except Exception as e:
             self.logger.error(f"Failed to register training button handlers: {e}", exc_info=True)
     
+    def _setup_training_button_dependencies(self) -> None:
+        """
+        Setup button dependencies specific to training module requirements.
+        
+        This uses the enhanced button mixin functionality to define when
+        training buttons should be enabled/disabled based on module state.
+        """
+        try:
+            # Start training button depends on having a model selected
+            self.set_button_dependency('start_training', self._check_start_training_dependency)
+            
+            # Resume training button depends on having a checkpoint
+            self.set_button_dependency('resume_training', self._check_resume_training_dependency)
+            
+            # Stop training button depends on training being active
+            self.set_button_dependency('stop_training', self._check_stop_training_dependency)
+            
+            # Validate model button depends on having model or checkpoint
+            self.set_button_dependency('validate_model', self._check_validate_model_dependency)
+            
+            self.logger.debug("✅ Training button dependencies configured")
+            
+        except Exception as e:
+            self.logger.error(f"Failed to setup training button dependencies: {e}")
+    
+    def _check_start_training_dependency(self) -> bool:
+        """
+        Check if start training button should be enabled.
+        
+        Returns:
+            True if start training should be enabled (has model and not training)
+        """
+        return self._has_model and not self._is_training_active
+    
+    def _check_resume_training_dependency(self) -> bool:
+        """
+        Check if resume training button should be enabled.
+        
+        Returns:
+            True if resume training should be enabled (has checkpoint and not training)
+        """
+        return self._has_checkpoint and not self._is_training_active
+    
+    def _check_stop_training_dependency(self) -> bool:
+        """
+        Check if stop training button should be enabled.
+        
+        Returns:
+            True if stop training should be enabled (training is active)
+        """
+        return self._is_training_active
+    
+    def _check_validate_model_dependency(self) -> bool:
+        """
+        Check if validate model button should be enabled.
+        
+        Returns:
+            True if validate model should be enabled (has model or checkpoint)
+        """
+        return self._has_model or self._has_checkpoint
+    
+    def _update_training_state(self, has_model: bool = None, has_checkpoint: bool = None, is_training_active: bool = None) -> None:
+        """
+        Update training state and refresh button states using enhanced mixin.
+        
+        Args:
+            has_model: Whether a model is available
+            has_checkpoint: Whether a checkpoint is available
+            is_training_active: Whether training is currently active
+        """
+        try:
+            # Update state variables
+            if has_model is not None:
+                self._has_model = has_model
+            if has_checkpoint is not None:
+                self._has_checkpoint = has_checkpoint
+            if is_training_active is not None:
+                self._is_training_active = is_training_active
+            
+            # Update button states using enhanced mixin functionality
+            self._update_training_button_states()
+            
+        except Exception as e:
+            self.logger.error(f"Failed to update training state: {e}")
+    
+    def _update_training_button_states(self) -> None:
+        """
+        Update all training button states based on current conditions.
+        
+        This replaces the custom button state logic with the enhanced mixin approach.
+        """
+        try:
+            # Define button conditions based on current state
+            button_conditions = {
+                'start_training': self._has_model and not self._is_training_active,
+                'resume_training': self._has_checkpoint and not self._is_training_active,
+                'stop_training': self._is_training_active,
+                'validate_model': self._has_model or self._has_checkpoint
+            }
+            
+            # Define reasons for disabled buttons
+            button_reasons = {
+                'start_training': self._get_start_training_disable_reason(),
+                'resume_training': self._get_resume_training_disable_reason(),
+                'stop_training': "No active training to stop" if not self._is_training_active else None,
+                'validate_model': "No model or checkpoint available" if not (self._has_model or self._has_checkpoint) else None
+            }
+            
+            # Update all button states in one call using enhanced mixin
+            self.update_button_states_based_on_condition(button_conditions, button_reasons)
+            
+            self.logger.debug("Training button states updated based on current conditions")
+            
+        except Exception as e:
+            self.logger.error(f"Failed to update training button states: {e}")
+    
+    def _get_start_training_disable_reason(self) -> Optional[str]:
+        """Get reason why start training button is disabled."""
+        if not self._has_model:
+            return "No model selected - configure backbone first"
+        elif self._is_training_active:
+            return "Training already in progress"
+        return None
+    
+    def _get_resume_training_disable_reason(self) -> Optional[str]:
+        """Get reason why resume training button is disabled."""
+        if not self._has_checkpoint:
+            return "No checkpoint available to resume from"
+        elif self._is_training_active:
+            return "Training already in progress"
+        return None
+    
     def _handle_start_training(self, button=None) -> None:
         """Handle start training button click."""
         try:
             self.log_info("Starting training...")
+            
+            # Update state to indicate training is starting
+            self._update_training_state(is_training_active=True)
+            
             result = self.execute_start_training()
             
             if result.get('success'):
                 self.log_success(f"Training started: {result.get('message', '')}")
             else:
+                # Reset training state if start failed
+                self._update_training_state(is_training_active=False)
                 self.log_error(f"Training start failed: {result.get('message', '')}")
                 
         except Exception as e:
+            # Reset training state on error
+            self._update_training_state(is_training_active=False)
             self.log_error(f"Start training error: {e}")
     
     def _handle_stop_training(self, button=None) -> None:
         """Handle stop training button click."""
         try:
             self.log_info("Stopping training...")
+            
+            # Update state to indicate training is stopping
+            self._update_training_state(is_training_active=False)
+            
             result = self.execute_stop_training()
             
             if result.get('success'):
                 self.log_success(f"Training stopped: {result.get('message', '')}")
+                # Update state to reflect stopped training
+                self._update_training_state(is_training_active=False)
             else:
                 self.log_error(f"Training stop failed: {result.get('message', '')}")
+                # Reset training state if stop failed
+                self._update_training_state(is_training_active=True)
                 
         except Exception as e:
+            # Reset training state on error
+            self._update_training_state(is_training_active=True)
             self.log_error(f"Stop training error: {e}")
     
     def _handle_resume_training(self, button=None) -> None:
         """Handle resume training button click."""
         try:
             self.log_info("Resuming training...")
+            
+            # Update state to indicate training is resuming
+            self._update_training_state(is_training_active=True)
+            
             result = self.execute_resume_training()
             
             if result.get('success'):
                 self.log_success(f"Training resumed: {result.get('message', '')}")
             else:
+                # Reset training state if resume failed
+                self._update_training_state(is_training_active=False)
                 self.log_error(f"Training resume failed: {result.get('message', '')}")
                 
         except Exception as e:
+            # Reset training state on error
+            self._update_training_state(is_training_active=False)
             self.log_error(f"Resume training error: {e}")
     
     # _handle_validate_model removed - validation now handled by backbone module
@@ -258,29 +413,31 @@ class TrainingUIModule(ModelConfigSyncMixin, BackendServiceMixin, BaseUIModule, 
             self.log_error(f"Refresh backbone config error: {e}")
     
     def _handle_save_config(self, button=None) -> None:
-        """Handle save config button click."""
+        """Handle save config button click - delegates to ConfigurationMixin."""
         try:
             self.log_info("Saving configuration...")
-            result = self.save_current_config()
+            result = self.save_config()  # Delegates to ConfigurationMixin
             
-            if result.get('success'):
+            if result.get('success', True):  # ConfigurationMixin may return True directly
                 self.log_success("Configuration saved successfully")
             else:
-                self.log_error(f"Save config failed: {result.get('message', '')}")
+                self.log_error(f"Save config failed: {result.get('message', 'Unknown error')}")
                 
         except Exception as e:
             self.log_error(f"Save config error: {e}")
     
     def _handle_reset_config(self, button=None) -> None:
-        """Handle reset config button click."""
+        """Handle reset config button click - delegates to ConfigurationMixin."""
         try:
             self.log_info("Resetting configuration...")
-            result = self.reset_to_defaults()
+            result = self.reset_config()  # Delegates to ConfigurationMixin
             
-            if result.get('success'):
+            if result.get('success', True):  # ConfigurationMixin may return True directly
                 self.log_success("Configuration reset to defaults")
+                # Sync UI after reset
+                self._sync_config_to_ui()
             else:
-                self.log_error(f"Reset config failed: {result.get('message', '')}")
+                self.log_error(f"Reset config failed: {result.get('message', 'Unknown error')}")
                 
         except Exception as e:
             self.log_error(f"Reset config error: {e}")
@@ -387,6 +544,7 @@ class TrainingUIModule(ModelConfigSyncMixin, BackendServiceMixin, BaseUIModule, 
             backbone_config = self._get_backbone_configuration()
             
             if not backbone_config:
+                self._update_training_state(has_model=False)
                 return {'success': False, 'message': 'No backbone configuration available'}
             
             if not self._config_handler:
@@ -395,9 +553,14 @@ class TrainingUIModule(ModelConfigSyncMixin, BackendServiceMixin, BaseUIModule, 
             # Update model selection based on backbone
             model_result = self._config_handler.select_model_from_backbone(backbone_config)
             if model_result['success']:
-                # Update configuration and UI
-                self._update_module_config(model_selection=model_result['model_selection'])
+                # Update configuration using ConfigurationMixin delegation
+                for key, value in model_result['model_selection'].items():
+                    self.update_config_value(f'model_selection.{key}', value)
                 self._sync_config_to_ui()
+                
+                # Update training state to reflect model availability
+                has_model = bool(model_result['model_selection'].get('backbone_type'))
+                self._update_training_state(has_model=has_model)
                 
                 return {
                     'success': True,
@@ -405,11 +568,13 @@ class TrainingUIModule(ModelConfigSyncMixin, BackendServiceMixin, BaseUIModule, 
                     'model_selection': model_result['model_selection']
                 }
             else:
+                self._update_training_state(has_model=False)
                 return model_result
                 
         except Exception as e:
             error_msg = f"Failed to refresh backbone config: {e}"
             self.logger.error(error_msg)
+            self._update_training_state(has_model=False)
             return {'success': False, 'message': error_msg}
     
     def _get_backbone_configuration(self) -> Optional[Dict[str, Any]]:
@@ -471,96 +636,98 @@ class TrainingUIModule(ModelConfigSyncMixin, BackendServiceMixin, BaseUIModule, 
         except Exception as e:
             self.log_warning(f"Failed to update charts: {e}")
     
-    def save_current_config(self) -> Dict[str, Any]:
-        """Save current configuration."""
-        try:
-            if not self._config_handler:
-                return {'success': False, 'message': 'Config handler not available'}
-            
-            # Extract config from UI if needed
-            current_config = self.get_current_config()
-            
-            # In a real implementation, this would save to file or database
-            self.logger.info("📋 Configuration saved successfully")
-            return {
-                'success': True,
-                'message': 'Configuration saved successfully',
-                'config': current_config
-            }
-            
-        except Exception as e:
-            error_msg = f"Failed to save config: {e}"
-            self.logger.error(error_msg)
-            return {'success': False, 'message': error_msg}
-    
-    def reset_to_defaults(self) -> Dict[str, Any]:
-        """Reset configuration to defaults."""
-        try:
-            default_config = get_default_training_config()
-            self._update_module_config(**default_config)
-            self._sync_config_to_ui()
-            
-            self.logger.info("🔄 Configuration reset to defaults")
-            return {
-                'success': True,
-                'message': 'Configuration reset to defaults',
-                'config': default_config
-            }
-            
-        except Exception as e:
-            error_msg = f"Failed to reset config: {e}"
-            self.logger.error(error_msg)
-            return {'success': False, 'message': error_msg}
+    # Configuration methods removed - now properly delegated to ConfigurationMixin
+    # save_current_config() -> use self.save_config() from ConfigurationMixin
+    # reset_to_defaults() -> use self.reset_config() from ConfigurationMixin
     
     def _sync_config_to_ui(self) -> None:
         """Sync current configuration to UI components."""
         try:
-            if self._config_handler and self._ui_components:
+            if self._ui_components:
                 current_config = self.get_current_config()
                 
                 # Update form if available
                 form_container = self._ui_components.get('form_container')
                 if form_container and hasattr(form_container, 'update_from_config'):
                     form_container.update_from_config(current_config)
-                    # Debug information disabled during normal operation
+                    self.log_debug("UI form synchronized with configuration")
                 else:
-                    self.log_warning("Form container or update method not available")
+                    self.log_debug("Form container or update method not available")
+                
+                # Update training state based on configuration changes
+                self._update_training_state_from_config(current_config)
                     
         except Exception as e:
             self.log_warning(f"Failed to sync config to UI: {e}")
-
-    def _update_module_config(self, **updates: Any) -> None:
-        """Update module configuration with provided values."""
+    
+    def _update_training_state_from_config(self, config: Dict[str, Any]) -> None:
+        """Update training state based on configuration changes."""
         try:
-            if self._config_handler:
-                current_config = self.get_current_config()
-                
-                # Deep update configuration
-                for key, value in updates.items():
-                    if key in current_config and isinstance(current_config[key], dict) and isinstance(value, dict):
-                        current_config[key].update(value)
-                    else:
-                        current_config[key] = value
-                
-                # Update the config handler
-                self._config_handler.config = current_config
-                # Debug information disabled during normal operation
-            else:
-                self.log_warning("Config handler not available for update")
-                
+            # Check for model and checkpoint availability after config sync
+            model_selection = config.get('model_selection', {})
+            has_model = bool(model_selection.get('backbone_type'))
+            has_checkpoint = bool(model_selection.get('checkpoint_path'))
+            
+            # Update training state based on configuration
+            self._update_training_state(has_model=has_model, has_checkpoint=has_checkpoint)
+            
         except Exception as e:
-            self.logger.error(f"Failed to update module config: {e}")
+            self.log_warning(f"Failed to update training state from config: {e}")
+
+    # _update_module_config method removed - replaced with proper ConfigurationMixin delegation
+    # Use self.update_config_value(key, value) or self.update_config_section(section, values) instead
     
     def get_training_status(self) -> Dict[str, Any]:
-        """Get current training status."""
+        """Get current training status including button states."""
         return {
-            'initialized': self.is_ready(),
+            'initialized': self._config_handler is not None and self._ui_components is not None,
             'module_name': self.module_name,
             'parent_module': self.parent_module,
             'config_available': self._config_handler is not None,
             'charts_available': bool(self._chart_updaters),
-            'training_state': self._training_state.copy()
+            'training_state': self._training_state.copy(),
+            'button_states': {
+                'has_model': self._has_model,
+                'has_checkpoint': self._has_checkpoint,
+                'is_training_active': self._is_training_active
+            }
         }
+    
+    def _initialize_training_state(self) -> None:
+        """
+        Initialize training state based on current configuration and available data.
+        
+        This method checks for model availability, checkpoint existence, and 
+        training status to set initial button states correctly.
+        """
+        try:
+            # Check if we have a model from backbone configuration
+            backbone_config = self._get_backbone_configuration()
+            has_model = bool(backbone_config and backbone_config.get('available_models'))
+            
+            # Check for existing checkpoints (placeholder for now)
+            has_checkpoint = False  # TODO: Implement checkpoint detection
+            
+            # Training should start as inactive
+            is_training_active = False
+            
+            # Update the training state
+            self._update_training_state(
+                has_model=has_model,
+                has_checkpoint=has_checkpoint,
+                is_training_active=is_training_active
+            )
+            
+            self.logger.debug(f"Training state initialized: model={has_model}, checkpoint={has_checkpoint}, active={is_training_active}")
+            
+        except Exception as e:
+            self.logger.warning(f"Failed to initialize training state: {e}")
+            # Set safe defaults on error
+            self._update_training_state(
+                has_model=False,
+                has_checkpoint=False,
+                is_training_active=False
+            )
     
     def get_live_charts(self) -> Dict[str, Any]:
         """Get live chart widgets."""
@@ -585,7 +752,7 @@ class TrainingUIModule(ModelConfigSyncMixin, BackendServiceMixin, BaseUIModule, 
                     self._ui_components._cleanup()
                 
                 # Close individual widgets
-                for component_name, component in self._ui_components.items():
+                for _, component in self._ui_components.items():
                     if hasattr(component, 'close'):
                         try:
                             component.close()

@@ -338,28 +338,30 @@ class PreprocessingUIModule(BaseUIModule):
             return {'success': False, 'message': error_msg}
 
     def _update_operation_summary(self, content: str) -> None:
-        """Update the operation summary container with new content."""
+        """Update the operation summary container with new content using markdown formatter."""
         try:
-            from smartcash.ui.core.ui_utils import format_operation_summary
-            
             summary_container = self.get_component('summary_container')
             if summary_container and hasattr(summary_container, 'set_content'):
-                # Format content using core utility
-                formatted_content = format_operation_summary(
-                    content=content,
-                    title="Preprocessing Summary",
-                    icon="📊",
-                    border_color="#28a745"
+                # Convert markdown content to HTML using the new formatter
+                from smartcash.ui.core.utils import format_summary_to_html
+                formatted_content = format_summary_to_html(
+                    content, 
+                    title="📊 Preprocessing Summary", 
+                    module_name="preprocessing"
                 )
                 summary_container.set_content(formatted_content)
-                self.log_debug("✅ Summary container updated with operation results")
+                self.log_debug("✅ Summary container updated with preprocessing results")
             else:
                 # Fallback to operation summary updater
                 updater = self.get_component('operation_summary_updater')
                 if updater and callable(updater):
-                    # Also convert content for updater using core utility
-                    from smartcash.ui.core.ui_utils import convert_summary_to_html
-                    html_content = convert_summary_to_html(content)
+                    # Use the new markdown formatter for consistency 
+                    from smartcash.ui.core.utils import format_summary_to_html
+                    html_content = format_summary_to_html(
+                        content, 
+                        title="📊 Preprocessing Summary", 
+                        module_name="preprocessing"
+                    )
                     updater(html_content)
                 else:
                     self.log_warning("Summary container tidak ditemukan atau tidak dapat dipanggil.")

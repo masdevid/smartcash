@@ -113,26 +113,39 @@ class TrainingStartOperationHandler(BaseTrainingOperation):
             
             validation_result = self._validate_training_prerequisites()
             if not validation_result['success']:
-                self.error_dual_progress(validation_result['message'])
+                if hasattr(self, 'error_triple_progress'):
+                    self.error_triple_progress(validation_result['message'])
+                else:
+                    self.error_dual_progress(validation_result['message'])
                 return validation_result
             
-            self.update_dual_progress(
-                current_step=4,
-                current_percent=100,
-                message="Prerequisite training valid"
+            self.update_triple_progress(
+                overall_step=80,
+                overall_message="Prerequisites Check",
+                phase_step=100,
+                phase_message="Prerequisite training valid",
+                current_step=100,
+                current_message="All packages and dependencies ready"
             )
             
             # Step 5: Start training process
-            self.update_dual_progress(
-                current_step=5,
-                current_percent=0,
-                message="Memulai training process..."
+            self.update_triple_progress(
+                overall_step=80,
+                overall_message="Starting Training Process",
+                phase_step=0,
+                phase_message="Memulai training process...",
+                current_step=0,
+                current_message="Initiating backend training"
             )
             
             training_result = self._start_training_process(training_api)
             
             if training_result['success']:
-                self.complete_progress("Training berhasil dimulai")
+                # Complete with triple progress if available
+                if hasattr(self, 'complete_triple_progress'):
+                    self.complete_triple_progress("Training berhasil dimulai dengan live charts aktif")
+                else:
+                    self.complete_progress("Training berhasil dimulai")
                 
                 # Execute success callback
                 self._execute_callback('on_success', "Training berhasil dimulai dengan live charts aktif")
@@ -144,13 +157,21 @@ class TrainingStartOperationHandler(BaseTrainingOperation):
                     'estimated_time': training_result.get('estimated_time')
                 }
             else:
-                self.error_progress(training_result['message'])
+                # Error handling with triple progress if available
+                if hasattr(self, 'error_triple_progress'):
+                    self.error_triple_progress(training_result['message'])
+                else:
+                    self.error_progress(training_result['message'])
                 self._execute_callback('on_failure', training_result['message'])
                 return training_result
                 
         except Exception as e:
             error_message = f"Training start operation failed: {str(e)}"
-            self.error_progress(error_message)
+            # Use triple progress error handling if available
+            if hasattr(self, 'error_triple_progress'):
+                self.error_triple_progress(error_message)
+            else:
+                self.error_progress(error_message)
             self._execute_callback('on_failure', error_message)
             return {'success': False, 'message': error_message}
 
@@ -172,12 +193,23 @@ class TrainingStartOperationHandler(BaseTrainingOperation):
                     percentage = kwargs.get('percentage', 0)
                     message = kwargs.get('message', "")
                 
-                # Update current step progress
-                self.update_dual_progress(
-                    current_step=self._current_step if hasattr(self, '_current_step') else 1,
-                    current_percent=percentage,
-                    message=message
-                )
+                # Update progress using triple progress if available
+                if hasattr(self, 'update_triple_progress'):
+                    self.update_triple_progress(
+                        overall_step=int(percentage),
+                        overall_message="Backend API Progress",
+                        phase_step=int(percentage),
+                        phase_message=message or "Initializing...",
+                        current_step=int(percentage),
+                        current_message=f"API setup: {percentage}%"
+                    )
+                else:
+                    # Fallback to dual progress
+                    self.update_dual_progress(
+                        current_step=self._current_step if hasattr(self, '_current_step') else 1,
+                        current_percent=percentage,
+                        message=message
+                    )
             
             # Initialize API with training-specific config
             api = create_model_api(progress_callback=progress_callback)
@@ -670,7 +702,21 @@ class TrainingStartOperationHandler(BaseTrainingOperation):
             }
 
     def _update_training_button_states(self, training_active: bool) -> None:
-        """Update button states based on training status."""
+        """Update button states based on training status using enhanced mixin."""
+        try:
+            # Update UI module state and let it handle button updates
+            if hasattr(self._ui_module, '_update_training_state'):
+                self._ui_module._update_training_state(is_training_active=training_active)
+                self.log_operation(f"⚙️ Training button states updated via enhanced mixin: {'Active' if training_active else 'Inactive'}", 'info')
+            else:
+                # Fallback for backward compatibility
+                self._fallback_button_state_update(training_active)
+                
+        except Exception as e:
+            self.log_operation(f"⚠️ Failed to update button states: {e}", 'warning')
+    
+    def _fallback_button_state_update(self, training_active: bool) -> None:
+        """Fallback method for button state updates when enhanced mixin not available."""
         try:
             # Get buttons from UI components
             buttons = {}
@@ -687,8 +733,6 @@ class TrainingStartOperationHandler(BaseTrainingOperation):
                     buttons['resume_training'].disabled = True
                 if 'stop_training' in buttons:
                     buttons['stop_training'].disabled = False
-                    
-                self.log_operation("⚙️ Training buttons updated: Stop enabled", 'info')
             else:
                 # Enable start and resume, disable stop
                 if 'start_training' in buttons:
@@ -698,10 +742,10 @@ class TrainingStartOperationHandler(BaseTrainingOperation):
                 if 'stop_training' in buttons:
                     buttons['stop_training'].disabled = True
                     
-                self.log_operation("⚙️ Training buttons updated: Start/Resume enabled", 'info')
+            self.log_operation("⚙️ Training buttons updated via fallback method", 'info')
                 
         except Exception as e:
-            self.log_operation(f"⚠️ Failed to update button states: {e}", 'warning')
+            self.log_operation(f"⚠️ Fallback button update failed: {e}", 'warning')
     
     def _store_training_state(self, training_id: str, training_config: Dict[str, Any]) -> None:
         """Store training state for stop functionality."""

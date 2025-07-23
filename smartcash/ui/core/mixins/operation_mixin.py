@@ -756,6 +756,86 @@ class OperationMixin:
             if hasattr(self, 'logger'):
                 self.logger.debug(f"Failed to set error progress: {e}")
     
+    def complete_triple_progress(self, message: str = "Completed!") -> None:
+        """
+        Complete triple progress tracking - delegates to operation_container.
+        
+        Args:
+            message: Completion message
+        """
+        try:
+            # Try operation manager first
+            if self._operation_manager and hasattr(self._operation_manager, 'complete_triple_progress'):
+                self._operation_manager.complete_triple_progress(message)
+                return
+            
+            # Delegate to operation_container for triple progress completion
+            if hasattr(self, '_ui_components') and self._ui_components:
+                operation_container = self._ui_components.get('operation_container')
+                if operation_container:
+                    # Handle operation_container as OperationContainer object
+                    if hasattr(operation_container, 'complete_triple_progress'):
+                        operation_container.complete_triple_progress(message)
+                        return
+                    # Handle operation_container as dict (returned by create_operation_container)
+                    elif isinstance(operation_container, dict) and 'complete_triple_progress' in operation_container:
+                        operation_container['complete_triple_progress'](message)
+                        return
+                    # Fallback to updating all three progress levels to 100%
+                    elif hasattr(operation_container, 'update_triple_progress'):
+                        operation_container.update_triple_progress(
+                            100, message, 100, message, 100, message
+                        )
+                        return
+            
+            # Fallback logging
+            if hasattr(self, 'logger'):
+                self.logger.debug(f"[Triple Progress Complete] {message}")
+                
+        except Exception as e:
+            if hasattr(self, 'logger'):
+                self.logger.debug(f"Failed to complete triple progress: {e}")
+    
+    def error_triple_progress(self, message: str = "An error occurred!") -> None:
+        """
+        Set triple progress to error state - delegates to operation_container.
+        
+        Args:
+            message: Error message
+        """
+        try:
+            # Try operation manager first
+            if self._operation_manager and hasattr(self._operation_manager, 'error_triple_progress'):
+                self._operation_manager.error_triple_progress(message)
+                return
+            
+            # Delegate to operation_container for triple progress error
+            if hasattr(self, '_ui_components') and self._ui_components:
+                operation_container = self._ui_components.get('operation_container')
+                if operation_container:
+                    # Handle operation_container as OperationContainer object
+                    if hasattr(operation_container, 'error_triple_progress'):
+                        operation_container.error_triple_progress(message)
+                        return
+                    # Handle operation_container as dict (returned by create_operation_container)
+                    elif isinstance(operation_container, dict) and 'error_triple_progress' in operation_container:
+                        operation_container['error_triple_progress'](message)
+                        return
+                    # Fallback to updating progress levels with error indication
+                    elif hasattr(operation_container, 'update_triple_progress'):
+                        operation_container.update_triple_progress(
+                            0, f"❌ {message}", 0, f"❌ {message}", 0, f"❌ {message}"
+                        )
+                        return
+            
+            # Fallback logging
+            if hasattr(self, 'logger'):
+                self.logger.debug(f"[Triple Progress Error] {message}")
+                
+        except Exception as e:
+            if hasattr(self, 'logger'):
+                self.logger.debug(f"Failed to set triple progress error: {e}")
+    
     # Operation logging is now handled by LoggingMixin to avoid conflicts
     # OperationMixin delegates to LoggingMixin for all logging operations
     

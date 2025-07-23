@@ -42,7 +42,7 @@ def create_training_form(training_config: Dict[str, Any], ui_config: Dict[str, A
             ],
             value=model_selection.get('source', 'backbone'),
             style={'description_width': 'initial'},
-            layout=widgets.Layout(width='auto', min_width='300px')
+            layout=widgets.Layout(width='auto')
         )
         
         checkpoint_path_text = widgets.Text(
@@ -50,7 +50,7 @@ def create_training_form(training_config: Dict[str, Any], ui_config: Dict[str, A
             value=model_selection.get('checkpoint_path', 'data/models/best_smartcash_backbone_latest.pt'),
             placeholder="data/models/best_smartcash_backbone_latest.pt",
             style={'description_width': 'initial'},
-            layout=widgets.Layout(width='auto', min_width='300px')
+            layout=widgets.Layout(width='auto')
         )
         
         # Basic Training Parameters
@@ -61,7 +61,7 @@ def create_training_form(training_config: Dict[str, Any], ui_config: Dict[str, A
             max=validation_config['max_epochs'],
             step=10,
             style={'description_width': 'initial'},
-            layout=widgets.Layout(width='auto', min_width='300px')
+            layout=widgets.Layout(width='auto')
         )
         
         batch_size_input = widgets.IntSlider(
@@ -71,7 +71,7 @@ def create_training_form(training_config: Dict[str, Any], ui_config: Dict[str, A
             max=validation_config['max_batch_size'],
             step=1,
             style={'description_width': 'initial'},
-            layout=widgets.Layout(width='auto', min_width='300px')
+            layout=widgets.Layout(width='auto')
         )
         
         learning_rate_input = widgets.FloatLogSlider(
@@ -82,7 +82,7 @@ def create_training_form(training_config: Dict[str, Any], ui_config: Dict[str, A
             max=0,
             step=0.1,
             style={'description_width': 'initial'},
-            layout=widgets.Layout(width='auto', min_width='300px')
+            layout=widgets.Layout(width='auto')
         )
         
         # Optimizer and Scheduler
@@ -91,7 +91,7 @@ def create_training_form(training_config: Dict[str, Any], ui_config: Dict[str, A
             options=[(name, key) for key, name in optimizers.items()],
             value=training_config.get('optimizer', 'adam'),
             style={'description_width': 'initial'},
-            layout=widgets.Layout(width='auto', min_width='300px')
+            layout=widgets.Layout(width='auto')
         )
         
         scheduler_dropdown = widgets.Dropdown(
@@ -99,7 +99,7 @@ def create_training_form(training_config: Dict[str, Any], ui_config: Dict[str, A
             options=[(name, key) for key, name in schedulers.items()],
             value=training_config.get('scheduler', 'cosine'),
             style={'description_width': 'initial'},
-            layout=widgets.Layout(width='auto', min_width='300px')
+            layout=widgets.Layout(width='auto')
         )
         
         weight_decay_input = widgets.FloatSlider(
@@ -110,7 +110,7 @@ def create_training_form(training_config: Dict[str, Any], ui_config: Dict[str, A
             step=0.0001,
             readout_format='.4f',
             style={'description_width': 'initial'},
-            layout=widgets.Layout(width='auto', min_width='300px')
+            layout=widgets.Layout(width='auto')
         )
         
         # Advanced Training Options
@@ -137,7 +137,7 @@ def create_training_form(training_config: Dict[str, Any], ui_config: Dict[str, A
             max=50,
             step=5,
             style={'description_width': 'initial'},
-            layout=widgets.Layout(width='auto', min_width='300px')
+            layout=widgets.Layout(width='auto')
         )
         
         # Data Configuration - validation split is fixed at 75/15/15 (train/valid/test)
@@ -151,7 +151,7 @@ def create_training_form(training_config: Dict[str, Any], ui_config: Dict[str, A
             max=16,
             step=1,
             style={'description_width': 'initial'},
-            layout=widgets.Layout(width='auto', min_width='300px')
+            layout=widgets.Layout(width='auto')
         )
         
         # Monitoring Configuration
@@ -164,7 +164,7 @@ def create_training_form(training_config: Dict[str, Any], ui_config: Dict[str, A
             max=50,
             step=1,
             style={'description_width': 'initial'},
-            layout=widgets.Layout(width='auto', min_width='300px')
+            layout=widgets.Layout(width='auto')
         )
         
         # UI Configuration removed - not needed for training module
@@ -444,21 +444,24 @@ def create_simple_training_form(config: Dict[str, Any]) -> widgets.Widget:
         description="Epochs:",
         value=training_config.get('epochs', 100),
         min=1, max=500, step=10,
-        style={'description_width': '120px'}
+        style={'description_width': 'initial'},
+        layout=widgets.Layout(width='auto')
     )
     
     batch_size = widgets.IntSlider(
         description="Batch Size:",
         value=training_config.get('batch_size', 16),
         min=1, max=128, step=1,
-        style={'description_width': '120px'}
+        style={'description_width': 'initial'},
+        layout=widgets.Layout(width='auto')
     )
     
     lr = widgets.FloatLogSlider(
         description="Learning Rate:",
         value=training_config.get('learning_rate', 0.001),
         base=10, min=-5, max=-1, step=0.1,
-        style={'description_width': '120px'}
+        style={'description_width': 'initial'},
+        layout=widgets.Layout(width='auto')
     )
     
     return widgets.VBox([

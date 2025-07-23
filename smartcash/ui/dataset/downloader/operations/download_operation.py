@@ -288,25 +288,42 @@ class DownloadOperation(DownloaderBaseOperation):
             return self._handle_error("Error tidak terduga saat download", e)
 
     def _format_download_summary(self, result: Dict[str, Any]) -> str:
-        """Format download operation result into HTML summary."""
+        """Format download operation result into markdown for HTML conversion."""
         file_count = result.get('file_count', 0)
         total_size = result.get('total_size', '0B')
         download_path = result.get('download_path', 'N/A')
         
-        return f"""
-### Ringkasan Operasi Download
+        markdown_content = f"""
+## 📥 Ringkasan Download Dataset
 
+### Status Operasi
+✅ **Download Berhasil Diselesaikan**
+
+### Statistik Download
+- **File Downloaded**: 📁 {file_count:,} file
+- **Total Size**: 💾 {total_size}
+- **Download Path**: 📂 `{download_path}`
+
+### Detail Operasi
 | Kategori | Detail |
-| :--- | :--- |
-| **Status** | ✅ Berhasil |
-| **File Downloaded** | 📁 {file_count} file |
-| **Total Size** | 💾 {total_size} |
-| **Download Path** | 📂 {download_path} |
+|:---------|:-------|
+| Status | ✅ Berhasil |
+| File Count | {file_count:,} file |
+| Data Size | {total_size} |
+| Location | {download_path} |
 
 ---
 
-**Dataset berhasil didownload dan siap digunakan!**
+🎉 **Dataset berhasil didownload dan siap digunakan untuk preprocessing!**
 """
+        
+        # Convert markdown to HTML using the new formatter
+        from smartcash.ui.core.utils import format_summary_to_html
+        return format_summary_to_html(
+            markdown_content, 
+            title="📥 Download Results", 
+            module_name="download"
+        )
 
     def _validate_and_prepare(self) -> Dict[str, Any]:
         """

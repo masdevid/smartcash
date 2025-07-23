@@ -338,27 +338,60 @@ class DownloadCleanupOperation(DownloaderBaseOperation):
             return self._handle_error("Error tidak terduga saat cleanup", e)
 
     def _format_cleanup_summary(self, result: Dict[str, Any]) -> str:
-        """Format cleanup operation result into HTML summary."""
+        """Format cleanup operation result into markdown for HTML conversion."""
         deleted_files = result.get('deleted_files', 0)
         freed_space = result.get('freed_space', '0B')
         targets = result.get('targets', {})
         
         total_targets = targets.get('total_files', 0) if targets else 0
         
-        return f"""
-### Ringkasan Operasi Cleanup Dataset
+        markdown_content = f"""
+## 🧹 Ringkasan Pembersihan Dataset
 
+### Status Operasi
+✅ **Pembersihan Berhasil Diselesaikan**
+
+### Statistik Pembersihan
+- **File Deleted**: 🗑️ {deleted_files:,} file
+- **Total Targets**: 📁 {total_targets:,} file
+- **Freed Space**: 💾 {freed_space}
+- **Success Rate**: {(deleted_files/total_targets*100):.1f}% ({deleted_files}/{total_targets})
+
+### Detail Operasi
 | Kategori | Detail |
-| :--- | :--- |
-| **Status** | ✅ Berhasil |
-| **Files Deleted** | 🗑️ {deleted_files} file |
-| **Total Targets** | 📁 {total_targets} file |
-| **Freed Space** | 💾 {freed_space} |
+|:---------|:-------|
+| Status | ✅ Berhasil |
+| Files Deleted | {deleted_files:,} file |
+| Total Targets | {total_targets:,} file |
+| Space Freed | {freed_space} |
+
+### Target Pembersihan
+"""
+
+        # Add target details if available
+        if targets and isinstance(targets, dict):
+            for target_name, target_info in targets.items():
+                if isinstance(target_info, dict):
+                    file_count = target_info.get('file_count', 0)
+                    size_formatted = target_info.get('size_formatted', '0B')
+                    friendly_name = target_name.replace('_', ' ').title()
+                    if file_count > 0:
+                        markdown_content += f"- **{friendly_name}**: {file_count:,} file ({size_formatted})\n"
+
+        markdown_content += """
 
 ---
 
-**Dataset cleanup completed successfully!**
+🎉 **Dataset cleanup berhasil diselesaikan! Ruang penyimpanan telah dibebaskan.**
 """
+        
+        # Convert markdown to HTML using the new formatter
+        from smartcash.ui.core.utils import format_summary_to_html
+        return format_summary_to_html(
+            markdown_content, 
+            title="🧹 Cleanup Results", 
+            module_name="download"
+        )
 
     def show_cleanup_confirmation(
         self, 

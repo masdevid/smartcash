@@ -1,8 +1,12 @@
 """
-File: smartcash/ui/model/backbone/services/__init__.py
-Description: Export public services for backbone module
+Backbone UI services module.
+
+Contains service classes for backbone module UI operations:
+- BackboneOperationService: Handles UI operations and backend API integration
 """
 
-from .backbone_service import BackboneService
+from .operation_service import BackboneOperationService
 
-__all__ = ['BackboneService']
+__all__ = [
+    'BackboneOperationService'
+]

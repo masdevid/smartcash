@@ -557,45 +557,103 @@ class ButtonHandlerMixin:
         """
         return self._get_button_state(button_id, 'last_error')
     
-    def disable_button(self, button_id: str) -> None:
+    def disable_button(self, button_id: str, reason: str = None) -> None:
         """
-        Disable a button.
+        Disable a button with optional reason tracking.
         
         Args:
             button_id: Button identifier
+            reason: Optional reason for disabling (for status tracking)
         """
         try:
-            if hasattr(self, '_ui_components') and self._ui_components:
-                action_container = self._ui_components.get('action_container')
-                if action_container:
-                    buttons = action_container.get('buttons', {})
-                    button = buttons.get(button_id)
-                    if button and hasattr(button, 'disabled'):
-                        button.disabled = True
-                        
+            button = self._find_button_widget(button_id)
+            if button and hasattr(button, 'disabled'):
+                # Store previous state for potential restoration
+                if not hasattr(self, '_button_disable_reasons'):
+                    self._button_disable_reasons = {}
+                
+                if not button.disabled:  # Only store if we're actually changing state
+                    self._button_disable_reasons[button_id] = {
+                        'reason': reason,
+                        'previously_enabled': True
+                    }
+                
+                button.disabled = True
+                self._set_button_state(button_id, 'disabled_reason', reason)
+                
         except Exception as e:
             if hasattr(self, 'logger'):
                 self.logger.debug(f"Failed to disable button {button_id}: {e}")
     
-    def enable_button(self, button_id: str) -> None:
+    def enable_button(self, button_id: str, force: bool = False) -> None:
         """
-        Enable a button.
+        Enable a button, considering dependency conditions.
         
         Args:
             button_id: Button identifier
+            force: If True, enable regardless of dependencies
         """
         try:
-            if hasattr(self, '_ui_components') and self._ui_components:
-                action_container = self._ui_components.get('action_container')
-                if action_container:
-                    buttons = action_container.get('buttons', {})
-                    button = buttons.get(button_id)
-                    if button and hasattr(button, 'disabled'):
-                        button.disabled = False
-                        
+            button = self._find_button_widget(button_id)
+            if button and hasattr(button, 'disabled'):
+                # Check dependencies unless forced
+                if not force and not self._check_button_dependencies(button_id):
+                    return
+                
+                button.disabled = False
+                
+                # Clear disable reason tracking
+                if hasattr(self, '_button_disable_reasons') and button_id in self._button_disable_reasons:
+                    del self._button_disable_reasons[button_id]
+                
+                self._set_button_state(button_id, 'disabled_reason', None)
+                
         except Exception as e:
             if hasattr(self, 'logger'):
                 self.logger.debug(f"Failed to enable button {button_id}: {e}")
+    
+    def _find_button_widget(self, button_id: str):
+        """
+        Find button widget by ID across different container types.
+        
+        Args:
+            button_id: Button identifier
+            
+        Returns:
+            Button widget or None if not found
+        """
+        if not hasattr(self, '_ui_components') or not self._ui_components:
+            return None
+            
+        # Method 1: Direct lookup with _button suffix
+        button = self._ui_components.get(f'{button_id}_button')
+        if button and hasattr(button, 'disabled'):
+            return button
+            
+        # Method 2: Action container buttons
+        action_container = self._ui_components.get('action_container')
+        if action_container:
+            if isinstance(action_container, dict):
+                buttons = action_container.get('buttons', {})
+                button = buttons.get(button_id)
+                if button and hasattr(button, 'disabled'):
+                    return button
+            elif hasattr(action_container, 'buttons'):
+                buttons = getattr(action_container, 'buttons', {})
+                if isinstance(buttons, dict):
+                    button = buttons.get(button_id)
+                    if button and hasattr(button, 'disabled'):
+                        return button
+        
+        # Method 3: Form container buttons
+        form_container = self._ui_components.get('form_container')
+        if form_container and isinstance(form_container, dict):
+            buttons = form_container.get('buttons', {})
+            button = buttons.get(button_id)
+            if button and hasattr(button, 'disabled'):
+                return button
+        
+        return None
     
     def get_button_states(self) -> Dict[str, Dict[str, Any]]:
         """
@@ -795,4 +853,118 @@ class ButtonHandlerMixin:
         if operation_name and any(seq_op in operation_name.lower() for seq_op in sequence_operations):
             return True
             
+        return False
+    
+    def _check_button_dependencies(self, button_id: str) -> bool:
+        """
+        Check if button dependencies are satisfied.
+        
+        Args:
+            button_id: Button identifier
+            
+        Returns:
+            True if dependencies are satisfied
+        """
+        # Check if module has dependency checker method
+        if hasattr(self, '_check_button_dependency'):
+            try:
+                return self._check_button_dependency(button_id)
+            except Exception as e:
+                if hasattr(self, 'logger'):
+                    self.logger.debug(f"Button dependency check failed for {button_id}: {e}")
+                return True  # Default to allow if check fails
+        
+        # Default: no dependencies, always allow
+        return True
+    
+    def set_button_dependency(self, button_id: str, dependency_check: Callable[[], bool]) -> None:
+        """
+        Set a dependency check function for a button.
+        
+        Args:
+            button_id: Button identifier
+            dependency_check: Function that returns True if dependencies are satisfied
+        """
+        if not hasattr(self, '_button_dependencies'):
+            self._button_dependencies = {}
+        
+        self._button_dependencies[button_id] = dependency_check
+    
+    def _check_button_dependency(self, button_id: str) -> bool:
+        """
+        Internal method to check button-specific dependencies.
+        
+        Args:
+            button_id: Button identifier
+            
+        Returns:
+            True if dependencies are satisfied
+        """
+        if not hasattr(self, '_button_dependencies'):
+            return True
+            
+        dependency_check = self._button_dependencies.get(button_id)
+        if dependency_check and callable(dependency_check):
+            try:
+                return dependency_check()
+            except Exception as e:
+                if hasattr(self, 'logger'):
+                    self.logger.debug(f"Dependency check failed for {button_id}: {e}")
+                return False
+        
+        return True
+    
+    def set_button_visibility(self, button_id: str, visible: bool, reason: str = None) -> None:
+        """
+        Set button visibility (enable/disable based on condition).
+        
+        Args:
+            button_id: Button identifier
+            visible: True to enable, False to disable
+            reason: Optional reason for the visibility change
+        """
+        if visible:
+            self.enable_button(button_id)
+        else:
+            self.disable_button(button_id, reason or "Not available")
+    
+    def update_button_states_based_on_condition(self, condition_results: Dict[str, bool], reasons: Dict[str, str] = None) -> None:
+        """
+        Update multiple button states based on condition results.
+        
+        Args:
+            condition_results: Dict of button_id -> should_be_enabled
+            reasons: Optional dict of button_id -> reason for state change
+        """
+        reasons = reasons or {}
+        
+        for button_id, should_enable in condition_results.items():
+            reason = reasons.get(button_id)
+            self.set_button_visibility(button_id, should_enable, reason)
+    
+    def get_button_disable_reason(self, button_id: str) -> Optional[str]:
+        """
+        Get the reason why a button was disabled.
+        
+        Args:
+            button_id: Button identifier
+            
+        Returns:
+            Disable reason or None
+        """
+        return self._get_button_state(button_id, 'disabled_reason')
+    
+    def is_button_enabled(self, button_id: str) -> bool:
+        """
+        Check if a button is currently enabled.
+        
+        Args:
+            button_id: Button identifier
+            
+        Returns:
+            True if button is enabled
+        """
+        button = self._find_button_widget(button_id)
+        if button and hasattr(button, 'disabled'):
+            return not button.disabled
         return False

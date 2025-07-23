@@ -244,11 +244,20 @@ class BackboneBuildOperationHandler(BaseBackboneOperation, ColabSecretsMixin):
                 # Add model path to build result for summary
                 build_result['model_path'] = model_path
                 
-                # Format summary with enhanced information
-                summary = self._format_enhanced_build_summary(build_result, use_multi_layer)
+                # Format summary with enhanced information using markdown HTML formatter
+                markdown_summary = self._format_enhanced_build_summary(build_result, use_multi_layer)
+                
+                # Convert markdown to HTML using the new formatter
+                from smartcash.ui.core.utils import format_summary_to_html
+                html_summary = format_summary_to_html(
+                    markdown_summary, 
+                    title="🏗️ Backbone Build Results", 
+                    module_name="backbone"
+                )
+                
                 location_info = f" dan disimpan di: {model_path}" if model_path else ""
                 self.log_operation(f"✅ Model backbone berhasil dibangun dengan dukungan multi-layer{location_info}", level='success')
-                self._execute_callback('on_success', summary)
+                self._execute_callback('on_success', html_summary)
                 
                 # Log parameter count
                 total_params = model.count_parameters()

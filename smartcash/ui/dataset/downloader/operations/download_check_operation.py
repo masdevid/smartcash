@@ -272,7 +272,7 @@ class DownloadCheckOperation(DownloaderBaseOperation):
             return self._handle_error("Error tidak terduga saat check", e)
 
     def _format_check_summary(self, result: Dict[str, Any]) -> str:
-        """Format check operation result into HTML summary."""
+        """Format check operation result into markdown for HTML conversion."""
         file_count = result.get('file_count', 0)
         total_size = result.get('total_size', '0B')
         dataset_path = result.get('dataset_path', 'N/A')
@@ -283,25 +283,63 @@ class DownloadCheckOperation(DownloaderBaseOperation):
         total_images = summary.get('total_images', 0)
         total_labels = summary.get('total_labels', 0)
         
-        issues_text = f"⚠️ {len(issues)} issues found" if issues else "✅ No issues"
+        issues_text = f"⚠️ {len(issues)} masalah ditemukan" if issues else "✅ Tidak ada masalah"
         
-        return f"""
-### Ringkasan Operasi Check Dataset
+        markdown_content = f"""
+## 🔍 Ringkasan Pemeriksaan Dataset
 
+### Status Operasi
+✅ **Dataset Berhasil Ditemukan dan Diperiksa**
+
+### Statistik Dataset
+- **Total Files**: 📁 {file_count:,} file
+- **Total Images**: 🖼️ {total_images:,}
+- **Total Labels**: 🏷️ {total_labels:,}  
+- **Total Size**: 💾 {total_size}
+- **Dataset Path**: 📂 `{dataset_path}`
+
+### Detail Pemeriksaan
 | Kategori | Detail |
-| :--- | :--- |
-| **Status** | ✅ Dataset Found |
-| **Total Files** | 📁 {file_count} file |
-| **Images** | 🖼️ {total_images} |
-| **Labels** | 🏷️ {total_labels} |
-| **Total Size** | 💾 {total_size} |
-| **Dataset Path** | 📂 {dataset_path} |
-| **Issues** | {issues_text} |
+|:---------|:-------|
+| Status | ✅ Dataset Found |
+| File Count | {file_count:,} file |
+| Images | {total_images:,} |
+| Labels | {total_labels:,} |
+| Data Size | {total_size} |
+| Issues | {issues_text} |
+
+### Analisis Kualitas Data
+{issues_text}
+"""
+
+        # Add issue details if any
+        if issues:
+            markdown_content += f"""
+
+#### Detail Masalah ({len(issues)} items):
+"""
+            for i, issue in enumerate(issues[:5], 1):  # Show only top 5 issues
+                issue_type = issue.get('type', 'Unknown')
+                issue_count = issue.get('count', 1)
+                markdown_content += f"- **{issue_type}**: {issue_count} item\n"
+            
+            if len(issues) > 5:
+                markdown_content += f"- ... dan {len(issues) - 5} masalah lainnya\n"
+        
+        markdown_content += """
 
 ---
 
-**Dataset check completed successfully!**
+🎉 **Dataset check berhasil diselesaikan! Dataset siap untuk digunakan.**
 """
+        
+        # Convert markdown to HTML using the new formatter
+        from smartcash.ui.core.utils import format_summary_to_html
+        return format_summary_to_html(
+            markdown_content, 
+            title="🔍 Check Results", 
+            module_name="download"
+        )
 
     def _create_dataset_scanner(self):
         """

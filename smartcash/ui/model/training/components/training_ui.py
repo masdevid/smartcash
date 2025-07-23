@@ -277,7 +277,7 @@ def update_training_ui_from_config(ui_components: Dict[str, Any], config: Dict[s
             return False
         
         training_config = config.get('training', {})
-        model_selection = config.get('model_selection', {})
+        # model_selection = config.get('model_selection', {})  # Not needed with enhanced button management
         
         # Update form container if available
         form_container = ui_components.get('form_container')
@@ -294,24 +294,12 @@ def update_training_ui_from_config(ui_components: Dict[str, Any], config: Dict[s
             except Exception as e:
                 logger.warning(f"Failed to update summary container: {e}")
         
-        # Update button states based on configuration
-        action_container = ui_components.get('action_container', {})
-        buttons = action_container.get('buttons', {})
+        # Note: Button state management now handled by enhanced button mixin
+        # TrainingUIModule._update_training_button_states() handles all button states
+        # based on training state, model availability, and checkpoint status.
+        # This provides consistent dependency-based button management across all modules.
         
-        # Enable/disable buttons based on model selection
-        has_model = bool(model_selection.get('backbone_type'))
-        has_checkpoint = bool(model_selection.get('checkpoint_path'))
-        
-        if 'start_training' in buttons:
-            buttons['start_training'].disabled = not has_model
-        
-        if 'resume_training' in buttons:
-            buttons['resume_training'].disabled = not has_checkpoint
-        
-        if 'validate_model' in buttons:
-            buttons['validate_model'].disabled = not (has_model or has_checkpoint)
-        
-        logger.debug("✅ Training UI updated from configuration")
+        logger.debug("✅ Training UI updated from configuration (enhanced button management)")
         return True
         
     except Exception as e:

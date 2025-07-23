@@ -4,7 +4,7 @@ File: smartcash/ui/model/backbone/backbone_uimodule.py
 Description: Refactored implementation of the Backbone Module using the modern BaseUIModule pattern.
 """
 
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 
 from smartcash.ui.core.base_ui_module import BaseUIModule
 # Enhanced UI Module Factory removed - use direct instantiation
@@ -21,10 +21,22 @@ from smartcash.ui.model.mixins import (
     BackendServiceMixin
 )
 
+# Import the operation service for backend API integration
+from .services import BackboneOperationService
 
-class BackboneUIModule(ModelDiscoveryMixin, ModelConfigSyncMixin, BackendServiceMixin, BaseUIModule):
+
+class BackboneUIModule(BaseUIModule, ModelDiscoveryMixin, ModelConfigSyncMixin, BackendServiceMixin):
     """
-    Backbone UI Module.
+    Backbone UI Module with proper inheritance structure.
+    
+    Inherits from:
+    - BaseUIModule: Core UI module functionality with proper MRO
+    - ModelDiscoveryMixin: Standardized checkpoint discovery and file scanning
+    - ModelConfigSyncMixin: Cross-module configuration synchronization
+    - BackendServiceMixin: Backend service integration and management
+    
+    The inheritance order ensures proper Method Resolution Order (MRO) with
+    BaseUIModule as the primary base class and mixins providing additional functionality.
     """
     # Define required UI components at class level
     _required_components = [
@@ -58,7 +70,10 @@ class BackboneUIModule(ModelDiscoveryMixin, ModelConfigSyncMixin, BackendService
         # Button registration tracking
         self._buttons_registered = False
         
-        self.log_debug("BackboneUIModule initialized.")
+        # Initialize operation service for backend API integration
+        self._operation_service = None
+        
+        self.log_debug("BackboneUIModule initialized with proper mixin inheritance.")
 
     def get_default_config(self) -> Dict[str, Any]:
         """Get default configuration for this module."""
@@ -167,6 +182,53 @@ class BackboneUIModule(ModelDiscoveryMixin, ModelConfigSyncMixin, BackendService
         except Exception as e:
             self.log_error(f"Failed to setup operation container: {e}", exc_info=True)
             return False
+    
+    def get_available_models_via_mixin(self) -> Dict[str, Any]:
+        """
+        Demonstrate proper usage of ModelDiscoveryMixin for model discovery.
+        
+        This method shows how to leverage the mixin functionality instead of
+        implementing custom discovery logic.
+        
+        Returns:
+            Dict containing discovered models organized by type
+        """
+        try:
+            # Use the ModelDiscoveryMixin's standardized discovery
+            discovered_checkpoints = self.discover_checkpoints(
+                discovery_paths=['data/models', 'data/checkpoints'],
+                filename_patterns=[
+                    '*backbone*smartcash*.pt', '*backbone*smartcash*.pth',
+                    '*backbone*.pt', '*backbone*.pth',
+                    '*.pt', '*.pth'
+                ],
+                validation_requirements={
+                    'min_size_mb': 1,
+                    'required_extensions': ['.pt', '.pth']
+                }
+            )
+            
+            # Organize results by backbone type using mixin's normalization
+            by_type = {}
+            for checkpoint in discovered_checkpoints:
+                backbone = checkpoint.get('backbone', 'unknown')
+                normalized = self._normalize_backbone_name(backbone)
+                
+                if normalized not in by_type:
+                    by_type[normalized] = []
+                
+                by_type[normalized].append(checkpoint)
+            
+            return {
+                'success': True,
+                'total_found': len(discovered_checkpoints),
+                'by_type': by_type,
+                'mixin_used': True  # Indicate this uses proper mixin functionality
+            }
+            
+        except Exception as e:
+            self.log_error(f"Mixin-based model discovery failed: {e}")
+            return {'success': False, 'error': str(e), 'mixin_used': True}
 
     @suppress_ui_init_logs(duration=3.0)
     def initialize(self, config: Optional[Dict[str, Any]] = None, **kwargs) -> bool:
@@ -195,6 +257,12 @@ class BackboneUIModule(ModelDiscoveryMixin, ModelConfigSyncMixin, BackendService
                 
                 # Setup operation container reference for logging
                 self._setup_operation_container()
+                
+                # Initialize operation service after UI components are ready
+                self._operation_service = BackboneOperationService(ui_module=self, logger=self.logger)
+                
+                # Setup button dependencies for backbone-specific requirements
+                self._setup_backbone_button_dependencies()
                 
                 # Register module-specific button handlers
                 self._register_module_button_handlers()
@@ -233,10 +301,13 @@ class BackboneUIModule(ModelDiscoveryMixin, ModelConfigSyncMixin, BackendService
             if not hasattr(self, '_ui_components') or not self._ui_components:
                 return {'valid': False, 'message': "Komponen UI belum siap, silakan coba lagi"}
             
-            # Check data prerequisites
-            prereq_check = self._check_data_prerequisites()
-            if not prereq_check['success']:
-                return {'valid': False, 'message': f"Prerequisites missing: {prereq_check['message']}"}
+            # Check data prerequisites using operation service
+            if self._operation_service:
+                prereq_check = self._operation_service.validate_data_prerequisites()
+                if not prereq_check.get('prerequisites_ready', False):
+                    return {'valid': False, 'message': f"Prerequisites missing: {prereq_check.get('message', 'Unknown error')}"}
+            else:
+                return {'valid': False, 'message': "Operation service not available"}
             
             return {'valid': True}
         
@@ -260,10 +331,13 @@ class BackboneUIModule(ModelDiscoveryMixin, ModelConfigSyncMixin, BackendService
             if not hasattr(self, '_ui_components') or not self._ui_components:
                 return {'valid': False, 'message': "Komponen UI belum siap, silakan coba lagi"}
             
-            # Check data prerequisites
-            prereq_check = self._check_data_prerequisites()
-            if not prereq_check['success']:
-                return {'valid': False, 'message': f"Prerequisites missing: {prereq_check['message']}"}
+            # Check data prerequisites using operation service
+            if self._operation_service:
+                prereq_check = self._operation_service.validate_data_prerequisites()
+                if not prereq_check.get('prerequisites_ready', False):
+                    return {'valid': False, 'message': f"Prerequisites missing: {prereq_check.get('message', 'Unknown error')}"}
+            else:
+                return {'valid': False, 'message': "Operation service not available"}
             
             return {'valid': True}
         
@@ -294,141 +368,7 @@ class BackboneUIModule(ModelDiscoveryMixin, ModelConfigSyncMixin, BackendService
             error_message="Kesalahan pembangunan model"
         )
 
-    def _check_data_prerequisites(self) -> Dict[str, Any]:
-        """Check if all required data is available."""
-        try:
-            missing = []
-            warnings = []
-            
-            # Check pretrained models
-            pretrained_check = self._check_pretrained_models()
-            if not pretrained_check['available']:
-                warnings.append("Pretrained models not found")
-            
-            # Check raw data using preprocessor API
-            raw_data_check = self._check_raw_data()
-            if not raw_data_check['available']:
-                missing.append("Raw data not found")
-            
-            # Check preprocessed data
-            preprocessed_check = self._check_preprocessed_data()
-            if not preprocessed_check['available']:
-                warnings.append("Preprocessed data not found")
-            
-            if missing:
-                return {
-                    'success': False,
-                    'message': f"Missing required data: {', '.join(missing)}",
-                    'missing': missing,
-                    'warnings': warnings
-                }
-            elif warnings:
-                return {
-                    'success': True,
-                    'message': f"Some optional data missing: {', '.join(warnings)}",
-                    'missing': [],
-                    'warnings': warnings
-                }
-            else:
-                return {
-                    'success': True,
-                    'message': "All data prerequisites available",
-                    'missing': [],
-                    'warnings': []
-                }
-                
-        except Exception as e:
-            return {
-                'success': False,
-                'message': f"Error checking prerequisites: {e}",
-                'missing': [],
-                'warnings': []
-            }
-
-    def _check_pretrained_models(self) -> Dict[str, Any]:
-        """Check if pretrained models are available."""
-        try:
-            from pathlib import Path
-            
-            pretrained_dir = Path('/data/pretrained')
-            backbone_config = self.get_current_config().get('backbone', {})
-            backbone_type = backbone_config.get('model_type', 'efficientnet_b4')
-            
-            # Check for backbone-specific pretrained models
-            if backbone_type == 'efficientnet_b4':
-                efficientnet_dir = pretrained_dir / 'efficientnet'
-                if efficientnet_dir.exists():
-                    model_files = list(efficientnet_dir.glob('*.pth')) + list(efficientnet_dir.glob('*.pt'))
-                    if model_files:
-                        return {'available': True, 'path': str(efficientnet_dir), 'files': len(model_files)}
-            elif backbone_type == 'cspdarknet':
-                yolov5_dir = pretrained_dir / 'yolov5'
-                if yolov5_dir.exists():
-                    model_files = list(yolov5_dir.glob('*.pt'))
-                    if model_files:
-                        return {'available': True, 'path': str(yolov5_dir), 'files': len(model_files)}
-            
-            return {'available': False, 'path': str(pretrained_dir), 'files': 0}
-            
-        except Exception as e:
-            self.log_error(f"Error checking pretrained models: {e}")
-            return {'available': False, 'path': '', 'files': 0}
-
-    def _check_raw_data(self) -> Dict[str, Any]:
-        """Check raw data using preprocessor API."""
-        try:
-            # Use preprocessor API to check raw data
-            from smartcash.dataset.preprocessor.api.preprocessing_api import get_preprocessing_status
-            
-            status = get_preprocessing_status(config=self.get_current_config())
-            if status.get('success') and status.get('service_ready'):
-                file_stats = status.get('file_statistics', {})
-                
-                # Check if any split has raw images
-                total_raw = sum(
-                    split_data.get('raw_images', 0) 
-                    for split_data in file_stats.values()
-                )
-                
-                return {
-                    'available': total_raw > 0,
-                    'total_files': total_raw,
-                    'details': file_stats
-                }
-            
-            return {'available': False, 'total_files': 0, 'details': {}}
-            
-        except Exception as e:
-            self.log_error(f"Error checking raw data: {e}")
-            return {'available': False, 'total_files': 0, 'details': {}}
-
-    def _check_preprocessed_data(self) -> Dict[str, Any]:
-        """Check preprocessed data using preprocessor API."""
-        try:
-            # Use preprocessor API to check preprocessed data
-            from smartcash.dataset.preprocessor.api.preprocessing_api import get_preprocessing_status
-            
-            status = get_preprocessing_status(config=self.get_current_config())
-            if status.get('success') and status.get('service_ready'):
-                file_stats = status.get('file_statistics', {})
-                
-                # Check if any split has preprocessed files
-                total_preprocessed = sum(
-                    split_data.get('preprocessed_files', 0) 
-                    for split_data in file_stats.values()
-                )
-                
-                return {
-                    'available': total_preprocessed > 0,
-                    'total_files': total_preprocessed,
-                    'details': file_stats
-                }
-            
-            return {'available': False, 'total_files': 0, 'details': {}}
-            
-        except Exception as e:
-            self.log_error(f"Error checking preprocessed data: {e}")
-            return {'available': False, 'total_files': 0, 'details': {}}
+    # Data validation methods removed - now handled by backend API via operation service
 
     # ==================== OPERATION EXECUTION METHODS ====================
 
@@ -676,242 +616,53 @@ class BackboneUIModule(ModelDiscoveryMixin, ModelConfigSyncMixin, BackendService
         except Exception as e:
             self.log_error(f"Failed to enable UI: {e}")
 
+    def _check_built_models(self) -> Dict[str, List[Dict[str, Any]]]:
+        """
+        Check for built models using operation service.
+        
+        Returns:
+            Dictionary mapping backbone types to lists of model information
+        """
+        try:
+            if self._operation_service:
+                scan_result = self._operation_service.rescan_built_models()
+                if scan_result.get('success', False):
+                    return scan_result.get('by_backbone', {})
+                else:
+                    self.log_debug(f"Model scan failed: {scan_result.get('message', 'Unknown error')}")
+                    return {}
+            else:
+                self.log_warning("Operation service not available for model checking")
+                return {}
+        except Exception as e:
+            self.log_error(f"Failed to check built models: {e}")
+            return {}
+    
     def _update_built_model_indicators(self) -> None:
         """Update UI to show built model indicators."""
         try:
-            # Check for built models
+            # Check for built models using operation service
             built_models = self._check_built_models()
             
-            if hasattr(self, '_ui_components') and self._ui_components:
-                widgets = self._ui_components.get('widgets', {})
-                
-                # Update model status info if available
-                if 'model_status_info' in widgets:
-                    status_widget = widgets['model_status_info']
-                    if hasattr(status_widget, 'value'):
-                        # Update the HTML content to show built model status
-                        current_config = self.get_current_config()
-                        backbone_type = current_config.get('backbone', {}).get('model_type', 'efficientnet_b4')
-                        
-                        model_count = len(built_models.get(backbone_type, []))
-                        status_text = f"✅ Built" if model_count > 0 else "⚠️ Not Built"
-                        last_built = "Recently" if model_count > 0 else "Never"
-                        available_text = f"{model_count} model(s) found" if model_count > 0 else "No models found"
-                        
-                        # Use JavaScript to update the spans
-                        from IPython.display import Javascript, display
-                        js_code = f"""
-                        if (document.getElementById('model-status')) {{
-                            document.getElementById('model-status').innerText = '{status_text}';
-                            document.getElementById('last-built').innerText = '{last_built}';
-                            document.getElementById('available-models').innerText = '{available_text}';
-                        }}
-                        """
-                        display(Javascript(js_code))
-                        
-                        self.log(f"📊 Model indicators updated: {available_text}", 'info')
+            # Get current backbone type safely
+            current_config = self.get_current_config()
+            backbone_type = current_config.get('backbone', {}).get('model_type', 'efficientnet_b4')
+            
+            # Calculate model statistics
+            model_count = len(built_models.get(backbone_type, []))
+            status_text = f"✅ Built" if model_count > 0 else "⚠️ Not Built"
+            last_built = "Recently" if model_count > 0 else "Never"
+            available_text = f"{model_count} model(s) found" if model_count > 0 else "No models found"
+            
+            # Update the display using the existing method
+            self._update_model_status_display(status_text, last_built, available_text)
+            
+            self.log(f"📊 Model indicators updated: {available_text}", 'info')
                 
         except Exception as e:
             self.log_error(f"Failed to update built model indicators: {e}")
 
-    def _check_built_models(self) -> Dict[str, Any]:
-        """Check for built models by backbone type using optimized parallel discovery."""
-        try:
-            from concurrent.futures import ThreadPoolExecutor, as_completed
-            import threading
-            
-            # Define search paths with priorities - enhanced for both EfficientNet and CSPDarkNet
-            search_configs = [
-                {
-                    'paths': ['data/models', 'data/checkpoints'],
-                    'patterns': [
-                        '*backbone*smartcash*efficientnet*.pt', '*backbone*smartcash*efficientnet*.pth',  # EfficientNet format
-                        '*backbone*smartcash*cspdarknet*.pt', '*backbone*smartcash*cspdarknet*.pth',     # CSPDarkNet format
-                        '*backbone*.pt', '*backbone*.pth',                                               # General backbone files
-                        '*smartcash*.pt', '*smartcash*.pth'                                              # SmartCash models
-                    ],
-                    'priority': 1
-                },
-                {
-                    'paths': ['runs/train/*/weights'],
-                    'patterns': ['best.pt', 'last.pt', 'epoch_*.pt'],
-                    'priority': 2
-                },
-                {
-                    'paths': ['experiments/*/checkpoints', 'models'],
-                    'patterns': [
-                        '*efficientnet*.pt', '*efficientnet*.pth',   # EfficientNet models
-                        '*cspdarknet*.pt', '*cspdarknet*.pth',       # CSPDarkNet models
-                        '*yolov5*.pt', '*yolov5*.pth',               # YOLOv5 models
-                        '*.pt', '*.pth'                              # Any PyTorch model files
-                    ],
-                    'priority': 3
-                }
-            ]
-            
-            built_models = {}
-            thread_lock = threading.Lock()
-            
-            def scan_path_pattern(path_pattern, file_patterns):
-                """Scan a single path pattern for model files."""
-                local_models = {}
-                try:
-                    import glob
-                    from pathlib import Path
-                    
-                    # Handle wildcard patterns
-                    if '*' in path_pattern:
-                        expanded_paths = glob.glob(path_pattern)
-                        paths_to_scan = [Path(p) for p in expanded_paths if Path(p).exists()]
-                    else:
-                        paths_to_scan = [Path(path_pattern)] if Path(path_pattern).exists() else []
-                    
-                    for scan_path in paths_to_scan:
-                        if not scan_path.exists():
-                            continue
-                            
-                        for pattern in file_patterns:
-                            model_files = list(scan_path.glob(pattern))
-                            
-                            for model_file in model_files:
-                                # Quick metadata extraction without deep validation
-                                metadata = self._extract_quick_metadata(str(model_file))
-                                backbone_type = metadata.get('backbone', 'found')
-                                
-                                if backbone_type not in local_models:
-                                    local_models[backbone_type] = []
-                                local_models[backbone_type].append(str(model_file))
-                                
-                except Exception as e:
-                    self.log_debug(f"Error scanning {path_pattern}: {e}")
-                
-                return local_models
-            
-            # Use ThreadPoolExecutor for parallel discovery
-            with ThreadPoolExecutor(max_workers=4, thread_name_prefix="ModelScan") as executor:
-                # Submit all scan tasks
-                future_to_config = {}
-                for config in search_configs:
-                    for path in config['paths']:
-                        future = executor.submit(scan_path_pattern, path, config['patterns'])
-                        future_to_config[future] = {'path': path, 'priority': config['priority']}
-                
-                # Collect results as they complete
-                for future in as_completed(future_to_config, timeout=10):  # 10 second timeout
-                    try:
-                        scan_result = future.result(timeout=5)  # 5 second per task timeout
-                        
-                        # Merge results thread-safely
-                        with thread_lock:
-                            for backbone_type, model_paths in scan_result.items():
-                                if backbone_type not in built_models:
-                                    built_models[backbone_type] = []
-                                built_models[backbone_type].extend(model_paths)
-                                
-                    except Exception as e:
-                        config_info = future_to_config[future]
-                        self.log_debug(f"Scan task failed for {config_info['path']}: {e}")
-            
-            # Remove duplicates and sort by modification time
-            for backbone_type in built_models:
-                unique_paths = list(set(built_models[backbone_type]))
-                # Sort by modification time (newest first), limit to 10 most recent
-                try:
-                    unique_paths.sort(key=lambda x: Path(x).stat().st_mtime, reverse=True)
-                    built_models[backbone_type] = unique_paths[:10]
-                except Exception:
-                    built_models[backbone_type] = unique_paths[:10]
-            
-            total_models = sum(len(models) for models in built_models.values())
-            self.log_debug(f"Parallel scan found {total_models} built models across {len(built_models)} backbone types")
-            return built_models
-            
-        except Exception as e:
-            self.log_error(f"Parallel model discovery failed: {e}, trying fallback method")
-            # Fallback: simple file system scan
-            return self._fallback_model_scan()
-
-    def _extract_quick_metadata(self, filepath: str) -> Dict[str, Any]:
-        """Quick metadata extraction without deep file validation."""
-        from pathlib import Path
-        
-        filename = Path(filepath).name
-        metadata = {'backbone': 'found', 'path': filepath}
-        filename_lower = filename.lower()
-        
-        # Enhanced backbone type detection for both EfficientNet and CSPDarkNet models
-        # Handle patterns like:
-        # - backbone_smartcash_efficientnet_b4_20250723_1209.pt (EfficientNet example)  
-        # - backbone_smartcash_cspdarknet_20250723_1209.pt (CSPDarkNet example)
-        # - best_smartcash_cspdarknet_multi_20240101.pt (Training output example)
-        
-        if ('backbone' in filename_lower and 'smartcash' in filename_lower and 
-            'efficientnet' in filename_lower):
-            metadata['backbone'] = 'efficientnet_b4'
-        elif ('backbone' in filename_lower and 'smartcash' in filename_lower and 
-              'cspdarknet' in filename_lower):
-            metadata['backbone'] = 'cspdarknet'
-        elif ('smartcash' in filename_lower and 'cspdarknet' in filename_lower):
-            # Handle cases like best_smartcash_cspdarknet_multi_20240101.pt
-            metadata['backbone'] = 'cspdarknet'
-        elif ('smartcash' in filename_lower and 'efficientnet' in filename_lower):
-            # Handle cases like best_smartcash_efficientnet_b4_multi_20240101.pt
-            metadata['backbone'] = 'efficientnet_b4'
-        elif 'efficientnet' in filename_lower or ('b4' in filename_lower and 'backbone' in filename_lower):
-            metadata['backbone'] = 'efficientnet_b4'
-        elif 'cspdarknet' in filename_lower or ('yolov5' in filename_lower and 'smartcash' in filename_lower):
-            metadata['backbone'] = 'cspdarknet'
-        elif 'yolov5' in filename_lower and ('backbone' in filename_lower or 'smartcash' in filename_lower):
-            # Handle YOLOv5-based models
-            metadata['backbone'] = 'cspdarknet'
-        
-        return metadata
-
-    def _fallback_model_scan(self) -> Dict[str, Any]:
-        """Fallback method to scan for models using simple file system operations."""
-        import os
-        import glob
-        from pathlib import Path
-        
-        built_models = {}
-        
-        try:
-            # Common model directories
-            search_dirs = [
-                'data/checkpoints',
-                'data/models', 
-                'models',
-                'runs/train/*/weights'
-            ]
-            
-            model_extensions = ['*.pt', '*.pth']
-            found_files = []
-            
-            for search_dir in search_dirs:
-                if '*' in search_dir:
-                    # Handle wildcard patterns
-                    for pattern_dir in glob.glob(search_dir):
-                        if os.path.isdir(pattern_dir):
-                            for ext in model_extensions:
-                                found_files.extend(glob.glob(os.path.join(pattern_dir, ext)))
-                else:
-                    # Direct directory search
-                    if os.path.exists(search_dir):
-                        for ext in model_extensions:
-                            found_files.extend(glob.glob(os.path.join(search_dir, ext)))
-            
-            # Group files by assumed backbone type (simplified)
-            if found_files:
-                # For simplicity, group all found models under 'found' category
-                built_models['found'] = found_files
-                self.log_debug(f"Fallback scan found {len(found_files)} model files")
-            else:
-                self.log_debug("Fallback scan found no model files")
-            
-        except Exception as e:
-            self.log_error(f"Fallback model scan also failed: {e}")
-        
-        return built_models
+    # Model discovery methods removed - now handled by backend API via operation service
 
     def _register_rescan_button(self) -> None:
         """Register rescan models button with BaseUIModule system."""
@@ -974,123 +725,211 @@ class BackboneUIModule(ModelDiscoveryMixin, ModelConfigSyncMixin, BackendService
         except Exception as e:
             self.log_error(f"Failed to setup rescan button handler: {e}")
 
-    def _handle_rescan_models(self, button=None) -> None:
-        """Handle rescan models button click."""
+    def _handle_rescan_models(self, _=None) -> None:
+        """Handle rescan models button click using operation service."""
         try:
             self.log("🔄 Rescanning for existing models...", 'info')
-            self._perform_model_scan()
-            self.log("✅ Model rescan completed", 'success')
+            
+            if self._operation_service:
+                # Use operation service for model rescanning
+                result = self._operation_service.rescan_built_models()
+                
+                if result.get('success'):
+                    total_models = result.get('total_models', 0)
+                    self.log(f"✅ Model rescan completed - found {total_models} models", 'success')
+                    
+                    # Update UI display based on results
+                    self._update_ui_from_scan_results(result)
+                else:
+                    error_msg = result.get('discovery_summary', 'Unknown error')
+                    self.log(f"❌ Model rescan failed: {error_msg}", 'error')
+            else:
+                self.log("❌ Operation service not available", 'error')
+                
         except Exception as e:
             self.log(f"❌ Error during model rescan: {e}", 'error')
             # Log additional debug information
             self.log_error(f"Rescan error details: {e}", exc_info=True)
 
     def _perform_initial_model_scan(self) -> None:
-        """Perform initial model scan during module initialization."""
+        """Perform initial model scan during module initialization using operation service."""
         try:
             self.log("🔍 Scanning for existing backbone models...", 'info')
-            self._perform_model_scan()
+            
+            if self._operation_service:
+                result = self._operation_service.rescan_built_models()
+                if result.get('success'):
+                    total_models = result.get('total_models', 0)
+                    self.log(f"✅ Found {total_models} existing models", 'info')
+                    self._update_ui_from_scan_results(result)
+                else:
+                    self.log("⚠️ No existing models found", 'warning')
+            else:
+                self.log("⚠️ Operation service not available for initial scan", 'warning')
+                
         except Exception as e:
             self.log_error(f"Failed to perform initial model scan: {e}")
             self.log("⚠️ Failed to scan for existing models", 'warning')
-
-    def _perform_model_scan(self) -> None:
-        """Perform model scan and update UI indicators."""
+    
+    def _update_ui_from_scan_results(self, scan_result: Dict[str, Any]) -> None:
+        """
+        Update UI components based on model scan results from backend API.
+        
+        Args:
+            scan_result: Results from backend API model discovery
+        """
         try:
-            # Check for built models
-            built_models = self._check_built_models()
+            by_backbone = scan_result.get('by_backbone', {})
+            total_models = scan_result.get('total_models', 0)
             
             # Get current backbone type
             current_config = self.get_current_config()
             backbone_type = current_config.get('backbone', {}).get('model_type', 'efficientnet_b4')
             
             # Count models for current backbone
-            current_backbone_models = built_models.get(backbone_type, [])
-            
-            # If no models found for specific backbone, check 'found' category (fallback scan)
-            if not current_backbone_models and 'found' in built_models:
-                current_backbone_models = built_models['found']
-                self.log_debug(f"Using fallback 'found' models: {len(current_backbone_models)} files")
-            
+            current_backbone_models = by_backbone.get(backbone_type, [])
             model_count = len(current_backbone_models)
             
-            # Determine status
-            if model_count > 0:
+            # Determine status and button states
+            has_models = model_count > 0
+            if has_models:
                 status_text = "✅ Built"
                 last_built = "Recently"
                 available_text = f"{model_count} model(s) found"
-                status_level = 'success'
-                
-                # Update validate button visibility
-                self._update_validate_button_visibility(True)
             else:
                 status_text = "⚠️ Not Built"
                 last_built = "Never"
                 available_text = "No models found"
-                status_level = 'warning'
-                
-                # Hide validate button if no models
-                self._update_validate_button_visibility(False)
+            
+            # Update button states using enhanced mixin functionality
+            button_conditions = {
+                'validate': has_models,
+                # Other buttons can be added here as needed
+            }
+            
+            button_reasons = {
+                'validate': "No built models available" if not has_models else None,
+            }
+            
+            self.update_button_states_based_on_condition(button_conditions, button_reasons)
             
             # Update UI indicators
             self._update_model_status_display(status_text, last_built, available_text)
             
             # Log results
-            total_models = sum(len(models) for models in built_models.values())
             if total_models > 0:
-                self.log(f"✅ Found {total_models} built models across all backbones", status_level)
-                self.log(f"📊 Current backbone ({backbone_type}): {model_count} models", 'info')
+                self.log_debug(f"Found {total_models} built models across all backbones")
+                self.log_debug(f"Current backbone ({backbone_type}): {model_count} models")
             else:
-                self.log("❌ No built models found - build models first", 'warning')
+                self.log_debug("No built models found")
                 
         except Exception as e:
-            self.log_error(f"Failed to perform model scan: {e}")
-            self.log("❌ Model scan failed", 'error')
+            self.log_error(f"Failed to update UI from scan results: {e}")
             # Set error state
-            self._update_model_status_display("❌ Error", "Scan Failed", "Error scanning models")
+            self._update_model_status_display("❌ Error", "Scan Failed", "Error processing results")
+            
+            # Disable all buttons in error state
+            self.update_button_states_based_on_condition(
+                {'validate': False, 'build': False},
+                {'validate': "Error scanning models", 'build': "Error scanning models"}
+            )
+
+    # Old model scan method removed - now handled by backend API via operation service
 
     def _update_model_status_display(self, status: str, last_built: str, available: str) -> None:
-        """Update the model status display in the UI."""
+        """Update the model status display in the UI with enhanced error handling."""
         try:
             from IPython.display import Javascript, display
+            
+            # Sanitize inputs to prevent JavaScript injection
+            status = str(status).replace("'", "\\'").replace('"', '\\"')
+            last_built = str(last_built).replace("'", "\\'").replace('"', '\\"')
+            available = str(available).replace("'", "\\'").replace('"', '\\"')
+            
             js_code = f"""
-            if (document.getElementById('model-status')) {{
-                document.getElementById('model-status').innerText = '{status}';
-                document.getElementById('last-built').innerText = '{last_built}';
-                document.getElementById('available-models').innerText = '{available}';
+            try {{
+                if (document.getElementById('model-status')) {{
+                    document.getElementById('model-status').innerText = '{status}';
+                }}
+                if (document.getElementById('last-built')) {{
+                    document.getElementById('last-built').innerText = '{last_built}';
+                }}
+                if (document.getElementById('available-models')) {{
+                    document.getElementById('available-models').innerText = '{available}';
+                }}
+            }} catch (e) {{
+                console.log('Model status update elements not found:', e);
             }}
             """
             display(Javascript(js_code))
+            self.log_debug(f"Model status display updated: {available}")
+            
         except Exception as e:
             self.log_error(f"Failed to update model status display: {e}")
 
-    def _update_validate_button_visibility(self, visible: bool) -> None:
-        """Update validate button visibility based on model availability."""
+    def _setup_backbone_button_dependencies(self) -> None:
+        """
+        Setup button dependencies specific to backbone module requirements.
+        
+        This uses the enhanced button mixin functionality to define when
+        buttons should be enabled/disabled based on module state.
+        """
         try:
-            if hasattr(self, '_ui_components') and self._ui_components:
-                action_container = self._ui_components.get('action_container')
-                if action_container and isinstance(action_container, dict):
-                    # Update button visibility through action container
-                    if 'update_button_visibility' in action_container:
-                        action_container['update_button_visibility']('validate', visible)
-                    elif 'buttons' in action_container:
-                        # Fallback: directly disable/enable button
-                        buttons = action_container['buttons']
-                        # Check if buttons is a dict (button_id: button_widget) or list
-                        if isinstance(buttons, dict):
-                            # Handle dict structure
-                            if 'validate' in buttons:
-                                validate_button = buttons['validate']
-                                if hasattr(validate_button, 'disabled'):
-                                    validate_button.disabled = not visible
-                        elif isinstance(buttons, list):
-                            # Handle list structure
-                            for button_info in buttons:
-                                # Check if button_info is a dict with 'id' key
-                                if isinstance(button_info, dict) and button_info.get('id') == 'validate':
-                                    button_info['disabled'] = not visible
-                                    break
-                                
+            # Validate button depends on having built models
+            self.set_button_dependency('validate', self._check_validate_button_dependency)
+            
+            # Build button depends on data prerequisites  
+            self.set_button_dependency('build', self._check_build_button_dependency)
+            
+            self.log_debug("✅ Backbone button dependencies configured")
+            
+        except Exception as e:
+            self.log_error(f"Failed to setup backbone button dependencies: {e}")
+    
+    def _check_validate_button_dependency(self) -> bool:
+        """
+        Check if validate button should be enabled.
+        
+        Returns:
+            True if validate button should be enabled (models are available)
+        """
+        try:
+            if not self._operation_service:
+                return False
+                
+            # Quick check: if we have any built models, enable validate
+            result = self._operation_service.rescan_built_models()
+            return result.get('success', False) and result.get('total_models', 0) > 0
+            
+        except Exception as e:
+            self.log_debug(f"Validate button dependency check failed: {e}")
+            return False
+    
+    def _check_build_button_dependency(self) -> bool:
+        """
+        Check if build button should be enabled.
+        
+        Returns:
+            True if build button should be enabled (data prerequisites are met)
+        """
+        try:
+            if not self._operation_service:
+                return False
+                
+            # Check data prerequisites
+            result = self._operation_service.validate_data_prerequisites()
+            return result.get('prerequisites_ready', False)
+            
+        except Exception as e:
+            self.log_debug(f"Build button dependency check failed: {e}")
+            return False
+    
+    def _update_validate_button_visibility(self, visible: bool) -> None:
+        """Update validate button visibility using enhanced button mixin functionality."""
+        try:
+            reason = "No built models available" if not visible else None
+            self.set_button_visibility('validate', visible, reason)
+            
             self.log_debug(f"Validate button visibility set to: {visible}")
         except Exception as e:
             self.log_error(f"Failed to update validate button visibility: {e}")
@@ -1105,7 +944,7 @@ class BackboneUIModule(ModelDiscoveryMixin, ModelConfigSyncMixin, BackendService
                     self._ui_components._cleanup()
                 
                 # Close individual widgets
-                for component_name, component in self._ui_components.items():
+                for component in self._ui_components.values():
                     if hasattr(component, 'close'):
                         try:
                             component.close()

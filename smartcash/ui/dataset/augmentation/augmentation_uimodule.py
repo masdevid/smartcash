@@ -421,19 +421,17 @@ class AugmentationUIModule(BaseUIModule):
             return {'success': False, 'message': f"Error in preview operation: {e}"}
     
     def _update_operation_summary(self, content: str) -> None:
-        """Updates the operation summary container with new content."""
+        """Updates the operation summary container with new content using markdown formatter."""
         try:
-            from smartcash.ui.core.ui_utils import format_operation_summary
-            
             # Get summary container from UI components
             summary_container = self.get_component('summary_container')
             if summary_container and hasattr(summary_container, 'set_content'):
-                # Format content using core utility with augmentation-specific styling
-                formatted_content = format_operation_summary(
-                    content=content,
-                    title="Augmentation Summary", 
-                    icon="📊",
-                    border_color="#f39c12"  # Orange color for augmentation
+                # Convert markdown content to HTML using the new formatter
+                from smartcash.ui.core.utils import format_summary_to_html
+                formatted_content = format_summary_to_html(
+                    content, 
+                    title="🎨 Augmentation Summary", 
+                    module_name="augmentation"
                 )
                 summary_container.set_content(formatted_content)
                 self.log_debug("✅ Summary container updated with augmentation results")
@@ -441,8 +439,13 @@ class AugmentationUIModule(BaseUIModule):
                 # Fallback: try operation_summary_updater method
                 updater = self.get_component('operation_summary_updater')
                 if updater and callable(updater):
-                    from smartcash.ui.core.ui_utils import convert_summary_to_html
-                    html_content = convert_summary_to_html(content)
+                    # Use the new markdown formatter for consistency
+                    from smartcash.ui.core.utils import format_summary_to_html
+                    html_content = format_summary_to_html(
+                        content, 
+                        title="🎨 Augmentation Summary", 
+                        module_name="augmentation"
+                    )
                     self.log(f"Memperbarui ringkasan operasi.", 'debug')
                     updater(html_content, title="Ringkasan Operasi", icon="📊", visible=True)
                 else:

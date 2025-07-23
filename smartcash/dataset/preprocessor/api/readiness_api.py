@@ -12,10 +12,11 @@ from smartcash.common.logger import get_logger
 
 def check_service_readiness(data_dir: Union[str, Path] = "data") -> Dict[str, Any]:
     """
-    Quick backend service readiness check.
+    Enhanced backend service readiness check.
     
-    Check if preprocessed directories exist and contain data:
-    - /dataset/preprocessed/{train, valid, test}/{labels, images}
+    Check both raw data availability and preprocessed directories:
+    - Raw data: /data/{train, valid, test}/{labels, images}
+    - Preprocessed structure: /data/preprocessed/{train, valid, test}/{labels, images}
     
     Args:
         data_dir: Base data directory path
@@ -33,60 +34,49 @@ def check_service_readiness(data_dir: Union[str, Path] = "data") -> Dict[str, An
         data_path = Path(data_dir)
         preprocessed_path = data_path / "preprocessed"
         
-        # Check if preprocessed directory exists
-        if not preprocessed_path.exists():
-            return {
-                'success': True,
-                'ready': False,
-                'message': 'Preprocessed directory does not exist',
-                'details': {
-                    'preprocessed_dir_exists': False,
-                    'splits_status': {},
-                    'total_files': 0
-                }
-            }
+        # Check raw data availability first (rp_* images)
+        raw_data_status = _check_raw_data_availability(data_path)
         
-        # Check each split (train, valid, test)
-        splits = ['train', 'valid', 'test']
-        splits_status = {}
-        total_files = 0
+        # Check augmented data (aug_* regular images before normalization)
+        augmented_data_status = _check_augmented_data_availability(data_path)
         
-        for split in splits:
-            split_path = preprocessed_path / split
-            images_path = split_path / "images"
-            labels_path = split_path / "labels"
-            
-            # Count files in each subdirectory
-            images_count = len(list(images_path.glob("*.npy"))) if images_path.exists() else 0
-            labels_count = len(list(labels_path.glob("*.txt"))) if labels_path.exists() else 0
-            
-            splits_status[split] = {
-                'exists': split_path.exists(),
-                'images_dir_exists': images_path.exists(),
-                'labels_dir_exists': labels_path.exists(),
-                'images_count': images_count,
-                'labels_count': labels_count,
-                'has_data': images_count > 0 or labels_count > 0
-            }
-            
-            total_files += images_count + labels_count
+        # Check preprocessed directory structure (pre_* and aug_* .npy files)
+        preprocessed_status = _check_preprocessed_structure(preprocessed_path)
         
-        # Determine overall readiness
-        has_any_data = any(split_info['has_data'] for split_info in splits_status.values())
-        all_dirs_exist = all(split_info['exists'] for split_info in splits_status.values())
+        # Service is ready if any of the data stages exist
+        ready = (raw_data_status['has_raw_data'] or 
+                augmented_data_status['has_augmented_data'] or 
+                preprocessed_status['structure_ready'])
         
-        # Service is ready if preprocessed directory exists and has basic structure
-        ready = preprocessed_path.exists() and all_dirs_exist
+        # Determine readiness message based on what's available
+        total_files = (raw_data_status['total_raw_files'] + 
+                      augmented_data_status['total_augmented_files'] + 
+                      preprocessed_status['total_preprocessed_files'])
+        
+        available_stages = []
+        if raw_data_status['has_raw_data']:
+            available_stages.append(f"raw data ({raw_data_status['total_raw_files']} rp_* files)")
+        if augmented_data_status['has_augmented_data']:
+            available_stages.append(f"augmented data ({augmented_data_status['total_augmented_files']} aug_* files)")
+        if preprocessed_status['structure_ready']:
+            available_stages.append(f"preprocessed structure ({preprocessed_status['total_preprocessed_files']} .npy files)")
+        
+        if available_stages:
+            message = f"✅ Service ready - {', '.join(available_stages)} available"
+        else:
+            message = "❌ Service not ready - no data found (missing rp_*, aug_*, pre_* files)"
         
         return {
             'success': True,
             'ready': ready,
-            'has_data': has_any_data,
-            'message': _generate_readiness_message(ready, has_any_data, total_files),
+            'has_raw_data': raw_data_status['has_raw_data'],
+            'has_augmented_data': augmented_data_status['has_augmented_data'],
+            'has_preprocessed_structure': preprocessed_status['structure_ready'],
+            'message': message,
             'details': {
-                'preprocessed_dir_exists': preprocessed_path.exists(),
-                'preprocessed_dir_path': str(preprocessed_path),
-                'splits_status': splits_status,
+                'raw_data': raw_data_status,
+                'augmented_data': augmented_data_status,
+                'preprocessed': preprocessed_status,
                 'total_files': total_files
             }
         }
@@ -96,10 +86,159 @@ def check_service_readiness(data_dir: Union[str, Path] = "data") -> Dict[str, An
         return {
             'success': False,
             'ready': False,
-            'has_data': False,
+            'has_raw_data': False,
+            'has_preprocessed_structure': False,
             'message': f'Error checking readiness: {str(e)}',
             'details': {}
         }
+
+
+def _check_raw_data_availability(data_path: Path) -> Dict[str, Any]:
+    """Check for raw data availability in /data/{train,valid,test}/{images,labels}.
+    
+    Checks for raw images with prefix 'rp_*' in regular image formats.
+    """
+    splits = ['train', 'valid', 'test']
+    raw_data_status = {}
+    total_raw_files = 0
+    
+    for split in splits:
+        split_path = data_path / split
+        images_path = split_path / "images"
+        labels_path = split_path / "labels"
+        
+        # Count raw data files with rp_* prefix
+        images_count = 0
+        if images_path.exists():
+            # Check for raw images with rp_* prefix in common formats
+            image_patterns = ["rp_*.jpg", "rp_*.jpeg", "rp_*.png", "rp_*.bmp", "rp_*.tiff"]
+            for pattern in image_patterns:
+                images_count += len(list(images_path.glob(pattern)))
+        
+        labels_count = len(list(labels_path.glob("*.txt"))) if labels_path.exists() else 0
+        
+        raw_data_status[split] = {
+            'split_exists': split_path.exists(),
+            'images_dir_exists': images_path.exists(),
+            'labels_dir_exists': labels_path.exists(),
+            'raw_images_count': images_count,
+            'labels_count': labels_count,
+            'has_data': images_count > 0 or labels_count > 0
+        }
+        
+        total_raw_files += images_count + labels_count
+    
+    has_raw_data = total_raw_files > 0
+    
+    return {
+        'has_raw_data': has_raw_data,
+        'total_raw_files': total_raw_files,
+        'splits_status': raw_data_status
+    }
+
+
+def _check_augmented_data_availability(data_path: Path) -> Dict[str, Any]:
+    """Check for augmented data availability in /data/augmented/{train,valid,test}/{images,labels}.
+    
+    Checks for augmented images with prefix 'aug_*' in regular image formats.
+    """
+    augmented_path = data_path / "augmented"
+    if not augmented_path.exists():
+        return {
+            'has_augmented_data': False,
+            'total_augmented_files': 0,
+            'splits_status': {}
+        }
+    
+    splits = ['train', 'valid', 'test']
+    augmented_data_status = {}
+    total_augmented_files = 0
+    
+    for split in splits:
+        split_path = augmented_path / split
+        images_path = split_path / "images"
+        labels_path = split_path / "labels"
+        
+        # Count augmented data files with aug_* prefix
+        images_count = 0
+        if images_path.exists():
+            # Check for augmented images with aug_* prefix in common formats
+            image_patterns = ["aug_*.jpg", "aug_*.jpeg", "aug_*.png", "aug_*.bmp", "aug_*.tiff"]
+            for pattern in image_patterns:
+                images_count += len(list(images_path.glob(pattern)))
+        
+        labels_count = len(list(labels_path.glob("*.txt"))) if labels_path.exists() else 0
+        
+        augmented_data_status[split] = {
+            'split_exists': split_path.exists(),
+            'images_dir_exists': images_path.exists(),
+            'labels_dir_exists': labels_path.exists(),
+            'augmented_images_count': images_count,
+            'labels_count': labels_count,
+            'has_data': images_count > 0 or labels_count > 0
+        }
+        
+        total_augmented_files += images_count + labels_count
+    
+    has_augmented_data = total_augmented_files > 0
+    
+    return {
+        'has_augmented_data': has_augmented_data,
+        'total_augmented_files': total_augmented_files,
+        'splits_status': augmented_data_status
+    }
+
+
+def _check_preprocessed_structure(preprocessed_path: Path) -> Dict[str, Any]:
+    """Check for preprocessed directory structure with pre_* and aug_* prefixed .npy files."""
+    if not preprocessed_path.exists():
+        return {
+            'structure_ready': False,
+            'total_preprocessed_files': 0,
+            'splits_status': {}
+        }
+    
+    splits = ['train', 'valid', 'test']
+    splits_status = {}
+    total_preprocessed_files = 0
+    
+    for split in splits:
+        split_path = preprocessed_path / split
+        images_path = split_path / "images"
+        labels_path = split_path / "labels"
+        
+        # Count preprocessed .npy files with pre_* and aug_* prefixes
+        preprocessed_count = 0
+        augmented_count = 0
+        if images_path.exists():
+            preprocessed_count = len(list(images_path.glob("pre_*.npy")))
+            augmented_count = len(list(images_path.glob("aug_*.npy")))
+        
+        total_images = preprocessed_count + augmented_count
+        labels_count = len(list(labels_path.glob("*.txt"))) if labels_path.exists() else 0
+        
+        splits_status[split] = {
+            'exists': split_path.exists(),
+            'images_dir_exists': images_path.exists(),
+            'labels_dir_exists': labels_path.exists(),
+            'preprocessed_count': preprocessed_count,
+            'augmented_count': augmented_count,
+            'total_images': total_images,
+            'labels_count': labels_count,
+            'has_data': total_images > 0 or labels_count > 0
+        }
+        
+        total_preprocessed_files += total_images + labels_count
+    
+    # Structure is ready if all directories exist (regardless of content)
+    all_dirs_exist = all(split_info['exists'] for split_info in splits_status.values())
+    structure_ready = preprocessed_path.exists() and all_dirs_exist
+    
+    return {
+        'structure_ready': structure_ready,
+        'total_preprocessed_files': total_preprocessed_files,
+        'splits_status': splits_status
+    }
 
 
 def check_existing_data(data_dir: Union[str, Path] = "data", 

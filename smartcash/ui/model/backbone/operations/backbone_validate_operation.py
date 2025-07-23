@@ -103,9 +103,19 @@ class BackboneValidateOperationHandler(BaseBackboneOperation):
             )
             
             if validation_result.get('valid', False):
-                summary = self._format_validation_summary(validation_result)
+                # Format summary using markdown HTML formatter
+                markdown_summary = self._format_validation_summary(validation_result)
+                
+                # Convert markdown to HTML using the new formatter
+                from smartcash.ui.core.utils import format_summary_to_html
+                html_summary = format_summary_to_html(
+                    markdown_summary, 
+                    title="🔍 Backbone Validation Results", 
+                    module_name="backbone"
+                )
+                
                 self.log_operation("✅ Validasi konfigurasi backbone berhasil", level='success')
-                self._execute_callback('on_success', summary)
+                self._execute_callback('on_success', html_summary)
                 
                 self.complete_dual_progress("Validasi berhasil diselesaikan")
                 return {'success': True, 'message': 'Validation completed successfully'}

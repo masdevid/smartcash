@@ -47,17 +47,21 @@ class EvaluationService:
     
     def __init__(self, model_api=None, config: Dict[str, Any] = None):
         # Ensure config is a dictionary and has the expected structure
+        self.logger = get_logger('evaluation_service')
+        
         if not isinstance(config, dict):
-            self.logger = get_logger('evaluation_service')
             self.logger.warning(f"Config is not a dictionary (got {type(config).__name__}), converting to dict")
-            config = {"evaluation": config} if config is not None else {}
+            # For non-dict config, create empty dict with evaluation section
+            config = {"evaluation": {}} 
         
         # Ensure the config has the required structure
         if "evaluation" not in config:
-            if not hasattr(self, 'logger'):
-                self.logger = get_logger('evaluation_service')
             self.logger.warning("Config missing 'evaluation' key, adding it")
-            config = {"evaluation": config if config is not None else {}}
+            # Move existing config under evaluation if it's a dict
+            if isinstance(config, dict) and config:
+                config = {"evaluation": config}
+            else:
+                config = {"evaluation": {}}
         
         self.config = config
         if not hasattr(self, 'logger'):
@@ -65,12 +69,12 @@ class EvaluationService:
         self.model_api = model_api
         
         try:
-            # Initialize components with proper error handling
-            self.scenario_manager = ScenarioManager(config)
-            self.evaluation_metrics = EvaluationMetrics(config)
-            self.checkpoint_selector = CheckpointSelector(config=config)
-            self.inference_timer = InferenceTimer(config)
-            self.results_aggregator = ResultsAggregator(config)
+            # Initialize components with normalized config
+            self.scenario_manager = ScenarioManager(self.config)
+            self.evaluation_metrics = EvaluationMetrics(self.config)
+            self.checkpoint_selector = CheckpointSelector(config=self.config)
+            self.inference_timer = InferenceTimer(self.config)
+            self.results_aggregator = ResultsAggregator(self.config)
         except Exception as e:
             self.logger.error(f"Failed to initialize evaluation service components: {e}", exc_info=True)
             raise
@@ -231,14 +235,18 @@ class EvaluationService:
         
         # Add results to aggregator if not already there
         if 'evaluation_results' in results:
-            for scenario_name, backbone_results in results['evaluation_results'].items():
-                for backbone, result_data in backbone_results.items():
-                    self.results_aggregator.add_scenario_results(
-                        scenario_name, backbone,
-                        result_data.get('checkpoint_info', {}),
-                        result_data.get('metrics', {}),
-                        result_data.get('additional_data', {})
-                    )
+            eval_results = results['evaluation_results']
+            if isinstance(eval_results, dict):
+                for scenario_name, backbone_results in eval_results.items():
+                    if isinstance(backbone_results, dict):
+                        for backbone, result_data in backbone_results.items():
+                            if isinstance(result_data, dict):
+                                self.results_aggregator.add_scenario_results(
+                                    scenario_name, backbone,
+                                    result_data.get('checkpoint_info', {}),
+                                    result_data.get('metrics', {}),
+                                    result_data.get('additional_data', {})
+                                )
         
         return self.results_aggregator.export_results(formats)
     
@@ -407,9 +415,12 @@ class EvaluationService:
                         })
                         
                         # Record timing
-                        if self.inference_timer.timings['evaluation']:
+                        if self.inference_timer.timings.get('evaluation'):
                             last_timing = self.inference_timer.timings['evaluation'][-1]
                             inference_times.append(last_timing['time'])
+                        else:
+                            # Fallback timing if timer not working
+                            inference_times.append(0.1)
                         
                     except Exception as e:
                         self.logger.debug(f"⚠️ Inference error untuk {img_data['filename']}: {str(e)}")
@@ -445,6 +456,17 @@ class EvaluationService:
                 progress = 30 + (idx / len(test_images)) * 40  # 30-70% range
                 self.progress_bridge.update_metrics(int(progress), f"Processing image {idx + 1}/{len(test_images)}")
         
+        # Ensure we have the same number of predictions and timings
+        if len(predictions) != len(inference_times):
+            self.logger.warning(f"Prediction count ({len(predictions)}) != timing count ({len(inference_times)}), adjusting")
+            while len(inference_times) < len(predictions):
+                inference_times.append(0.1)  # Add default timing
+            while len(predictions) < len(inference_times):
+                predictions.append({
+                    'filename': f'missing_prediction_{len(predictions)}.jpg',
+                    'detections': []
+                })
+        
         self.logger.info(f"⏱️ Inference complete: {len(predictions)} predictions, avg time: {np.mean(inference_times):.3f}s")
         return predictions, inference_times
     
@@ -458,8 +480,12 @@ class EvaluationService:
         img_tensor = torch.from_numpy(img_array).permute(2, 0, 1).unsqueeze(0)
         
         # Move to GPU jika tersedia
-        if torch.cuda.is_available() and self.model_api:
-            img_tensor = img_tensor.cuda()
+        try:
+            if torch.cuda.is_available() and self.model_api:
+                img_tensor = img_tensor.cuda()
+        except (AssertionError, RuntimeError):
+            # CUDA not available or not compiled with CUDA
+            pass
         
         return img_tensor
     

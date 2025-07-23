@@ -14,15 +14,44 @@ class ScenarioManager:
     """Manager untuk research scenarios evaluation"""
     
     def __init__(self, config: Dict[str, Any] = None):
+        # Ensure config is a dictionary
+        if not isinstance(config, dict):
+            self.logger = get_logger('scenario_manager')
+            self.logger.warning(f"Config is not a dictionary (got {type(config).__name__}), using default")
+            config = {}
+        
         self.config = config or {}
-        self.logger = get_logger('scenario_manager')
+        if not hasattr(self, 'logger'):
+            self.logger = get_logger('scenario_manager')
+        
         self.scenario_augmentation = ScenarioAugmentation(config)
         
-        # Setup directories
-        data_config = self.config.get('evaluation', {}).get('data', {})
-        self.test_dir = Path(data_config.get('test_dir', 'data/preprocessed/test'))
-        self.evaluation_dir = Path(data_config.get('evaluation_dir', 'data/evaluation'))
-        self.results_dir = Path(data_config.get('results_dir', 'data/evaluation/results'))
+        # Setup directories with safe config access
+        try:
+            eval_config = self.config.get('evaluation', {})
+            if isinstance(eval_config, dict):
+                data_config = eval_config.get('data', {})
+                if isinstance(data_config, dict):
+                    test_dir = data_config.get('test_dir', 'data/preprocessed/test')
+                    evaluation_dir = data_config.get('evaluation_dir', 'data/evaluation') 
+                    results_dir = data_config.get('results_dir', 'data/evaluation/results')
+                else:
+                    test_dir = 'data/preprocessed/test'
+                    evaluation_dir = 'data/evaluation'
+                    results_dir = 'data/evaluation/results'
+            else:
+                test_dir = 'data/preprocessed/test'
+                evaluation_dir = 'data/evaluation'
+                results_dir = 'data/evaluation/results'
+            
+            self.test_dir = Path(test_dir)
+            self.evaluation_dir = Path(evaluation_dir)
+            self.results_dir = Path(results_dir)
+        except Exception as e:
+            self.logger.warning(f"Error setting up directories: {e}")
+            self.test_dir = Path('data/preprocessed/test')
+            self.evaluation_dir = Path('data/evaluation')
+            self.results_dir = Path('data/evaluation/results')
         
         self._ensure_directories()
     
@@ -206,32 +235,47 @@ class ScenarioManager:
     
     def list_available_scenarios(self) -> List[Dict[str, Any]]:
         """📋 List semua scenario yang tersedia"""
-        scenarios_config = self.config.get('evaluation', {}).get('scenarios', {})
+        eval_config = self.config.get('evaluation', {})
+        scenarios_config = eval_config.get('scenarios', {})
         
         scenarios = []
-        for scenario_name, scenario_config in scenarios_config.items():
-            scenario_info = {
-                'name': scenario_name,
-                'display_name': scenario_config.get('name', scenario_name.replace('_', ' ').title()),
-                'enabled': scenario_config.get('enabled', False),
-                'description': self._get_scenario_description(scenario_name),
-                'data_exists': (self.evaluation_dir / scenario_name).exists()
-            }
-            
-            # Add validation if data exists
-            if scenario_info['data_exists']:
-                validation = self.validate_scenario(scenario_name)
-                scenario_info.update({
-                    'data_valid': validation['data_valid'],
-                    'ready': validation['ready_for_evaluation']
+        
+        # Handle different scenario config formats
+        if isinstance(scenarios_config, list):
+            # If scenarios is a list, convert to dict format
+            for scenario_name in scenarios_config:
+                scenarios.append({
+                    'name': scenario_name,
+                    'display_name': scenario_name.replace('_', ' ').title(),
+                    'enabled': True,  # Assume enabled if in list
+                    'description': self._get_scenario_description(scenario_name),
+                    'data_exists': (self.evaluation_dir / scenario_name).exists()
                 })
-            else:
-                scenario_info.update({
-                    'data_valid': False,
-                    'ready': False
-                })
-            
-            scenarios.append(scenario_info)
+        elif isinstance(scenarios_config, dict):
+            # If scenarios is a dict, use existing logic
+            for scenario_name, scenario_config in scenarios_config.items():
+                scenario_info = {
+                    'name': scenario_name,
+                    'display_name': scenario_config.get('name', scenario_name.replace('_', ' ').title()),
+                    'enabled': scenario_config.get('enabled', False),
+                    'description': self._get_scenario_description(scenario_name),
+                    'data_exists': (self.evaluation_dir / scenario_name).exists()
+                }
+                
+                # Add validation if data exists
+                if scenario_info['data_exists']:
+                    validation = self.validate_scenario(scenario_name)
+                    scenario_info.update({
+                        'data_valid': validation['data_valid'],
+                        'ready': validation['ready_for_evaluation']
+                    })
+                else:
+                    scenario_info.update({
+                        'data_valid': False,
+                        'ready': False
+                    })
+                
+                scenarios.append(scenario_info)
         
         return scenarios
     

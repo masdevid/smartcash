@@ -17,7 +17,23 @@ class EvaluationMetrics:
     def __init__(self, config: Dict[str, Any] = None):
         self.config = config or {}
         self.logger = get_logger('evaluation_metrics')
-        self.metrics_config = self.config.get('evaluation', {}).get('metrics', {})
+        
+        # Safe extraction of metrics config
+        try:
+            eval_config = self.config.get('evaluation', {})
+            if isinstance(eval_config, dict):
+                metrics_config = eval_config.get('metrics', {})
+                if isinstance(metrics_config, dict):
+                    self.metrics_config = metrics_config
+                else:
+                    self.logger.warning(f"Metrics config is not a dict (got {type(metrics_config).__name__}), using default")
+                    self.metrics_config = {}
+            else:
+                self.logger.warning(f"Evaluation config is not a dict (got {type(eval_config).__name__}), using default")
+                self.metrics_config = {}
+        except Exception as e:
+            self.logger.warning(f"Error accessing metrics config: {e}")
+            self.metrics_config = {}
         
         # Metrics storage
         self.predictions = []
@@ -37,9 +53,16 @@ class EvaluationMetrics:
             class_aps = {}
             all_classes = set()
             
-            # Collect all classes
+            # Collect all classes with safe access
             for gt in ground_truths:
-                all_classes.update([ann['class_id'] for ann in gt.get('annotations', [])])
+                for ann in gt.get('annotations', []):
+                    if isinstance(ann, dict) and 'class_id' in ann:
+                        try:
+                            class_id = ann['class_id']
+                            if isinstance(class_id, (int, float)):
+                                all_classes.add(int(class_id))
+                        except (ValueError, TypeError):
+                            continue  # Skip invalid class_ids
             
             for class_id in all_classes:
                 ap = self._calculate_ap_for_class(predictions, ground_truths, class_id, iou_thresh)
@@ -83,8 +106,12 @@ class EvaluationMetrics:
                     if gt_idx in matched_gt:
                         continue
                     
-                    # Check class match dan IoU
-                    if (pred_box.get('class_id') == gt_box.get('class_id') and
+                    # Check class match dan IoU with safe access
+                    pred_class = pred_box.get('class_id')
+                    gt_class = gt_box.get('class_id')
+                    
+                    if (isinstance(pred_class, (int, float)) and isinstance(gt_class, (int, float)) and
+                        pred_class == gt_class and 'bbox' in pred_box and 'bbox' in gt_box and
                         self._calculate_iou(pred_box['bbox'], gt_box['bbox']) >= iou_threshold):
                         correct_detections += 1
                         matched_gt.add(gt_idx)
@@ -123,6 +150,10 @@ class EvaluationMetrics:
             
             for pred_box in pred_boxes:
                 class_id = pred_box.get('class_id')
+                if not isinstance(class_id, (int, float)):
+                    continue
+                
+                class_id = int(class_id)
                 class_stats[class_id]['total_pred'] += 1
                 
                 # Find best matching ground truth

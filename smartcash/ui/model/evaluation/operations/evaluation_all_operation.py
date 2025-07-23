@@ -240,7 +240,7 @@ class EvaluationAllOperation(EvaluationBaseOperation):
             
             evaluation_result = run_evaluation_pipeline(
                 scenarios=[backend_scenario],
-                checkpoints=None,  # Let backend select best checkpoints
+                checkpoints=self._get_matching_checkpoints(backbone, layer_mode, eval_config),
                 model_api=model_api,
                 config=eval_config,
                 progress_callback=progress_callback,
@@ -289,3 +289,33 @@ class EvaluationAllOperation(EvaluationBaseOperation):
                 'model_evaluated': model_name,
                 'error': str(e)
             }
+    
+    def _get_matching_checkpoints(self, backbone: str, layer_mode: str, eval_config: dict) -> list:
+        """Get checkpoints matching the specified backbone and layer mode."""
+        try:
+            from smartcash.model.evaluation.checkpoint_selector import CheckpointSelector
+            checkpoint_selector = CheckpointSelector(config=eval_config)
+            available_checkpoints = checkpoint_selector.list_available_checkpoints()
+            
+            # Filter checkpoints by backbone and layer_mode
+            matching_checkpoints = [
+                cp for cp in available_checkpoints 
+                if cp.get("backbone", "").lower() in backbone.lower() and 
+                   cp.get("layer_mode", "").lower() in layer_mode.lower()
+            ]
+            
+            if not matching_checkpoints:
+                # Use best available checkpoint as fallback
+                selected_checkpoints = available_checkpoints[:1] if available_checkpoints else []
+                if selected_checkpoints:
+                    self._ui_module.log_warning(f"⚠️ No exact match for {backbone}+{layer_mode}, using best available")
+                else:
+                    self._ui_module.log_error(f"❌ No checkpoints available for evaluation")
+                return [cp["path"] for cp in selected_checkpoints]
+            else:
+                self._ui_module.log_info(f"✅ Found matching checkpoint: {matching_checkpoints[0]['display_name']}")
+                return [matching_checkpoints[0]['path']]
+                
+        except Exception as e:
+            self._ui_module.log_error(f"Failed to get matching checkpoints: {e}")
+            return []  # Let backend select default

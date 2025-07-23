@@ -15,9 +15,32 @@ class ScenarioAugmentation:
     """Research scenario augmentation dengan integration ke existing API"""
     
     def __init__(self, config: Dict[str, Any] = None):
+        # Ensure config is a dictionary
+        if not isinstance(config, dict):
+            self.logger = get_logger('test_augmentation')
+            self.logger.warning(f"Config is not a dictionary (got {type(config).__name__}), using default")
+            config = {}
+        
         self.config = config or {}
-        self.logger = get_logger('test_augmentation')
-        self.evaluation_dir = Path(self.config.get('evaluation', {}).get('data', {}).get('evaluation_dir', 'data/evaluation'))
+        if not hasattr(self, 'logger'):
+            self.logger = get_logger('test_augmentation')
+        
+        # Safe config access with proper error handling
+        try:
+            eval_config = self.config.get('evaluation', {})
+            if isinstance(eval_config, dict):
+                data_config = eval_config.get('data', {})
+                if isinstance(data_config, dict):
+                    eval_dir = data_config.get('evaluation_dir', 'data/evaluation')
+                else:
+                    eval_dir = 'data/evaluation'
+            else:
+                eval_dir = 'data/evaluation'
+            
+            self.evaluation_dir = Path(eval_dir)
+        except Exception as e:
+            self.logger.warning(f"Error accessing evaluation directory config: {e}")
+            self.evaluation_dir = Path('data/evaluation')
         
     def generate_position_variations(self, test_dir: str, output_dir: str, num_variations: int = 5) -> Dict[str, Any]:
         """🔄 Generate position variation data untuk research scenario"""

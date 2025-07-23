@@ -17,7 +17,10 @@ Updated 22 Juli 2025, 20:
 - [✅] Progress tracker not appearing - Fixed with proper timing delays
 - [✅] Install, Uninstall and updates process use synchronous - Already implemented correctly
 - [✅] Check missing packages and updates should use threadpool for faster response - Implemented ThreadPoolExecutor for check operations
-- [✅] Ensure no overlapping operations - Added operation lock mechanism with proper validation 
+- [✅] Ensure no overlapping operations - Added operation lock mechanism with proper validation
+- [✅] Button states should be disabled during operations - Fixed BaseUIModule to disable all buttons during operations and re-enable after completion
+- [✅] Config manager logs leaking outside operation container - Fixed by suppressing config manager console logs in base operation
+- [✅] Installation should only install missing packages instead of all packages - Added package checking to only install packages that are not already installed 
 
 # DOWNLOAD MODULE
 - [✅] Each operation done should update summary result - Implemented summary container integration with formatted markdown output for all operations (download, check, cleanup) 
@@ -51,4 +54,4 @@ Updated 22 Juli 2025, 20:
 - [✅] Remove this handler to not triggering unnecesary log from dynamic buttons registration - Commented out missing button handlers for 'stop_evaluation' and 'export_results'
 
 # VISUALIZATION MODULE
-- [✅] Dashboard cards still not appearing. Only blank container - Fixed container lookup logic to properly find dashboard container
+- [✅] Dashboard cards still not appearing. Only blank container - Fixed container layout issues, improved placeholder data initialization, and simplified dashboard card creation process

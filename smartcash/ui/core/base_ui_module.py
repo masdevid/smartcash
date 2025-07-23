@@ -795,8 +795,8 @@ class BaseUIModule(
             
             self.start_progress(f"Memulai {operation_name.lower()}...", 0)
             
-            # Only disable the clicked button, not all buttons
-            self.disable_all_buttons(f"⏳ {operation_name}...", button_id=button_id)
+            # Disable all buttons during operation to prevent overlapping operations
+            self.disable_all_buttons(f"⏳ {operation_name}...")
             
             # Run validation if provided
             if validation_func:
@@ -845,9 +845,8 @@ class BaseUIModule(
             self.error_progress(error_msg)
             return {'success': False, 'message': error_msg}
         finally:
-            # Re-enable only the specific button that was disabled
-            if button_id:
-                self.enable_all_buttons(button_id=button_id)
+            # Re-enable all buttons after operation completes
+            self.enable_all_buttons()
 
     def _clear_operation_logs(self) -> None:
         """Clear operation container logs at the start of each operation."""

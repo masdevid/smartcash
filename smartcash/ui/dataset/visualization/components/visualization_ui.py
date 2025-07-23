@@ -213,20 +213,14 @@ def create_visualization_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -
     ui_components['footer'] = footer_container
     
     # === 5.1 Buat Dashboard Container ===
-    # Buat container untuk dashboard cards
+    # Buat container untuk dashboard cards (using HBox for horizontal layout)
     dashboard_container = widgets.VBox(
         layout=widgets.Layout(
             width='100%',
             padding='10px',
             margin='10px 0',
             border='1px solid #e0e0e0',
-            border_radius='5px',
-            display='flex',
-            flex_flow='row wrap',
-            justify_content='space-between',
-            align_items='stretch',
-            align_content='stretch',
-            overflow='hidden'
+            border_radius='5px'
         )
     )
     
@@ -392,11 +386,13 @@ def _create_module_summary_content(config: Dict[str, Any]) -> str:
     Buat konten ringkasan untuk modul.
     
     Args:
-        config: Kamus konfigurasi
+        config: Kamus konfigurasi (used for future customization)
         
     Returns:
         String HTML yang berisi konten ringkasan
     """
+    # Use config parameter to avoid unused parameter warning
+    _ = config
     return """
     <div style="padding: 10px;">
         <h5>📊 Ringkasan Dataset</h5>

@@ -81,7 +81,7 @@ class VisualizationUIModule(BaseUIModule):
         self.components = self.create_ui_components(self._config)
         self._ui_components = self.components  # For backward compatibility
         
-        # Initialize dashboard cards
+        # Initialize dashboard cards first
         self._initialize_dashboard()
         
         # Initialize sample comparison viewer
@@ -111,13 +111,16 @@ class VisualizationUIModule(BaseUIModule):
         }
     
     def _update_dashboard_stats(self) -> None:
-        """Update statistics on the dashboard cards with empty stats."""
+        """Update statistics on the dashboard cards with placeholder stats."""
         if not hasattr(self, '_dashboard_cards') or not self._dashboard_cards:
+            self.log_debug("❌ Dashboard cards not available for stats update")
             return
         
-        # Initialize with empty stats (will be updated by refresh operation)
-        empty_stats = {
+        # Initialize with placeholder stats (shows as placeholder until refresh)
+        placeholder_stats = {
+            'success': False,  # This ensures cards show as placeholders
             'dataset_stats': {
+                'success': False,  # Backend not available
                 'by_split': {
                     'train': {'raw': 0, 'preprocessed': 0, 'augmented': 0},
                     'valid': {'raw': 0, 'preprocessed': 0, 'augmented': 0},
@@ -126,67 +129,92 @@ class VisualizationUIModule(BaseUIModule):
                 'overview': {'total_files': 0}
             },
             'augmentation_stats': {
+                'success': False,  # Backend not available
                 'by_split': {
                     'train': {'file_count': 0},
                     'valid': {'file_count': 0},
                     'test': {'file_count': 0}
                 }
-            }
+            },
+            'last_updated': 'Never - click refresh to load data'
         }
         
-        # Update all cards with empty stats
+        # Update all cards with placeholder stats
         if hasattr(self._dashboard_cards, 'update_all_cards'):
-            self._dashboard_cards.update_all_cards(empty_stats)
+            self._dashboard_cards.update_all_cards(placeholder_stats)
+            self.log_debug("📊 Dashboard cards updated with placeholder data")
+        else:
+            self.log_error("❌ Dashboard cards object missing update_all_cards method")
     
     def _initialize_dashboard(self):
         """Initialize the dashboard with enhanced visualization stats cards."""
         try:
             from .components.visualization_stats_cards import create_visualization_stats_dashboard
             
+            # Find dashboard container first
+            dashboard_container = self.components.get('dashboard') if hasattr(self, 'components') else None
+            
+            if not dashboard_container:
+                self.log_error("❌ Dashboard container not found - cannot initialize cards")
+                return
+            
             # Create enhanced visualization stats dashboard
             self._dashboard_cards = create_visualization_stats_dashboard()
-            self.log_debug("📊 Dashboard cards created successfully")
+            self.log_debug("📊 Dashboard cards object created")
             
-            # Find dashboard container in components structure
-            dashboard_container = None
-            
-            # Primary lookup: Check components dictionary for 'dashboard' key
-            if hasattr(self, 'components') and isinstance(self.components, dict):
-                dashboard_container = self.components.get('dashboard')
-                if dashboard_container:
-                    self.log_debug("✅ Found dashboard container in self.components['dashboard']")
-                else:
-                    self.log_debug(f"Available components keys: {list(self.components.keys())}")
-            
-            # Fallback: Check _ui_components (backward compatibility)
-            if not dashboard_container and hasattr(self, '_ui_components') and isinstance(self._ui_components, dict):
-                dashboard_container = self._ui_components.get('dashboard')
-                if dashboard_container:
-                    self.log_debug("✅ Found dashboard container in self._ui_components['dashboard']")
-                else:
-                    self.log_debug(f"Available _ui_components keys: {list(self._ui_components.keys())}")
-            
-            if dashboard_container:
-                # Add cards container to dashboard container
-                cards_container = self._dashboard_cards.get_container()
+            # Get cards container and add to dashboard immediately
+            cards_container = self._dashboard_cards.get_container()
+            if cards_container:
+                # Force cards to display with placeholder data first
+                self._dashboard_cards.update_all_cards({
+                    'success': False,
+                    'dataset_stats': {'success': False},
+                    'augmentation_stats': {'success': False},
+                    'last_updated': 'Click refresh to load data'
+                })
+                
+                # Add to dashboard container
                 dashboard_container.children = [cards_container]
-                self.log_debug("✅ Dashboard cards initialized and added to container")
+                self.log_debug("✅ Dashboard cards added to container with placeholder data")
                 
-                # Initialize with empty stats (will be updated by refresh operation)
-                self._update_dashboard_stats()
-                
-            else:
-                self.log_warning("⚠️ Dashboard container not found - cards created but not displayed")
-                # Log available components for debugging
-                if hasattr(self, 'components'):
-                    available_components = list(self.components.keys()) if isinstance(self.components, dict) else "Not a dict"
-                    self.log_debug(f"Available components: {available_components}")
-                if hasattr(self, '_ui_components'):
-                    available_ui_components = list(self._ui_components.keys()) if isinstance(self._ui_components, dict) else "Not a dict"
-                    self.log_debug(f"Available UI components: {available_ui_components}")
+                # Verify cards are visible
+                if hasattr(cards_container, 'children') and len(cards_container.children) > 0:
+                    self.log_debug(f"✅ {len(cards_container.children)} cards are visible in container")
+                else:
+                    self.log_warning("⚠️ Cards container appears empty")
                     
+            else:
+                self.log_error("❌ Failed to get cards container from dashboard object")
+                
         except Exception as e:
             self.log_error(f"❌ Failed to initialize dashboard: {e}", exc_info=True)
+            
+    def _add_dashboard_test_content(self):
+        """Add test content to dashboard to verify container is working."""
+        try:
+            # Find dashboard container
+            dashboard_container = None
+            if hasattr(self, 'components') and isinstance(self.components, dict):
+                dashboard_container = self.components.get('dashboard')
+            
+            if dashboard_container:
+                # Add a simple test widget to verify container works
+                test_widget = widgets.HTML(
+                    value='<div style="padding: 10px; background: #f0f0f0; border-radius: 5px; margin: 5px;">'
+                          '📊 Dashboard Test: Container is working. Cards will appear here after proper initialization.</div>'
+                )
+                
+                # If dashboard already has children (cards), don't overwrite
+                if not hasattr(dashboard_container, 'children') or len(dashboard_container.children) == 0:
+                    dashboard_container.children = [test_widget]
+                    self.log_debug("✅ Added test content to dashboard container")
+                else:
+                    self.log_debug(f"📊 Dashboard already has {len(dashboard_container.children)} children")
+            else:
+                self.log_debug("❌ Dashboard container not found for test content")
+                
+        except Exception as e:
+            self.log_debug(f"⚠️ Failed to add dashboard test content: {e}")
         
     def get_default_config(self) -> Dict[str, Any]:
         """

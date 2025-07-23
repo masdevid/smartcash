@@ -57,10 +57,21 @@ class BaseOperationHandler(LoggingMixin, OperationMixin):
         self.logger.debug(f"✅ BaseOperationHandler initialized: {operation_type}")
     
     def _get_config_path(self, filename: str = 'dependency_config.yaml') -> str:
-        """Get environment-aware config file path."""
+        """Get environment-aware config file path with log suppression."""
         try:
-            from smartcash.common.config.manager import get_environment_config_path
-            return get_environment_config_path(filename)
+            # Suppress config manager logs by temporarily disabling logging
+            import logging
+            config_logger = logging.getLogger('smartcash.common.config.manager')
+            original_level = config_logger.level
+            config_logger.setLevel(logging.CRITICAL)  # Suppress all logs below CRITICAL
+            
+            try:
+                from smartcash.common.config.manager import get_environment_config_path
+                return get_environment_config_path(filename)
+            finally:
+                # Restore original logging level
+                config_logger.setLevel(original_level)
+                
         except Exception:
             return os.path.join('./configs', filename)
     

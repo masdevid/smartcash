@@ -46,6 +46,14 @@ class InstallOperationHandler(BaseOperationHandler):
                 self.log("⚠️ Tidak ada paket yang dipilih untuk diinstal", 'warning')
                 return {'success': False, 'error': 'Tidak ada paket yang dipilih'}
             
+            # Check which packages are missing and need installation
+            missing_packages = self._filter_missing_packages(packages)
+            if not missing_packages:
+                self.log("✅ Semua paket sudah terinstal", 'success')
+                return {'success': True, 'message': 'Semua paket sudah terinstal'}
+            
+            self.log(f"📋 {len(missing_packages)} dari {len(packages)} paket perlu diinstal: {', '.join(missing_packages)}", 'info')
+            
             # Update and save config with current packages
             selected, custom = self._categorize_packages(packages)
             self.config.update({
@@ -56,9 +64,9 @@ class InstallOperationHandler(BaseOperationHandler):
             # Save config to YAML file
             self._save_config_to_file(self.config)
             
-            # Execute installation
+            # Execute installation only for missing packages
             start_time = time.time()
-            results = self._install_packages(packages)
+            results = self._install_packages(missing_packages)
             duration = time.time() - start_time
             
             # Process results
@@ -92,6 +100,59 @@ class InstallOperationHandler(BaseOperationHandler):
             error_msg = f"Gagal melakukan instalasi: {str(e)}"
             self.log(error_msg, 'error')
             return {'success': False, 'error': error_msg}
+    
+    def _filter_missing_packages(self, packages: List[str]) -> List[str]:
+        """Filter packages to only include those not already installed.
+        
+        Args:
+            packages: List of package names to check
+            
+        Returns:
+            List of packages that are not installed
+        """
+        missing_packages = []
+        
+        self.log("🔍 Memeriksa paket yang sudah terinstal...", 'info')
+        
+        for package in packages:
+            if self._cancelled:
+                break
+            
+            # Check if package is already installed
+            if not self._is_package_installed(package):
+                missing_packages.append(package)
+            else:
+                self.log(f"✅ Sudah terinstal: {package}", 'info')
+        
+        return missing_packages
+    
+    def _is_package_installed(self, package: str) -> bool:
+        """Check if a package is already installed.
+        
+        Args:
+            package: Package name to check
+            
+        Returns:
+            True if package is installed, False otherwise
+        """
+        try:
+            # Handle package names with version specifiers
+            package_name = package.split('==')[0].split('>=')[0].split('<=')[0].split('>')[0].split('<')[0].strip()
+            
+            # Try to import the package or use pip show
+            import subprocess
+            result = subprocess.run(
+                ["pip", "show", package_name],
+                capture_output=True,
+                text=True,
+                timeout=10
+            )
+            
+            return result.returncode == 0
+            
+        except Exception:
+            # If we can't check, assume it's not installed (safer to install)
+            return False
     
     def _install_packages(self, packages: List[str]) -> List[Dict[str, Any]]:
         """Install multiple packages sequentially with progress tracking."""

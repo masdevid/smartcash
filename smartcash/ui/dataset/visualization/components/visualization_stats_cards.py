@@ -122,7 +122,8 @@ class VisualizationStatsCard:
         
         # Create HTML widget
         self.card = widgets.HTML()
-        self.update()
+        # Force initial placeholder update
+        self.update(None)  # Explicitly pass None to trigger placeholder display
     
     def update(self, stats_data: Optional[Dict[str, Any]] = None):
         """Update card with new statistics data with robust placeholder support.

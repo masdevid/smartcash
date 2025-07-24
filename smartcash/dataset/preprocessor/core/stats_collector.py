@@ -57,6 +57,14 @@ class StatsCollector:
                 
                 stats['overview']['total_size_mb'] += split_stats['total_size_mb']
         
+        # Add aggregation for new differentiated counts
+        stats['by_type']['raw_preprocessed'] = 0
+        stats['by_type']['augmented_preprocessed'] = 0
+        
+        for split_data in stats['by_split'].values():
+            stats['by_type']['raw_preprocessed'] += split_data['file_counts'].get('raw_preprocessed', 0)
+            stats['by_type']['augmented_preprocessed'] += split_data['file_counts'].get('augmented_preprocessed', 0)
+        
         # Calculate averages
         if stats['overview']['total_files'] > 0:
             total_image_size = sum(
@@ -66,13 +74,16 @@ class StatsCollector:
             total_npy_size = sum(
                 split_data.get('avg_sizes', {}).get('npy', 0) * (
                     split_data['file_counts'].get('preprocessed', 0) + 
-                    split_data['file_counts'].get('augmented', 0)
+                    split_data['file_counts'].get('augmented', 0) +
+                    split_data['file_counts'].get('raw_preprocessed', 0) +
+                    split_data['file_counts'].get('augmented_preprocessed', 0)
                 )
                 for split_data in stats['by_split'].values()
             )
             
             total_images = stats['by_type']['raw'] + stats['by_type']['sample']
-            total_npy = stats['by_type']['preprocessed'] + stats['by_type']['augmented']
+            total_npy = (stats['by_type']['preprocessed'] + stats['by_type']['augmented'] + 
+                        stats['by_type']['raw_preprocessed'] + stats['by_type']['augmented_preprocessed'])
             
             stats['file_sizes']['avg_image_mb'] = round(total_image_size / max(total_images, 1), 2)
             stats['file_sizes']['avg_npy_mb'] = round(total_npy_size / max(total_npy, 1), 2)
@@ -80,14 +91,14 @@ class StatsCollector:
         return stats
     
     def _analyze_split(self, split_path: Path) -> Dict[str, Any]:
-        """📊 Analyze split menggunakan naming manager"""
+        """📊 Analyze split dengan differentiation antara raw_preprocessed dan augmented_preprocessed"""
         from .file_processor import FileProcessor
         
         fp = FileProcessor()
         images_dir = split_path / 'images'
         labels_dir = split_path / 'labels'
         
-        # Scan files by type menggunakan naming manager
+        # Scan files by type dengan differentiation
         file_counts = {}
         all_files = []
         
@@ -99,13 +110,37 @@ class StatsCollector:
             else:
                 file_counts[file_type] = 0
         
+        # Additional counts untuk preprocessing differentiation
+        if images_dir.exists():
+            # Raw preprocessed: pre_* files as .npy
+            raw_preprocessed_files = list(images_dir.glob('pre_*.npy'))
+            file_counts['raw_preprocessed'] = len(raw_preprocessed_files)
+            
+            # Augmented preprocessed: aug_* files as .npy in preprocessed directory
+            parent_path = images_dir.parent
+            if 'preprocessed' in str(parent_path):
+                augmented_preprocessed_files = list(images_dir.glob('aug_*.npy'))
+                file_counts['augmented_preprocessed'] = len(augmented_preprocessed_files)
+            else:
+                file_counts['augmented_preprocessed'] = 0
+            
+            # Update all_files to include these specific files
+            all_files.extend(raw_preprocessed_files)
+            if file_counts['augmented_preprocessed'] > 0:
+                all_files.extend(images_dir.glob('aug_*.npy'))
+        else:
+            file_counts['raw_preprocessed'] = 0
+            file_counts['augmented_preprocessed'] = 0
+        
         # Class dan layer distribution
         class_dist, layer_dist = self._analyze_labels(labels_dir)
         
-        # File sizes
+        # File sizes dengan kategorisasi yang lebih detail
         avg_sizes = self._calculate_average_sizes({
             'images': [f for f in all_files if f.suffix.lower() in {'.jpg', '.jpeg', '.png', '.bmp', '.tiff'}],
-            'npy': [f for f in all_files if f.suffix.lower() == '.npy']
+            'npy': [f for f in all_files if f.suffix.lower() == '.npy'],
+            'raw_preprocessed': [f for f in all_files if f.name.startswith('pre_') and f.suffix.lower() == '.npy'],
+            'augmented_preprocessed': [f for f in all_files if f.name.startswith('aug_') and f.suffix.lower() == '.npy']
         })
         
         total_size = sum(fp.get_file_info(f).get('size_mb', 0) for f in all_files)

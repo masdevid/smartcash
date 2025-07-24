@@ -84,32 +84,64 @@ class UpdateOperationHandler(BaseOperationHandler):
             return {'success': False, 'error': error_msg}
     
     def _update_packages(self, packages: List[str]) -> List[Dict[str, Any]]:
-        """Update multiple packages sequentially with progress tracking."""
+        """Update multiple packages with threadpool optimization for faster response."""
         if not packages:
             return []
             
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+        import threading
+        
         results = []
         total = len(packages)
+        completed_count = 0
+        lock = threading.Lock()
         
-        for i, package in enumerate(packages, 1):
-            if self._cancelled:
-                break
+        # Use threadpool for parallel updates (max 3 to avoid pip conflicts)
+        max_workers = min(len(packages), 3)
+        
+        with ThreadPoolExecutor(max_workers=max_workers, thread_name_prefix="PackageUpdate") as executor:
+            # Submit all update tasks
+            future_to_package = {
+                executor.submit(self._update_single_package, package): package
+                for package in packages
+            }
+            
+            # Process completed updates
+            for future in as_completed(future_to_package):
+                if self._cancelled:
+                    break
+                    
+                package = future_to_package[future]
                 
-            # Update progress using mixin method
-            self.update_progress(
-                (i / total) * 100,
-                f"Mengupdate paket {i}/{total}: {package}"
-            )
-            
-            result = self._update_single_package(package)
-            results.append(result)
-            
-            # Show result status
-            status = "✅" if result.get('success') else "❌"
-            self.update_progress(
-                (i / total) * 100,
-                f"Selesai {i}/{total}: {status} {package}"
-            )
+                try:
+                    result = future.result()
+                    results.append(result)
+                    
+                    with lock:
+                        completed_count += 1
+                        progress = (completed_count / total) * 100
+                        
+                        # Update progress using mixin method
+                        status = "✅" if result.get('success') else "❌"
+                        self.update_progress(
+                            progress,
+                            f"{status} Update paket {completed_count}/{total}: {package}"
+                        )
+                        
+                except Exception as e:
+                    results.append({
+                        'package': package,
+                        'success': False,
+                        'error': str(e)
+                    })
+                    
+                    with lock:
+                        completed_count += 1
+                        progress = (completed_count / total) * 100
+                        self.update_progress(
+                            progress,
+                            f"❌ Update paket {completed_count}/{total}: {package} - {str(e)}"
+                        )
         
         return results
     

@@ -401,6 +401,9 @@ class TrainingUIModule(ModelConfigSyncMixin, BackendServiceMixin, BaseUIModule, 
     def _handle_refresh_backbone_config(self, button=None) -> None:
         """Handle refresh backbone config button click."""
         try:
+            # Suppress button registration logs during discovery
+            self._suppress_button_logs = True
+            
             self.log_info("Refreshing backbone configuration...")
             result = self.execute_refresh_backbone_config()
             
@@ -411,6 +414,9 @@ class TrainingUIModule(ModelConfigSyncMixin, BackendServiceMixin, BaseUIModule, 
                 
         except Exception as e:
             self.log_error(f"Refresh backbone config error: {e}")
+        finally:
+            # Always reset the log suppression flag
+            self._suppress_button_logs = False
     
     def _handle_save_config(self, button=None) -> None:
         """Handle save config button click - delegates to ConfigurationMixin."""

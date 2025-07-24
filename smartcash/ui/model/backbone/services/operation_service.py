@@ -138,15 +138,13 @@ class BackboneOperationService:
                 
                 self.logger.info(f"✅ Found {total_models} total models")
                 
-                for backbone_type, models in by_backbone.items():
-                    model_count = len(models)
-                    self.logger.info(f"  • {backbone_type}: {model_count} model(s)")
-                    
-                    # Log details of first few models
-                    for model in models[:2]:  # Show first 2 models per type
-                        size_mb = model.get('size_mb', 0)
-                        timestamp = model.get('timestamp', 'unknown')
-                        self.logger.info(f"    - {timestamp} ({size_mb}MB)")
+                # Use summary logging to reduce noise
+                total_models = sum(len(models) for models in by_backbone.values())
+                if total_models > 0:
+                    backbone_summary = ", ".join([f"{bt}: {len(models)}" for bt, models in by_backbone.items()])
+                    self.logger.info(f"  • Found {total_models} models ({backbone_summary})")
+                else:
+                    self.logger.info("  • No models found")
                         
         except Exception as e:
             if self.logger:

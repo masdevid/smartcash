@@ -134,21 +134,68 @@ class FileProcessor:
     
     def scan_files_by_type(self, directory: Union[str, Path], file_type: str, 
                           extensions: set = None) -> List[Path]:
-        """🔍 Scan files untuk specific type menggunakan naming manager"""
-        prefix = self.naming_manager.get_prefix(file_type)
-        if not prefix:
+        """🔍 Scan files untuk specific type berdasarkan data organization pattern"""
+        dir_path = Path(directory)
+        if not dir_path.exists():
             return []
+            
+        # Data organization pattern based on TASK.md:
+        # 1. Raw Data (/data/{train,valid,test}/images/): Files with prefix rp_* in regular image formats
+        # 2. Augmented Data (/data/augmented/{train,valid,test}/images/): Files with prefix aug_* in regular image formats (before normalization)
+        # 3. Preprocessed Data (/data/preprocessed/{train,valid,test}/images/):
+        #    - Files with prefix pre_* as .npy files (preprocessed)
+        #    - Files with prefix aug_* as .npy files (augmented after normalization)
         
-        default_extensions = {
-            'raw': self.supported_image_formats,
-            'preprocessed': {'.npy'},
-            'augmented': {'.npy', '.jpg'},
-            'sample': {'.jpg'},
-            'augmented_sample': {'.jpg'}
-        }
+        files = []
         
-        extensions = extensions or default_extensions.get(file_type, self.supported_image_formats)
-        return self.scan_files(directory, prefix, extensions)
+        if file_type == 'raw':
+            # Raw data: rp_* files in regular image formats
+            for ext in self.supported_image_formats:
+                files.extend(dir_path.glob(f'rp_*{ext}'))
+                
+        elif file_type == 'preprocessed':
+            # Preprocessed data: pre_* files as .npy files only
+            files.extend(dir_path.glob('pre_*.npy'))
+            
+        elif file_type == 'augmented':
+            # Check directory context to determine correct augmented files
+            parent_path = dir_path.parent
+            if 'augmented' in str(parent_path):
+                # In /data/augmented/: aug_* files in regular image formats (before normalization)
+                for ext in self.supported_image_formats:
+                    files.extend(dir_path.glob(f'aug_*{ext}'))
+            elif 'preprocessed' in str(parent_path):
+                # In /data/preprocessed/: aug_* files as .npy files (after normalization)
+                files.extend(dir_path.glob('aug_*.npy'))
+            else:
+                # Default: both formats
+                for ext in self.supported_image_formats:
+                    files.extend(dir_path.glob(f'aug_*{ext}'))
+                files.extend(dir_path.glob('aug_*.npy'))
+                
+        elif file_type == 'sample':
+            # Sample preprocessed: sample_pre_* files
+            files.extend(dir_path.glob('sample_pre_*.jpg'))
+            
+        elif file_type == 'augmented_sample':
+            # Sample augmented: sample_aug_* files
+            files.extend(dir_path.glob('sample_aug_*.jpg'))
+            
+        else:
+            # Fallback to original logic for compatibility
+            prefix = self.naming_manager.get_prefix(file_type)
+            if prefix:
+                default_extensions = {
+                    'raw': self.supported_image_formats,
+                    'preprocessed': {'.npy'},
+                    'augmented': {'.npy', '.jpg'},
+                    'sample': {'.jpg'},
+                    'augmented_sample': {'.jpg'}
+                }
+                extensions = extensions or default_extensions.get(file_type, self.supported_image_formats)
+                return self.scan_files(directory, prefix, extensions)
+        
+        return sorted(files)
     
     def copy_file(self, src: Union[str, Path], dst: Union[str, Path]) -> bool:
         """📄 Copy single file dengan error handling"""

@@ -66,8 +66,8 @@ class LoadPreprocessedOperation(VisualizationBaseOperation):
             # Muat sampel preprocessed
             result = samples_service['get_samples'](
                 data_dir=data_dir,
-                sample_type='preprocessed',
-                limit=10  # Muat 10 sampel pertama
+                split='train',  # Use valid split parameter instead of sample_type
+                max_samples=10  # Use max_samples instead of limit
             )
             
             if not result.get('success'):

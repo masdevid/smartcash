@@ -126,33 +126,7 @@ class InstallOperationHandler(BaseOperationHandler):
         
         return missing_packages
     
-    def _is_package_installed(self, package: str) -> bool:
-        """Check if a package is already installed.
-        
-        Args:
-            package: Package name to check
-            
-        Returns:
-            True if package is installed, False otherwise
-        """
-        try:
-            # Handle package names with version specifiers
-            package_name = package.split('==')[0].split('>=')[0].split('<=')[0].split('>')[0].split('<')[0].strip()
-            
-            # Try to import the package or use pip show
-            import subprocess
-            result = subprocess.run(
-                ["pip", "show", package_name],
-                capture_output=True,
-                text=True,
-                timeout=10
-            )
-            
-            return result.returncode == 0
-            
-        except Exception:
-            # If we can't check, assume it's not installed (safer to install)
-            return False
+    # _is_package_installed is now inherited from BaseOperationHandler
     
     def _install_packages(self, packages: List[str]) -> List[Dict[str, Any]]:
         """Install multiple packages sequentially with progress tracking."""

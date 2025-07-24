@@ -318,8 +318,8 @@ def check_built_models() -> Dict[str, Any]:
                         elif config_info['priority'] < all_discovered_models[model_key].get('discovery_priority', 999):
                             all_discovered_models[model_key] = model_info
                             
-                except Exception as e:
-                    logger.debug(f"Discovery task failed: {e}")
+                except Exception:
+                    # Suppress individual task failure logs to reduce noise
                     continue
         
         # Organize by backbone type
@@ -374,10 +374,26 @@ def _scan_path_pattern(path_pattern: str, file_patterns: List[str]) -> Dict[str,
         Dictionary of found models with metadata
     """
     found_models = {}
+    logger = get_logger(__name__)
+    
     try:
+        # Convert to absolute path for better reliability
+        from pathlib import Path
+        abs_path = Path(path_pattern).resolve()
+        
+        # Check if directory exists before scanning
+        if not abs_path.exists():
+            logger.debug(f"Directory {abs_path} does not exist, skipping scan")
+            return found_models
+            
+        total_files = 0
+        valid_models = 0
+        
         for pattern in file_patterns:
-            full_pattern = f"{path_pattern}/{pattern}"
+            full_pattern = str(abs_path / pattern)
             files = glob.glob(full_pattern)
+            total_files += len(files)
+            
             for filepath in files:
                 try:
                     metadata = extract_quick_metadata(filepath)
@@ -389,9 +405,14 @@ def _scan_path_pattern(path_pattern: str, file_patterns: List[str]) -> Dict[str,
                             'found_in_path': path_pattern,
                             'pattern': pattern
                         }
-                except Exception as e:
-                    logger.debug(f"Error processing {filepath}: {e}")
+                        valid_models += 1
+                except Exception:
+                    # Suppress per-file error logs to reduce noise
                     continue
+        
+        # Use summary logging instead of per-file logging
+        if total_files > 0:
+            logger.debug(f"Scanned {abs_path}: {valid_models}/{total_files} valid models")
     except Exception as e:
         logger.debug(f"Error scanning {path_pattern} with patterns {file_patterns}: {e}")
     

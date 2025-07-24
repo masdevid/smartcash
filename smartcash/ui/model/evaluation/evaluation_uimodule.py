@@ -220,6 +220,9 @@ class EvaluationUIModule(ModelDiscoveryMixin, ModelConfigSyncMixin, BackendServi
     def _handle_refresh_models(self, button=None) -> Dict[str, Any]:
         """Handle refresh models button using enhanced checkpoint discovery."""
         try:
+            # Suppress button registration logs during discovery
+            self._suppress_button_logs = True
+            
             self.log_info("🔄 Refreshing available models...")
             discovered_models = self.discover_checkpoints(
                 discovery_paths=['data/checkpoints', 'runs/train/*/weights', 'experiments/*/checkpoints'],
@@ -240,6 +243,9 @@ class EvaluationUIModule(ModelDiscoveryMixin, ModelConfigSyncMixin, BackendServi
         except Exception as e:
             self.log_error(f"Model refresh failed: {e}")
             return {'success': False, 'message': f'Refresh failed: {e}'}
+        finally:
+            # Always reset the log suppression flag
+            self._suppress_button_logs = False
     
     def get_evaluation_status(self) -> Dict[str, Any]:
         """Get current evaluation status with real backend data."""

@@ -342,8 +342,14 @@ class ButtonHandlerMixin:
                     self.log_debug(f"  ✓ Skipping already processed button: {button_id}")
                 continue
                 
-            # Reduce logging noise for one-click mode
-            if hasattr(self, 'log_debug') and not self._is_oneclick_mode:
+            # Reduce logging noise for one-click mode and discovery operations
+            suppress_debug = (self._is_oneclick_mode or 
+                            getattr(self, '_suppress_button_logs', False) or
+                            'discovery' in button_id.lower() or 
+                            'refresh' in button_id.lower() or
+                            'rescan' in button_id.lower())
+            
+            if hasattr(self, 'log_debug') and not suppress_debug:
                 self.log_debug(f"🔍 Looking for button widget for handler '{button_id}'")
             
             # Try different naming patterns
@@ -359,7 +365,7 @@ class ButtonHandlerMixin:
             for variant in button_variants:
                 if variant in buttons:
                     button = buttons[variant]
-                    if hasattr(self, 'log_debug') and not self._is_oneclick_mode and variant != button_id:
+                    if hasattr(self, 'log_debug') and not suppress_debug and variant != button_id:
                         self.log_debug(f"  - Found as variant: {variant}")
                     break
             
@@ -380,8 +386,8 @@ class ButtonHandlerMixin:
                 processed_buttons.add(button_id)
                 registered_count += 1
                 
-                # Minimal logging for registration
-                if hasattr(self, 'log_debug') and not self._is_oneclick_mode:
+                # Minimal logging for registration (suppress for discovery operations)
+                if hasattr(self, 'log_debug') and not suppress_debug:
                     self.log_debug(f"✅ Handler registered: {button_id}")
             else:
                 # Only log warnings for critical issues in one-click mode

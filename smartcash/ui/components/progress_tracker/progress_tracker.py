@@ -333,10 +333,12 @@ class ProgressTracker(BaseUIComponent):
                 self.tqdm_manager = TqdmManager(self)
                 self.tqdm_manager.initialize_bars(self._config.get_level_configs())
             
-            # Map level to valid progress bar names
+            # Map level to valid progress bar names based on progress mode
+            # For dual mode: primary->overall, secondary->current  
+            # For triple mode: primary->overall, secondary->step, tertiary->current
             level_map = {
                 'primary': 'overall',
-                'secondary': 'step',
+                'secondary': 'current' if self._config.level.name in ['SINGLE', 'DUAL'] else 'step',
                 'tertiary': 'current'
             }
             level = level_map.get(level, level)

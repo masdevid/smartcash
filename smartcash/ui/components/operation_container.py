@@ -377,8 +377,30 @@ class OperationContainer(BaseUIComponent):
             level: Progress level (primary, secondary, tertiary)
             level_label: Optional label for the progress level
         """
-        if not self.progress_tracker or level not in self.progress_bars:
+        if not self.progress_tracker:
             return
+            
+        # Ensure progress bars are initialized if level doesn't exist
+        if level not in self.progress_bars:
+            # Auto-initialize progress bars if not already done
+            if not self.progress_bars:
+                levels = {
+                    'single': ['primary'],
+                    'dual': ['primary', 'secondary'],
+                    'triple': ['primary', 'secondary', 'tertiary']
+                }.get(self.progress_levels, ['primary'])
+                
+                for lvl in levels:
+                    self.progress_bars[lvl] = {
+                        'value': 0,
+                        'message': '',
+                        'visible': True
+                    }
+            
+            # If level still doesn't exist after setup, return
+            if level not in self.progress_bars:
+                self.log_debug(f"Progress level '{level}' not found in configured levels: {list(self.progress_bars.keys())}")
+                return
         
         # Ensure progress tracker is visible when updating progress
         if not self.progress_tracker._initialized:

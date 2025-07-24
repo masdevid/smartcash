@@ -340,3 +340,120 @@ class BaseOperationHandler(LoggingMixin, OperationMixin):
             'execute': self.execute_operation,
             'cancel': self.cancel_operation
         }
+    
+    # ===== Consolidated Package Management Methods =====
+    
+    def _is_package_installed(self, package: str) -> bool:
+        """
+        Check if a package is installed using pip show.
+        
+        Args:
+            package: Package name to check
+            
+        Returns:
+            True if package is installed, False otherwise
+        """
+        try:
+            # Extract package name without version specifier
+            package_name = package.split('==')[0].split('>=')[0].split('<=')[0].split('>')[0].split('<')[0].strip()
+            
+            # Use pip show to check installation
+            result = subprocess.run(
+                ["pip", "show", package_name],
+                capture_output=True,
+                text=True,
+                timeout=10
+            )
+            return result.returncode == 0
+            
+        except (subprocess.TimeoutExpired, Exception):
+            return False
+    
+    def _get_package_info(self, package: str) -> Dict[str, Any]:
+        """
+        Get detailed information about an installed package.
+        
+        Args:
+            package: Package name to get info for
+            
+        Returns:
+            Dictionary with package information or error details
+        """
+        try:
+            # Extract package name without version specifier
+            package_name = package.split('==')[0].split('>=')[0].split('<=')[0].split('>')[0].split('<')[0].strip()
+            
+            # Use pip show to get package information
+            result = subprocess.run(
+                ['pip', 'show', package_name],
+                capture_output=True,
+                text=True,
+                timeout=30
+            )
+            
+            if result.returncode == 0:
+                # Parse pip show output
+                version_info = self._parse_pip_show_output(result.stdout)
+                return {
+                    'package': package_name,
+                    'installed': True,
+                    'version': version_info.get('version', 'Unknown'),
+                    'location': version_info.get('location', 'Unknown'),
+                    'summary': version_info.get('summary', ''),
+                    'requires': version_info.get('requires', '')
+                }
+            else:
+                return {
+                    'package': package_name,
+                    'installed': False,
+                    'error': 'Package not found',
+                    'message': 'Not installed'
+                }
+                
+        except subprocess.TimeoutExpired:
+            return {
+                'package': package_name,
+                'installed': False,
+                'error': 'Timeout saat memeriksa paket',
+                'message': 'Timeout'
+            }
+        except Exception as e:
+            return {
+                'package': package_name,
+                'installed': False,
+                'error': str(e),
+                'message': 'Error checking package'
+            }
+    
+    def _parse_pip_show_output(self, output: str) -> Dict[str, str]:
+        """Parse output from pip show command."""
+        info = {}
+        for line in output.split('\n'):
+            if ':' in line:
+                key, value = line.split(':', 1)
+                info[key.strip().lower()] = value.strip()
+        return info
+    
+    def _build_pip_command(self, operation: str, package: str, **kwargs) -> List[str]:
+        """
+        Build a pip command based on operation type and configuration.
+        
+        Args:
+            operation: Type of operation ('install', 'uninstall', 'upgrade')
+            package: Package name
+            **kwargs: Additional options
+            
+        Returns:
+            List of command arguments
+        """
+        command = ["pip", operation]
+        
+        if operation == "install":
+            command.append("--upgrade")
+            if self.config.get('use_index_url'):
+                command.extend(["-i", self.config['index_url']])
+        elif operation == "uninstall":
+            command.append("-y")  # Skip confirmation
+            
+        command.append(package)
+        return command

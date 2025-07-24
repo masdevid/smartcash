@@ -418,8 +418,8 @@ class DownloadCleanupOperation(DownloaderBaseOperation):
             
             # Use operation container's confirmation dialog if available
             operation_container = getattr(self._ui_module, 'operation_container', None)
-            if operation_container and hasattr(operation_container, 'show_confirmation_dialog'):
-                operation_container.show_confirmation_dialog(
+            if operation_container and hasattr(operation_container, 'show_dialog'):
+                operation_container.show_dialog(
                     message=message,
                     callback=on_confirm,
                     title="⚠️ Konfirmasi Pembersihan Dataset",

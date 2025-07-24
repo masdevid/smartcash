@@ -728,6 +728,9 @@ class BackboneUIModule(BaseUIModule, ModelDiscoveryMixin, ModelConfigSyncMixin, 
     def _handle_rescan_models(self, _=None) -> None:
         """Handle rescan models button click using operation service."""
         try:
+            # Suppress button registration logs during discovery
+            self._suppress_button_logs = True
+            
             self.log("🔄 Rescanning for existing models...", 'info')
             
             if self._operation_service:
@@ -750,6 +753,9 @@ class BackboneUIModule(BaseUIModule, ModelDiscoveryMixin, ModelConfigSyncMixin, 
             self.log(f"❌ Error during model rescan: {e}", 'error')
             # Log additional debug information
             self.log_error(f"Rescan error details: {e}", exc_info=True)
+        finally:
+            # Always reset the log suppression flag
+            self._suppress_button_logs = False
 
     def _perform_initial_model_scan(self) -> None:
         """Perform initial model scan during module initialization using operation service."""

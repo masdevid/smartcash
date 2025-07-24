@@ -434,7 +434,14 @@ class AugmentationUIModule(BaseUIModule):
                     module_name="augmentation"
                 )
                 summary_container.set_content(formatted_content)
-                self.log_debug("✅ Summary container updated with augmentation results")
+                
+                # Make summary container visible after updating content
+                main_container = self.get_component('main_container')
+                if main_container and hasattr(main_container, 'show_component'):
+                    main_container.show_component('summary')
+                    self.log_debug("✅ Summary container updated and made visible")
+                else:
+                    self.log_debug("✅ Summary container updated with augmentation results")
             else:
                 # Fallback: try operation_summary_updater method
                 updater = self.get_component('operation_summary_updater')

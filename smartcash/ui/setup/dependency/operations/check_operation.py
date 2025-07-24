@@ -157,52 +157,16 @@ class CheckStatusOperationHandler(BaseOperationHandler):
                 'message': 'Dibatalkan oleh pengguna'
             }
         
-        try:
-            # Use pip show to check if package is installed
-            result = subprocess.run(
-                ['pip', 'show', package],
-                capture_output=True,
-                text=True,
-                timeout=30
-            )
+        # Use the consolidated method from BaseOperationHandler
+        package_info = self._get_package_info(package)
+        
+        # Add localized message for compatibility
+        if package_info.get('installed'):
+            version = package_info.get('version', 'Unknown')
+            package_info['message'] = f"Terinstal (v{version})"
+        else:
+            package_info['message'] = 'Tidak terinstal'
             
-            if result.returncode == 0:
-                # Package is installed, parse version info
-                version_info = self._parse_pip_show_output(result.stdout)
-                return {
-                    'package': package,
-                    'installed': True,
-                    'version': version_info.get('version', 'Unknown'),
-                    'location': version_info.get('location', 'Unknown'),
-                    'message': f"Terinstal (v{version_info.get('version', 'Unknown')})"
-                }
-            else:
-                return {
-                    'package': package,
-                    'installed': False,
-                    'message': 'Tidak terinstal'
-                }
-                
-        except subprocess.TimeoutExpired:
-            return {
-                'package': package,
-                'installed': False,
-                'error': 'Timeout saat memeriksa paket',
-                'message': 'Timeout'
-            }
-        except Exception as e:
-            return {
-                'package': package,
-                'installed': False,
-                'error': str(e),
-                'message': f"Error: {str(e)[:50]}"
-            }
+        return package_info
     
-    def _parse_pip_show_output(self, output: str) -> Dict[str, str]:
-        """Parse output from pip show command."""
-        info = {}
-        for line in output.split('\n'):
-            if ':' in line:
-                key, value = line.split(':', 1)
-                info[key.strip().lower()] = value.strip()
-        return info
+    # _parse_pip_show_output is now inherited from BaseOperationHandler

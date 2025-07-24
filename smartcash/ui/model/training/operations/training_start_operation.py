@@ -235,11 +235,18 @@ class TrainingStartOperationHandler(BaseTrainingOperation):
             
             # Check if models are actually built before proceeding
             if backbone_config.get('models_built') is False:
-                error_msg = backbone_config.get('error', 'No built backbone models found')
-                return {
-                    'success': False,
-                    'message': f'Cannot start training: {error_msg}. Please build models in the backbone module first.'
-                }
+                # Try manual discovery as final fallback
+                manual_discovery = self._discover_backbone_models_manually()
+                if manual_discovery.get('available_models'):
+                    self.log_operation("✅ Found models through manual discovery", 'success')
+                    backbone_config = manual_discovery
+                else:
+                    error_msg = backbone_config.get('error', 'No built backbone models found')
+                    self.log_operation(f"❌ {error_msg}. Checked directories: /data/models, /data/checkpoints", 'error')
+                    return {
+                        'success': False,
+                        'message': f'Cannot start training: {error_msg}. Please build models in the backbone module first.'
+                    }
                 
             # Check if we have available models
             available_models = backbone_config.get('available_models', {})
@@ -326,17 +333,28 @@ class TrainingStartOperationHandler(BaseTrainingOperation):
             from pathlib import Path
             import glob
             
-            # Search for backbone model files
+            # Create directories if they don't exist
+            Path('data/models').mkdir(parents=True, exist_ok=True)
+            Path('data/checkpoints').mkdir(parents=True, exist_ok=True)
+            
+            # Search for backbone model files with expanded patterns
             search_paths = [
                 'data/models/*backbone*smartcash*.pt',
                 'data/models/*backbone*smartcash*.pth', 
+                'data/models/backbone_*.pt',           # More flexible pattern
+                'data/models/backbone_*.pth',
                 'data/checkpoints/*backbone*.pt',
                 'data/checkpoints/*backbone*.pth'
             ]
             
             found_models = []
+            searched_paths = []
             for pattern in search_paths:
-                found_models.extend(glob.glob(pattern))
+                matches = glob.glob(pattern)
+                found_models.extend(matches)
+                searched_paths.append(f"{pattern} -> {len(matches)} files")
+            
+            self.log_operation(f"🔍 Manual search results: {'; '.join(searched_paths)}", 'info')
             
             if found_models:
                 # Try to determine backbone type from first found model

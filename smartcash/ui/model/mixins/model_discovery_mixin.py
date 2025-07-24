@@ -108,13 +108,15 @@ class ModelDiscoveryMixin:
                 self._log_discovery(f"Discovery path not found or no matches: {discovery_path}", 'debug')
                 continue
             
-            # Scan each expanded path
+            # Scan each expanded path with summary logging
             for scan_path in paths_to_scan:
-                self._log_discovery(f"📁 Scanning directory: {scan_path}", 'debug')
+                scan_file_count = 0
+                scan_valid_count = 0
                 
                 # Apply each filename pattern
                 for pattern in filename_patterns:
                     checkpoint_files = list(scan_path.glob(pattern))
+                    scan_file_count += len(checkpoint_files)
                     
                     for checkpoint_file in checkpoint_files:
                         total_files_scanned += 1
@@ -135,12 +137,18 @@ class ModelDiscoveryMixin:
                             metadata['validation_message'] = validation_msg
                             
                             if not is_valid:
-                                self._log_discovery(f"⚠️ Invalid checkpoint {checkpoint_file.name}: {validation_msg}", 'debug')
                                 continue
+                            else:
+                                scan_valid_count += 1
                         else:
                             metadata['valid'] = True
+                            scan_valid_count += 1
                         
                         discovered_checkpoints.append(metadata)
+                
+                # Summary log per directory (only if files were found)
+                if scan_file_count > 0:
+                    self._log_discovery(f"📁 {scan_path}: {scan_valid_count}/{scan_file_count} valid models", 'debug')
         
         # Sort by modification time (newest first) and limit to 5 latest
         discovered_checkpoints = sorted(

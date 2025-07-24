@@ -3,7 +3,7 @@ File: smartcash/dataset/preprocessor/api/readiness_api.py
 Deskripsi: Readiness check API untuk preprocessing service
 """
 
-from typing import Dict, Any, List, Union, Optional
+from typing import Dict, Any, List, Union
 from pathlib import Path
 import os
 
@@ -217,6 +217,11 @@ def _check_preprocessed_structure(preprocessed_path: Path) -> Dict[str, Any]:
         total_images = preprocessed_count + augmented_count
         labels_count = len(list(labels_path.glob("*.txt"))) if labels_path.exists() else 0
         
+        # Enhanced data detection - check for any valid files that indicate preprocessed data
+        has_valid_structure = (split_path.exists() and 
+                             (images_path.exists() or labels_path.exists()))
+        has_content = total_images > 0 or labels_count > 0
+        
         splits_status[split] = {
             'exists': split_path.exists(),
             'images_dir_exists': images_path.exists(),
@@ -225,14 +230,16 @@ def _check_preprocessed_structure(preprocessed_path: Path) -> Dict[str, Any]:
             'augmented_count': augmented_count,
             'total_images': total_images,
             'labels_count': labels_count,
-            'has_data': total_images > 0 or labels_count > 0
+            'has_data': has_valid_structure and has_content,
+            'has_structure': has_valid_structure
         }
         
         total_preprocessed_files += total_images + labels_count
     
-    # Structure is ready if all directories exist (regardless of content)
-    all_dirs_exist = all(split_info['exists'] for split_info in splits_status.values())
-    structure_ready = preprocessed_path.exists() and all_dirs_exist
+    # Structure is ready if preprocessed directory exists and has valid structure or data
+    has_any_data = any(split_info['has_data'] for split_info in splits_status.values())
+    has_any_structure = any(split_info['has_structure'] for split_info in splits_status.values())
+    structure_ready = preprocessed_path.exists() and (has_any_data or has_any_structure)
     
     return {
         'structure_ready': structure_ready,
@@ -384,15 +391,6 @@ def get_preprocessing_directory_info(data_dir: Union[str, Path] = "data") -> Dic
             'directory_info': {}
         }
 
-
-def _generate_readiness_message(ready: bool, has_data: bool, total_files: int) -> str:
-    """Generate human-readable readiness message."""
-    if not ready:
-        return "❌ Service not ready - preprocessed directory structure missing"
-    elif not has_data:
-        return "⚠️ Service ready but no preprocessed data found"
-    else:
-        return f"✅ Service ready with {total_files} preprocessed files"
 
 
 def _generate_existing_data_message(has_data: bool, total_files: int) -> str:

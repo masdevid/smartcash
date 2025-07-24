@@ -91,13 +91,13 @@ def create_dependency_ui_components(module_config: Optional[Dict[str, Any]] = No
         buttons=[
             {
                 'id': 'install',
-                'text': '📥 Instal Terpilih',
+                'text': '📥 Instal Paket Terpilih',
                 'style': 'success',
                 'tooltip': 'Instal paket yang dipilih'
             },
             {
                 'id': 'check_status', 
-                'text': '🔍 Cek Status',
+                'text': '🔍 Periksa Status',
                 'style': 'info',
                 'tooltip': 'Periksa status instalasi dan temukan paket yang hilang'
             },

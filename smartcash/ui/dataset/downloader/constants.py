@@ -52,8 +52,8 @@ CONFIG_ROBOFLOW_VERSION = 'version'
 # Module metadata
 MODULE_GROUP: str = "dataset"
 MODULE_NAME: str = "downloader"
-MODULE_TITLE: str = "Dataset Downloader"
-MODULE_DESCRIPTION: str = "Download datasets from Roboflow"
+MODULE_TITLE: str = "Unduh Dataset"
+MODULE_DESCRIPTION: str = "Unduh dataset dari Roboflow"
 MODULE_ICON: str = "📥"
 MODULE_VERSION: str = "1.0.0"
 
@@ -72,21 +72,21 @@ UI_CONFIG: Dict[str, Any] = {
 # Button configurations
 BUTTON_CONFIG: Dict[str, ButtonConfig] = {
     OperationType.DOWNLOAD.value: {
-        'text': '📥 Download',
+        'text': '📥 Unduh',
         'style': 'success',
-        'tooltip': 'Download dataset from Roboflow',
+        'tooltip': 'Unduh dataset dari Roboflow',
         'order': 1
     },
     OperationType.CHECK.value: {
-        'text': '🔍 Check',
+        'text': '🔍 Periksa',
         'style': 'info',
-        'tooltip': 'Check dataset status and integrity',
+        'tooltip': 'Periksa status dan integritas dataset',
         'order': 2
     },
     OperationType.CLEANUP.value: {
-        'text': '🗑️ Cleanup',
+        'text': '🗑️ Bersihkan',
         'style': 'danger',
-        'tooltip': 'Remove dataset files from local storage',
+        'tooltip': 'Hapus file dataset dari penyimpanan lokal',
         'order': 3
     }
 }

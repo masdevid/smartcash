@@ -65,13 +65,18 @@ class SmartCashModelAPI:
             'model': {
                 'backbone': 'efficientnet_b4',
                 'model_name': 'smartcash_yolov5',
-                'detection_layers': ['banknote'],
-                'layer_mode': 'single',
-                'num_classes': 7,
+                'detection_layers': ['layer_1', 'layer_2', 'layer_3'],
+                'layer_mode': 'multi',
+                'multi_layer_heads': True,
+                'num_classes': {
+                    'layer_1': 7,   # 7 denominations
+                    'layer_2': 7,   # 7 denomination-specific features  
+                    'layer_3': 3    # 3 common features
+                },
                 'img_size': 640,
                 'confidence_threshold': 0.25,
                 'iou_threshold': 0.45,
-                'feature_optimization': {'enabled': False}
+                'feature_optimization': {'enabled': True}
             },
             'data': {
                 'pretrained_dir': '/data/pretrained',
@@ -194,7 +199,10 @@ class SmartCashModelAPI:
                     d[k] = v
             return d
         
+        self.logger.debug(f"📝 Before update - backbone: {self.config.get('model', {}).get('backbone', 'N/A')}")
+        self.logger.debug(f"📝 Updates received: {updates}")
         update_nested(self.config, updates)
+        self.logger.debug(f"📝 After update - backbone: {self.config.get('model', {}).get('backbone', 'N/A')}")
         self.logger.debug("📝 Configuration updated")
     
     def _preprocess_input(self, input_data: Union[str, torch.Tensor]) -> torch.Tensor:
@@ -249,7 +257,7 @@ class SmartCashModelAPI:
             'total_parameters': total_params,
             'trainable_parameters': trainable_params,
             'device': str(self.device),
-            'feature_optimization': self.config['model']['feature_optimization']['enabled'],
+            'feature_optimization': self.config['model']['feature_optimization'] if isinstance(self.config['model']['feature_optimization'], bool) else self.config['model']['feature_optimization']['enabled'],
             'memory_usage': f"{torch.cuda.memory_allocated(self.device) / 1024**2:.1f} MB" if self.device.type == 'cuda' else 'N/A'
         }
     

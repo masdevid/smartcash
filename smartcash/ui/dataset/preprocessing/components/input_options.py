@@ -37,26 +37,33 @@ def create_preprocessing_input_options(config: Optional[Dict[str, Any]] = None) 
     resolution_dropdown = widgets.Dropdown(
         options=preset_options,
         value=current_preset if current_preset in YOLO_PRESETS else 'yolov5s',
-        description='YOLO Preset:',
-        style={'description_width': '90px'}
+        description='Preset YOLO:',
+        style={'description_width': '90px'},
+        tooltip='Pilih preset model YOLO untuk normalisasi gambar'
     )
     resolution_dropdown.layout = widgets.Layout(width='100%', margin='2px 0')
     
     # Normalization method
     method = normalization_config.get('method', 'minmax')
     normalization_dropdown = widgets.Dropdown(
-        options=[('Min-Max (0-1)', 'minmax'), ('Z-Score', 'zscore'), ('Robust', 'robust')],
+        options=[
+            ('Min-Max (0-1)', 'minmax'), 
+            ('Z-Score', 'zscore'), 
+            ('Robust', 'robust')
+        ],
         value=method if method in ['minmax', 'zscore', 'robust'] else 'minmax',
         description='Metode:',
-        style={'description_width': '90px'}
+        style={'description_width': '90px'},
+        tooltip='Pilih metode normalisasi untuk data gambar'
     )
     normalization_dropdown.layout = widgets.Layout(width='100%', margin='2px 0')
     
     # Preserve aspect ratio
     preserve_aspect_checkbox = widgets.Checkbox(
         value=normalization_config.get('preserve_aspect_ratio', True),
-        description='Pertahankan Aspect Ratio (YOLO)',
-        style={'description_width': 'initial'}
+        description='Pertahankan Rasio Aspek (YOLO)',
+        style={'description_width': 'initial'},
+        tooltip='Pertahankan rasio aspek gambar saat melakukan resize'
     )
     preserve_aspect_checkbox.layout = widgets.Layout(width='100%', margin='2px 0')
     
@@ -77,8 +84,9 @@ def create_preprocessing_input_options(config: Optional[Dict[str, Any]] = None) 
     target_splits_select = widgets.SelectMultiple(
         options=split_options,
         value=tuple(target_splits) if isinstance(target_splits, list) else tuple(DEFAULT_SPLITS),
-        description='Target Splits:',
-        style={'description_width': '90px'}
+        description='Pembagian Data:',
+        style={'description_width': '90px'},
+        tooltip='Pilih pembagian data untuk preprocessing (train/val/test)'
     )
     target_splits_select.layout = widgets.Layout(width='100%', height='80px', margin='2px 0')
     
@@ -86,13 +94,14 @@ def create_preprocessing_input_options(config: Optional[Dict[str, Any]] = None) 
     batch_size_input = widgets.BoundedIntText(
         value=preprocessing_config.get('batch_size', 32),
         min=1, max=256, step=1,
-        description='Batch Size:',
-        style={'description_width': '90px'}
+        description='Ukuran Batch:',
+        style={'description_width': '90px'},
+        tooltip='Jumlah sampel yang diproses dalam satu batch (semakin besar membutuhkan lebih banyak memori)'
     )
     batch_size_input.layout = widgets.Layout(width='100%', margin='2px 0')
     
     processing_section = widgets.VBox([
-        widgets.HTML(value="<div style='font-weight:bold;color:#FF9800;margin-bottom:6px;'>⚡ Processing</div>"),
+        widgets.HTML(value="<div style='font-weight:bold;color:#FF9800;margin-bottom:6px;'>⚡ Pemrosesan</div>"),
         target_splits_select,
         batch_size_input
     ])
@@ -103,21 +112,25 @@ def create_preprocessing_input_options(config: Optional[Dict[str, Any]] = None) 
     validation_checkbox = widgets.Checkbox(
         value=validation_config.get('enabled', False),
         description='Validasi Dataset (Minimal)',
-        style={'description_width': 'initial'}
+        style={'description_width': 'initial'},
+        tooltip='Aktifkan validasi dataset untuk memeriksa kualitas data'
     )
     validation_checkbox.layout = widgets.Layout(width='100%', margin='2px 0')
     
     move_invalid_checkbox = widgets.Checkbox(
         value=preprocessing_config.get('move_invalid', False),
-        description='Pindahkan File Invalid',
-        style={'description_width': 'initial'}
+        description='Pindahkan File Tidak Valid',
+        style={'description_width': 'initial'},
+        tooltip='Pindahkan file yang tidak valid ke direktori terpisah'
     )
     move_invalid_checkbox.layout = widgets.Layout(width='100%', margin='2px 0')
     
     invalid_dir_input = widgets.Text(
         value=preprocessing_config.get('invalid_dir', 'data/invalid'),
-        description='Dir Invalid:',
-        style={'description_width': '90px'}
+        description='Direktori Invalid:',
+        style={'description_width': '90px'},
+        placeholder='Masukkan direktori untuk file tidak valid',
+        tooltip='Lokasi penyimpanan file yang tidak lolos validasi'
     )
     invalid_dir_input.layout = widgets.Layout(width='100%', margin='2px 0')
     
@@ -136,19 +149,21 @@ def create_preprocessing_input_options(config: Optional[Dict[str, Any]] = None) 
         options=cleanup_target_options,
         value=preprocessing_config.get('cleanup_target', CleanupTarget.PREPROCESSED.value),
         description='Target:',
-        style={'description_width': '90px'}
+        style={'description_width': '90px'},
+        tooltip='Pilih target yang akan dibersihkan'
     )
     cleanup_target_dropdown.layout = widgets.Layout(width='100%', margin='2px 0')
     
     backup_checkbox = widgets.Checkbox(
         value=preprocessing_config.get('backup_enabled', True),
         description='Buat Backup Sebelum Hapus',
-        style={'description_width': 'initial'}
+        style={'description_width': 'initial'},
+        tooltip='Buat cadangan data sebelum melakukan pembersihan'
     )
     backup_checkbox.layout = widgets.Layout(width='100%', margin='2px 0')
     
     cleanup_section = widgets.VBox([
-        widgets.HTML(value="<div style='font-weight:bold;color:#F44336;margin-bottom:6px;'>🧹 Cleanup</div>"),
+        widgets.HTML(value="<div style='font-weight:bold;color:#F44336;margin-bottom:6px;'>🧹 Pembersihan</div>"),
         cleanup_target_dropdown,
         backup_checkbox
     ])
@@ -163,13 +178,19 @@ def create_preprocessing_input_options(config: Optional[Dict[str, Any]] = None) 
     bottom_row.layout = widgets.Layout(width='100%', justify_content='space-between')
     
     options_container = widgets.VBox([
-        widgets.HTML(value="<h5 style='margin:8px 0;color:#495057;border-bottom:2px solid #28a745;padding-bottom:4px;'>⚙️ Konfigurasi Preprocessing</h5>"),
+        widgets.HTML(value="<h5 style='margin:8px 0;color:#495057;border-bottom:2px solid #28a745;padding-bottom:4px;'>⚙️ Konfigurasi Pra-pemrosesan</h5>"),
         top_row,
-        bottom_row
+        bottom_row,
+        widgets.HTML(value="<div style='margin-top:10px;font-size:12px;color:#6c757d;'>"
+                         "<i>Pastikan konfigurasi sesuai sebelum memulai proses</i></div>")
     ])
     options_container.layout = widgets.Layout(
-        padding='12px', width='100%', border='1px solid #dee2e6',
-        border_radius='6px', background_color='#f8f9fa'
+        padding='12px', 
+        width='100%', 
+        border='1px solid #dee2e6',
+        border_radius='6px', 
+        background_color='#f8f9fa',
+        margin='5px 0 15px 0'
     )
     
     # Attach components for access from parent

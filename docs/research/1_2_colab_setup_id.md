@@ -1,4 +1,4 @@
-# Analisis Alur Setup Google Colab pada SmartCash
+# 1.2 Konfigurasi Lingkungan Google Colab
 
 ## Deskripsi
 

@@ -84,7 +84,7 @@ class ModelProgressBridge:
                     self.progress_callback.error(error_message, phase)
                 elif callable(self.progress_callback):
                     # Fallback: call as regular progress dengan error indicator
-                    self.progress_callback("error", 0, 1, f"❌ {error_message}", phase)
+                    self.progress_callback("error", 0, 1, f"❌ {error_message}")
             except Exception as e:
                 self.logger.warning(f"⚠️ Error calling progress callback: {str(e)}")
         

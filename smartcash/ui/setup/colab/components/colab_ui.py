@@ -104,10 +104,10 @@ def _create_colab_ui_components(config: Dict[str, Any]) -> Tuple[Dict[str, Any],
     ui_components['disable_all'] = action_container.get('disable_all')
     
     # 4. Create summary container
-    summary_content = "<div style='padding: 10px; width: 100%;'>Colab setup summary will appear here...</div>"
+    summary_content = "<div style='padding: 10px; width: 100%;'>Ringkasan setup Colab akan muncul di sini...</div>"
     summary_container = create_summary_container(
         theme='default',
-        title='Colab Setup Summary',
+        title='Ringkasan Setup Colab',
         icon='📊'
     )
     summary_container.set_content(summary_content)
@@ -152,8 +152,8 @@ def _create_header(): return create_header_container(title=UI_CONFIG['title'], s
 
 def _create_action_buttons():
     return create_action_container(
-        buttons=[{'id': 'colab_setup', 'text': '🚀 Mulai Setup', 'style': 'primary', 'tooltip': 'One-click setup untuk semua fase lingkungan Colab', 'order': 1}],
-        title="🚀 Colab Environment Setup",
+        buttons=[{'id': 'colab_setup', 'text': '🚀 Mulai Setup', 'style': 'primary', 'tooltip': 'Setup satu klik untuk semua fase lingkungan Colab', 'order': 1}],
+        title="🚀 Setup Lingkungan Colab",
         container_margin="15px 0 5px 0",
         show_save_reset=True,
         phases=COLAB_PHASES
@@ -164,8 +164,8 @@ def _create_operation_container():
 
 def _create_footer():
     return create_footer_container(panels=[
-        PanelConfig(panel_type=PanelType.INFO_ACCORDION, title="📚 Colab Setup Guide", content=_create_module_info_box().value, style="info", flex="1", min_width="50%", open_by_default=False),
-        PanelConfig(panel_type=PanelType.INFO_ACCORDION, title="💡 Setup Tips", content=_create_module_tips_box().value, style="info", flex="1", min_width="50%", open_by_default=False)
+        PanelConfig(panel_type=PanelType.INFO_ACCORDION, title="📚 Panduan Setup Colab", content=_create_module_info_box().value, style="info", flex="1", min_width="50%", open_by_default=False),
+        PanelConfig(panel_type=PanelType.INFO_ACCORDION, title="💡 Tips Setup", content=_create_module_info_box().value, style="info", flex="1", min_width="50%", open_by_default=False)
     ])
 
 def _assemble_main_container(header_container, form_container, action_container, summary_container, operation_container, environment_container):

@@ -25,11 +25,17 @@ class YOLOHead(nn.Module):
         self.img_size = img_size
         self.num_anchors = num_anchors
         
-        # Layer configuration untuk currency detection
+        # Layer configuration untuk currency detection (MODEL_ARC.md compliant)
         self.layer_config = {
+            # Legacy configuration for backward compatibility
             'banknote': {'num_classes': 7, 'description': 'Main banknote detection'},
             'nominal': {'num_classes': 7, 'description': 'Nominal value detection'},
-            'security': {'num_classes': 3, 'description': 'Security features detection'}
+            'security': {'num_classes': 3, 'description': 'Security features detection'},
+            
+            # MODEL_ARC.md compliant multi-layer configuration
+            'layer_1': {'num_classes': 7, 'description': 'Full banknote detection (main object)'},
+            'layer_2': {'num_classes': 7, 'description': 'Denomination-specific visual markers'},
+            'layer_3': {'num_classes': 3, 'description': 'Common features across all notes'}
         }
         
         # Build detection heads
@@ -49,7 +55,7 @@ class YOLOHead(nn.Module):
                 primary_layer: self._create_layer_heads(layer_classes)
             })
             
-        elif self.layer_mode == 'multilayer':
+        elif self.layer_mode in ['multilayer', 'multi']:
             # Multi-layer mode: separate heads untuk setiap layer
             self.heads = nn.ModuleDict()
             
@@ -57,6 +63,17 @@ class YOLOHead(nn.Module):
                 if layer_name in self.layer_config:
                     layer_classes = self.layer_config[layer_name]['num_classes']
                     self.heads[layer_name] = self._create_layer_heads(layer_classes)
+                else:
+                    # Fallback: use default num_classes if layer not in config
+                    self.logger.warning(f"⚠️ Layer '{layer_name}' not in config, using default classes: {self.num_classes}")
+                    self.heads[layer_name] = self._create_layer_heads(self.num_classes)
+        
+        else:
+            # Fallback case: initialize empty heads if mode not recognized
+            self.logger.warning(f"⚠️ Unrecognized layer_mode: {self.layer_mode}, using single layer fallback")
+            self.heads = nn.ModuleDict({
+                'fallback': self._create_layer_heads(self.num_classes)
+            })
         
         self.logger.debug(f"🔧 Built {len(self.heads)} detection heads")
     

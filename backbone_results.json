@@ -1,0 +1,95 @@
+{
+  "total_backbones": 2,
+  "successful_builds": 2,
+  "successful_validations": 0,
+  "results": {
+    "efficientnet_b4": {
+      "build": {
+        "success": true,
+        "backbone_type": "efficientnet_b4",
+        "model_info": {
+          "status": "built",
+          "model_name": "smartcash_yolov5",
+          "backbone": "efficientnet_b4",
+          "layer_mode": "multi",
+          "detection_layers": [
+            "layer_1",
+            "layer_2",
+            "layer_3"
+          ],
+          "num_classes": {
+            "layer_1": 7,
+            "layer_2": 7,
+            "layer_3": 3
+          },
+          "img_size": 640,
+          "total_parameters": 65119848,
+          "trainable_parameters": 65119848,
+          "device": "cpu",
+          "feature_optimization": true,
+          "memory_usage": "N/A"
+        },
+        "device": "cpu",
+        "parameters": 65119848,
+        "backbone_name": "efficientnet_b4",
+        "layer_mode": "multi",
+        "detection_layers": [
+          "layer_1",
+          "layer_2",
+          "layer_3"
+        ],
+        "checkpoint_path": "data/checkpoints/best_smartcash_yolov5_efficientnet_b4_20250724.pt"
+      },
+      "validation": {
+        "success": false,
+        "backbone_type": "efficientnet_b4",
+        "error": "No built models found for efficientnet_b4",
+        "available_backbones": []
+      }
+    },
+    "cspdarknet": {
+      "build": {
+        "success": true,
+        "backbone_type": "cspdarknet",
+        "model_info": {
+          "status": "built",
+          "model_name": "smartcash_yolov5",
+          "backbone": "cspdarknet",
+          "layer_mode": "multi",
+          "detection_layers": [
+            "layer_1",
+            "layer_2",
+            "layer_3"
+          ],
+          "num_classes": {
+            "layer_1": 7,
+            "layer_2": 7,
+            "layer_3": 3
+          },
+          "img_size": 640,
+          "total_parameters": 55281213,
+          "trainable_parameters": 48055328,
+          "device": "cpu",
+          "feature_optimization": true,
+          "memory_usage": "N/A"
+        },
+        "device": "cpu",
+        "parameters": 55281213,
+        "backbone_name": "cspdarknet",
+        "layer_mode": "multi",
+        "detection_layers": [
+          "layer_1",
+          "layer_2",
+          "layer_3"
+        ],
+        "checkpoint_path": "data/checkpoints/best_smartcash_yolov5_cspdarknet_20250724.pt"
+      },
+      "validation": {
+        "success": false,
+        "backbone_type": "cspdarknet",
+        "error": "No built models found for cspdarknet",
+        "available_backbones": []
+      }
+    }
+  }
+}

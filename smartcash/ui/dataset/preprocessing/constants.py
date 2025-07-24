@@ -128,7 +128,7 @@ UI_CONFIG = {
 
 # ==================== DEFAULT SPLITS ====================
 
-DEFAULT_SPLITS = ['train', 'valid']
+DEFAULT_SPLITS = ['train', 'valid', 'test']
 SUPPORTED_SPLITS = ['train', 'valid', 'test']
 
 # ==================== PROGRESS SETTINGS ====================

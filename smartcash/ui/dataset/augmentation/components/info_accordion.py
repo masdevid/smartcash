@@ -18,20 +18,20 @@ def create_info_accordion() -> widgets.Widget:
     # Define accordion sections with their titles and content
     sections = [
         {
-            'title': '💡 Augmentation Tips',
+            'title': '💡 Tips Augmentasi',
             'items': [
-                "Use 'Combined' type for balanced position + lighting effects",
-                'Monitor target count to maintain dataset balance',
-                'Preview results before running full augmentation',
-                'Backup data before cleanup operations'
+                "Gunakan tipe 'Combined' untuk efek posisi + pencahayaan yang seimbang",
+                'Pantau jumlah target untuk menjaga keseimbangan dataset',
+                'Pratinjau hasil sebelum menjalankan augmentasi penuh',
+                'Buat cadangan data sebelum operasi pembersihan'
             ]
         },
         {
-            'title': '📊 Recommended Settings',
+            'title': '📊 Pengaturan yang Direkomendasikan',
             'items': [
-                'Start with low intensity (0.1-0.3) and gradually increase',
-                'Use 2-4 augmentation types for balanced results',
-                'Check class distribution after augmentation'
+                'Mulai dengan intensitas rendah (0.1-0.3) dan tingkatkan secara bertahap',
+                'Gunakan 2-4 tipe augmentasi untuk hasil yang seimbang',
+                'Periksa distribusi kelas setelah augmentasi'
             ]
         }
     ]
@@ -50,7 +50,7 @@ def create_info_accordion() -> widgets.Widget:
         accordion_children.append(widgets.HTML(content))
     
     # Create and configure the accordion
-    accordion = widgets.Accordion(children=accordion_children)
+    accordion = widgets.Accordion(children=accordion_children, selected_index=None)  # Collapsed by default
     
     # Set section titles
     for i, section in enumerate(sections):

@@ -54,6 +54,9 @@ def create_operation_container(
         'show_info': container.show_info,
         'clear_dialog': container.clear_dialog,
         'update_progress': container.update_progress,
+        'update_triple_progress': container.update_triple_progress,
+        'complete_triple_progress': container.complete_triple_progress,
+        'error_triple_progress': container.error_triple_progress,
         'log': container.log
     }
 
@@ -399,7 +402,7 @@ class OperationContainer(BaseUIComponent):
             
             # If level still doesn't exist after setup, return
             if level not in self.progress_bars:
-                self.log_debug(f"Progress level '{level}' not found in configured levels: {list(self.progress_bars.keys())}")
+                self.debug(f"Progress level '{level}' not found in configured levels: {list(self.progress_bars.keys())}")
                 return
         
         # Ensure progress tracker is visible when updating progress
@@ -483,6 +486,75 @@ class OperationContainer(BaseUIComponent):
             })
         
         self._update_progress_bars()
+    
+    def update_triple_progress(self, 
+                              overall_step: int = None, overall_message: str = "",
+                              phase_step: int = None, phase_message: str = "",
+                              current_step: int = None, current_message: str = "") -> None:
+        """Update triple progress display for granular operation tracking.
+        
+        Args:
+            overall_step: Overall progress value (0-100)
+            overall_message: Overall progress message
+            phase_step: Phase progress value (0-100) 
+            phase_message: Phase progress message
+            current_step: Current step progress value (0-100)
+            current_message: Current step progress message
+        """
+        try:
+            # Update overall progress (primary level)
+            if overall_step is not None:
+                self.update_progress(overall_step, overall_message, 'primary')
+            
+            # Update phase progress (secondary level)
+            if phase_step is not None:
+                self.update_progress(phase_step, phase_message, 'secondary')
+            
+            # Update current progress (tertiary level)
+            if current_step is not None:
+                self.update_progress(current_step, current_message, 'tertiary')
+                
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Error in update_triple_progress: {e}")
+    
+    def complete_triple_progress(self, message: str = "Completed!") -> None:
+        """Complete triple progress tracking by setting all levels to 100%.
+        
+        Args:
+            message: Completion message
+        """
+        try:
+            self.update_triple_progress(
+                overall_step=100, overall_message=message,
+                phase_step=100, phase_message=message,
+                current_step=100, current_message=message
+            )
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Error in complete_triple_progress: {e}")
+    
+    def error_triple_progress(self, message: str = "An error occurred!") -> None:
+        """Set triple progress to error state.
+        
+        Args:
+            message: Error message
+        """
+        try:
+            # Set error state for all three levels
+            for level in ['primary', 'secondary', 'tertiary']:
+                if level in self.progress_bars:
+                    self.progress_bars[level].update({
+                        'error': True,
+                        'message': f"❌ {message}"
+                    })
+            self._update_progress_bars()
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Error in error_triple_progress: {e}")
     
     def _update_progress_bars(self) -> None:
         """Update the progress tracker with current progress values."""

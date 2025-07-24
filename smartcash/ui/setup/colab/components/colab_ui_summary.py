@@ -21,20 +21,20 @@ def create_module_summary_content(config: Dict[str, Any]) -> Optional[widgets.Wi
     
     # Add environment summary
     env_summary = [
-        f"<strong>Environment:</strong> {config.get('environment', 'Not configured')}",
-        f"<strong>Drive Path:</strong> {config.get('drive_path', 'Not set')}",
-        f"<strong>Project Name:</strong> {config.get('project_name', 'Not set')}"
+        f"<strong>Lingkungan:</strong> {config.get('environment', 'Belum dikonfigurasi')}",
+        f"<strong>Path Drive:</strong> {config.get('drive_path', 'Belum diatur')}",
+        f"<strong>Nama Proyek:</strong> {config.get('project_name', 'Belum diatur')}"
     ]
     
     # Add configuration summary
     if 'auto_detect' in config:
-        auto_detect = "Enabled" if config['auto_detect'] else "Disabled"
-        env_summary.append(f"<strong>Auto-detect:</strong> {auto_detect}")
+        auto_detect = "Aktif" if config['auto_detect'] else "Nonaktif"
+        env_summary.append(f"<strong>Deteksi Otomatis:</strong> {auto_detect}")
     
     # Create summary widget
     if env_summary:
         summary_html = "<div style='line-height: 1.6;'>"
-        summary_html += "<h4 style='margin-top: 0;'>Configuration Summary</h4>"
+        summary_html += "<h4 style='margin-top: 0;'>Ringkasan Konfigurasi</h4>"
         summary_html += "<ul style='margin: 0; padding-left: 20px;'>"
         for item in env_summary:
             summary_html += f"<li>{item}</li>"

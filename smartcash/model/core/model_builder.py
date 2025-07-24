@@ -32,13 +32,20 @@ class ModelBuilder:
             feature_optimization = feature_optimization or {'enabled': False}
             
             self.logger.info(f"🏗️ Building {backbone} model | Layers: {detection_layers} | Mode: {layer_mode}")
+            self.logger.debug(f"🔍 Model config received: backbone={backbone}, layer_mode={layer_mode}, detection_layers={detection_layers}")
             
             # Step 1: Build backbone
             self.progress_bridge.update_substep(1, 4, f"🔧 Building {backbone} backbone...")
+            # Handle feature_optimization as bool or dict
+            if isinstance(feature_optimization, bool):
+                feature_opt_enabled = feature_optimization
+            else:
+                feature_opt_enabled = feature_optimization.get('enabled', False)
+                
             backbone_model = self.backbone_factory.create_backbone(
                 backbone, 
                 pretrained=True,
-                feature_optimization=feature_optimization.get('enabled', False)
+                feature_optimization=feature_opt_enabled
             )
             
             # Step 2: Build neck (FPN-PAN)

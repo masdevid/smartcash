@@ -186,6 +186,10 @@ class FileNamingManager:
         except (ValueError, TypeError):
             return '000000'
     
+    def parse_existing_filename(self, filename: str) -> Optional[Dict[str, str]]:
+        """Alias for parse_filename to maintain backward compatibility"""
+        return self.parse_filename(filename)
+        
     def extract_primary_class_from_label(self, label_path: Path) -> Optional[str]:
         """Extract primary class dengan layer priority"""
         if not label_path.exists():

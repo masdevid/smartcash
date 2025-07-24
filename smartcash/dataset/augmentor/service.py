@@ -152,7 +152,7 @@ class AugmentationService:
         
         for file_path in aug_files:
             try:
-                parsed = self.engine.naming_manager.parse_filename(file_path.name)
+                parsed = self.engine.naming_manager.parse_filename(Path(file_path).name)
                 if parsed and parsed.get('type') == 'augmented':
                     variance = parsed.get('variance', '001')
                     unique_variances.add(variance)

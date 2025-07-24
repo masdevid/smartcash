@@ -5,8 +5,8 @@ Description: Constants for the augmentation module.
 
 # UI Configuration
 UI_CONFIG = {
-    'title': 'Data Augmentation',
-    'subtitle': 'Configure image augmentation for dataset enhancement',
+    'title': 'Augmentasi Data',
+    'subtitle': 'Konfigurasi augmentasi gambar untuk peningkatan dataset',
     'icon': '🎨',
     'module_name': 'augmentation',
     'parent_module': 'dataset',
@@ -16,21 +16,21 @@ UI_CONFIG = {
 # Button Configuration
 BUTTON_CONFIG = {
     'augment': {
-        'text': '🎨 Augment Dataset',
+        'text': '🎨 Augmentasi Dataset',
         'style': 'success',  # Changed from 'primary' to avoid conflict
-        'tooltip': 'Apply augmentation to the dataset',
+        'tooltip': 'Terapkan augmentasi pada dataset',
         'order': 1
     },
     'status': {
-        'text': '🔍 Check Status',
+        'text': '🔍 Periksa Status',
         'style': 'info',
-        'tooltip': 'Check augmentation status',
+        'tooltip': 'Periksa status augmentasi',
         'order': 2
     },
     'cleanup': {
-        'text': '🧹 Cleanup',
-        'style': 'warning',
-        'tooltip': 'Clean up augmented files',
+        'text': '🧹 Bersihkan',
+        'style': 'danger',
+        'tooltip': 'Bersihkan file hasil augmentasi',
         'order': 3
     }
 }

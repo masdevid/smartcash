@@ -45,10 +45,10 @@ def _create_augment_ui_components(config: Dict[str, Any]) -> Dict[str, Any]:
     # 4. Create summary container
     summary_container = create_summary_container(
         theme='default',
-        title='Augmentation Summary',
+        title='Ringkasan Augmentasi',
         icon='📊'
     )
-    summary_content = "<div style='padding: 10px; width: 100%;'>Augmentation summary will appear here...</div>"
+    summary_content = "<div style='padding: 10px; width: 100%;'>Ringkasan augmentasi akan muncul di sini...</div>"
     summary_container.set_content(summary_content)
     
     # 5. Create operation container
@@ -116,7 +116,7 @@ def _create_action_buttons() -> Dict[str, Any]:
     
     return create_action_container(
         buttons=action_buttons,
-        title="🚀 Augmentation Operations",
+        title="🚀 Operasi Augmentasi",
         container_margin="15px 0 5px 0",
         show_save_reset=True  # Include save/reset buttons
     )
@@ -142,7 +142,7 @@ def _create_footer() -> Any:
         panels=[
             PanelConfig(
                 panel_type=PanelType.INFO_ACCORDION,
-                title="📚 Augmentation Guide",
+                title="📚 Panduan Augmentasi",
                 content=create_info_accordion(),
                 style="info",
                 flex="1",

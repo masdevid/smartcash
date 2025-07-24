@@ -24,9 +24,9 @@ def create_live_preview_widget() -> Dict[str, Any]:
     
     # Generate preview button
     generate_button = widgets.Button(
-        description='🎯 Generate Preview',
+        description='🎯 Hasilkan Pratinjau',
         button_style='info',
-        tooltip='Generate preview ke /data/aug_preview.jpg',
+        tooltip='Hasilkan pratinjau ke /data/aug_preview.jpg',
         icon='image',
         layout=widgets.Layout(
             width='180px', height='32px', 
@@ -36,23 +36,23 @@ def create_live_preview_widget() -> Dict[str, Any]:
     
     # Status text untuk preview
     preview_status = widgets.HTML(
-        value="<div style='text-align: center; color: #666; font-size: 12px; margin: 4px 0;'>Preview: /data/aug_preview.jpg</div>",
+        value="<div style='text-align: center; color: #666; font-size: 12px; margin: 4px 0;'>Pratinjau: /data/aug_preview.jpg</div>",
         layout=widgets.Layout(width='100%', margin='4px auto')
     )
     
     # Info content with simple HTML
     info_content = widgets.HTML("""
     <div style='background: #f8f9fa; padding: 8px; border-radius: 4px; margin: 8px 0; font-size: 12px;'>
-        <strong>Live Preview:</strong><br>
-        • File: /data/aug_preview.jpg<br>
-        • Generate: Buat preview dari parameter saat ini<br>
-        • Format: 200x200px responsive container
+        <strong>Pratinjau Langsung:</strong><br>
+        • Berkas: /data/aug_preview.jpg<br>
+        • Hasilkan: Buat pratinjau dari parameter saat ini<br>
+        • Format: Kontainer responsif 200x200px
     </div>
     """)
     
     # Main container dengan center alignment  
     container = widgets.VBox([
-        widgets.HTML("<h6 style='color: #ff9800; margin: 6px 0;'>🎬 Live Preview Augmentasi</h6>"),
+        widgets.HTML("<h6 style='color: #ff9800; margin: 6px 0;'>🎬 Pratinjau Langsung Augmentasi</h6>"),
         widgets.VBox([
             preview_image,
             preview_status,

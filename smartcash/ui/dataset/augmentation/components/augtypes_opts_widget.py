@@ -12,12 +12,12 @@ def create_augmentation_types_widget() -> Dict[str, Any]:
     # Augmentation types widget
     augmentation_types = widgets.SelectMultiple(
         options=[
-            ('🎯 Combined: Posisi + Pencahayaan (Research Pipeline)', 'combined'),
-            ('📍 Position: Transformasi geometri (rotation, flip, scale)', 'position'),
-            ('💡 Lighting: Variasi pencahayaan (brightness, contrast, HSV)', 'lighting'),
-            ('🔄 Geometric: Transformasi lanjutan (perspective, shear)', 'geometric'),
-            ('🎨 Color: Variasi warna dan saturasi', 'color'),
-            ('📡 Noise: Gaussian noise dan motion blur', 'noise')
+            ('🎯 Gabungan: Posisi + Pencahayaan (Pipeline Riset)', 'combined'),
+            ('📍 Posisi: Transformasi geometri (rotasi, balik, skala)', 'position'),
+            ('💡 Pencahayaan: Variasi pencahayaan (kecerahan, kontras, HSV)', 'lighting'),
+            ('🔄 Geometri: Transformasi lanjutan (perspektif, geser)', 'geometric'),
+            ('🎨 Warna: Variasi warna dan saturasi', 'color'),
+            ('📡 Derau: Gaussian noise dan motion blur', 'noise')
         ],
         value=['combined'],
         disabled=False,
@@ -29,10 +29,10 @@ def create_augmentation_types_widget() -> Dict[str, Any]:
     info_content = widgets.HTML("""
     <div style='background: #f0f8f0; padding: 8px; border-radius: 4px; margin: 8px 0; font-size: 12px;'>
         <strong>Jenis Augmentasi:</strong><br>
-        • Combined: Research pipeline optimal<br>
-        • Position: Geometric transforms + bbox preservation<br>
-        • Lighting: Photometric transforms pencahayaan<br>
-        • Advanced: Geometric, color, noise transforms
+        • Gabungan: Pipeline riset optimal<br>
+        • Posisi: Transformasi geometri + pelestarian bbox<br>
+        • Pencahayaan: Transformasi fotometrik pencahayaan<br>
+        • Lanjutan: Transformasi geometri, warna, dan derau
     </div>
     """)
     

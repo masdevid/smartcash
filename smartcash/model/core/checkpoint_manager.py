@@ -206,8 +206,13 @@ class CheckpointManager:
         
         # Add metric info jika ada
         if metrics:
-            best_metric = min(metrics.values()) if metrics else 0
-            variables['metric'] = f"{best_metric:.4f}".replace('.', '')
+            # Extract numeric metrics only for comparison
+            numeric_metrics = {k: v for k, v in metrics.items() if isinstance(v, (int, float))}
+            if numeric_metrics:
+                best_metric = min(numeric_metrics.values())
+                variables['metric'] = f"{best_metric:.4f}".replace('.', '')
+            else:
+                variables['metric'] = "0000"
         
         # Format filename
         try:

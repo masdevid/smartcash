@@ -12,11 +12,11 @@ StatusType = str  # 'success', 'warning', 'error', 'info', etc.
 
 # Color mapping for different status types
 STATUS_COLORS = {
-    'success': '#4caf50',  # Green
-    'warning': '#ff9800',  # Orange
-    'error': '#f44336',    # Red
-    'info': '#2196f3',     # Blue
-    'default': '#9e9e9e'   # Grey
+    'success': '#4caf50',  # Hijau
+    'warning': '#ff9800',  # Oranye
+    'error': '#f44336',    # Merah
+    'info': '#2196f3',     # Biru
+    'default': '#9e9e9e'   # Abu-abu
 }
 
 # Operation icons
@@ -74,7 +74,7 @@ def update_operation_summary(
 
 def _get_initial_summary_content(message: Optional[str] = None) -> str:
     """Generate initial summary content"""
-    default_message = message or "🔧 Dataset downloader ready..."
+    default_message = message or "🔧 Pengunduh dataset siap..."
     
     return f"""
     <div style="text-align: center; padding: 20px;">
@@ -82,7 +82,7 @@ def _get_initial_summary_content(message: Optional[str] = None) -> str:
             {default_message}
         </div>
         <div style="font-size: 14px; color: #666;">
-            Configure Roboflow settings and choose an operation to begin
+            Konfigurasi pengaturan Roboflow dan pilih operasi untuk memulai
         </div>
     </div>
     """

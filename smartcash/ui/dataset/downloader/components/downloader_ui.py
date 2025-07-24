@@ -101,7 +101,7 @@ def create_downloader_ui_components(
     
     # Create action container with save/reset buttons as requested
     action_container = create_action_container(
-        title="📥 Dataset Operations",
+        title="📥 Operasi Dataset",
         buttons=buttons,
         show_save_reset=True
     )
@@ -125,10 +125,10 @@ def create_downloader_ui_components(
     # 5. Create Summary Container for operation results
     summary_container = create_summary_container(
         theme='default',
-        title='Download Summary',
+        title='Ringkasan Unduhan',
         icon='📊'
     )
-    summary_content = "<div style='padding: 10px; width: 100%;'>Download operation summary will appear here...</div>"
+    summary_content = "<div style='padding: 10px; width: 100%;'>Ringkasan operasi unduhan akan muncul di sini...</div>"
     summary_container.set_content(summary_content)
     
     # Initialize progress tracker if available

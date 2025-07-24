@@ -31,7 +31,7 @@ def create_env_info_panel(env_info: Optional[Dict[str, Any]] = None, lazy_load: 
         try:
             with container.hold_trait_notifications():
                 container.children = [widgets.HTML(
-                    value='<div style="text-align: center; padding: 20px;">Memuat informasi environment...</div>',
+                    value='<div style="text-align: center; padding: 20px;">Memuat informasi lingkungan...</div>',
                     layout={'width': '100%'}
                 )]
                 
@@ -53,7 +53,7 @@ def create_env_info_panel(env_info: Optional[Dict[str, Any]] = None, lazy_load: 
                 )]
         except Exception as e:
             container.children = [widgets.HTML(
-                value=f'<div style="color: #d32f2f; padding: 10px;">Gagal memuat informasi environment: {str(e)}</div>',
+                value=f'<div style="color: #d32f2f; padding: 10px;">Gagal memuat informasi lingkungan: {str(e)}</div>',
                 layout={'width': '100%'}
             )]
     
@@ -74,7 +74,7 @@ def create_env_info_panel(env_info: Optional[Dict[str, Any]] = None, lazy_load: 
     elif lazy_load:
         # Tampilkan tombol untuk memuat environment
         load_button = widgets.Button(
-            description='🔍 Muat Informasi Environment',
+            description='🔍 Muat Informasi Lingkungan',
             button_style='info',
             layout={'width': 'auto', 'margin': '10px 0'}
         )
@@ -83,7 +83,7 @@ def create_env_info_panel(env_info: Optional[Dict[str, Any]] = None, lazy_load: 
         container.children = [
             widgets.HTML(
                 value='<div style="text-align: center; padding: 15px; border: 1px dashed #e0e0e0; border-radius: 6px; margin: 10px 0;">'
-                     '<p>Informasi environment belum dimuat</p>',
+                     '<p>Informasi lingkungan belum dimuat</p>',
                 layout={'width': '100%'}
             ),
             load_button

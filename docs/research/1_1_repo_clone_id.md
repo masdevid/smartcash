@@ -1,4 +1,4 @@
-# Analisis Fungsi Kloning Repository pada SmartCash
+# 1.1 Fungsi Kloning Repository pada SmartCash
 
 ## Deskripsi
 

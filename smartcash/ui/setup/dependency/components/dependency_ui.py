@@ -309,6 +309,7 @@ def _create_custom_packages_area() -> widgets.Textarea:
     return widgets.Textarea(
         value='',
         placeholder='Masukkan nama paket tambahan (satu per baris)\nContoh:\nnumpy>=1.19.0\npandas',
+        description='Paket Kustom',
         style={'description_width': 'initial'},
         layout=widgets.Layout(height='auto')
     )

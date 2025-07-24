@@ -12,41 +12,41 @@ def create_basic_options_widget() -> Dict[str, Any]:
     # Create widgets dengan overflow-safe styling
     widgets_dict = {
         'num_variations': widgets.IntSlider(
-            value=2, min=1, max=10, step=1, description='Jumlah Variasi:',
+            value=2, min=1, max=10, step=1, description='Jumlah Variasi (1-10):',
             continuous_update=False, readout=True, readout_format='d',
             style={'description_width': '110px'}, layout=widgets.Layout(width='auto', max_width='100%')
         ),
         'target_count': widgets.IntSlider(
-            value=500, min=100, max=2000, step=50, description='Target Count:',
+            value=500, min=100, max=2000, step=50, description='Jumlah Target:',
             continuous_update=False, readout=True, readout_format='d',
             style={'description_width': '110px'}, layout=widgets.Layout(width='auto', max_width='100%')
         ),
         'intensity': widgets.FloatSlider(
-            value=0.7, min=0.1, max=1.0, step=0.1, description='Intensitas:',
+            value=0.7, min=0.1, max=1.0, step=0.1, description='Tingkat Intensitas (0.1-1.0):',
             continuous_update=False, readout=True, readout_format='.1f',
             style={'description_width': '110px'}, layout=widgets.Layout(width='auto', max_width='100%')
         ),
         'target_split': widgets.Dropdown(
             options=[
-                ('🎯 Train - Dataset training (Recommended)', 'train'),
-                ('📊 Valid - Dataset validasi', 'valid'),
-                ('🧪 Test - Dataset testing (Not Recommended)', 'test')
+                ('🎯 Latih - Dataset pelatihan (Direkomendasikan)', 'train'),
+                ('📊 Validasi - Dataset validasi', 'valid'),
+                ('🧪 Uji - Dataset pengujian (Tidak Direkomendasikan)', 'test')
             ],
-            value='train', description='Target Split:', disabled=False,
+            value='train', description='Pembagian Dataset:', disabled=False,
             style={'description_width': '110px'}, layout=widgets.Layout(width='auto', max_width='100%')
         ),
         # CHANGED: cleanup_target menggantikan output_prefix
         'cleanup_target': widgets.Dropdown(
             options=[
-                ('🧹 Augmented - Hapus file augmented saja', 'augmented'),
-                ('🖼️ Samples - Hapus sample preview saja', 'samples'),
-                ('🗑️ Both - Hapus augmented + samples', 'both')
+                ('🧹 Augmented - Hapus file hasil augmentasi', 'augmented'),
+                ('🖼️ Sampel - Hapus pratinjau sampel', 'samples'),
+                ('🗑️ Keduanya - Hapus hasil dan pratinjau', 'both')
             ],
-            value='both', description='Cleanup Target:', disabled=False,
+            value='both', description='Target Pembersihan:', disabled=False,
             style={'description_width': '110px'}, layout=widgets.Layout(width='auto', max_width='100%')
         ),
         'balance_classes': widgets.Checkbox(
-            value=True, description='Balance Classes (Layer 1 & 2 optimal)',
+            value=True, description='Seimbangkan Kelas (Optimal untuk Layer 1 & 2)',
             indent=False, layout=widgets.Layout(width='auto', margin='6px 0')
         )
     }
@@ -54,17 +54,17 @@ def create_basic_options_widget() -> Dict[str, Any]:
     # Create info content with simple HTML
     info_content = widgets.HTML("""
     <div style='background: #f8f9fa; padding: 10px; border-radius: 5px; margin: 10px 0;'>
-        <strong>Parameter Guidance:</strong><br>
-        • Variasi: 2-5 optimal untuk research<br>
-        • Target Count: 500-1000 efektif<br>
-        • Intensitas: 0.7 optimal, 0.3-0.5 conservative<br>
-        • Cleanup: Both = comprehensive cleanup
+        <strong>Panduan Parameter:</strong><br>
+        • Variasi: 2-5 optimal untuk penelitian<br>
+        • Jumlah Target: 500-1000 efektif<br>
+        • Intensitas: 0.7 optimal, 0.3-0.5 konservatif<br>
+        • Pembersihan: Keduanya = pembersihan menyeluruh
     </div>
     """)
     
     # Create container with simple layout
     container = widgets.VBox([
-        widgets.HTML("<h6 style='color: #4caf50; margin: 6px 0;'>⚙️ Opsi Dasar</h6>"),
+        widgets.HTML("<h6 style='color: #4caf50; margin: 6px 0;'>⚙️ Opsi Dasar Augmentasi</h6>"),
         *widgets_dict.values(),
         info_content
     ], layout=widgets.Layout(width='100%'))

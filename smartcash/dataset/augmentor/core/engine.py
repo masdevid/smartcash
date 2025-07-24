@@ -310,7 +310,7 @@ class AugmentationEngine:
                     error_details = "; ".join(variation_errors)
                 else:
                     error_details = "; ".join(variation_errors[:3]) + f"... (+{len(variation_errors)-3} more)"
-                self.logger.debug(f"⚠️ {file_path.name}: {error_summary} ({error_details})")
+                self.logger.debug(f"⚠️ {Path(file_path).name}: {error_summary} ({error_details})")
             
             return {'status': 'success', 'file': file_path, 'generated': generated_count}
             

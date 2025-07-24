@@ -34,13 +34,13 @@ def create_module_form_widgets(config: Dict[str, Any]) -> Dict[str, Any]:
     row1 = HBox([
         create_form_container(
             basic_options['container'], 
-            "📋 Basic Options", 
+            "📋 Opsi Dasar", 
             'basic_options', 
             '48%'
         ),
         create_form_container(
             advanced_options['container'], 
-            "⚙️ Advanced Parameters", 
+            "⚙️ Parameter Lanjutan", 
             'advanced_options', 
             '48%'
         )
@@ -57,13 +57,13 @@ def create_module_form_widgets(config: Dict[str, Any]) -> Dict[str, Any]:
     row2 = HBox([
         create_form_container(
             augmentation_types['container'], 
-            "🔄 Augmentation Types", 
+            "🔄 Jenis Augmentasi", 
             'augmentation_types', 
             '48%'
         ),
         create_form_container(
             preview_widget['container'], 
-            "👁️ Live Preview", 
+            "👁️ Pratinjau Langsung", 
             'preview_panel', 
             '48%'
         )

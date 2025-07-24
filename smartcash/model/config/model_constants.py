@@ -6,75 +6,82 @@ Deskripsi: Konstanta-konstanta untuk konfigurasi model
 import torch
 from typing import Dict, Any, List
 
-# Definisi layer deteksi untuk digunakan di seluruh aplikasi
-DETECTION_LAYERS = ['banknote', 'nominal', 'security']
+# Definisi layer deteksi untuk digunakan di seluruh aplikasi (updated to match MODEL_ARC_README.md)
+DETECTION_LAYERS = ['layer_1', 'layer_2', 'layer_3']
+
+# Legacy layer mapping for backward compatibility
+LEGACY_LAYER_MAPPING = {
+    'banknote': 'layer_1',  # Full banknote detection
+    'nominal': 'layer_2',   # Denomination-specific features
+    'security': 'layer_3'   # Common security features
+}
 
 # Definisi threshold default untuk setiap layer deteksi
 DETECTION_THRESHOLDS = {
-    'banknote': 0.25,
-    'nominal': 0.30,
-    'security': 0.35
+    'layer_1': 0.25,  # Full banknote detection
+    'layer_2': 0.30,  # Denomination features
+    'layer_3': 0.35   # Security features
 }
 
-# Konfigurasi lengkap untuk setiap layer deteksi
+# Konfigurasi lengkap untuk setiap layer deteksi (updated to match MODEL_ARC_README.md)
 LAYER_CONFIG = {
-    'banknote': {
+    'layer_1': {
         'num_classes': 7,
         'classes': [
-            {'id': 0, 'name': '001', 'desc': 'Rp1000'},
-            {'id': 1, 'name': '002', 'desc': 'Rp2000'},
-            {'id': 2, 'name': '005', 'desc': 'Rp5000'},
-            {'id': 3, 'name': '010', 'desc': 'Rp10000'},
-            {'id': 4, 'name': '020', 'desc': 'Rp20000'},
-            {'id': 5, 'name': '050', 'desc': 'Rp50000'},
-            {'id': 6, 'name': '100', 'desc': 'Rp100000'},
+            {'id': 0, 'name': '001', 'desc': '1K IDR'},
+            {'id': 1, 'name': '002', 'desc': '2K IDR'},
+            {'id': 2, 'name': '005', 'desc': '5K IDR'},
+            {'id': 3, 'name': '010', 'desc': '10K IDR'},
+            {'id': 4, 'name': '020', 'desc': '20K IDR'},
+            {'id': 5, 'name': '050', 'desc': '50K IDR'},
+            {'id': 6, 'name': '100', 'desc': '100K IDR'},
         ],
-        'description': 'Deteksi uang kertas utuh'
+        'description': 'Layer 1: Full Banknote Detection - Detects full note bounding boxes'
     },
-    'nominal': {
+    'layer_2': {
         'num_classes': 7,
         'classes': [
-            {'id': 7, 'name': 'l2_001', 'desc': 'Rp1000'},
-            {'id': 8, 'name': 'l2_002', 'desc': 'Rp2000'},
-            {'id': 9, 'name': 'l2_005', 'desc': 'Rp5000'},
-            {'id': 10, 'name': 'l2_010', 'desc': 'Rp10000'},
-            {'id': 11, 'name': 'l2_020', 'desc': 'Rp20000'},
-            {'id': 12, 'name': 'l2_050', 'desc': 'Rp50000'},
-            {'id': 13, 'name': 'l2_100', 'desc': 'Rp100000'},
+            {'id': 7, 'name': 'l2_001', 'desc': '1K Features'},
+            {'id': 8, 'name': 'l2_002', 'desc': '2K Features'},
+            {'id': 9, 'name': 'l2_005', 'desc': '5K Features'},
+            {'id': 10, 'name': 'l2_010', 'desc': '10K Features'},
+            {'id': 11, 'name': 'l2_020', 'desc': '20K Features'},
+            {'id': 12, 'name': 'l2_050', 'desc': '50K Features'},
+            {'id': 13, 'name': 'l2_100', 'desc': '100K Features'},
         ],
-        'description': 'Deteksi area nominal'
+        'description': 'Layer 2: Denomination Features - Detects denomination-specific visual markers'
     },
-    'security': {
+    'layer_3': {
         'num_classes': 3,
         'classes': [
-            {'id': 14, 'name': 'l3_sign', 'desc': 'Tanda tangan'},
-            {'id': 15, 'name': 'l3_text', 'desc': 'Teks mikro'},
-            {'id': 16, 'name': 'l3_thread', 'desc': 'Benang pengaman'},
+            {'id': 14, 'name': 'l3_sign', 'desc': 'BI Logo'},
+            {'id': 15, 'name': 'l3_text', 'desc': 'Serial Number & Micro Text'},
+            {'id': 16, 'name': 'l3_thread', 'desc': 'Security Thread'},
         ],
-        'description': 'Deteksi fitur keamanan'
+        'description': 'Layer 3: Common Features - Detects common features across all notes'
     }
 }
 
 LAYER_CONFIG_FLAT = [
-    {'id': 0, 'layer': 'banknote', 'name': '001', 'desc': 'Rp1000'},
-    {'id': 1, 'layer': 'banknote', 'name': '002', 'desc': 'Rp2000'},
-    {'id': 2, 'layer': 'banknote', 'name': '005', 'desc': 'Rp5000'},
-    {'id': 3, 'layer': 'banknote', 'name': '010', 'desc': 'Rp10000'},
-    {'id': 4, 'layer': 'banknote', 'name': '020', 'desc': 'Rp20000'},
-    {'id': 5, 'layer': 'banknote', 'name': '050', 'desc': 'Rp50000'},
-    {'id': 6, 'layer': 'banknote', 'name': '100', 'desc': 'Rp100000'},
+    {'id': 0, 'layer': 'layer_1', 'name': '001', 'desc': '1K IDR'},
+    {'id': 1, 'layer': 'layer_1', 'name': '002', 'desc': '2K IDR'},
+    {'id': 2, 'layer': 'layer_1', 'name': '005', 'desc': '5K IDR'},
+    {'id': 3, 'layer': 'layer_1', 'name': '010', 'desc': '10K IDR'},
+    {'id': 4, 'layer': 'layer_1', 'name': '020', 'desc': '20K IDR'},
+    {'id': 5, 'layer': 'layer_1', 'name': '050', 'desc': '50K IDR'},
+    {'id': 6, 'layer': 'layer_1', 'name': '100', 'desc': '100K IDR'},
     
-    {'id': 7, 'layer': 'nominal', 'name': 'l2_001', 'desc': 'Rp1000'},
-    {'id': 8, 'layer': 'nominal', 'name': 'l2_002', 'desc': 'Rp2000'},
-    {'id': 9, 'layer': 'nominal', 'name': 'l2_005', 'desc': 'Rp5000'},
-    {'id': 10, 'layer': 'nominal', 'name': 'l2_010', 'desc': 'Rp10000'},
-    {'id': 11, 'layer': 'nominal', 'name': 'l2_020', 'desc': 'Rp20000'},
-    {'id': 12, 'layer': 'nominal', 'name': 'l2_050', 'desc': 'Rp50000'},
-    {'id': 13, 'layer': 'nominal', 'name': 'l2_100', 'desc': 'Rp100000'},
+    {'id': 7, 'layer': 'layer_2', 'name': 'l2_001', 'desc': '1K Features'},
+    {'id': 8, 'layer': 'layer_2', 'name': 'l2_002', 'desc': '2K Features'},
+    {'id': 9, 'layer': 'layer_2', 'name': 'l2_005', 'desc': '5K Features'},
+    {'id': 10, 'layer': 'layer_2', 'name': 'l2_010', 'desc': '10K Features'},
+    {'id': 11, 'layer': 'layer_2', 'name': 'l2_020', 'desc': '20K Features'},
+    {'id': 12, 'layer': 'layer_2', 'name': 'l2_050', 'desc': '50K Features'},
+    {'id': 13, 'layer': 'layer_2', 'name': 'l2_100', 'desc': '100K Features'},
     
-    {'id': 14, 'layer': 'security', 'name': 'l3_sign', 'desc': 'Tanda tangan'},
-    {'id': 15, 'layer': 'security', 'name': 'l3_text', 'desc': 'Teks mikro'},
-    {'id': 16, 'layer': 'security', 'name': 'l3_thread', 'desc': 'Benang pengaman'}
+    {'id': 14, 'layer': 'layer_3', 'name': 'l3_sign', 'desc': 'BI Logo'},
+    {'id': 15, 'layer': 'layer_3', 'name': 'l3_text', 'desc': 'Serial Number & Micro Text'},
+    {'id': 16, 'layer': 'layer_3', 'name': 'l3_thread', 'desc': 'Security Thread'}
 ]
 
 
@@ -124,7 +131,7 @@ SUPPORTED_BACKBONES = {
     }
 }
 
-# Model optimasi yang didukung
+# Model optimasi yang didukung (updated to multi-layer defaults)
 OPTIMIZED_MODELS = {
     'yolov5s': {
         'description': 'YOLOv5s dengan CSPDarknet sebagai backbone (model pembanding)',
@@ -132,8 +139,10 @@ OPTIMIZED_MODELS = {
         'use_attention': False,
         'use_residual': False,
         'use_ciou': False,
-        'detection_layers': ['banknote'],
-        'num_classes': 7,
+        'detection_layers': DETECTION_LAYERS,
+        'layer_mode': 'multi',
+        'multi_layer_heads': True,
+        'num_classes': {'layer_1': 7, 'layer_2': 7, 'layer_3': 3},
         'img_size': 640,
         'pretrained': True
     },
@@ -143,8 +152,10 @@ OPTIMIZED_MODELS = {
         'use_attention': False,
         'use_residual': False,
         'use_ciou': False,
-        'detection_layers': ['banknote'],
-        'num_classes': 7,
+        'detection_layers': DETECTION_LAYERS,
+        'layer_mode': 'multi',
+        'multi_layer_heads': True,
+        'num_classes': {'layer_1': 7, 'layer_2': 7, 'layer_3': 3},
         'img_size': 640,
         'pretrained': True
     },
@@ -154,8 +165,10 @@ OPTIMIZED_MODELS = {
         'use_attention': True,
         'use_residual': False,
         'use_ciou': False,
-        'detection_layers': ['banknote'],
-        'num_classes': 7,
+        'detection_layers': DETECTION_LAYERS,
+        'layer_mode': 'multi',
+        'multi_layer_heads': True,
+        'num_classes': {'layer_1': 7, 'layer_2': 7, 'layer_3': 3},
         'img_size': 640,
         'pretrained': True
     },
@@ -165,14 +178,16 @@ OPTIMIZED_MODELS = {
         'use_attention': True,
         'use_residual': True,
         'use_ciou': True,
-        'detection_layers': ['banknote'],
-        'num_classes': 7,
+        'detection_layers': DETECTION_LAYERS,
+        'layer_mode': 'multi',
+        'multi_layer_heads': True,
+        'num_classes': {'layer_1': 7, 'layer_2': 7, 'layer_3': 3},
         'img_size': 640,
         'pretrained': True
     }
 }
 
-# Default konfigurasi model
+# Default konfigurasi model (updated to multi-layer)
 DEFAULT_MODEL_CONFIG = {
     'backbone': 'efficientnet_b4',
     'img_size': 640,
@@ -181,7 +196,9 @@ DEFAULT_MODEL_CONFIG = {
     'use_residual': True,
     'use_ciou': True,
     'detection_layers': DETECTION_LAYERS,
-    'num_classes': 20,
+    'layer_mode': 'multi',
+    'multi_layer_heads': True,
+    'num_classes': {'layer_1': 7, 'layer_2': 7, 'layer_3': 3},
     'device': 'cuda' if torch.cuda.is_available() else 'cpu'
 }
 
@@ -219,9 +236,9 @@ DEFAULT_MODEL_CONFIG_FULL = {
         'degrees': 0.0
     },
     'layers': {
-        'banknote': {'enabled': True, 'threshold': DETECTION_THRESHOLDS['banknote']},
-        'nominal': {'enabled': True, 'threshold': DETECTION_THRESHOLDS['nominal']},
-        'security': {'enabled': True, 'threshold': DETECTION_THRESHOLDS['security']}
+        'layer_1': {'enabled': True, 'threshold': DETECTION_THRESHOLDS['layer_1']},
+        'layer_2': {'enabled': True, 'threshold': DETECTION_THRESHOLDS['layer_2']},
+        'layer_3': {'enabled': True, 'threshold': DETECTION_THRESHOLDS['layer_3']}
     },
     'optimizer': {
         'type': 'SGD',

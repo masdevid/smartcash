@@ -15,13 +15,13 @@ def create_module_info_box() -> widgets.HTML:
     """
     info_content = """
     <div style='font-size: 0.9em; line-height: 1.5;'>
-        <h4 style='margin-top: 0;'>About Colab Setup</h4>
-        <p>This module helps you set up your Google Colab environment for SmartCash.</p>
-        <p><strong>Version:</strong> 1.0.0</p>
-        <p><strong>Requirements:</strong></p>
+        <h4 style='margin-top: 0;'>Tentang Setup Colab</h4>
+        <p>Modul ini membantu Anda menyiapkan lingkungan Google Colab untuk SmartCash.</p>
+        <p><strong>Versi:</strong> 1.0.0</p>
+        <p><strong>Persyaratan:</strong></p>
         <ul style='margin: 5px 0; padding-left: 20px;'>
-            <li>Google Colab runtime</li>
-            <li>Google Drive access</li>
+            <li>Runtime Google Colab</li>
+            <li>Akses Google Drive</li>
             <li>Python 3.7+</li>
         </ul>
     </div>
@@ -36,12 +36,12 @@ def create_module_tips_box() -> widgets.HTML:
     """
     tips_content = """
     <div style='font-size: 0.9em; line-height: 1.5;'>
-        <h4 style='margin-top: 0;'>Quick Tips</h4>
+        <h4 style='margin-top: 0;'>Tips Cepat</h4>
         <ul style='margin: 5px 0; padding-left: 20px;'>
-            <li>Use auto-detect to automatically configure your environment</li>
-            <li>Mount Google Drive to save your work</li>
-            <li>Check the logs for detailed information</li>
-            <li>Click the help icons for more information</li>
+            <li>Gakan deteksi otomatis untuk mengonfigurasi lingkungan Anda</li>
+            <li>Mount Google Drive untuk menyimpan pekerjaan Anda</li>
+            <li>Periksa log untuk informasi detail</li>
+            <li>Klik ikon bantuan untuk informasi lebih lanjut</li>
         </ul>
     </div>
     """

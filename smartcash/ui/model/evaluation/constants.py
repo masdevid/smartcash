@@ -42,9 +42,9 @@ class LayerMode(Enum):
 UI_CONFIG = {
     'module_name': 'evaluation',
     'parent_module': 'model',
-    'title': 'Model Evaluation',
-    'subtitle': 'Evaluate model performance across different scenarios and configurations',
-    'description': 'Evaluate model performance across 4 research scenarios',
+    'title': 'Evaluasi Model',
+    'subtitle': 'Evaluasi performa model di berbagai skenario dan konfigurasi',
+    'description': 'Evaluasi performa model di 4 skenario penelitian',
     'icon': '🎯',
     'version': '2.0.0'
 }
@@ -52,8 +52,8 @@ UI_CONFIG = {
 # 2 Research Scenarios from evaluation_config.yaml
 RESEARCH_SCENARIOS = {
     "position_variation": {
-        "name": "Position Variation",
-        "description": "Test model robustness against position and rotation changes",
+        "name": "Variasi Posisi",
+        "description": "Uji ketahanan model terhadap perubahan posisi dan rotasi",
         "icon": "📐",
         "color": "#007bff",
         "enabled": True,
@@ -62,8 +62,8 @@ RESEARCH_SCENARIOS = {
         }
     },
     "lighting_variation": {
-        "name": "Lighting Variation", 
-        "description": "Test model robustness against lighting condition changes",
+        "name": "Variasi Pencahayaan", 
+        "description": "Uji ketahanan model terhadap perubahan kondisi pencahayaan",
         "icon": "💡",
         "color": "#ffc107",
         "enabled": True,
@@ -96,7 +96,7 @@ for scenario in RESEARCH_SCENARIOS.keys():
 EVALUATION_METRICS = {
     "map": {
         "name": "mAP@0.5", 
-        "description": "Mean Average Precision at IoU=0.5",
+        "description": "Rata-rata Presisi Rata-rata pada IoU=0.5",
         "format": "{:.3f}",
         "icon": "🎯",
         "color": "#007bff"
@@ -182,34 +182,34 @@ BUTTON_CONFIG = {
 # Operation messages for logging
 OPERATION_MESSAGES = {
     EvaluationOperation.POSITION_VARIATION: {
-        "start": "📐 Starting position variation scenario...",
-        "progress": "📐 Testing position variations... {progress}%",
-        "success": "✅ Position variation scenario completed",
-        "error": "❌ Position variation scenario failed"
+        "start": "📐 Memulai skenario variasi posisi...",
+        "progress": "📐 Menguji variasi posisi... {progress}%",
+        "success": "✅ Skenario variasi posisi selesai",
+        "error": "❌ Gagal menjalankan skenario variasi posisi"
     },
     EvaluationOperation.LIGHTING_VARIATION: {
-        "start": "💡 Starting lighting variation scenario...",
-        "progress": "💡 Testing lighting variations... {progress}%", 
-        "success": "✅ Lighting variation scenario completed",
-        "error": "❌ Lighting variation scenario failed"
+        "start": "💡 Memulai skenario variasi pencahayaan...",
+        "progress": "💡 Menguji variasi pencahayaan... {progress}%", 
+        "success": "✅ Skenario variasi pencahayaan selesai",
+        "error": "❌ Gagal menjalankan skenario variasi pencahayaan"
     },
     EvaluationOperation.ALL_SCENARIOS: {
-        "start": "🚀 Starting comprehensive evaluation...",
-        "progress": "🔄 Testing {current}/{total} model combinations...",
-        "success": "🎉 All scenarios evaluation completed successfully",
-        "error": "❌ Comprehensive evaluation failed"
+        "start": "🚀 Memulai evaluasi komprehensif...",
+        "progress": "🔄 Menguji {current}/{total} kombinasi model...",
+        "success": "🎉 Evaluasi semua skenario berhasil diselesaikan",
+        "error": "❌ Evaluasi komprehensif gagal"
     },
     EvaluationOperation.LOAD_CHECKPOINT: {
-        "start": "📂 Loading model checkpoint...",
-        "progress": "⏳ Loading model from {checkpoint}...",
-        "success": "✅ Model checkpoint loaded successfully",
-        "error": "❌ Failed to load model checkpoint"
+        "start": "📂 Memuat model checkpoint...",
+        "progress": "⏳ Memuat model dari {checkpoint}...",
+        "success": "✅ Model checkpoint berhasil dimuat",
+        "error": "❌ Gagal memuat model checkpoint"
     },
     EvaluationOperation.GENERATE_REPORT: {
-        "start": "📄 Generating evaluation report...",
-        "progress": "📊 Compiling results from {scenarios} scenarios...",
-        "success": "📋 Evaluation report generated successfully", 
-        "error": "❌ Report generation failed"
+        "start": "📄 Membuat laporan evaluasi...",
+        "progress": "📊 Mengompilasi hasil dari {scenarios} skenario...",
+        "success": "📋 Laporan evaluasi berhasil dibuat", 
+        "error": "❌ Gagal membuat laporan"
     }
 }
 

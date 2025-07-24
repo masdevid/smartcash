@@ -11,22 +11,22 @@ def create_advanced_options_widget() -> Dict[str, Any]:
     # Position parameters dengan overflow-safe styling
     position_widgets = {
         'fliplr': widgets.FloatSlider(
-            value=0.5, min=0.0, max=1.0, step=0.05, description='Flip Horizontal:',
+            value=0.5, min=0.0, max=1.0, step=0.05, description='Balik Horizontal (0.0-1.0):',
             continuous_update=False, readout=True, readout_format='.2f',
             style={'description_width': '100px'}, layout=widgets.Layout(width='100%', max_width='100%')
         ),
         'degrees': widgets.IntSlider(
-            value=12, min=0, max=30, step=1, description='Rotasi (°):',
+            value=12, min=0, max=30, step=1, description='Rotasi (0-30°):',
             continuous_update=False, readout=True,
             style={'description_width': '100px'}, layout=widgets.Layout(width='100%', max_width='100%')
         ),
         'translate': widgets.FloatSlider(
-            value=0.08, min=0.0, max=0.25, step=0.01, description='Translasi:',
+            value=0.08, min=0.0, max=0.25, step=0.01, description='Translasi (0.0-0.25):',
             continuous_update=False, readout=True, readout_format='.2f',
             style={'description_width': '100px'}, layout=widgets.Layout(width='100%', max_width='100%')
         ),
         'scale': widgets.FloatSlider(
-            value=0.04, min=0.0, max=0.25, step=0.01, description='Skala:',
+            value=0.04, min=0.0, max=0.25, step=0.01, description='Skala (0.0-0.25):',
             continuous_update=False, readout=True, readout_format='.2f',
             style={'description_width': '100px'}, layout=widgets.Layout(width='100%', max_width='100%')
         )
@@ -35,22 +35,22 @@ def create_advanced_options_widget() -> Dict[str, Any]:
     # Lighting parameters dengan HSV support
     lighting_widgets = {
         'brightness': widgets.FloatSlider(
-            value=0.2, min=0.0, max=0.4, step=0.02, description='Brightness:',
+            value=0.2, min=0.0, max=0.4, step=0.02, description='Kecerahan (0.0-0.4):',
             continuous_update=False, readout=True, readout_format='.2f',
             style={'description_width': '100px'}, layout=widgets.Layout(width='100%', max_width='100%')
         ),
         'contrast': widgets.FloatSlider(
-            value=0.15, min=0.0, max=0.4, step=0.02, description='Contrast:',
+            value=0.15, min=0.0, max=0.4, step=0.02, description='Kontras (0.0-0.4):',
             continuous_update=False, readout=True, readout_format='.2f',
             style={'description_width': '100px'}, layout=widgets.Layout(width='100%', max_width='100%')
         ),
         'hsv_h': widgets.IntSlider(
-            value=10, min=0, max=30, step=1, description='HSV Hue:',
+            value=10, min=0, max=30, step=1, description='Warna HSV (0-30):',
             continuous_update=False, readout=True,
             style={'description_width': '100px'}, layout=widgets.Layout(width='100%', max_width='100%')
         ),
         'hsv_s': widgets.IntSlider(
-            value=15, min=0, max=50, step=1, description='HSV Saturation:',
+            value=15, min=0, max=50, step=1, description='Saturasi HSV (0-50):',
             continuous_update=False, readout=True,
             style={'description_width': '100px'}, layout=widgets.Layout(width='100%', max_width='100%')
         )
@@ -63,29 +63,29 @@ def create_advanced_options_widget() -> Dict[str, Any]:
         • Rotasi: 0-30° (optimal: 8-15°)<br>
         • Translasi & Skala: 0.0-0.25<br>
         • Flip: 0.0-1.0 (50% probabilitas)<br>
-        • Backend: Albumentations compatible
+        • Backend: Kompatibel dengan Albumentations
     </div>
     """)
     
     lighting_info = widgets.HTML("""
     <div style='background: #fff8f0; padding: 8px; border-radius: 4px; margin: 8px 0; font-size: 12px;'>
         <strong>Parameter Pencahayaan:</strong><br>
-        • Brightness/Contrast: 0.0-0.4<br>
-        • HSV Hue: 0-30 (color shift)<br>
-        • HSV Saturation: 0-50 (saturation shift)<br>
-        • Backend: OpenCV HSV compatible
+        • Kecerahan/Kontras: 0.0-0.4<br>
+        • Warna HSV: 0-30 (perubahan warna)<br>
+        • Saturasi HSV: 0-50 (perubahan saturasi)<br>
+        • Backend: Kompatibel dengan OpenCV HSV
     </div>
     """)
     
     # Create tab content
     position_content = widgets.VBox([
-        widgets.HTML("<p style='font-size: 10px; color: #666; margin: 2px 0;'>Transformasi geometri dengan Albumentations</p>"),
+        widgets.HTML("<p style='font-size: 10px; color: #666; margin: 2px 0;'>Transformasi geometri menggunakan Albumentations</p>"),
         *position_widgets.values(),
         position_info
     ])
     
     lighting_content = widgets.VBox([
-        widgets.HTML("<p style='font-size: 10px; color: #666; margin: 2px 0;'>Variasi pencahayaan dengan OpenCV HSV</p>"),
+        widgets.HTML("<p style='font-size: 10px; color: #666; margin: 2px 0;'>Variasi pencahayaan menggunakan OpenCV HSV</p>"),
         *lighting_widgets.values(),
         lighting_info
     ])

@@ -52,7 +52,7 @@ def create_downloader_input_options(config: Optional[Dict[str, Any]] = None) -> 
     # Version input
     version_input = widgets.Text(
         value=str(roboflow_config.get('version', '3')),
-        description='Version:',
+        description='Versi:',
         placeholder='Versi dataset',
         style={'description_width': '80px'},
         layout=widgets.Layout(width='100%', margin='3px 0')
@@ -62,31 +62,31 @@ def create_downloader_input_options(config: Optional[Dict[str, Any]] = None) -> 
     api_key_value = api_key or roboflow_config.get('api_key', '')
     api_key_input = widgets.Password(
         value=api_key_value,
-        description='API Key:',
-        placeholder='🔑 Auto-detect dari Colab secrets' if api_key else 'Masukkan API Key Roboflow',
+        description='Kunci API:',
+        placeholder='🔑 Otomatis dari Colab secrets' if api_key else 'Masukkan Kunci API Roboflow',
         style={'description_width': '80px'},
         layout=widgets.Layout(width='100%', margin='3px 0')
     )
     
     # Left column dengan fixed padding
     left_column = widgets.VBox([
-        widgets.HTML("<div style='margin-bottom: 6px; color: #666; font-weight: bold; font-size: 13px;'>🎯 Dataset Target</div>"),
-        widgets.HTML("<div style='margin-bottom: 3px; color: #888; font-size: 11px;'>Roboflow workspace identifier</div>"),
+        widgets.HTML("<div style='margin-bottom: 6px; color: #666; font-weight: bold; font-size: 13px;'>🎯 Target Dataset</div>"),
+        widgets.HTML("<div style='margin-bottom: 3px; color: #888; font-size: 11px;'>Pengenal workspace Roboflow</div>"),
         workspace_input,
-        widgets.HTML("<div style='margin: 6px 0 3px 0; color: #888; font-size: 11px;'>Project name dalam workspace</div>"),
+        widgets.HTML("<div style='margin: 6px 0 3px 0; color: #888; font-size: 11px;'>Nama project dalam workspace</div>"),
         project_input,
-        widgets.HTML("<div style='margin: 6px 0 3px 0; color: #888; font-size: 11px;'>Versi dataset yang akan didownload</div>"),
+        widgets.HTML("<div style='margin: 6px 0 3px 0; color: #888; font-size: 11px;'>Versi dataset yang akan diunduh</div>"),
         version_input,
-        widgets.HTML("<div style='margin: 6px 0 3px 0; color: #888; font-size: 11px;'>API key untuk akses Roboflow</div>"),
+        widgets.HTML("<div style='margin: 6px 0 3px 0; color: #888; font-size: 11px;'>Kunci API untuk mengakses Roboflow</div>"),
         api_key_input
     ], layout=widgets.Layout(width='47%', padding='8px'))
     
-    # === KOLOM KANAN: Download Options (Fixed Width) ===
+    # === KOLOM KANAN: Opsi Unduhan (Fixed Width) ===
     
     # Validation checkbox
     validate_checkbox = widgets.Checkbox(
         value=download_config.get('validate_download', True),
-        description='Validasi hasil download',
+        description='Validasi hasil unduhan',
         style={'description_width': '140px'},
         layout=widgets.Layout(width='100%', margin='3px 0')
     )
@@ -94,7 +94,7 @@ def create_downloader_input_options(config: Optional[Dict[str, Any]] = None) -> 
     # Backup checkbox
     backup_checkbox = widgets.Checkbox(
         value=download_config.get('backup_existing', False),
-        description='Backup data existing',
+        description='Cadangkan data yang ada',
         style={'description_width': '140px'},
         layout=widgets.Layout(width='100%', margin='3px 0')
     )

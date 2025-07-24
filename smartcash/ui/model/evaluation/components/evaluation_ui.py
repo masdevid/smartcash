@@ -46,18 +46,18 @@ def create_evaluation_ui(config: Dict[str, Any]) -> Dict[str, Any]:
             buttons=[
                 {
                     'id': 'run_evaluation',
-                    'text': '🚀 Run Evaluation',
-                    'tooltip': 'Execute evaluation based on selected configuration',
+                    'text': '🚀 Jalankan Evaluasi',
+                    'tooltip': 'Jalankan evaluasi berdasarkan konfigurasi yang dipilih',
                     'style': 'success'
                 },
                 {
                     'id': 'refresh_models',
-                    'text': '🔄 Refresh Models',
-                    'tooltip': 'Refresh available model checkpoints',
+                    'text': '🔄 Segarkan Model',
+                    'tooltip': 'Segarkan daftar model yang tersedia',
                     'style': 'info'
                 }
             ],
-            title="Evaluation Actions",
+            title="Aksi Evaluasi",
             show_save_reset=True
         )
         
@@ -70,13 +70,13 @@ def create_evaluation_ui(config: Dict[str, Any]) -> Dict[str, Any]:
             log_module_name=UI_CONFIG['module_name'],
             log_height="150px",
             collapsible=True,
-            collapsed=False
+            collapsed=True
         )
         
         # Create summary container for results
         summary_container = create_summary_container(
             theme="info",
-            title="📊 Evaluation Results",
+            title="📊 Hasil Evaluasi",
             icon="📊"
         )
         

@@ -23,7 +23,7 @@ def create_environment_container(config: Dict[str, Any]) -> widgets.VBox:
     
     # Create environment container
     return widgets.VBox([
-        widgets.HTML("<h4>📊 Environment Information</h4>"),
+        widgets.HTML("<h4>📊 Informasi Lingkungan</h4>"),
         env_info
     ], layout=widgets.Layout(
         width='100%',

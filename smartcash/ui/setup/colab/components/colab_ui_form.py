@@ -32,7 +32,7 @@ def create_module_form_widgets(config: Dict[str, Any]) -> Dict[str, Any]:
     # Create form widgets with default values from config
     auto_detect = widgets.Checkbox(
         value=config.get('auto_detect', True),
-        description='Auto-detect environment',
+        description='Deteksi otomatis lingkungan',
         indent=False,
         layout=checkbox_layout,
         style={'description_width': 'initial'}
@@ -40,23 +40,23 @@ def create_module_form_widgets(config: Dict[str, Any]) -> Dict[str, Any]:
     
     drive_path = widgets.Text(
         value=config.get('drive_path', '/content/drive/MyDrive'),
-        description='Google Drive Path:',
-        placeholder='Enter Google Drive mount path',
+        description='Path Google Drive:',
+        placeholder='Masukkan path mount Google Drive',
         layout=input_layout,
         style={'description_width': '140px'}
     )
     
     project_name = widgets.Text(
         value=config.get('project_name', 'SmartCash'),
-        description='Project Name:',
-        placeholder='Enter project name',
+        description='Nama Proyek:',
+        placeholder='Masukkan nama proyek',
         layout=input_layout,
         style={'description_width': '140px'}
     )
     
     # Create form sections with two-column layout
     config_section = widgets.VBox([
-        widgets.HTML("<h4 style='margin: 10px 0 5px 0;'>🔧 Environment Settings</h4>"),
+        widgets.HTML("<h4 style='margin: 10px 0 5px 0;'>🔧 Pengaturan Lingkungan</h4>"),
         auto_detect,
         drive_path,
         project_name

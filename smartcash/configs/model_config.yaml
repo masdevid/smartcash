@@ -10,14 +10,18 @@ model:
   
   # Feature optimization - enables channel attention and feature adapters
   feature_optimization:
-    enabled: false  # When true, adds feature adapters with channel attention
+    enabled: true  # When true, adds feature adapters with channel attention
   
   # Detection configuration
-  detection_layers: ['banknote']  # Can include: 'banknote', 'nominal', 'security'
-  layer_mode: 'single'  # Options: 'single' | 'multilayer'
+  detection_layers: ['layer_1', 'layer_2', 'layer_3']  # Multi-layer detection system
+  layer_mode: 'multi'  # Options: 'single' | 'multi'
+  multi_layer_heads: true  # Enable multi-layer detection heads
   
   # Model parameters
-  num_classes: 7  # Number of currency denominations
+  num_classes:  # Number of classes per detection layer
+    layer_1: 7   # 7 denominations (1K, 2K, 5K, 10K, 20K, 50K, 100K IDR)
+    layer_2: 7   # 7 denomination-specific features
+    layer_3: 3   # 3 common features (BI Logo, Serial Number, Security Thread)
   img_size: 640   # Input image size (height=width)
   conf_threshold: 0.25  # Minimum confidence score for detections
   iou_threshold: 0.45   # NMS IoU threshold

@@ -67,9 +67,6 @@
 - **DO** register components with clear, consistent naming conventions
 - **DO** use SharedMethodRegistry for cross-module functionality
 - **DO** implement proper cleanup in module destructors
-- **DO** use BaseUIModule pattern for new modules (see `UI_MODULE_REFACTORING.md`)
-- **DO** follow the refactoring checklist when migrating existing modules
-- **DO** follow the operation checklist when creating new or migrating existing operations (see `OPERATION_CHECKLIST.md`)
 
 #### Code Organization
 - **DO** keep functions under 500 lines by splitting into helper methods
@@ -102,7 +99,6 @@
 - **DON'T** duplicate common functionality across modules (use mixins instead)
 - **DON'T** create direct dependencies between modules (use SharedMethodRegistry instead)
 - **DON'T** implement complex multi-tab interfaces (use single-screen approach)
-- **DON'T** ignore the refactoring guide when migrating modules
 
 #### Performance and Memory
 - **DON'T** create memory leaks by not cleaning up event handlers

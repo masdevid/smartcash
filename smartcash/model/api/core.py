@@ -151,6 +151,56 @@ class SmartCashModelAPI:
             self.logger.error(error_msg)
             raise RuntimeError(error_msg)
     
+    def save_initial_model(self, metrics: Optional[Dict] = None, model_name: Optional[str] = None, **kwargs) -> str:
+        """💾 Save initial built model to /data/models directory"""
+        try:
+            if not self.is_model_built:
+                raise RuntimeError("❌ Model belum dibangun, tidak dapat menyimpan model")
+            
+            # Create models directory
+            models_dir = Path('data/models')
+            models_dir.mkdir(parents=True, exist_ok=True)
+            
+            # Generate model filename
+            if model_name is None:
+                model_name = f"{self.config['model']['backbone']}_backbone"
+            
+            current_date = datetime.now()
+            filename = f"{model_name}_{current_date.strftime('%Y%m%d')}.pt"
+            model_path = models_dir / filename
+            
+            self.progress_bridge.start_operation("Saving Initial Model", 3)
+            
+            # Prepare model data
+            self.progress_bridge.update(1, "📦 Preparing model data...")
+            model_data = {
+                'model_state_dict': self.model.state_dict(),
+                'model_config': getattr(self.model, 'config', {}),
+                'metrics': metrics or {},
+                'timestamp': current_date.isoformat(),
+                'torch_version': torch.__version__,
+                'model_info': self._get_model_info_dict(),
+                'model_type': 'initial_build'  # Mark as initial build
+            }
+            
+            # Save model
+            self.progress_bridge.update(2, f"💾 Saving to {filename}...")
+            torch.save(model_data, model_path)
+            
+            self.progress_bridge.complete(3, f"✅ Initial model saved: {filename}")
+            
+            # Log save info
+            file_size = model_path.stat().st_size / (1024 * 1024)  # MB
+            self.logger.info(f"💾 Initial model saved: {filename} ({file_size:.1f}MB)")
+            
+            return str(model_path)
+            
+        except Exception as e:
+            error_msg = f"❌ Initial model saving failed: {str(e)}"
+            self.logger.error(error_msg)
+            self.progress_bridge.error(error_msg)
+            raise RuntimeError(error_msg)
+    
     def list_checkpoints(self) -> List[Dict[str, Any]]:
         """📋 List available checkpoints"""
         return self.checkpoint_manager.list_checkpoints()
@@ -199,9 +249,38 @@ class SmartCashModelAPI:
                     d[k] = v
             return d
         
+        # Define model-related parameters that should be nested under 'model'
+        model_params = {
+            'backbone', 'layer_mode', 'detection_layers', 'multi_layer_heads', 
+            'num_classes', 'img_size', 'pretrained', 'feature_optimization', 
+            'mixed_precision', 'conf_threshold', 'iou_threshold', 'device'
+        }
+        
         self.logger.debug(f"📝 Before update - backbone: {self.config.get('model', {}).get('backbone', 'N/A')}")
         self.logger.debug(f"📝 Updates received: {updates}")
-        update_nested(self.config, updates)
+        
+        # Check if updates contain flat model parameters
+        flat_model_updates = {}
+        other_updates = {}
+        
+        for k, v in updates.items():
+            if k in model_params:
+                flat_model_updates[k] = v
+            else:
+                other_updates[k] = v
+        
+        # Apply flat model parameters to the model section
+        if flat_model_updates:
+            if 'model' not in self.config:
+                self.config['model'] = {}
+            update_nested(self.config['model'], flat_model_updates)
+            self.logger.debug(f"📝 Applied flat model updates: {flat_model_updates}")
+        
+        # Apply other updates normally
+        if other_updates:
+            update_nested(self.config, other_updates)
+            self.logger.debug(f"📝 Applied other updates: {other_updates}")
+        
         self.logger.debug(f"📝 After update - backbone: {self.config.get('model', {}).get('backbone', 'N/A')}")
         self.logger.debug("📝 Configuration updated")
     
@@ -261,6 +340,28 @@ class SmartCashModelAPI:
             'memory_usage': f"{torch.cuda.memory_allocated(self.device) / 1024**2:.1f} MB" if self.device.type == 'cuda' else 'N/A'
         }
     
+    def _get_model_info_dict(self) -> Dict[str, Any]:
+        """Get model info as dict for saving (without status)"""
+        if not self.is_model_built:
+            return {}
+        
+        # Hitung parameter
+        total_params = sum(p.numel() for p in self.model.parameters())
+        trainable_params = sum(p.numel() for p in self.model.parameters() if p.requires_grad)
+        
+        return {
+            'model_name': self.config['model']['model_name'],
+            'backbone': self.config['model']['backbone'],
+            'layer_mode': self.config['model']['layer_mode'],
+            'detection_layers': self.config['model']['detection_layers'],
+            'num_classes': self.config['model']['num_classes'],
+            'img_size': self.config['model']['img_size'],
+            'total_parameters': total_params,
+            'trainable_parameters': trainable_params,
+            'device': str(self.device),
+            'feature_optimization': self.config['model']['feature_optimization'] if isinstance(self.config['model']['feature_optimization'], bool) else self.config['model']['feature_optimization']['enabled']
+        }
+    
     def _log_device_info(self) -> None:
         """Log informasi device"""
         device_info = get_device_info()
@@ -269,6 +370,68 @@ class SmartCashModelAPI:
         else:
             self.logger.info("💻 Running on CPU")
 
+
+# Training API
+def run_full_training_pipeline(backbone: str = 'cspdarknet',
+                              phase_1_epochs: int = 1,
+                              phase_2_epochs: int = 1,
+                              checkpoint_dir: str = 'data/checkpoints',
+                              progress_callback: Optional[Callable] = None,
+                              log_callback: Optional[Callable] = None,
+                              live_chart_callback: Optional[Callable] = None,
+                              metrics_callback: Optional[Callable] = None,
+                              verbose: bool = True,
+                              force_cpu: bool = False,
+                              training_mode: str = 'two_phase',
+                              single_phase_layer_mode: str = 'multi',
+                              single_phase_freeze_backbone: bool = False,
+                              **kwargs) -> Dict[str, Any]:
+    """
+    Main API for running the complete unified training pipeline with UI callbacks.
+    
+    Args:
+        backbone: Model backbone ('cspdarknet' or 'efficientnet_b4')
+        phase_1_epochs: Number of epochs for phase 1 (frozen backbone)
+        phase_2_epochs: Number of epochs for phase 2 (fine-tuning)
+        checkpoint_dir: Directory for checkpoint management  
+        progress_callback: Callback function for progress updates
+        log_callback: Callback for logging events (level, message, data)
+        live_chart_callback: Callback for live chart updates (chart_type, data, config)
+        metrics_callback: Callback for metrics updates (phase, epoch, metrics)
+        verbose: Enable verbose logging
+        force_cpu: Force CPU usage instead of auto-detecting GPU/MPS (default: False)
+        training_mode: Training mode ('single_phase', 'two_phase') (default: 'two_phase')
+        single_phase_layer_mode: Layer mode for single-phase training ('single', 'multi') (default: 'multi')
+        single_phase_freeze_backbone: Whether to freeze backbone in single-phase training (default: False)
+        **kwargs: Additional configuration overrides
+        
+    Returns:
+        Complete training results with all phase information
+        
+    Note:
+        single_phase_layer_mode and single_phase_freeze_backbone parameters are only used
+        when training_mode='single_phase' and are ignored in two_phase mode.
+    """
+    from smartcash.model.training.unified_training_pipeline import UnifiedTrainingPipeline
+    
+    pipeline = UnifiedTrainingPipeline(
+        progress_callback=progress_callback,
+        log_callback=log_callback,
+        live_chart_callback=live_chart_callback,
+        metrics_callback=metrics_callback,
+        verbose=verbose
+    )
+    return pipeline.run_full_training_pipeline(
+        backbone=backbone,
+        phase_1_epochs=phase_1_epochs,
+        phase_2_epochs=phase_2_epochs,
+        checkpoint_dir=checkpoint_dir,
+        force_cpu=force_cpu,
+        training_mode=training_mode,
+        single_phase_layer_mode=single_phase_layer_mode,
+        single_phase_freeze_backbone=single_phase_freeze_backbone,
+        **kwargs
+    )
 
 # Factory functions untuk convenience
 def create_model_api(config_path: Optional[str] = None, progress_callback: Optional[Callable] = None) -> SmartCashModelAPI:

@@ -19,9 +19,9 @@ def create_backbone(backbone_type: str, pretrained: bool = True, **kwargs):
 
 # Fase 2: Training Pipeline
 from .training import (
-    TrainingService, start_training, resume_training,
-    create_training_service, get_training_info
+    start_training, get_training_info
 )
+# Main training API moved to .api.core.run_full_training_pipeline
 
 # Fase 3: Analysis & Evaluation
 from .analysis.analysis_service import AnalysisService

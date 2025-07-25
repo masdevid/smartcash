@@ -402,8 +402,8 @@ class DownloaderUIModule(BaseUIModule):
             )
             return {'success': True, 'message': 'Dialog konfirmasi ditampilkan'}
         else:
-            self.log_warning("Dialog not available, executing action directly")
-            return confirm_action()
+            self.log_error("Dialog not available, cannot proceed with confirmation required action")
+            return {'success': False, 'message': 'Dialog konfirmasi tidak tersedia. Operasi tidak dapat dilanjutkan.'}
 
     def _show_info_dialog(self, title: str, message: str) -> Dict[str, Any]:
         """Show information dialog."""

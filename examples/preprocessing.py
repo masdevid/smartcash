@@ -48,7 +48,7 @@ def setup_arg_parser() -> argparse.ArgumentParser:
     
     # Performance options
     parser.add_argument('--workers', type=int, 
-                      default=int(os.getenv('WORKERS', '6')),
+                      default=int(os.getenv('WORKERS', '8')),
                       help='Number of worker processes')
     parser.add_argument('--batch-size', type=int, 
                       default=int(os.getenv('BATCH_SIZE', '32')),

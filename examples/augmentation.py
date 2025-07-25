@@ -155,9 +155,9 @@ def main():
                       help='Output directory for augmented data (default: data/augmented/)')
     parser.add_argument('--splits', type=str, default='train',
                       help='Comma-separated list of splits to augment (default: train)')
-    parser.add_argument('--num-variations', type=int, default=int(os.getenv('AUG_NUM_VARIATIONS', 2)),
+    parser.add_argument('--num-variations', type=int, default=int(os.getenv('AUG_NUM_VARIATIONS', 5)),
                       help='Number of augmented variations per image (default: 2)')
-    parser.add_argument('--target-count', type=int, default=int(os.getenv('AUG_TARGET_COUNT', 500)),
+    parser.add_argument('--target-count', type=int, default=int(os.getenv('AUG_TARGET_COUNT', 5)),
                       help='Target number of images per class (default: 1000)')
     parser.add_argument('--augmentation-types', type=str, default=os.getenv('AUG_TYPES', 'combined'),
                       help='Comma-separated list of augmentation types (default: combined)')
@@ -165,8 +165,8 @@ def main():
                       help='Normalization preset (default: default)')
     parser.add_argument('--img-size', type=int, default=int(os.getenv('IMG_SIZE', 640)),
                       help='Image size for preprocessing (default: 640)')
-    parser.add_argument('--workers', type=int, default=int(os.getenv('NUM_WORKERS', 4)),
-                      help='Number of worker processes (default: 4)')
+    parser.add_argument('--workers', type=int, default=int(os.getenv('NUM_WORKERS', 8)),
+                      help='Number of worker processes (default: 8)')
     parser.add_argument('--cleanup', action='store_true',
                       help='Clean up existing augmented data before starting')
     parser.add_argument('--verbose', action='store_true',

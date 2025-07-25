@@ -1,97 +1,231 @@
-# SmartCash Training Configuration
-# Minimal configuration that matches the actual codebase structure
+# SmartCash Unified Training Configuration
+# Comprehensive configuration for the unified training pipeline with UI integration
+
+# === UNIFIED TRAINING PIPELINE CONFIGURATION ===
+unified_training:
+  # 6-Phase Pipeline Configuration
+  enabled: true
+  phases:
+    1:
+      name: "Preparation"
+      description: "Setup environment and configuration"
+      weight: 0.05
+    2:
+      name: "Build Model"
+      description: "Create and configure model architecture"
+      weight: 0.10
+    3:
+      name: "Validate Model"
+      description: "Verify model readiness"
+      weight: 0.05
+    4:
+      name: "Training Phase 1"
+      description: "Train detection heads (backbone frozen)"
+      weight: 0.35
+    5:
+      name: "Training Phase 2"
+      description: "Fine-tune entire model"
+      weight: 0.35
+    6:
+      name: "Summary & Visualization"
+      description: "Generate charts and reports"
+      weight: 0.10
+
+  # Platform-aware configuration (auto-detected)
+  platform_optimization:
+    enabled: true
+    auto_detect: true
+    use_worker_utils: true
+    memory_management: true
+
+  # UI Integration Callbacks
+  ui_integration:
+    log_callback: true          # Structured logging for UI components
+    live_chart_callback: true   # Real-time chart data updates
+    metrics_callback: true      # Detailed metrics reporting
+    markdown_summary: true      # Formatted training summary
 
 training:
-  # Core training parameters
-  epochs: 100
-  batch_size: 16
+  # Core training parameters (platform-optimized defaults)
+  epochs: 100  # Global default (overridden by phase-specific)
+  batch_size: null  # Auto-detected based on platform
   learning_rate: 0.001
   weight_decay: 0.0005
   
   # Optimizer settings
-  optimizer: adam  # Supported: adam, adamw, sgd, rmsprop
+  optimizer: adamw  # Supported: adam, adamw, sgd, rmsprop
   scheduler: cosine  # Supported: cosine, step, plateau, exponential, multistep, cyclic, none
-  warmup_epochs: 3  # Optional warmup period
-  mixed_precision: true  # Enable mixed precision training
+  warmup_epochs: 0  # No warmup for short phase training
+  mixed_precision: null  # Auto-detected based on platform
   gradient_clip: 10.0  # Clip gradients to this value, 0 to disable
+  compile_model: null  # Auto-detected based on platform
+  memory_efficient: null  # Auto-detected based on platform
   
-  # Data loading configuration
+  # Data loading configuration (platform-optimized)
   data:
-    num_workers: 4  # Number of data loading workers
-    pin_memory: true  # Pin memory for faster GPU transfer
-    persistent_workers: true  # Keep workers alive between epochs
-    prefetch_factor: 2  # Number of batches to prefetch per worker
-    drop_last: true  # Drop last incomplete batch
+    num_workers: null  # Auto-detected using worker_utils
+    pin_memory: null   # Auto-detected based on device
+    persistent_workers: true
+    prefetch_factor: 2
+    drop_last: true
   
-    mixed_precision: true
-  # Loss function configuration
+  # Enhanced multi-task loss configuration
   loss:
+    type: uncertainty_multi_task  # Supported: uncertainty_multi_task, weighted_multi_task, focal, standard
     box_weight: 0.05  # Bounding box loss weight
     obj_weight: 1.0    # Objectness loss weight
     cls_weight: 0.5    # Classification loss weight
     focal_loss: false  # Use focal loss if true
     label_smoothing: 0.0  # Label smoothing epsilon
+    dynamic_weighting: true  # Enable uncertainty-based weighting
+    min_variance: 1e-3  # Minimum variance for stability
+    max_variance: 10.0  # Maximum variance to prevent overflow
   
-  # Early stopping configuration
+  # Enhanced early stopping configuration
   early_stopping:
     enabled: true
     patience: 15  # Epochs to wait before stopping
-    metric: val_map50  # Metric to monitor (e.g., val_loss, val_map50)
+    metric: val_map50  # Metric to monitor (val_loss, val_map50, val_accuracy, etc.)
     mode: max  # One of: min, max
     min_delta: 0.001  # Minimum change to qualify as improvement
+    adaptive: false  # Enable adaptive early stopping
+    adaptive_factor: 1.5  # Factor to increase patience on significant improvement
+    max_patience: 50  # Maximum patience for adaptive mode
+    improvement_threshold: 0.01  # Threshold for significant improvement
 
-# Paths configuration - sync with other config files
+# Paths configuration - unified management
 paths:
-  pretrained_models: 'data/pretrained'        # Sync with pretrained_config.yaml:9
-  checkpoints: 'data/checkpoints'             # Sync with evaluation_config.yaml:16
-  training_outputs: 'runs/train'              # Training outputs directory
-  
-# Multi-layer architecture configuration (from MODEL_ARC.md)
-architecture:
-  backbone:
-    types: ['EfficientNet-B4', 'CSPDarknet']  # MODEL_ARC.md:20
-    pretrained: true
-    source: 'data/pretrained'                 # MODEL_ARC.md:22
-  
-  neck:
-    type: 'PAN/FPN'                          # MODEL_ARC.md:25
-    compatible_with: 'YOLOv5'                # MODEL_ARC.md:26
-    pretrained: true                         # MODEL_ARC.md:27
-  
-  heads:                                     # MODEL_ARC.md:29-45
-    - name: 'layer_1_head'
-      description: 'Detects full note bounding boxes'
-      init: 'from_scratch'
-    - name: 'layer_2_head'  
-      description: 'Detects denomination-specific visual markers'
-      init: 'from_scratch'
-    - name: 'layer_3_head'
-      description: 'Detects common features across all notes'
-      init: 'from_scratch'
+  checkpoints: 'data/checkpoints'             # Unified checkpoint management
+  visualization: 'data/visualization'        # Chart and visualization outputs
+  logs: 'data/logs'                          # Training logs and summaries
+  pretrained_models: 'data/pretrained'       # Pretrained model storage
+  training_outputs: 'runs/train'             # Legacy training outputs
 
-# Multi-task loss configuration (from MODEL_ARC.md:96-97)
-multi_task_loss:
-  enabled: true
-  uncertainty_weighting: true                # MODEL_ARC.md:97
-  loss_function: 'total_loss = λ1 * loss_layer1 + λ2 * loss_layer2 + λ3 * loss_layer3'
+# Model configuration for unified pipeline
+model:
+  # Backbone configuration
+  backbone: cspdarknet  # Default: cspdarknet, efficientnet_b4
+  pretrained: true      # Always use pretrained models
+  feature_optimization: true  # Always enable feature optimization
+  
+  # Multi-layer detection configuration
+  layer_mode: multi
+  detection_layers: ['layer_1', 'layer_2', 'layer_3']
+  multi_layer_heads: true
+  
+  # Class configuration per layer
+  num_classes:
+    layer_1: 7  # Banknote denominations: [001, 002, 005, 010, 020, 050, 100]
+    layer_2: 7  # Denomination-specific features
+    layer_3: 3  # Common features: [sign, text, thread]
+  
+  # Image processing
+  img_size: 640  # Platform-optimized (may be reduced for memory constraints)
 
-# Two-phase training strategy (from MODEL_ARC.md:93-95)
+# Enhanced two-phase training strategy with configurable parameters
 training_phases:
   phase_1:
-    description: 'Freeze backbone, train detection heads only'  # MODEL_ARC.md:94
-    epochs: 50
+    description: 'Train detection heads with frozen backbone'
+    epochs: 20  # Default (configurable via CLI)
     freeze_backbone: true
-    learning_rates:                          # MODEL_ARC.md:102-105
-      backbone: 1e-5
-      head: 1e-3
+    learning_rates:
+      backbone: 1e-5  # Very low for frozen backbone
+      head: 1e-3      # Higher for training heads
+    warmup_epochs: 0  # No warmup for short training
   
   phase_2:
-    description: 'Unfreeze entire model for fine-tuning'      # MODEL_ARC.md:95
-    epochs: 50  
+    description: 'Fine-tune entire model'
+    epochs: 40  # Default (configurable via CLI)
     freeze_backbone: false
     learning_rates:
-      backbone: 1e-5
-      head: 1e-4
+      backbone: 5e-6  # Very conservative for backbone
+      head: 1e-4      # Moderate for heads
+    warmup_epochs: 0  # No warmup for short training
+
+# Platform-specific presets (auto-applied based on detection)
+platform_presets:
+  apple_silicon_mac:
+    batch_size: 6  # Conservative for unified memory
+    mixed_precision: false  # Avoid MPS issues
+    num_workers: 6
+    pin_memory: false
+    memory_fraction: 0.7
+    
+  google_colab:
+    batch_size: 16
+    mixed_precision: true
+    num_workers: 4
+    pin_memory: true
+    memory_fraction: 0.9
+    
+  cuda_workstation:
+    batch_size: 24
+    mixed_precision: true
+    num_workers: auto  # Use optimal_mixed_workers()
+    pin_memory: true
+    memory_fraction: 0.8
+    
+  cpu_only:
+    batch_size: 4
+    mixed_precision: false
+    num_workers: auto  # Use get_optimal_worker_count('io')
+    pin_memory: false
+    memory_fraction: 1.0
+
+# Comprehensive metrics tracking
+metrics:
+  # Layer-wise metrics (automatically calculated)
+  calculate_per_layer: true
+  layer_metrics:
+    - accuracy    # Per-layer classification accuracy
+    - precision   # Per-layer precision (weighted average)
+    - recall      # Per-layer recall (weighted average)
+    - f1          # Per-layer F1 score (weighted average)
+  
+  # Training metrics
+  training_metrics:
+    - train_loss  # Training loss
+    - val_loss    # Validation loss
+    - val_map50   # Mean Average Precision at IoU=0.5
+    - val_map75   # Mean Average Precision at IoU=0.75
+  
+  # Update frequency
+  batch_update_frequency: adaptive  # 1-5 batches based on dataset size
+  epoch_summary: true
+  real_time_emission: true  # For UI callbacks
+
+# Visualization configuration
+visualization:
+  auto_generate: true
+  session_tracking: true
+  chart_types:
+    - training_curves      # Loss and metrics over time
+    - confusion_matrices   # Per-layer confusion matrices
+    - layer_metrics       # Layer performance comparison
+    - phase_analysis      # Phase-wise training analysis
+    - lr_schedule         # Learning rate schedule
+    - dashboard           # Comprehensive overview
+  
+  save_formats: ['png', 'pdf']  # Chart output formats
+  dpi: 300                      # Chart resolution
+  style: 'seaborn-v0_8'        # Matplotlib style
+
+# CLI parameter mappings (for unified_training_example.py)
+cli_overrides:
+  configurable_params:
+    - loss_type           # Override loss.type
+    - batch_size          # Override platform batch_size
+    - head_lr_p1          # Override phase_1.learning_rates.head
+    - head_lr_p2          # Override phase_2.learning_rates.head
+    - backbone_lr         # Override backbone learning rates
+    - early_stopping_*    # Override early_stopping parameters
+  
+  early_stopping_mapping:
+    early_stopping_enabled: early_stopping.enabled
+    early_stopping_patience: early_stopping.patience
+    early_stopping_metric: early_stopping.metric
+    early_stopping_mode: early_stopping.mode
+    early_stopping_min_delta: early_stopping.min_delta
 
 # Class layers configuration (from MODEL_ARC.md:58-76)
 class_layers:
@@ -99,20 +233,66 @@ class_layers:
     description: 'Full banknote detection (main object)'      # MODEL_ARC.md:61
     classes: ['001', '002', '005', '010', '020', '050', '100'] # MODEL_ARC.md:63
     examples: ['100K IDR', '50K IDR']                          # MODEL_ARC.md:62
+    num_classes: 7
   
   layer_2:
     description: 'Nominal-defining features (unique visual cues)' # MODEL_ARC.md:66
     classes: ['l2_001', 'l2_002', 'l2_005', 'l2_010', 'l2_020', 'l2_050', 'l2_100'] # MODEL_ARC.md:68
     examples: ['Large printed number', 'Portrait', 'Watermark', 'Braile'] # MODEL_ARC.md:67
+    num_classes: 7
   
   layer_3:
     description: 'Common features (shared among notes)'       # MODEL_ARC.md:71
     classes: ['l3_sign', 'l3_text', 'l3_thread']             # MODEL_ARC.md:73
     examples: ['BI Logo', 'Serial Number & Micro Text', 'Security Thread'] # MODEL_ARC.md:72
+    num_classes: 3
 
-# Checkpoint configuration
+# Unified checkpoint configuration
 checkpoints:
-  format: 'best_{model_name}_{backbone}_{date:%Y%m%d}.pt'    # MODEL_ARC.md:185
-  save_dir: 'data/checkpoints'                               # Sync with other configs
+  # Naming convention for unified pipeline
+  format: '{backbone}_phase{phase}_epoch{epoch}_best_{timestamp}.pt'
+  save_dir: 'data/checkpoints'  # Unified checkpoint management
   auto_cleanup: true
-  preserve_metadata: true                                    # MODEL_ARC.md:187
+  preserve_metadata: true
+  
+  # Checkpoint content
+  include_config: true      # Save training configuration
+  include_metrics: true     # Save best metrics
+  include_session_id: true  # Save training session ID
+  
+  # Management
+  max_checkpoints: 10       # Keep last N checkpoints
+  cleanup_on_complete: false # Don't auto-cleanup on completion
+
+# Session and logging configuration
+session:
+  # Session tracking for UI integration
+  generate_session_id: true    # Auto-generate unique session IDs
+  track_phase_timing: true     # Track duration of each phase
+  comprehensive_logging: true  # Detailed logging for debugging
+  
+  # Progress tracking
+  progress_update_frequency:
+    preparation: every_step     # Update on each preparation step
+    build_model: every_step     # Update on each build step
+    validate_model: every_step  # Update on each validation step
+    training_phase_1: adaptive  # Adaptive batch updates
+    training_phase_2: adaptive  # Adaptive batch updates
+    summary_visualization: every_step # Update on each summary step
+
+# Integration compatibility
+compatibility:
+  # Backward compatibility
+  legacy_configs: supported   # Support old config formats
+  legacy_apis: supported      # Support old API calls
+  
+  # Forward compatibility
+  extensible_callbacks: true  # Support additional callbacks
+  plugin_architecture: true  # Support future plugins
+  
+  # UI framework compatibility
+  ui_frameworks:
+    - tkinter     # Native Python GUI
+    - qt          # Qt-based frameworks
+    - web         # Web-based interfaces
+    - jupyter     # Jupyter notebook integration

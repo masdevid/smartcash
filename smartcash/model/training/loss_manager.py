@@ -62,6 +62,11 @@ class YOLOLoss(nn.Module):
         
         # Calculate loss untuk setiap scale
         for i, pred in enumerate(predictions):
+            # Safe indexing with bounds checking
+            if i >= len(indices) or i >= len(anchors) or i >= len(tcls) or i >= len(tbox):
+                # Skip this scale if indices are out of range
+                continue
+                
             b, a, gj, gi = indices[i]  # batch, anchor, grid_y, grid_x
             tobj = torch.zeros_like(pred[..., 0])  # target objectness
             
@@ -85,9 +90,10 @@ class YOLOLoss(nn.Module):
                     t[range(len(tcls[i])), tcls[i]] = self.cp
                     lcls += self._classification_loss(ps[:, 5:], t)
             
-            # Objectness loss
+            # Objectness loss with safe balance indexing
+            balance_weight = self.balance[i] if i < len(self.balance) else 1.0
             obji = self.bce_obj(pred[..., 4], tobj)
-            lobj += obji * self.balance[i]
+            lobj += obji * balance_weight
         
         # Scale losses
         lbox *= self.box_weight
@@ -143,14 +149,55 @@ class YOLOLoss(nn.Module):
                 offsets = 0
             
             # Define
-            b, c = t[:, :2].long().T  # batch, class
-            gxy = t[:, 2:4]  # grid xy
-            gwh = t[:, 4:6]  # grid wh
-            gij = (gxy - offsets).long()
-            gi, gj = gij.T  # grid xy indices
-            
-            # Append
-            a = t[:, 6].long()  # anchor indices
+            # Ensure targets are in the correct format and type
+            try:
+                # Ensure targets are properly formatted and converted
+                if len(t) == 0:
+                    continue
+                
+                # More robust type conversion with proper error handling
+                # Batch indices (must be integers)
+                batch_col = t[:, 0].detach().float()
+                b = batch_col.round().long()
+                
+                # Class indices (must be integers) 
+                class_col = t[:, 1].detach().float()
+                c = class_col.round().long()
+                
+                # Coordinates (can be floats)
+                gxy = t[:, 2:4].detach().float()  # grid xy
+                gwh = t[:, 4:6].detach().float()  # grid wh
+                
+                # Ensure offsets is compatible type
+                if not isinstance(offsets, (int, float)) and offsets != 0:
+                    offsets = offsets.float()
+                
+                # Grid indices calculation with proper type handling
+                if isinstance(offsets, (int, float)) and offsets == 0:
+                    gij_float = gxy
+                else:
+                    gij_float = gxy - offsets
+                
+                gij = gij_float.round().long()  # Integer grid indices for tbox
+                gi = gij_float[:, 0].round().long()
+                gj = gij_float[:, 1].round().long()
+                
+                # Anchor indices - handle case where column 6 might not exist
+                if t.size(1) > 6:
+                    anchor_col = t[:, 6].detach().float()
+                    a = anchor_col.round().long()  # Ensure integer anchor indices
+                else:
+                    # Default to anchor 0 if not specified
+                    a = torch.zeros(len(t), dtype=torch.long, device=t.device)
+                
+                # Validate all indices are within reasonable ranges
+                b = b.clamp(0, 1000)  # Reasonable batch size limit
+                c = c.clamp(0, 1000)  # Reasonable class limit
+                a = a.clamp(0, 8)     # Reasonable anchor limit
+                
+            except Exception as e:
+                # Skip this scale if target processing fails
+                continue
             indices.append((b, a, gj.clamp_(0, gain[3] - 1), gi.clamp_(0, gain[2] - 1)))
             tbox.append(torch.cat((gxy - gij, gwh), 1))  # box
             anch.append(anchors[a])  # anchors
@@ -230,9 +277,45 @@ class LossManager:
     
     def _setup_loss_functions(self) -> None:
         """Setup loss functions berdasarkan model configuration"""
-        # Main currency detection (7 classes)
-        self.loss_functions['banknote'] = YOLOLoss(
-            num_classes=7,
+        # Check if we should use uncertainty-based multi-task loss (MODEL_ARC.md compliant)
+        loss_type = self.config.get('training', {}).get('loss', {}).get('type', 'uncertainty_multi_task')
+        
+        if loss_type == 'uncertainty_multi_task' and self._is_multilayer_mode():
+            # Use MODEL_ARC.md compliant uncertainty-based multi-task loss
+            from smartcash.model.training.multi_task_loss import create_banknote_multi_task_loss
+            
+            layer_config = {
+                'layer_1': {'description': 'Full banknote detection', 'num_classes': 7},
+                'layer_2': {'description': 'Denomination-specific features', 'num_classes': 7}, 
+                'layer_3': {'description': 'Common features', 'num_classes': 3}
+            }
+            
+            loss_config = {
+                'box_weight': self.box_weight,
+                'obj_weight': self.obj_weight,
+                'cls_weight': self.cls_weight,
+                'focal_loss': self.focal_loss,
+                'label_smoothing': self.label_smoothing,
+                'dynamic_weighting': True,
+                'min_variance': 1e-3,
+                'max_variance': 10.0
+            }
+            
+            self.multi_task_loss = create_banknote_multi_task_loss(
+                use_adaptive=False,
+                loss_config=loss_config
+            )
+            self.use_multi_task_loss = True
+        else:
+            # Use individual YOLO losses for backward compatibility
+            self.use_multi_task_loss = False
+            self._setup_individual_losses()
+    
+    def _setup_individual_losses(self) -> None:
+        """Setup individual YOLO loss functions for each layer"""
+        # MODEL_ARC.md compliant layer names
+        self.loss_functions['layer_1'] = YOLOLoss(
+            num_classes=7,  # Full banknote detection
             box_weight=self.box_weight,
             obj_weight=self.obj_weight,
             cls_weight=self.cls_weight,
@@ -242,12 +325,19 @@ class LossManager:
         
         # Additional layers jika diperlukan
         if self._is_multilayer_mode():
-            self.loss_functions['nominal'] = YOLOLoss(num_classes=7, **self._get_loss_params())
-            self.loss_functions['security'] = YOLOLoss(num_classes=3, **self._get_loss_params())
+            self.loss_functions['layer_2'] = YOLOLoss(num_classes=7, **self._get_loss_params())  # Denomination features
+            self.loss_functions['layer_3'] = YOLOLoss(num_classes=3, **self._get_loss_params())  # Common features
+        
+        # Legacy support untuk backward compatibility
+        self.loss_functions['banknote'] = self.loss_functions['layer_1']
+        if self._is_multilayer_mode():
+            self.loss_functions['nominal'] = self.loss_functions['layer_2']
+            self.loss_functions['security'] = self.loss_functions['layer_3']
     
     def _is_multilayer_mode(self) -> bool:
         """Check if model menggunakan multilayer detection"""
-        return self.config.get('model', {}).get('layer_mode') == 'multilayer'
+        layer_mode = self.config.get('model', {}).get('layer_mode', 'multi')
+        return layer_mode in ['multi', 'multilayer']
     
     def _get_loss_params(self) -> Dict[str, Any]:
         """Get standard loss parameters"""
@@ -273,7 +363,36 @@ class LossManager:
             total_loss: Combined loss
             loss_breakdown: Detailed loss components
         """
-        total_loss = torch.tensor(0.0, device=targets.device, requires_grad=True)
+        device = targets.device if len(targets) > 0 else torch.device('cpu')
+        
+        # Use MODEL_ARC.md compliant uncertainty-based multi-task loss if available
+        if hasattr(self, 'use_multi_task_loss') and self.use_multi_task_loss:
+            return self._compute_multi_task_loss(predictions, targets, img_size)
+        else:
+            return self._compute_individual_losses(predictions, targets, img_size)
+    
+    def _compute_multi_task_loss(self, predictions: Dict[str, List[torch.Tensor]], 
+                                targets: torch.Tensor, img_size: int = 640) -> Tuple[torch.Tensor, Dict[str, Any]]:
+        """Compute loss using MODEL_ARC.md compliant uncertainty-based multi-task loss"""
+        # Prepare targets for each layer
+        layer_targets = {}
+        for layer_name in ['layer_1', 'layer_2', 'layer_3']:
+            if layer_name in predictions:
+                layer_targets[layer_name] = self._filter_targets_for_layer(targets, layer_name)
+        
+        # Use uncertainty-based multi-task loss
+        total_loss, loss_breakdown = self.multi_task_loss(predictions, layer_targets, img_size)
+        
+        # Add overall metrics
+        loss_breakdown['num_targets'] = len(targets)
+        
+        return total_loss, loss_breakdown
+    
+    def _compute_individual_losses(self, predictions: Dict[str, List[torch.Tensor]], 
+                                  targets: torch.Tensor, img_size: int = 640) -> Tuple[torch.Tensor, Dict[str, Any]]:
+        """Compute loss using individual YOLO losses (backward compatibility)"""
+        device = targets.device if len(targets) > 0 else torch.device('cpu')
+        total_loss = torch.tensor(0.0, device=device, requires_grad=True)
         loss_breakdown = {}
         
         # Handle single layer mode
@@ -314,11 +433,15 @@ class LossManager:
         if len(targets) == 0:
             return targets
         
-        # Class mapping untuk different layers
+        # Class mapping untuk different layers (MODEL_ARC.md compliant)
         layer_class_ranges = {
-            'banknote': list(range(0, 7)),    # Classes 0-6
-            'nominal': list(range(7, 14)),    # Classes 7-13  
-            'security': list(range(14, 17))   # Classes 14-16
+            'layer_1': list(range(0, 7)),    # Full banknote detection: Classes 0-6
+            'layer_2': list(range(7, 14)),   # Denomination features: Classes 7-13  
+            'layer_3': list(range(14, 17)),  # Common features: Classes 14-16
+            # Legacy support
+            'banknote': list(range(0, 7)),   # Classes 0-6
+            'nominal': list(range(7, 14)),   # Classes 7-13  
+            'security': list(range(14, 17))  # Classes 14-16
         }
         
         valid_classes = layer_class_ranges.get(layer_name, list(range(0, 7)))
@@ -326,9 +449,14 @@ class LossManager:
         # Filter targets dengan class yang sesuai
         mask = torch.zeros(len(targets), dtype=torch.bool, device=targets.device)
         for i, target in enumerate(targets):
-            class_id = int(target[1].item())
-            if class_id in valid_classes:
-                mask[i] = True
+            try:
+                # Ensure target[1] is properly converted to int
+                class_id = int(target[1].float().item())  # Explicit float conversion first
+                if class_id in valid_classes:
+                    mask[i] = True
+            except (ValueError, RuntimeError) as e:
+                # Skip invalid targets
+                continue
         
         filtered_targets = targets[mask].clone()
         

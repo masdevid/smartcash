@@ -15,6 +15,7 @@ def setup_device(device_config: Dict[str, Any]) -> torch.device:
     preferred = device_config.get('preferred', 'cuda')
     
     if auto_detect:
+        # Priority: CUDA > MPS > CPU
         if torch.cuda.is_available() and preferred == 'cuda':
             device = torch.device('cuda')
             logger.info(f"🎮 CUDA detected: {torch.cuda.get_device_name()}")
@@ -27,15 +28,28 @@ def setup_device(device_config: Dict[str, Any]) -> torch.device:
             torch.backends.cudnn.benchmark = True
             torch.backends.cudnn.deterministic = False
             
+        elif hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
+            device = torch.device('mps')
+            logger.info("🍎 MPS (Metal Performance Shaders) detected - optimized for M1/M2")
+            
+            # MPS doesn't support mixed precision yet
+            if device_config.get('mixed_precision', False):
+                logger.warning("⚠️ Mixed precision not supported on MPS, disabled")
+            
         else:
             device = torch.device('cpu')
             logger.info("💻 Using CPU")
             
-            if preferred == 'cuda':
-                logger.warning("⚠️ CUDA preferred but not available, falling back to CPU")
+            if preferred in ['cuda', 'mps']:
+                logger.warning(f"⚠️ {preferred.upper()} preferred but not available, falling back to CPU")
     else:
-        device = torch.device(preferred)
-        logger.info(f"🔧 Device manually set to: {device}")
+        # Manual device setting
+        if preferred == 'mps' and hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
+            device = torch.device('mps')
+            logger.info("🍎 MPS manually set - optimized for M1/M2")
+        else:
+            device = torch.device(preferred)
+            logger.info(f"🔧 Device manually set to: {device}")
     
     return device
 
@@ -45,6 +59,7 @@ def get_device_info() -> Dict[str, Any]:
         'cuda_available': torch.cuda.is_available(),
         'cuda_version': torch.version.cuda if torch.cuda.is_available() else None,
         'device_count': torch.cuda.device_count() if torch.cuda.is_available() else 0,
+        'mps_available': hasattr(torch.backends, 'mps') and torch.backends.mps.is_available(),
     }
     
     if torch.cuda.is_available():
@@ -54,6 +69,12 @@ def get_device_info() -> Dict[str, Any]:
             'gpu_name': torch.cuda.get_device_name(current_device),
             'gpu_memory_gb': torch.cuda.get_device_properties(current_device).total_memory / (1024**3),
             'gpu_compute_capability': torch.cuda.get_device_properties(current_device).major,
+        })
+    elif hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
+        info.update({
+            'device_type': 'mps',
+            'device_name': 'Apple Silicon GPU (MPS)',
+            'optimization': 'Metal Performance Shaders'
         })
     
     return info

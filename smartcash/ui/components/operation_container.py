@@ -832,6 +832,10 @@ class OperationContainer(BaseUIComponent):
         """Log a debug message."""
         self.log(message, LogLevel.DEBUG)
     
+    def log_debug(self, message: str, namespace: str = None) -> None:
+        """Log a debug message with optional namespace (alias for debug with namespace support)."""
+        self.log(message, LogLevel.DEBUG, namespace)
+    
     def info(self, message: str) -> None:
         """Log an info message."""
         self.log(message, LogLevel.INFO)

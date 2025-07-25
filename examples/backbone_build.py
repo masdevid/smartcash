@@ -121,6 +121,7 @@ def build_backbone_model(backbone_type: str, verbose: bool = False) -> Dict[str,
             'layer_2': 7,   # 7 denomination-specific features  
             'layer_3': 3    # 3 common features
         }
+        config['backbone']['feature_optimization'] = True
         
         # Log configuration if verbose
         if verbose:
@@ -165,9 +166,9 @@ def build_backbone_model(backbone_type: str, verbose: bool = False) -> Dict[str,
                     if model_info.get('status') == 'built':
                         print(f"✅ {backbone_type} backbone built successfully!")
                         
-                        # Save the model for validation
+                        # Save the initial built model to /data/models
                         try:
-                            checkpoint_metrics = {
+                            model_metrics = {
                                 'backbone': backbone_type,
                                 'parameters': model_info.get('total_parameters', 0),
                                 'layer_mode': model_info.get('layer_mode', 'multi'),
@@ -176,17 +177,16 @@ def build_backbone_model(backbone_type: str, verbose: bool = False) -> Dict[str,
                                 'build_time': time.time()
                             }
                             
-                            checkpoint_path = api.save_checkpoint(
-                                metrics=checkpoint_metrics,
-                                model_name=f"{backbone_type}_backbone",
-                                is_best=True
+                            model_path = api.save_initial_model(
+                                metrics=model_metrics,
+                                model_name=f"{backbone_type}_backbone"
                             )
                             
                             if verbose:
-                                print(f"💾 Model saved to: {checkpoint_path}")
+                                print(f"💾 Initial model saved to: {model_path}")
                                 
                         except Exception as save_error:
-                            logger.warning(f"⚠️ Failed to save model: {str(save_error)}")
+                            logger.warning(f"⚠️ Failed to save initial model: {str(save_error)}")
                             # Don't fail the build if save fails
                         
                         # Clean up progress bars
@@ -201,7 +201,7 @@ def build_backbone_model(backbone_type: str, verbose: bool = False) -> Dict[str,
                             'backbone_name': model_info.get('backbone', backbone_type),
                             'layer_mode': model_info.get('layer_mode', 'multi'),
                             'detection_layers': model_info.get('detection_layers', []),
-                            'checkpoint_path': checkpoint_path if 'checkpoint_path' in locals() else None
+                            'model_path': model_path if 'model_path' in locals() else None
                         }
                     else:
                         error_msg = model_info.get('message', 'Model not built properly')

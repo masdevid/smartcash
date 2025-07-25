@@ -107,7 +107,7 @@ class CheckpointManager:
             
             # Load checkpoint data
             self.progress_bridge.update(2, f"📂 Loading {checkpoint_path.name}...")
-            checkpoint_data = torch.load(checkpoint_path, map_location='cpu')
+            checkpoint_data = torch.load(checkpoint_path, map_location='cpu', weights_only=False)
             
             # Load model state
             if 'model_state_dict' in checkpoint_data:

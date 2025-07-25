@@ -3,7 +3,7 @@ File: smartcash/model/training/__init__.py
 Deskripsi: Training package exports untuk Fase 2 implementation
 """
 
-from .training_service import TrainingService, create_training_service, quick_train_model
+# Old training service removed - use unified_training_pipeline instead
 from .data_loader_factory import DataLoaderFactory, create_data_loaders, get_dataset_stats
 from .metrics_tracker import MetricsTracker, create_metrics_tracker
 from .optimizer_factory import (
@@ -20,51 +20,35 @@ from .utils.early_stopping import (
     EarlyStopping, MultiMetricEarlyStopping, AdaptiveEarlyStopping,
     create_early_stopping, create_adaptive_early_stopping
 )
+from .visualization_manager import ComprehensiveMetricsTracker, create_visualization_manager
+from .platform_presets import PlatformPresets, get_platform_presets, get_platform_config
+from .unified_training_pipeline import UnifiedTrainingPipeline
+# run_full_training_pipeline moved to smartcash.model.api.core
 
-# Main training API
-def start_training(model_api, config=None, epochs=100, ui_components=None,
-                  progress_callback=None, metrics_callback=None):
+# Main training API - now uses unified training pipeline
+def start_training(backbone='cspdarknet', phase_1_epochs=1, phase_2_epochs=1, 
+                  progress_callback=None, **kwargs):
     """
-    Quick start training dengan default setup
+    Quick start training using unified training pipeline
     
     Args:
-        model_api: SmartCashModelAPI dari Fase 1
-        config: Training configuration (optional)
-        epochs: Number of epochs
-        ui_components: UI components untuk progress tracking
+        backbone: Model backbone ('cspdarknet' or 'efficientnet_b4')
+        phase_1_epochs: Number of epochs for phase 1
+        phase_2_epochs: Number of epochs for phase 2
         progress_callback: Progress callback function
-        metrics_callback: Metrics callback function
+        **kwargs: Additional configuration overrides
         
     Returns:
         Training results
     """
-    service = create_training_service(
-        model_api=model_api,
-        config=config, 
-        ui_components=ui_components,
+    from smartcash.model.api.core import run_full_training_pipeline
+    return run_full_training_pipeline(
+        backbone=backbone,
+        phase_1_epochs=phase_1_epochs,
+        phase_2_epochs=phase_2_epochs,
         progress_callback=progress_callback,
-        metrics_callback=metrics_callback
+        **kwargs
     )
-    
-    return service.start_training(epochs=epochs)
-
-def resume_training(model_api, checkpoint_path, additional_epochs=50, 
-                   config=None, ui_components=None):
-    """
-    Resume training dari checkpoint
-    
-    Args:
-        model_api: SmartCashModelAPI instance
-        checkpoint_path: Path ke checkpoint file
-        additional_epochs: Additional epochs untuk training
-        config: Training configuration
-        ui_components: UI components
-        
-    Returns:
-        Training results
-    """
-    service = create_training_service(model_api, config, ui_components)
-    return service.resume_training(checkpoint_path, additional_epochs)
 
 def get_training_info(config=None):
     """Get training configuration dan dataset info"""
@@ -81,10 +65,10 @@ def get_training_info(config=None):
         'device_info': 'cuda' if __import__('torch').cuda.is_available() else 'cpu'
     }
 
-# Export semua components
+# Export main components
 __all__ = [
-    # Main service
-    'TrainingService', 'create_training_service', 'start_training', 'resume_training',
+    # Main training API
+    'start_training', 'get_training_info',
     
     # Data loading
     'DataLoaderFactory', 'create_data_loaders', 'get_dataset_stats',
@@ -107,6 +91,10 @@ __all__ = [
     'EarlyStopping', 'MultiMetricEarlyStopping', 'AdaptiveEarlyStopping',
     'create_early_stopping', 'create_adaptive_early_stopping',
     
-    # Convenience functions
-    'quick_train_model', 'get_training_info'
+    # Visualization
+    'ComprehensiveMetricsTracker', 'create_visualization_manager',
+    
+    # Platform-aware training
+    'PlatformPresets', 'get_platform_presets', 'get_platform_config',
+    'UnifiedTrainingPipeline'
 ]

@@ -264,27 +264,39 @@ def check_built_models() -> Dict[str, Any]:
         Dictionary with discovery results organized by backbone type
     """
     try:
-        # Define search paths with priorities - enhanced for both EfficientNet and CSPDarkNet
+        # Define search paths with priorities - check both initial models and trained checkpoints
         search_configs = [
             {
-                'paths': ['data/models', 'data/checkpoints'],
+                'paths': ['data/models'],  # Initial built models (higher priority)
+                'patterns': [
+                    '*backbone*efficientnet*.pt', '*backbone*efficientnet*.pth',   # EfficientNet backbone models
+                    '*backbone*cspdarknet*.pt', '*backbone*cspdarknet*.pth',       # CSPDarkNet backbone models
+                    '*backbone*.pt', '*backbone*.pth',                            # General backbone files
+                    '*efficientnet*.pt', '*efficientnet*.pth',                    # EfficientNet models
+                    '*cspdarknet*.pt', '*cspdarknet*.pth',                        # CSPDarkNet models
+                    '*smartcash*.pt', '*smartcash*.pth'                           # SmartCash models
+                ],
+                'priority': 1
+            },
+            {
+                'paths': ['data/checkpoints'],  # Trained model checkpoints (lower priority)
                 'patterns': [
                     '*backbone*smartcash*efficientnet*.pt', '*backbone*smartcash*efficientnet*.pth',  # EfficientNet format
                     '*backbone*smartcash*cspdarknet*.pt', '*backbone*smartcash*cspdarknet*.pth',     # CSPDarkNet format
                     '*backbone*.pt', '*backbone*.pth',                                               # General backbone files
                     '*smartcash*.pt', '*smartcash*.pth'                                              # SmartCash models
                 ],
-                'priority': 1
+                'priority': 2
             },
             {
                 'paths': ['runs/train/*/weights'],
                 'patterns': ['best.pt', 'last.pt'],
-                'priority': 2
+                'priority': 3
             },
             {
                 'paths': ['data/models'],
                 'patterns': ['*.pt', '*.pth'],
-                'priority': 3
+                'priority': 4
             }
         ]
         
@@ -374,7 +386,6 @@ def _scan_path_pattern(path_pattern: str, file_patterns: List[str]) -> Dict[str,
         Dictionary of found models with metadata
     """
     found_models = {}
-    logger = get_logger(__name__)
     
     try:
         # Convert to absolute path for better reliability
@@ -383,7 +394,6 @@ def _scan_path_pattern(path_pattern: str, file_patterns: List[str]) -> Dict[str,
         
         # Check if directory exists before scanning
         if not abs_path.exists():
-            logger.debug(f"Directory {abs_path} does not exist, skipping scan")
             return found_models
             
         total_files = 0
@@ -412,9 +422,9 @@ def _scan_path_pattern(path_pattern: str, file_patterns: List[str]) -> Dict[str,
         
         # Use summary logging instead of per-file logging
         if total_files > 0:
-            logger.debug(f"Scanned {abs_path}: {valid_models}/{total_files} valid models")
+            pass  # Remove debug logging to avoid import issues
     except Exception as e:
-        logger.debug(f"Error scanning {path_pattern} with patterns {file_patterns}: {e}")
+        pass  # Remove debug logging to avoid import issues
     
     return found_models
 
@@ -455,7 +465,7 @@ def extract_quick_metadata(filepath: str) -> Dict[str, Any]:
         
         # Try to extract additional metadata from the file
         try:
-            checkpoint = torch.load(filepath, map_location='cpu', weights_only=True)
+            checkpoint = torch.load(filepath, map_location='cpu', weights_only=False)
             if isinstance(checkpoint, dict):
                 # Extract metadata from checkpoint
                 if 'metadata' in checkpoint:
@@ -476,7 +486,6 @@ def extract_quick_metadata(filepath: str) -> Dict[str, Any]:
         return metadata
         
     except Exception as e:
-        logger.debug(f"Error extracting metadata from {filepath}: {e}")
         return {'valid': False, 'error': str(e)}
 
 
@@ -564,7 +573,7 @@ def _fallback_model_scan() -> Dict[str, Any]:
         Basic scan results
     """
     try:
-        # Simple scan of common paths
+        # Simple scan of common paths - prioritize initial models over checkpoints
         common_paths = ['data/models', 'data/checkpoints']
         total_found = 0
         

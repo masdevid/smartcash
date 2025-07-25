@@ -26,17 +26,17 @@ model:
   conf_threshold: 0.25  # Minimum confidence score for detections
   iou_threshold: 0.45   # NMS IoU threshold
   
-  # Device configuration
-  device: 'auto'  # Options: 'auto' (recommended), 'cuda', 'cpu', 'mps'
+  # Device configuration - optimized for M1 MacBook Pro
+  device: 'mps'  # Use Metal Performance Shaders for M1 optimization
   
-  # Mixed precision training
-  mixed_precision: true  # Use mixed precision training (FP16)
+  # Mixed precision training - disabled for M1 compatibility
+  mixed_precision: false  # Disabled for MPS compatibility
 
 # Training Configuration (Reference only - See training_config.yaml for full options)
 training:
   # Core training parameters (refer to training_config.yaml for details)
   epochs: 100
-  batch_size: 16
+  batch_size: 4  # Further optimized for M1 MacBook Pro memory
   learning_rate: 0.001
   weight_decay: 0.0005
   

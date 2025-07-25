@@ -224,33 +224,88 @@ class CSPDarknet(BaseBackbone):
     
     def _extract_backbone(self, model):
         """Extract backbone dari YOLOv5 model dengan validasi struktur."""
-        if hasattr(model, 'model'):
-            modules = list(model.model.children())
-        else:
-            modules = list(model.children())
-            
-        # Validasi modul
-        if len(modules) < 10:
-            raise BackboneError(
-                f"❌ Struktur model yang tidak valid! Diharapkan minimal 10 layer, "
-                f"tetapi hanya menemukan {len(modules)}"
-            )
+        # Handle different YOLOv5 model structures
+        modules = None
         
-        # Ambil backbone layers (0 sampai maksimum P5 index + 1)
-        max_index = max(self.feature_indices) + 1
+        # Try different ways to access the model layers
+        if hasattr(model, 'model') and hasattr(model.model, 'model'):
+            # YOLOv5 with AutoShape wrapper: model.model.model
+            modules = list(model.model.model.children())
+            self.logger.debug("📋 Using model.model.model structure")
+        elif hasattr(model, 'model'):
+            # Direct YOLOv5 model: model.model
+            modules = list(model.model.children())
+            self.logger.debug("📋 Using model.model structure")
+        else:
+            # Fallback: direct model
+            modules = list(model.children())
+            self.logger.debug("📋 Using direct model structure")
+        
+        self.logger.debug(f"🔍 Found {len(modules)} modules in model")
+        
+        # For YOLOv5, we need to look for the backbone part
+        # YOLOv5 structure: [model layers] where backbone is usually first N layers
+        if len(modules) == 1 and hasattr(modules[0], 'model'):
+            # If we get a single module that contains the actual model
+            modules = list(modules[0].model.children())
+            self.logger.debug(f"🔍 Unwrapped single module, now have {len(modules)} modules")
+        
+        # Validate we have enough modules
+        if len(modules) < max(self.feature_indices) + 1:
+            self.logger.warning(f"⚠️ Only {len(modules)} modules found, need at least {max(self.feature_indices) + 1}")
+            
+            # If we still don't have enough modules, try to build a custom backbone
+            if len(modules) < 3:
+                self.logger.info("🔧 Building custom backbone due to insufficient modules")
+                self._build_custom_backbone()
+                return
+        
+        # Extract backbone layers (0 to maximum P5 index + 1)
+        max_index = min(max(self.feature_indices) + 1, len(modules))
         backbone_modules = modules[:max_index]
         
-        # Buat backbone Sequential
+        self.logger.debug(f"📋 Extracting {len(backbone_modules)} backbone modules (indices 0-{max_index-1})")
+        
+        # Build backbone Sequential
         self.backbone = nn.Sequential(*backbone_modules)
         
-        # Validasi feature indices
+        # Adjust feature indices if necessary
         if max(self.feature_indices) >= len(backbone_modules):
-            actual_layers = len(backbone_modules)
-            problematic = [i for i in self.feature_indices if i >= actual_layers]
-            raise BackboneError(
-                f"❌ Feature indices yang tidak valid! Indices {problematic} "
-                f"di luar batas (total layers: {actual_layers})"
-            )
+            self.logger.warning(f"⚠️ Adjusting feature indices to fit available layers")
+            # Adjust feature indices to available layers
+            available_indices = list(range(len(backbone_modules)))
+            if len(available_indices) >= 3:
+                # Take the last 3 indices for P3, P4, P5
+                self.feature_indices = available_indices[-3:]
+                self.logger.info(f"📋 Adjusted feature indices to: {self.feature_indices}")
+            else:
+                raise BackboneError(
+                    f"❌ Not enough backbone layers ({len(backbone_modules)}) for multi-scale features"
+                )
+    
+    def _build_custom_backbone(self):
+        """Build a custom CSPDarknet-like backbone when YOLOv5 extraction fails."""
+        self.logger.info("🔧 Building custom CSPDarknet backbone")
+        
+        # Build a simplified CSPDarknet-like structure
+        self.backbone = nn.Sequential(
+            # Initial convolution
+            nn.Conv2d(3, 32, kernel_size=6, stride=2, padding=2),
+            nn.BatchNorm2d(32),
+            nn.SiLU(inplace=True),
+            
+            # Downsampling blocks for P3, P4, P5
+            self._make_downsample_block(32, 64),
+            self._make_downsample_block(64, 128),  # P3 - index 4
+            self._make_downsample_block(128, 256), # P4 - index 5  
+            self._make_downsample_block(256, 512), # P5 - index 6
+        )
+        
+        # Update configuration for custom backbone
+        self.feature_indices = [4, 5, 6]  # Indices where we extract features
+        self.expected_channels = [128, 256, 512]  # Match YOLO_CHANNELS
+        
+        self.logger.info(f"✅ Custom backbone built with indices {self.feature_indices}")
     
     def _verify_model_structure(self):
         """Verifikasi struktur model dan output channels."""

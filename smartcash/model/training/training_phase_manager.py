@@ -304,8 +304,10 @@ class TrainingPhaseManager:
             'val_accuracy': final_metrics.get('val_layer_1_accuracy', 0),
             'phase': phase_num
         }
+        # Fix nested f-string syntax error
+        phase_label = 'Single Phase' if self._is_single_phase else f'Phase {phase_num}'
         self.emit_live_chart_callback('training_curves', chart_data, {
-            'title': f'Training Progress - {'Single Phase' if self._is_single_phase else f'Phase {phase_num}'}',
+            'title': f'Training Progress - {phase_label}',
             'xlabel': 'Epoch',
             'ylabel': 'Loss / Accuracy'
         })

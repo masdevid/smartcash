@@ -1,8 +1,20 @@
 """
 File: smartcash/ui/model/training/components/__init__.py
-Training UI components package.
+Training UI components package - Updated for unified training pipeline.
 """
 
+# Unified training components (new)
+from .unified_training_ui import (
+    create_unified_training_ui,
+    update_training_buttons_state,
+    update_summary_display
+)
+
+from .unified_training_form import (
+    create_unified_training_form
+)
+
+# Legacy components (kept for compatibility)
 from .training_ui import (
     create_training_ui,
     update_training_ui_from_config,
@@ -36,30 +48,28 @@ from .training_config_summary import (
 )
 
 __all__ = [
-    # Main UI
+    # Unified training components (primary)
+    'create_unified_training_ui',
+    'update_training_buttons_state', 
+    'update_summary_display',
+    'create_unified_training_form',
+    
+    # Legacy components (compatibility)
     'create_training_ui',
     'update_training_ui_from_config',
     'get_training_form_values',
     'update_metrics_display',
     'update_chart_data',
     'show_validation_results',
-    
-    # Charts
     'create_dual_charts_layout',
     'create_simple_chart_placeholder',
-    
-    # Forms
     'create_training_form',
     'create_simple_training_form',
-    
-    # Metrics
     'generate_metrics_table_html',
     'get_initial_metrics_html',
     'get_quality_indicator',
     'create_metrics_summary',
     'format_metric_value',
-    
-    # Config Summary
     'create_config_summary',
     'create_simple_config_summary'
 ]

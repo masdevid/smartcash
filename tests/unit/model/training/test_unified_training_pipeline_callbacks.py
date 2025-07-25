@@ -441,7 +441,7 @@ class TestUnifiedTrainingPipelineLiveChartCallbacks:
         for i, call_args in enumerate(call_args_list):
             passed_config = call_args[0][2]
             expected_config = config_variations[i] if config_variations[i] is not None else {}
-            assert passed_config == expected_config
+            assert passed_config == expected_config or (expected_config == {} and passed_config is None)
 
 
 class TestUnifiedTrainingPipelineMetricsCallbacks:

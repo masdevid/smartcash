@@ -338,15 +338,22 @@ class TestUnifiedTrainingPipelinePhases:
         # Create sample data for iteration
         mock_sample_batch = (torch.randn(2, 3, 640, 640), torch.randn(2, 85))
         
-        # Mock the DataLoaderFactory and its created loaders
-        with patch('smartcash.model.training.unified_training_pipeline.DataLoaderFactory') as mock_factory_class:
-            # Create mock loaders that can be properly iterated
-            mock_train_loader = MagicMock()
-            mock_train_loader.__len__.return_value = 10
-            mock_train_loader.__iter__.return_value = iter([mock_sample_batch])
+        # Create a proper mock DataLoader class that supports all operations
+        class MockDataLoader:
+            def __init__(self, length, sample_batch):
+                self._length = length
+                self._sample_batch = sample_batch
             
-            mock_val_loader = MagicMock()
-            mock_val_loader.__len__.return_value = 5
+            def __len__(self):
+                return self._length
+            
+            def __iter__(self):
+                # Return an iterator that yields the sample batch
+                return iter([self._sample_batch])
+        
+        with patch('smartcash.model.training.unified_training_pipeline.DataLoaderFactory') as mock_factory_class:
+            mock_train_loader = MockDataLoader(10, mock_sample_batch)
+            mock_val_loader = MockDataLoader(5, mock_sample_batch)
             
             mock_factory = MagicMock()
             mock_factory.create_train_loader.return_value = mock_train_loader
@@ -393,27 +400,30 @@ class TestUnifiedTrainingPipelinePhases:
         """Test model validation with forward pass failure."""
         pipeline.config = mock_config
         mock_model = MagicMock()
+        mock_model.eval.return_value = None
         mock_model.parameters.return_value = [torch.tensor([1.0]).to('cpu')]
         mock_model.side_effect = RuntimeError("Forward pass error")
         pipeline.model = mock_model
         
-        # Create proper mock data loader class
+        # Create sample data for iteration
+        mock_sample_batch = (torch.randn(2, 3, 640, 640), torch.randn(2, 85))
+        
+        # Create a proper mock DataLoader class
         class MockDataLoader:
-            def __init__(self, length, data):
+            def __init__(self, length, sample_batch):
                 self._length = length
-                self._data = data
+                self._sample_batch = sample_batch
             
             def __len__(self):
                 return self._length
             
             def __iter__(self):
-                return iter(self._data)
-        
-        mock_sample_batch = (torch.randn(2, 3, 640, 640), torch.randn(2, 85))
-        mock_train_loader = MockDataLoader(10, [mock_sample_batch])
-        mock_val_loader = MockDataLoader(5, [mock_sample_batch])
+                return iter([self._sample_batch])
         
         with patch('smartcash.model.training.unified_training_pipeline.DataLoaderFactory') as mock_factory_class:
+            mock_train_loader = MockDataLoader(10, mock_sample_batch)
+            mock_val_loader = MockDataLoader(5, mock_sample_batch)
+            
             mock_factory = MagicMock()
             mock_factory.create_train_loader.return_value = mock_train_loader
             mock_factory.create_val_loader.return_value = mock_val_loader

@@ -34,6 +34,26 @@ from smartcash.model.training.unified_training_pipeline import UnifiedTrainingPi
 
 
 class TestUnifiedTrainingPipelineIntegration:
+    def _create_mock_data_loaders(self):
+        """Helper to create proper mock data loaders."""
+        class MockDataLoader:
+            def __init__(self, length, sample_data):
+                self._length = length
+                self._sample_data = sample_data
+            
+            def __len__(self):
+                return self._length
+            
+            def __iter__(self):
+                return iter(self._sample_data)
+        
+        mock_sample_batch = (torch.randn(2, 3, 640, 640), torch.randn(2, 85))
+        
+        return {
+            'train': MockDataLoader(10, [mock_sample_batch] * 10),
+            'val': MockDataLoader(5, [mock_sample_batch] * 5)
+        }
+
     """Integration tests for complete training pipeline workflows."""
     
     @pytest.fixture

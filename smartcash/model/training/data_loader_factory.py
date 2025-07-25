@@ -7,10 +7,13 @@ import os
 import torch
 import cv2
 import numpy as np
+import atexit
+import weakref
 from pathlib import Path
 from torch.utils.data import Dataset, DataLoader
-from typing import Dict, List, Tuple, Optional, Any
+from typing import Dict, List, Tuple, Optional, Any, Callable
 import yaml
+
 
 class YOLODataset(Dataset):
     """Dataset class untuk YOLO format dengan preprocessed .npy files"""
@@ -54,7 +57,14 @@ class YOLODataset(Dataset):
         
         # Convert ke tensor (data sudah normalized dari preprocessor)
         image = torch.from_numpy(image.astype(np.float32))
-        labels = torch.from_numpy(labels).float() if len(labels) > 0 else torch.zeros((0, 5))
+        if len(labels) > 0:
+            # Keep class IDs as integers and coordinates as floats
+            labels_tensor = torch.from_numpy(labels.astype(np.float32))
+            # Ensure class column (first column) is integer type
+            labels_tensor[:, 0] = labels_tensor[:, 0].long().float()
+            labels = labels_tensor
+        else:
+            labels = torch.zeros((0, 5), dtype=torch.float32)
         
         return image, labels
     
@@ -91,21 +101,52 @@ def collate_fn(batch: List[Tuple[torch.Tensor, torch.Tensor]]) -> Tuple[torch.Te
     targets = []
     for i, label in enumerate(labels):
         if len(label) > 0:
-            # Add batch index as first column
-            batch_labels = torch.full((len(label), 1), i)
+            # Add batch index as first column (ensure float for consistency)
+            batch_labels = torch.full((len(label), 1), float(i), dtype=torch.float32)
             targets.append(torch.cat([batch_labels, label], 1))
     
-    targets = torch.cat(targets, 0) if targets else torch.zeros((0, 6))
+    targets = torch.cat(targets, 0) if targets else torch.zeros((0, 6), dtype=torch.float32)
     
     return images, targets
 
 class DataLoaderFactory:
     """Factory untuk membuat data loaders dari preprocessed dataset"""
+    _instances = weakref.WeakSet()
     
     def __init__(self, config: Optional[Dict[str, Any]] = None, data_dir: str = 'data/preprocessed'):
         self.config = config or self._load_default_config()
         self.data_dir = Path(data_dir)
         self._validate_data_structure()
+        self._dataloaders = []
+        DataLoaderFactory._instances.add(self)
+        atexit.register(self.cleanup)
+    
+    def cleanup(self):
+        """Clean up all resources used by dataloaders and their workers to prevent semaphore leaks"""
+        for dl in self._dataloaders:
+            try:
+                # Explicitly shutdown worker processes if possible
+                if hasattr(dl, '_shutdown_workers'):
+                    dl._shutdown_workers()
+                if hasattr(dl, '_iterator'):
+                    # Remove iterator to help GC
+                    delattr(dl, '_iterator')
+                if hasattr(dl, 'dataset') and hasattr(dl.dataset, 'close'):
+                    dl.dataset.close()
+            except Exception:
+                pass
+        self._dataloaders.clear()
+        if self in DataLoaderFactory._instances:
+            DataLoaderFactory._instances.remove(self)
+    
+    @classmethod
+    def cleanup_all(cls):
+        """Clean up all DataLoaderFactory instances"""
+        for instance in list(cls._instances):
+            instance.cleanup()
+    
+    def __del__(self):
+        self.cleanup()
     
     def _load_default_config(self) -> Dict[str, Any]:
         """Load default training config"""
@@ -121,7 +162,7 @@ class DataLoaderFactory:
             'training': {
                 'batch_size': 16,
                 'data': {
-                    'num_workers': 4,
+                    'num_workers': 4,  # Use optimal workers for mixed I/O and CPU tasks
                     'pin_memory': True,
                     'persistent_workers': True,
                     'prefetch_factor': 2,
@@ -155,18 +196,19 @@ class DataLoaderFactory:
         )
         
         data_config = self.config.get('training', {}).get('data', {})
-        
-        return DataLoader(
+        loader = DataLoader(
             dataset,
             batch_size=self.config.get('training', {}).get('batch_size', 16),
             shuffle=True,
-            num_workers=data_config.get('num_workers', 4),
+            num_workers=4,
             pin_memory=data_config.get('pin_memory', True),
             persistent_workers=data_config.get('persistent_workers', True),
             prefetch_factor=data_config.get('prefetch_factor', 2),
             drop_last=data_config.get('drop_last', True),
             collate_fn=collate_fn
         )
+        self._dataloaders.append(loader)
+        return loader
     
     def create_val_loader(self, img_size: int = 640) -> DataLoader:
         """Create validation data loader"""
@@ -181,16 +223,17 @@ class DataLoaderFactory:
         )
         
         data_config = self.config.get('training', {}).get('data', {})
-        
-        return DataLoader(
+        loader = DataLoader(
             dataset,
             batch_size=self.config.get('training', {}).get('batch_size', 16),
             shuffle=False,
-            num_workers=data_config.get('num_workers', 4),
+            num_workers=4,
             pin_memory=data_config.get('pin_memory', True),
             persistent_workers=data_config.get('persistent_workers', True),
             collate_fn=collate_fn
         )
+        self._dataloaders.append(loader)
+        return loader
     
     def create_test_loader(self, img_size: int = 640) -> Optional[DataLoader]:
         """Create test data loader jika tersedia"""
@@ -208,15 +251,16 @@ class DataLoaderFactory:
         )
         
         data_config = self.config.get('training', {}).get('data', {})
-        
-        return DataLoader(
+        loader = DataLoader(
             dataset,
             batch_size=self.config.get('training', {}).get('batch_size', 16),
             shuffle=False,
-            num_workers=data_config.get('num_workers', 4),
+            num_workers=4,
             pin_memory=data_config.get('pin_memory', True),
             collate_fn=collate_fn
         )
+        self._dataloaders.append(loader)
+        return loader
     
     def get_dataset_info(self) -> Dict[str, Any]:
         """Get informasi dataset untuk preprocessed files"""

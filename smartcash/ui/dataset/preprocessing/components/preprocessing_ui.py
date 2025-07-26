@@ -205,8 +205,8 @@ def create_preprocessing_ui_components(
             {'component': header_container.container, 'type': 'header'},
             {'component': form_container['container'], 'type': 'form'},
             {'component': action_container['container'], 'type': 'action'},
-            {'component': summary_container.container, 'type': 'summary'},
             {'component': operation_container['container'], 'type': 'operation'},
+            {'component': summary_container.container, 'type': 'summary'},
             {'component': footer_container.container, 'type': 'footer'}
         ]
     )

@@ -172,8 +172,8 @@ def _assemble_main_container(
         {'type': 'header', 'component': header_container.container, 'order': 0, 'name': 'header'},
         {'type': 'form', 'component': form_container, 'order': 1, 'name': 'form'},
         {'type': 'action', 'component': action_container['container'], 'order': 2, 'name': 'actions'},
-        {'type': 'summary', 'component': summary_container, 'order': 3, 'name': 'summary', 'visible': False},
-        {'type': 'operation', 'component': operation_container['container'], 'order': 4, 'name': 'operations'},
+        {'type': 'operation', 'component': operation_container['container'], 'order': 3, 'name': 'operations'},
+        {'type': 'summary', 'component': summary_container, 'order': 4, 'name': 'summary', 'visible': False},
         {'type': 'footer', 'component': footer_container.container, 'order': 5, 'name': 'footer'}
     ]
     

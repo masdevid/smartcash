@@ -31,8 +31,8 @@ class PreprocessingUIModule(BaseUIModule):
             'header_container', 
             'form_container',
             'action_container',
-            'summary_container',
-            'operation_container'
+            'operation_container',
+            'summary_container'
         ]
         # Service readiness flag
         self._service_ready = False

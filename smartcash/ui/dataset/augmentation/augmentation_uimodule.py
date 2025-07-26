@@ -42,8 +42,8 @@ class AugmentationUIModule(BaseUIModule):
             'header_container',
             'form_container',
             'action_container',
-            'summary_container',
-            'operation_container'
+            'operation_container',
+            'summary_container'
         ]
         
         # Initialize resources dictionary for cleanup tracking

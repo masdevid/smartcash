@@ -55,8 +55,8 @@ def setup_arg_parser() -> argparse.ArgumentParser:
                       help='Batch size for processing')
     
     # Cleanup and logging options
-    parser.add_argument('--cleanup', action='store_true',
-                      help='Clean up existing preprocessed data before starting')
+    parser.add_argument('--cleanup', action='store_true', default=True,
+                      help='Clean up existing preprocessed data before starting (default: True)')
     parser.add_argument('--verbose', action='store_true',
                       help='Enable verbose logging (shows all messages)')
     
@@ -234,22 +234,25 @@ def main() -> int:
         print(f"   • Total splits processed: {len(args.splits)}")
         
         # Show per-split statistics if available
-        if 'splits' in results:
-            for split, stats in results['splits'].items():
+        stats = results.get('stats', {})
+        if 'by_split' in stats:
+            for split, split_stats in stats['by_split'].items():
                 print(f"   • {split.upper()} Split:")
-                print(f"     - Images: {stats.get('images', 0)}")
-                print(f"     - Labels: {stats.get('labels', 0)}")
-                if 'classes' in stats:
-                    print(f"     - Classes: {len(stats['classes'])}")
+                print(f"     - Processed: {split_stats.get('processed', 0)}")
+                print(f"     - Errors: {split_stats.get('errors', 0)}")
+                print(f"     - Total: {split_stats.get('total', 0)}")
         
         # Show overall statistics
         print("\n📈 Overall Statistics:")
-        print(f"   • Total images processed: {results.get('total_images', 0)}")
-        print(f"   • Total labels processed: {results.get('total_labels', 0)}")
-        if 'class_distribution' in results:
-            print("   • Class distribution:")
-            for cls, count in results['class_distribution'].items():
-                print(f"     - {cls}: {count}")
+        input_stats = stats.get('input', {})
+        output_stats = stats.get('output', {})
+        performance_stats = stats.get('performance', {})
+        
+        print(f"   • Total input images: {input_stats.get('total_images', 0)}")
+        print(f"   • Total processed: {output_stats.get('total_processed', 0)}")
+        print(f"   • Total errors: {output_stats.get('total_errors', 0)}")
+        print(f"   • Success rate: {output_stats.get('success_rate', 'N/A')}")
+        print(f"   • Processing speed: {performance_stats.get('images_per_second', 0)} images/sec")
         
         print(f"\n💾 Output saved to: {config['output_dir']}")
         

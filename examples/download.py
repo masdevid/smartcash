@@ -205,14 +205,51 @@ def download_dataset(args) -> bool:
             print(f"📁 Dataset saved to: {os.path.abspath(args.output_dir)}")
             
             # Log summary information
-            if result.get('summary'):
+            print("📊 Download Summary:")
+            
+            # Check for stats in result
+            if result.get('stats'):
+                stats = result['stats']
+                print(f"   • Total images: {stats.get('total_images', 0)}")
+                print(f"   • Total labels: {stats.get('total_labels', 0)}")
+                
+                # Show per-split information
+                if stats.get('splits'):
+                    print("   • Per-split breakdown:")
+                    for split, data in stats['splits'].items():
+                        if isinstance(data, dict):
+                            images = data.get('images', 0)
+                            labels = data.get('labels', 0)
+                            print(f"     - {split}: {images} images, {labels} labels")
+                        else:
+                            print(f"     - {split}: {data} files")
+                
+                # Show additional stats
+                if stats.get('uuid_renamed'):
+                    print(f"   • Files renamed to UUID format: Yes")
+                if stats.get('workers_used'):
+                    print(f"   • Workers used: {stats.get('workers_used')}")
+                if stats.get('parallel_enabled'):
+                    print(f"   • Parallel downloads: Enabled")
+                    
+            # Fallback for older summary format
+            elif result.get('summary'):
                 summary = result['summary']
-                print("📊 Download Summary:")
                 print(f"   • Total files: {summary.get('total_files', 'N/A')}")
                 print(f"   • Total size: {summary.get('total_size', 'N/A')}")
                 if summary.get('splits'):
                     for split, count in summary['splits'].items():
                         print(f"   • {split}: {count} files")
+            
+            # Show performance info
+            if result.get('duration'):
+                duration = result['duration']
+                print(f"   • Download time: {duration:.1f} seconds")
+            
+            # Show metadata info
+            if result.get('metadata'):
+                metadata = result['metadata']
+                print(f"   • Dataset: {metadata.get('workspace', 'N/A')}/{metadata.get('project', 'N/A')}/{metadata.get('version', 'N/A')}")
             
             return True
         else:

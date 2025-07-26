@@ -356,3 +356,16 @@ def setup_platform_optimizations():
     """Setup platform-specific optimizations with memory optimization."""
     presets = get_platform_presets()
     return presets.setup_platform_optimizations()
+
+def setup_platform_optimizations_with_device(device=None):
+    """Setup platform-specific optimizations with explicit device specification."""
+    presets = get_platform_presets()
+    if device is not None:
+        # Use specific device for memory optimizer
+        memory_optimizer = get_memory_optimizer(device)
+        memory_config = memory_optimizer.setup_memory_efficient_settings()
+        logger.info(f"✅ Memory optimization applied for {device}: {memory_config.get('device', 'unknown')}")
+        return memory_config
+    else:
+        # Use default auto-detection
+        return presets.setup_platform_optimizations()

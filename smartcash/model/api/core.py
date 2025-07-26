@@ -20,13 +20,18 @@ from smartcash.model.utils.memory_optimizer import get_memory_optimizer
 class SmartCashModelAPI:
     """🎯 API inti untuk operasi model SmartCash dengan progress tracking"""
     
-    def __init__(self, config_path: Optional[str] = None, progress_callback: Optional[Callable] = None):
+    def __init__(self, config_path: Optional[str] = None, progress_callback: Optional[Callable] = None, config: Optional[Dict[str, Any]] = None):
         """Inisialisasi API dengan konfigurasi dan progress callback"""
         self.logger = get_logger("model.api")
         self.progress_bridge = ModelProgressBridge(progress_callback)
         
-        # Load configuration
-        self.config = self._load_config(config_path)
+        # Load configuration - use provided config dict or load from file
+        if config is not None:
+            self.config = config
+            self.logger.info("📋 Using provided configuration dictionary")
+        else:
+            self.config = self._load_config(config_path)
+        
         self.device = setup_device(self.config.get('device', {}))
         
         # Initialize memory optimizer
@@ -397,6 +402,7 @@ class SmartCashModelAPI:
 
 # Training API
 def run_full_training_pipeline(backbone: str = 'cspdarknet',
+                              pretrained: bool = False,
                               phase_1_epochs: int = 1,
                               phase_2_epochs: int = 1,
                               checkpoint_dir: str = 'data/checkpoints',
@@ -415,6 +421,7 @@ def run_full_training_pipeline(backbone: str = 'cspdarknet',
     
     Args:
         backbone: Model backbone ('cspdarknet' or 'efficientnet_b4')
+        pretrained: Use pretrained weights for backbone (default: False)
         phase_1_epochs: Number of epochs for phase 1 (frozen backbone)
         phase_2_epochs: Number of epochs for phase 2 (fine-tuning)
         checkpoint_dir: Directory for checkpoint management  
@@ -447,6 +454,7 @@ def run_full_training_pipeline(backbone: str = 'cspdarknet',
     )
     return pipeline.run_full_training_pipeline(
         backbone=backbone,
+        pretrained=pretrained,
         phase_1_epochs=phase_1_epochs,
         phase_2_epochs=phase_2_epochs,
         checkpoint_dir=checkpoint_dir,
@@ -458,9 +466,9 @@ def run_full_training_pipeline(backbone: str = 'cspdarknet',
     )
 
 # Factory functions untuk convenience
-def create_model_api(config_path: Optional[str] = None, progress_callback: Optional[Callable] = None) -> SmartCashModelAPI:
+def create_model_api(config_path: Optional[str] = None, progress_callback: Optional[Callable] = None, config: Optional[Dict[str, Any]] = None) -> SmartCashModelAPI:
     """Factory function untuk membuat SmartCashModelAPI"""
-    return SmartCashModelAPI(config_path, progress_callback)
+    return SmartCashModelAPI(config_path, progress_callback, config)
 
 def quick_build_model(backbone: str = 'efficientnet_b4', progress_callback: Optional[Callable] = None) -> SmartCashModelAPI:
     """Quick build model dengan backbone tertentu"""

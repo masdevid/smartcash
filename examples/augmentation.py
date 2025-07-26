@@ -30,10 +30,11 @@ from smartcash.common.logger import get_logger
 logger = get_logger('augmentation_example', level="WARNING")
 
 def cleanup_augmented_data(output_dir: str, splits: List[str] = None) -> Dict[str, Any]:
-    """Enhanced wrapper for cleanup functionality targeting all specified splits"""
+    """Wrapper for CleanupManager API that targets both /data/augmented and /data/preprocessed"""
     try:
-        # Create a simple config for cleanup
-        config = {'data': {'dir': str(Path(output_dir).parent)}}
+        # Create config for cleanup manager
+        data_root = str(Path(output_dir).parent)
+        config = {'data': {'dir': data_root}}
         cleanup_manager = CleanupManager(config)
         
         # If no splits specified, clean all standard splits
@@ -45,9 +46,11 @@ def cleanup_augmented_data(output_dir: str, splits: List[str] = None) -> Dict[st
         split_results = {}
         
         for split in splits:
+            # Use CleanupManager API which handles both augmented and preprocessed directories
             result = cleanup_manager.cleanup_augmented_data(target_split=split)
             split_removed = result.get('total_removed', 0)
             total_removed += split_removed
+            
             split_results[split] = {
                 'status': result.get('status', 'unknown'),
                 'files_removed': split_removed,
@@ -56,7 +59,7 @@ def cleanup_augmented_data(output_dir: str, splits: List[str] = None) -> Dict[st
         
         return {
             'success': total_removed >= 0,  # Consider success if no errors
-            'message': f'Cleaned {total_removed} files across {len(splits)} splits',
+            'message': f'Cleaned {total_removed} files across {len(splits)} splits (augmented + preprocessed)',
             'total_removed': total_removed,
             'by_split': split_results
         }
@@ -194,7 +197,9 @@ def main():
                 print("✅ Cleanup completed successfully")
                 if args.verbose and 'by_split' in cleanup_result:
                     for split, stats in cleanup_result['by_split'].items():
-                        print(f"   • {split}: {stats.get('files_removed', 0)} files removed")
+                        files_removed = stats.get('files_removed', 0)
+                        status = stats.get('status', 'unknown')
+                        print(f"   • {split}: {files_removed} files removed (status: {status})")
             else:
                 logger.warning(f"⚠️ Cleanup warning: {cleanup_result.get('message', 'Unknown issue')}")
         except Exception as e:
@@ -248,8 +253,8 @@ def main():
                 
                 # Display results with summary
                 print(f"\n✅ Augmentation completed for {split} split:")
-                print(f"   • Original images: {results.get('original_count', 0)}")
-                print(f"   • Augmented images: {results.get('augmented_count', 0)}")
+                print(f"   • Generated images: {results.get('total_generated', 0)}")
+                print(f"   • Normalized images: {results.get('total_normalized', 0)}")
                 
                 # Save detailed results to JSON
                 split_output_dir = os.path.join(args.output_dir, split)
@@ -274,10 +279,10 @@ def main():
         
         # Show overall statistics
         print("\n📊 Overall Statistics:")
-        total_original = sum(r.get('original_count', 0) for r in all_results.values())
-        total_augmented = sum(r.get('augmented_count', 0) for r in all_results.values())
-        print(f"   • Total original images: {total_original}")
-        print(f"   • Total augmented images: {total_augmented}")
+        total_generated = sum(r.get('total_generated', 0) for r in all_results.values())
+        total_normalized = sum(r.get('total_normalized', 0) for r in all_results.values())
+        print(f"   • Total generated images: {total_generated}")
+        print(f"   • Total normalized images: {total_normalized}")
         print(f"   • Splits processed: {len(all_results)}")
         
         return 0

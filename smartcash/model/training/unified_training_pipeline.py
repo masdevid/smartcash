@@ -89,6 +89,7 @@ class UnifiedTrainingPipeline:
         
     def run_full_training_pipeline(self, 
                                   backbone: str = 'cspdarknet',
+                                  pretrained: bool = False,
                                   phase_1_epochs: int = 1,
                                   phase_2_epochs: int = 1,
                                   checkpoint_dir: str = 'data/checkpoints',
@@ -103,6 +104,7 @@ class UnifiedTrainingPipeline:
         
         Args:
             backbone: Model backbone ('cspdarknet' or 'efficientnet_b4')
+            pretrained: Use pretrained weights for backbone (default: False)
             phase_1_epochs: Number of epochs for phase 1 (frozen backbone)
             phase_2_epochs: Number of epochs for phase 2 (fine-tuning)
             checkpoint_dir: Directory for checkpoint management
@@ -169,7 +171,7 @@ class UnifiedTrainingPipeline:
             else:
                 # Fresh training - execute all phases
                 # Phase 1: Preparation
-                prep_result = self._phase_preparation(backbone, phase_1_epochs, phase_2_epochs, checkpoint_dir, force_cpu, **kwargs)
+                prep_result = self._phase_preparation(backbone, pretrained, phase_1_epochs, phase_2_epochs, checkpoint_dir, force_cpu, training_mode, **kwargs)
                 if not prep_result.get('success'):
                     return prep_result
                 
@@ -274,8 +276,8 @@ class UnifiedTrainingPipeline:
                 'pipeline_summary': self.progress_tracker.get_summary()
             }
     
-    def _phase_preparation(self, backbone: str, phase_1_epochs: int, phase_2_epochs: int, 
-                          checkpoint_dir: str, force_cpu: bool = False, **kwargs) -> Dict[str, Any]:
+    def _phase_preparation(self, backbone: str, pretrained: bool, phase_1_epochs: int, phase_2_epochs: int, 
+                          checkpoint_dir: str, force_cpu: bool = False, training_mode: str = 'two_phase', **kwargs) -> Dict[str, Any]:
         """Phase 1: Preparation - Setup environment and configuration."""
         self.current_phase = 'preparation'
         self.phase_start_time = time.time()
@@ -291,7 +293,7 @@ class UnifiedTrainingPipeline:
             # Use setup utils for environment preparation
             self.progress_tracker.update_phase(20, 100, "Preparing training environment")
             result = prepare_training_environment(
-                backbone, phase_1_epochs, phase_2_epochs, checkpoint_dir, force_cpu, **kwargs
+                backbone, pretrained, phase_1_epochs, phase_2_epochs, checkpoint_dir, force_cpu, training_mode, **kwargs
             )
             
             if result.get('success'):
@@ -323,9 +325,9 @@ class UnifiedTrainingPipeline:
         self.progress_tracker.start_phase('build_model', 100, "Building model architecture")
         
         try:
-            # Step 1: Create model API
+            # Step 1: Create model API with force_cpu configuration
             self.progress_tracker.update_phase(25, 100, "Creating model API")
-            self.model_api = create_model_api()
+            self.model_api = create_model_api(config=self.config)
             if not self.model_api:
                 raise RuntimeError("Failed to create model API")
             
@@ -834,7 +836,7 @@ class UnifiedTrainingPipeline:
             resume_epoch = resume_info['epoch']
             
             # Phase 1: Preparation (always execute for config setup)
-            prep_result = self._phase_preparation(backbone, phase_1_epochs, phase_2_epochs, checkpoint_dir, force_cpu, **kwargs)
+            prep_result = self._phase_preparation(backbone, pretrained, phase_1_epochs, phase_2_epochs, checkpoint_dir, force_cpu, training_mode, **kwargs)
             if not prep_result.get('success'):
                 raise RuntimeError(f"Preparation failed during resume: {prep_result.get('error')}")
             
@@ -901,7 +903,7 @@ class UnifiedTrainingPipeline:
             # Fall back to fresh training
             logger.info("🔄 Falling back to fresh training")
             
-            prep_result = self._phase_preparation(backbone, phase_1_epochs, phase_2_epochs, checkpoint_dir, force_cpu, **kwargs)
+            prep_result = self._phase_preparation(backbone, pretrained, phase_1_epochs, phase_2_epochs, checkpoint_dir, force_cpu, training_mode, **kwargs)
             if not prep_result.get('success'):
                 return prep_result, {}, {}, {}, {}
             

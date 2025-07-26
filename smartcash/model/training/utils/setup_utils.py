@@ -5,20 +5,23 @@ Setup and configuration utilities for the unified training pipeline.
 This module handles environment setup, configuration management, and preparation logic.
 """
 
+import torch
 from pathlib import Path
 from typing import Dict, Any
 from smartcash.common.logger import get_logger
-from smartcash.model.training.platform_presets import get_platform_config, setup_platform_optimizations
+from smartcash.model.training.platform_presets import get_platform_config, setup_platform_optimizations, setup_platform_optimizations_with_device
 
 logger = get_logger(__name__)
 
 
 def prepare_training_environment(
     backbone: str, 
+    pretrained: bool,
     phase_1_epochs: int, 
     phase_2_epochs: int, 
     checkpoint_dir: str, 
-    force_cpu: bool = False, 
+    force_cpu: bool = False,
+    training_mode: str = 'two_phase',
     **kwargs
 ) -> Dict[str, Any]:
     """
@@ -26,27 +29,42 @@ def prepare_training_environment(
     
     Args:
         backbone: Model backbone name
+        pretrained: Use pretrained weights for backbone
         phase_1_epochs: Number of epochs for phase 1
         phase_2_epochs: Number of epochs for phase 2
         checkpoint_dir: Directory for checkpoint management
         force_cpu: Force CPU usage instead of auto-detecting GPU/MPS
+        training_mode: Training mode ('single_phase' or 'two_phase')
         **kwargs: Additional configuration overrides
         
     Returns:
         Dictionary containing preparation results and configuration
     """
     try:
-        # Step 1: Platform detection and optimization
-        logger.info("🔧 Detecting platform and applying optimizations")
-        setup_platform_optimizations()
-        
-        # Step 2: Load platform-optimized configuration
+        # Step 1: Load platform-optimized configuration
         logger.info("⚙️ Loading platform-optimized configuration")
         config = get_platform_config(backbone, phase_1_epochs, phase_2_epochs)
+        
+        # Step 2: Set pretrained flag and training mode in configuration
+        if 'model' in config:
+            config['model']['pretrained'] = pretrained
+            logger.info(f"🏗️ Model configuration: backbone={backbone}, pretrained={pretrained}")
+        
+        if 'training' not in config:
+            config['training'] = {}
+        config['training']['training_mode'] = training_mode
+        logger.info(f"🚀 Training mode set: {training_mode}")
         
         # Step 3: Apply force_cpu if specified
         if force_cpu:
             config = apply_force_cpu_configuration(config)
+        
+        # Step 4: Platform detection and optimization (with device awareness)
+        logger.info("🔧 Detecting platform and applying optimizations")
+        target_device = None
+        if force_cpu:
+            target_device = torch.device('cpu')
+        setup_platform_optimizations_with_device(target_device)
         
         # Step 4: Apply custom overrides
         if kwargs:

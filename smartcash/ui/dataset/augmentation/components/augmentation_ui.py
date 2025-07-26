@@ -9,19 +9,16 @@ import ipywidgets as widgets
 # SmartCash UI components
 from smartcash.ui.components import (
     create_action_container,
-    create_footer_container,
     create_header_container,
     create_main_container,
     create_operation_container,
 )
-from smartcash.ui.components.footer_container import PanelConfig, PanelType
 from smartcash.ui.components.summary_container import create_summary_container
 from smartcash.ui.core.decorators import handle_ui_errors
 
 # Local module imports
 from ..constants import BUTTON_CONFIG, UI_CONFIG
 from .form_widgets import create_module_form_widgets
-from .info_accordion import create_info_accordion
 
 
 def _create_augment_ui_components(config: Dict[str, Any]) -> Dict[str, Any]:
@@ -136,28 +133,6 @@ def _create_operation_container() -> Dict[str, Any]:
     )
 
 
-def _create_footer() -> Any:
-    """Create footer with augmentation guide accordion."""
-    return create_footer_container(
-        panels=[
-            PanelConfig(
-                panel_type=PanelType.INFO_ACCORDION,
-                title="📚 Panduan Augmentasi",
-                content=create_info_accordion(),
-                style="info",
-                flex="1",
-                min_width="100%",
-                open_by_default=True
-            )
-        ],
-        style={
-            'border_top': '1px solid #e0e0e0',
-            'background': '#f9f9f9',
-            'margin_top': '15px',
-            'padding': '10px'
-        }
-    )
-
 
 def _assemble_main_container(
     header_container: Any,
@@ -165,7 +140,6 @@ def _assemble_main_container(
     action_container: Dict[str, Any],
     summary_container: Any,
     operation_container: Dict[str, Any],
-    footer_container: Any
 ) -> Any:
     """Assemble all components into the main container."""
     components = [
@@ -173,17 +147,11 @@ def _assemble_main_container(
         {'type': 'form', 'component': form_container, 'order': 1, 'name': 'form'},
         {'type': 'action', 'component': action_container['container'], 'order': 2, 'name': 'actions'},
         {'type': 'operation', 'component': operation_container['container'], 'order': 3, 'name': 'operations'},
-        {'type': 'summary', 'component': summary_container, 'order': 4, 'name': 'summary', 'visible': False},
-        {'type': 'footer', 'component': footer_container.container, 'order': 5, 'name': 'footer'}
+        {'type': 'summary', 'component': summary_container['container'], 'order': 4, 'name': 'summary', 'visible': False},
     ]
     
     return create_main_container(
         components=components,
-        width='100%',
-        max_width='1200px',
-        margin='0 auto',
-        padding='0 10px 20px 10px',
-        align_items='stretch'
     )
 
 
@@ -205,7 +173,6 @@ def create_augment_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> Dict
         'form': ui_components['form_container'],
         'actions': ui_components['action_container'],
         'operation': ui_components['operation_container'],
-        'footer': ui_components['footer_container'],
         'main': ui_components['main_container'],
         'widgets': {k: v for k, v in ui_components.items() if k.endswith('_widget') or k == 'generate'},
         'config': config

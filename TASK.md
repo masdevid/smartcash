@@ -20,22 +20,27 @@ Updated 22 Juli 2025, 20:
   - Labels as .txt files
 
 # GENERAL
+- [NEW] `[module]_uimodule.py` sepertinya menginisialisasi config handler dua kali, kecuali colab_uimodule.py.
+- [NEW] `[module]_uimodule.py` kecuali colab_uimodule.py sepertinya menginisialisasi component dua kali membuat proses inisialisasi saat restart dan reload colab menjadi lambat.
 
 # COLAB MODULE
 - N/A
 
 # DEPENDENCY MODULE
+- [NEW] Refactor operation container menggunakan signature yang tepat
+- [NEW] Integrasikan dual progress tracker yang benar pada semua operations kecuali save dan reset.
 
 # DOWNLOAD MODULE
-
+- [NEW] Format summary masih belum menggunakan markdown seperti summary pada preprocessing module
 
 # PREPROCESSING MODULE
+- [NEW] Integrasikan dual progress tracker dengan methods yang benar
 
 # SPLIT MODULE
 - N/A
 
 # AUGMENTATION MODULE
-
+- [NEW] Summary container belum muncul. Refaktro augmentation_ui tanpa mengubah form original. Pastikan semua kontainer menggunakan signature yang tepat. 
 
 # PRETRAINED MODULE
 - N/A

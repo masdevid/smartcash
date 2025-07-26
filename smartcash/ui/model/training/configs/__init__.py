@@ -15,13 +15,7 @@ from .unified_training_defaults import (
     validate_unified_training_config
 )
 
-# Legacy configuration (compatibility)
-from .training_defaults import (
-    get_default_training_config,
-    get_available_optimizers,
-    get_available_schedulers,
-    TRAINING_VALIDATION_CONFIG
-)
+# Legacy configuration removed - use unified system instead
 
 from .training_config_handler import TrainingConfigHandler
 
@@ -36,10 +30,5 @@ __all__ = [
     'get_single_phase_layer_mode_options',
     'validate_unified_training_config',
     
-    # Legacy configuration (compatibility)
-    'get_default_training_config',
-    'get_available_optimizers',
-    'get_available_schedulers',
-    'TRAINING_VALIDATION_CONFIG',
     'TrainingConfigHandler'
 ]

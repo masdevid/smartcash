@@ -292,35 +292,12 @@ class TrainingStartOperationHandler(BaseTrainingOperation):
     def _get_backbone_configuration(self) -> Dict[str, Any]:
         """Get current backbone configuration and verify built models exist."""
         try:
-            # Try to get from backbone module if available
-            from smartcash.ui.model.backbone.backbone_uimodule import get_backbone_uimodule
+            # Note: Removed dependency on smartcash.ui.model.backbone.backbone_uimodule
+            # to ensure training module only shows smartcash.model.* and smartcash.ui.model.training.*
             
-            backbone_module = get_backbone_uimodule(auto_initialize=False)
-            if backbone_module and hasattr(backbone_module, 'get_current_config'):
-                backbone_config = backbone_module.get_current_config()
-                
-                # Check if backbone models are actually built
-                if hasattr(backbone_module, '_check_built_models'):
-                    built_models = backbone_module._check_built_models()
-                    total_built = sum(len(models) for models in built_models.values())
-                    
-                    if total_built > 0:
-                        self.log_operation(f"✅ Found {total_built} built backbone models", 'success')
-                        # Add model availability info to config
-                        backbone_config['available_models'] = built_models
-                        return backbone_config
-                    else:
-                        self.log_operation("⚠️ No built backbone models found", 'warning')
-                        # Still return config but mark as models not built
-                        backbone_config['models_built'] = False
-                        return backbone_config
-                else:
-                    self.log_operation("✅ Backbone configuration retrieved (model check not available)", 'success')
-                    return backbone_config
-            else:
-                # Try to discover models manually if backbone module not available
-                self.log_operation("⚠️ Backbone module not available, discovering models manually", 'warning')
-                return self._discover_backbone_models_manually()
+            # Try to discover models manually
+            self.log_operation("⚠️ Discovering backbone models manually", 'warning')
+            return self._discover_backbone_models_manually()
                 
         except Exception as e:
             self.log_operation(f"⚠️ Error getting backbone config: {e}", 'warning')

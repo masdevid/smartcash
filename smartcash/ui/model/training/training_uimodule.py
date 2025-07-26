@@ -67,7 +67,7 @@ class TrainingUIModule(ModelConfigSyncMixin, BackendServiceMixin, BaseUIModule, 
     def create_config_handler(self, config: Optional[Dict[str, Any]] = None) -> TrainingConfigHandler:
         """Create configuration handler with proper delegation."""
         # Use ConfigurationMixin's merge functionality instead of duplicating logic
-        merged_config = config or get_default_training_config()
+        merged_config = config or get_unified_training_defaults()
         config_handler = TrainingConfigHandler(merged_config)
         if hasattr(self, '_ui_components') and self._ui_components:
             config_handler.set_ui_components(self._ui_components)
@@ -92,10 +92,6 @@ class TrainingUIModule(ModelConfigSyncMixin, BackendServiceMixin, BaseUIModule, 
         except Exception as e:
             self.logger.error(f"Failed to create UI components: {e}")
             raise
-    
-    # Chart updaters removed - unified pipeline generates static visualizations
-    
-    # Chart widget finding removed - no live charts in unified UI
     
     def _get_module_button_handlers(self) -> Dict[str, Callable]:
         """Get module-specific button handlers for unified training."""
@@ -149,8 +145,6 @@ class TrainingUIModule(ModelConfigSyncMixin, BackendServiceMixin, BaseUIModule, 
         """
         return not self._is_training_active
     
-    # Resume training dependency removed - unified pipeline handles checkpointing internally
-    
     def _check_stop_training_dependency(self) -> bool:
         """
         Check if stop training button should be enabled.
@@ -159,8 +153,6 @@ class TrainingUIModule(ModelConfigSyncMixin, BackendServiceMixin, BaseUIModule, 
             True if stop training should be enabled (training is active)
         """
         return self._is_training_active
-    
-    # Validate model dependency removed - unified pipeline includes validation automatically
     
     def _update_training_state(self, has_model: bool = None, has_checkpoint: bool = None, is_training_active: bool = None) -> None:
         """
@@ -226,8 +218,6 @@ class TrainingUIModule(ModelConfigSyncMixin, BackendServiceMixin, BaseUIModule, 
             return "Training already in progress"
         return None
     
-    # Resume training disable reason removed - no resume functionality in unified UI
-    
     def _handle_start_unified_training(self, button=None) -> None:
         """Handle start unified training button click."""
         try:
@@ -280,12 +270,6 @@ class TrainingUIModule(ModelConfigSyncMixin, BackendServiceMixin, BaseUIModule, 
             
         except Exception as e:
             self.log_error(f"Stop training error: {e}")
-    
-    # Resume training removed - unified pipeline handles checkpointing internally
-    
-    # _handle_validate_model removed - validation now handled by backbone module
-    
-    # Backbone config refresh removed - unified pipeline handles backbone selection directly
     
     def _handle_save_config(self, button=None) -> None:
         """Handle save config button click - delegates to ConfigurationMixin."""
@@ -370,12 +354,6 @@ class TrainingUIModule(ModelConfigSyncMixin, BackendServiceMixin, BaseUIModule, 
         except Exception as e:
             self.logger.warning(f"Failed to handle training completion: {e}")
     
-    # Model validation removed - unified pipeline includes validation automatically
-    
-    # Backbone config refresh removed - unified pipeline selects backbone directly from form
-    
-    # Backbone configuration removed - unified pipeline selects backbone from form directly
-    
     def _get_operation_callbacks(self) -> Dict[str, Callable]:
         """Get callbacks for unified training operation."""
         return {
@@ -402,12 +380,6 @@ class TrainingUIModule(ModelConfigSyncMixin, BackendServiceMixin, BaseUIModule, 
         """Handle operation failure."""
         self.log_error(message)
     
-    # Chart updates removed - unified pipeline generates visualizations automatically
-    
-    # Configuration methods removed - now properly delegated to ConfigurationMixin
-    # save_current_config() -> use self.save_config() from ConfigurationMixin
-    # reset_to_defaults() -> use self.reset_config() from ConfigurationMixin
-    
     def _sync_config_to_ui(self) -> None:
         """Sync current configuration to unified training form."""
         try:
@@ -422,11 +394,6 @@ class TrainingUIModule(ModelConfigSyncMixin, BackendServiceMixin, BaseUIModule, 
                     
         except Exception as e:
             self.log_warning(f"Failed to sync config to UI: {e}")
-    
-    # Training state from config removed - simplified for unified pipeline
-
-    # _update_module_config method removed - replaced with proper ConfigurationMixin delegation
-    # Use self.update_config_value(key, value) or self.update_config_section(section, values) instead
     
     def get_training_status(self) -> Dict[str, Any]:
         """Get current unified training status."""
@@ -465,8 +432,6 @@ class TrainingUIModule(ModelConfigSyncMixin, BackendServiceMixin, BaseUIModule, 
                 has_checkpoint=False,
                 is_training_active=False
             )
-    
-    # Live charts removed - unified pipeline generates static visualizations
     
     def cleanup(self) -> None:
         """Simplified cleanup for unified training UI."""

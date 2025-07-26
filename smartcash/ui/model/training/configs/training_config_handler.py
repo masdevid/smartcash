@@ -5,11 +5,9 @@ Configuration handler for training module using BaseUIModule pattern.
 
 from typing import Dict, Any, Optional, List
 from smartcash.ui.logger import get_module_logger
-from .training_defaults import (
-    get_default_training_config, 
-    get_available_optimizers, 
-    get_available_schedulers,
-    TRAINING_VALIDATION_CONFIG
+from .unified_training_defaults import (
+    get_unified_training_defaults,
+    validate_unified_training_config
 )
 
 
@@ -41,13 +39,9 @@ class TrainingConfigHandler:
         self.module_name = 'training'
         self.parent_module = 'model'
         
-        # Load default configuration
-        self._default_config = get_default_training_config()
+        # Load unified configuration
+        self._default_config = get_unified_training_defaults()
         self._config = self._default_config.copy()
-        
-        # Initialize available options
-        self.available_optimizers = get_available_optimizers()
-        self.available_schedulers = get_available_schedulers()
         
         # Update with provided config if any
         if config:
@@ -84,7 +78,7 @@ class TrainingConfigHandler:
 
     def reset_config(self) -> None:
         """Reset configuration to defaults."""
-        self._config = get_default_training_config().copy()
+        self._config = get_unified_training_defaults().copy()
         self.logger.info("Configuration reset to defaults")
 
     def save_config(self, config_path: Optional[str] = None) -> bool:
@@ -112,7 +106,7 @@ class TrainingConfigHandler:
         Returns:
             Default configuration dictionary
         """
-        return get_default_training_config()
+        return get_unified_training_defaults()
 
     def validate_config(self, config: Dict[str, Any]) -> bool:
         """
@@ -153,7 +147,7 @@ class TrainingConfigHandler:
         Returns:
             Default configuration dictionary
         """
-        return get_default_training_config()
+        return get_unified_training_defaults()
     
     def validate_config(self, config: Dict[str, Any]) -> bool:
         """

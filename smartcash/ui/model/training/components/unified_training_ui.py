@@ -1,195 +1,165 @@
 """
 File: smartcash/ui/model/training/components/unified_training_ui.py
-Description: Simplified training UI that uses the unified training pipeline.
+Description: Simplified training UI that uses the unified training pipeline with proper container components.
 """
 
-import ipywidgets as widgets
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 from smartcash.ui.logger import get_module_logger
-from smartcash.ui.components.operation_container import OperationContainer
+
+# Standard container imports
+from smartcash.ui.components import (
+    create_header_container, 
+    create_form_container, 
+    create_action_container,
+    create_operation_container, 
+    create_summary_container, 
+    create_main_container
+)
+from smartcash.ui.components.form_container import LayoutType
+from smartcash.ui.core.decorators import handle_ui_errors
 from .unified_training_form import create_unified_training_form
 
 
-def create_unified_training_ui(config: Dict[str, Any]) -> Dict[str, Any]:
-    """Create simplified training UI that uses the unified training pipeline.
+@handle_ui_errors(error_component_title="Unified Training UI Creation Error")
+def create_unified_training_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> Dict[str, Any]:
+    """Create unified training UI using standard container components.
     
     Args:
         config: Training configuration
+        **kwargs: Additional arguments
         
     Returns:
         Dictionary containing UI components
     """
+    if config is None:
+        config = {}
+    
+    # Handle additional kwargs if needed (currently unused but reserved for future extension)
+    _ = kwargs  # Suppress unused warning
+    
     logger = get_module_logger("smartcash.ui.model.training.components")
     
-    try:
-        # Header section
-        header_html = widgets.HTML(
-            value='''
-            <div style="text-align: center; padding: 20px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
-                        color: white; border-radius: 10px; margin-bottom: 20px;">
-                <h2 style="margin: 0; font-weight: bold;">🚀 Unified Training Pipeline</h2>
-                <p style="margin: 10px 0 0 0; opacity: 0.9;">Simplified training using the unified training pipeline</p>
-            </div>
-            ''',
-            layout=widgets.Layout(width='100%')
-        )
-        
-        # Form section
-        form_container = create_unified_training_form(config)
-        form_wrapper = widgets.VBox([
-            widgets.HTML("<h3 style='color: #007bff; margin: 20px 0 15px 0;'>⚙️ Training Configuration</h3>"),
-            form_container
-        ], layout=widgets.Layout(width='100%', padding='10px'))
-        
-        # Action buttons section
-        start_button = widgets.Button(
-            description="🚀 Start Training",
-            button_style='success',
-            layout=widgets.Layout(width='180px', height='40px'),
-            tooltip="Start unified training pipeline"
-        )
-        
-        stop_button = widgets.Button(
-            description="⏹️ Stop Training",
-            button_style='danger',
-            layout=widgets.Layout(width='180px', height='40px'),
-            tooltip="Stop training (if supported)",
-            disabled=True
-        )
-        
-        save_button = widgets.Button(
-            description="💾 Save Config",
-            button_style='info',
-            layout=widgets.Layout(width='180px', height='40px'),
-            tooltip="Save current configuration"
-        )
-        
-        reset_button = widgets.Button(
-            description="🔄 Reset Config",
-            button_style='warning',
-            layout=widgets.Layout(width='180px', height='40px'),
-            tooltip="Reset to default configuration"
-        )
-        
-        action_buttons = widgets.HBox([
-            start_button,
-            stop_button,
-            save_button,
-            reset_button
-        ], layout=widgets.Layout(justify_content='center', padding='20px'))
-        
-        action_container = widgets.VBox([
-            widgets.HTML("<h3 style='color: #28a745; margin: 20px 0 15px 0;'>🎯 Training Actions</h3>"),
-            action_buttons
-        ], layout=widgets.Layout(width='100%'))
-        
-        # Progress and logging section
-        operation_container = OperationContainer(
-            title="Training Progress & Logs",
-            show_progress=True,
-            show_logs=True,
-            max_log_entries=200,
-            enable_log_filtering=True
-        )
-        
-        # Summary section (simplified)
-        summary_html = widgets.HTML(
-            value='''
-            <div style="padding: 15px; background: #f8f9fa; border-radius: 8px; margin-top: 20px;">
-                <h4 style="color: #495057; margin: 0 0 10px 0;">📊 Training Summary</h4>
-                <p style="margin: 5px 0; color: #6c757d;">
-                    Training results and metrics will appear here after completion.
-                </p>
-                <p style="margin: 5px 0; color: #6c757d;">
-                    Charts and visualizations will be saved to <code>data/visualization/</code>
-                </p>
-            </div>
-            ''',
-            layout=widgets.Layout(width='100%')
-        )
-        
-        summary_container = widgets.VBox([
-            widgets.HTML("<h3 style='color: #fd7e14; margin: 20px 0 15px 0;'>📈 Training Summary</h3>"),
-            summary_html
-        ], layout=widgets.Layout(width='100%'))
-        
-        # Main layout
-        main_layout = widgets.VBox([
-            header_html,
-            form_wrapper,
-            action_container,
-            operation_container.container,
-            summary_container
-        ], layout=widgets.Layout(width='100%', padding='10px'))
-        
-        # Create UI components dictionary
-        ui_components = {
-            'main_container': main_layout,
-            'header_container': header_html,
-            'form_container': form_container,
-            'action_container': action_container,
-            'operation_container': operation_container,
-            'summary_container': summary_container,
-            
-            # Individual widgets for easy access
-            'start_button': start_button,
-            'stop_button': stop_button,
-            'save_button': save_button,
-            'reset_button': reset_button,
-            
-            # Progress and logging
-            'progress_tracker': operation_container.progress_tracker,
-            'log_accordion': operation_container.log_accordion,
-            
-            # Form access
-            'form_widgets': getattr(form_container, '_widgets', {}),
-            'get_form_values': getattr(form_container, 'get_form_values', lambda: {}),
-            'update_form_from_config': getattr(form_container, 'update_from_config', lambda x: None)
+    # 1. Create Header Container
+    header_container = create_header_container(
+        title="🚀 Unified Training Pipeline",
+        subtitle="Simplified training using the unified training pipeline",
+        icon='🚀',
+        theme='gradient',
+        gradient_colors=['#667eea', '#764ba2']
+    )
+    
+    # 2. Create Form Container with accordion
+    form_widgets = create_unified_training_form(config)
+    
+    form_container = create_form_container(
+        layout_type=LayoutType.COLUMN,
+        container_padding="10px",
+        gap="12px"
+    )
+    
+    # Add the form accordion to the form container
+    form_container['add_item'](form_widgets, "training_form")
+    
+    # 3. Create Action Container (only Start Training button)
+    action_buttons = [
+        {
+            'id': 'start_training',
+            'text': '🚀 Start Training',
+            'style': 'success',
+            'tooltip': 'Start unified training pipeline',
+            'order': 1
         }
+    ]
+    
+    action_container = create_action_container(
+        title="🎯 Training Actions",
+        buttons=action_buttons,
+        show_save_reset=True  # Use standard save/reset buttons
+    )
+    
+    # 4. Create Operation Container
+    operation_container = create_operation_container(
+        show_progress=True,
+        show_dialog=True,
+        show_logs=True,
+        progress_levels='dual',
+        log_module_name="Training",
+        log_height="200px",
+        collapsible=True,
+        collapsed=False
+    )
+    
+    # 5. Create Summary Container
+    summary_container = create_summary_container(
+        theme='default',
+        title='📈 Training Summary',
+        icon='📊'
+    )
+    
+    # Set initial content for summary container
+    summary_container.set_content('''
+        <div style="padding: 15px; background: #f8f9fa; border-radius: 8px;">
+            <h4 style="color: #495057; margin: 0 0 10px 0;">📊 Training Summary</h4>
+            <p style="margin: 5px 0; color: #6c757d;">
+                Training results and metrics will appear here after completion.
+            </p>
+            <p style="margin: 5px 0; color: #6c757d;">
+                Charts and visualizations will be saved to <code>data/visualization/</code>
+            </p>
+        </div>
+        ''')
+    
+    # 6. Create Main Container
+    main_container = create_main_container(
+        components=[
+            {'component': header_container.container, 'type': 'header'},
+            {'component': form_container['container'], 'type': 'form'},
+            {'component': action_container['container'], 'type': 'action'},
+            {'component': operation_container['container'], 'type': 'operation'},
+            {'component': summary_container.container, 'type': 'summary'}
+        ],
+        container_style={
+            'width': '100%',
+            'max_width': '1200px',
+            'margin': '0 auto',
+            'padding': '20px',
+            'border': '1px solid #e0e0e0',
+            'border_radius': '8px',
+            'background_color': '#ffffff'
+        }
+    )
+    
+    # 7. Create UI components dictionary
+    ui_components = {
+        'main_container': main_container,
+        'header_container': header_container,
+        'form_container': form_container,
+        'action_container': action_container,
+        'operation_container': operation_container,
+        'summary_container': summary_container,
         
-        # Add helper methods to operation container for easy access
-        def update_progress(progress: int, message: str = ""):
-            """Update progress bar and message."""
-            operation_container.update_progress(progress, message)
+        # Individual action buttons for easy access
+        'start_training_button': action_container['buttons'].get('start_training'),
+        'save_button': action_container['buttons'].get('save'),
+        'reset_button': action_container['buttons'].get('reset'),
         
-        def log_info(message: str):
-            """Log info message."""
-            operation_container.log(message, level='info')
+        # Operation container methods
+        'update_progress': operation_container.get('update_progress'),
+        'log': operation_container.get('log'),
+        'log_info': operation_container.get('info'),
+        'log_success': operation_container.get('success'),
+        'log_warning': operation_container.get('warning'),
+        'log_error': operation_container.get('error'),
+        'clear_logs': operation_container.get('clear_logs'),
         
-        def log_success(message: str):
-            """Log success message."""
-            operation_container.log(message, level='success')
-        
-        def log_warning(message: str):
-            """Log warning message."""
-            operation_container.log(message, level='warning')
-        
-        def log_error(message: str):
-            """Log error message."""
-            operation_container.log(message, level='error')
-        
-        def clear_logs():
-            """Clear all logs."""
-            operation_container.clear_logs()
-        
-        # Attach helper methods to main container
-        main_layout.update_progress = update_progress
-        main_layout.log_info = log_info
-        main_layout.log_success = log_success
-        main_layout.log_warning = log_warning
-        main_layout.log_error = log_error
-        main_layout.clear_logs = clear_logs
-        
-        # Set initial button states
-        start_button.disabled = False
-        stop_button.disabled = True
-        
-        logger.debug("✅ Unified training UI created successfully")
-        return ui_components
-        
-    except Exception as e:
-        logger.error(f"Failed to create unified training UI: {e}")
-        raise
+        # Form access methods
+        'form_widgets': getattr(form_widgets, '_widgets', {}),
+        'get_form_values': getattr(form_widgets, 'get_form_values', lambda: {}),
+        'update_form_from_config': getattr(form_widgets, 'update_from_config', lambda x: None)
+    }
+    
+    logger.debug("✅ Unified training UI created successfully with standard containers")
+    return ui_components
 
 
 def update_training_buttons_state(ui_components: Dict[str, Any], 
@@ -203,10 +173,9 @@ def update_training_buttons_state(ui_components: Dict[str, Any],
         has_model: Whether a model is available for training
     """
     try:
-        start_button = ui_components.get('start_button')
-        stop_button = ui_components.get('stop_button')
+        start_button = ui_components.get('start_training_button')
         
-        if start_button:
+        if start_button and hasattr(start_button, 'disabled'):
             start_button.disabled = is_training or not has_model
             if not has_model:
                 start_button.tooltip = "No model available - configure backbone first"
@@ -214,13 +183,6 @@ def update_training_buttons_state(ui_components: Dict[str, Any],
                 start_button.tooltip = "Training in progress"
             else:
                 start_button.tooltip = "Start unified training pipeline"
-        
-        if stop_button:
-            stop_button.disabled = not is_training
-            if is_training:
-                stop_button.tooltip = "Stop current training"
-            else:
-                stop_button.tooltip = "No active training to stop"
                 
     except Exception as e:
         logger = get_module_logger("smartcash.ui.model.training.components")
@@ -236,7 +198,7 @@ def update_summary_display(ui_components: Dict[str, Any], result: Dict[str, Any]
     """
     try:
         summary_container = ui_components.get('summary_container')
-        if not summary_container or not isinstance(summary_container, widgets.VBox):
+        if not summary_container or not hasattr(summary_container, 'set_content'):
             return
         
         if result.get('success'):
@@ -295,12 +257,8 @@ def update_summary_display(ui_components: Dict[str, Any], result: Dict[str, Any]
             </div>
             '''
         
-        # Update the summary HTML widget
-        if len(summary_container.children) > 1:
-            summary_container.children = (
-                summary_container.children[0],  # Keep the title
-                widgets.HTML(summary_html, layout=widgets.Layout(width='100%'))
-            )
+        # Update the summary container content
+        summary_container.set_content(summary_html)
             
     except Exception as e:
         logger = get_module_logger("smartcash.ui.model.training.components")

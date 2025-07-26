@@ -205,37 +205,66 @@ def create_unified_training_form(config: Dict[str, Any]) -> widgets.Widget:
             layout=widgets.Layout(width='300px')
         )
         
-        # Create form sections
-        basic_section = widgets.VBox([
+        # Set all input widths to auto
+        for widget in [backbone_dropdown, training_mode_dropdown, phase1_epochs, phase2_epochs, 
+                      loss_type_dropdown, head_lr_p1, head_lr_p2, backbone_lr, batch_size_text,
+                      early_stopping_checkbox, patience, es_metric, es_mode, min_delta,
+                      single_layer_mode, single_freeze_backbone, force_cpu, verbose, checkpoint_dir]:
+            widget.layout.width = 'auto'
+        
+        # Create form sections in two columns
+        # Basic section - left column
+        basic_left_column = widgets.VBox([
             widgets.HTML("<h4 style='color: #007bff; margin: 10px 0;'>🏗️ Model & Training Mode</h4>"),
             backbone_dropdown,
             training_mode_dropdown,
             widgets.HTML("<h4 style='color: #28a745; margin: 15px 0 10px 0;'>📊 Training Phases</h4>"),
             phase1_epochs,
-            phase2_epochs,
-            widgets.HTML("<h4 style='color: #fd7e14; margin: 15px 0 10px 0;'>🎯 Learning Configuration</h4>"),
+            phase2_epochs
+        ], layout=widgets.Layout(padding='10px', width='48%'))
+        
+        # Basic section - right column
+        basic_right_column = widgets.VBox([
+            widgets.HTML("<h4 style='color: #fd7e14; margin: 10px 0;'>🎯 Learning Configuration</h4>"),
             loss_type_dropdown,
             head_lr_p1,
             head_lr_p2,
             backbone_lr,
             batch_size_text
-        ], layout=widgets.Layout(padding='10px'))
+        ], layout=widgets.Layout(padding='10px', width='48%'))
         
-        advanced_section = widgets.VBox([
+        # Basic section - combine columns
+        basic_section = widgets.HBox([
+            basic_left_column,
+            basic_right_column
+        ], layout=widgets.Layout(width='100%', justify_content='space-between'))
+        
+        # Advanced section - left column
+        advanced_left_column = widgets.VBox([
             widgets.HTML("<h4 style='color: #dc3545; margin: 10px 0;'>⏹️ Early Stopping</h4>"),
             early_stopping_checkbox,
             patience,
             es_metric,
             es_mode,
-            min_delta,
-            widgets.HTML("<h4 style='color: #6f42c1; margin: 15px 0 10px 0;'>🔧 Single-Phase Options</h4>"),
+            min_delta
+        ], layout=widgets.Layout(padding='10px', width='48%'))
+        
+        # Advanced section - right column
+        advanced_right_column = widgets.VBox([
+            widgets.HTML("<h4 style='color: #6f42c1; margin: 10px 0;'>🔧 Single-Phase Options</h4>"),
             single_layer_mode,
             single_freeze_backbone,
             widgets.HTML("<h4 style='color: #17a2b8; margin: 15px 0 10px 0;'>⚙️ System Options</h4>"),
             force_cpu,
             verbose,
             checkpoint_dir
-        ], layout=widgets.Layout(padding='10px'))
+        ], layout=widgets.Layout(padding='10px', width='48%'))
+        
+        # Advanced section - combine columns
+        advanced_section = widgets.HBox([
+            advanced_left_column,
+            advanced_right_column
+        ], layout=widgets.Layout(width='100%', justify_content='space-between'))
         
         # Create accordion
         form_accordion = widgets.Accordion(children=[basic_section, advanced_section])

@@ -241,10 +241,10 @@ def create_unified_training_form(config: Dict[str, Any]) -> widgets.Widget:
             es_mode,
             min_delta
         ], layout=widgets.Layout(padding='10px', width='48%'))
-        
+        single_phase_options = widgets.HTML("<h4 style='color: #6f42c1; margin: 10px 0;'>🔧 Single-Phase Options</h4>"),
         # Advanced section - right column
         advanced_right_column = widgets.VBox([
-            widgets.HTML("<h4 style='color: #6f42c1; margin: 10px 0;'>🔧 Single-Phase Options</h4>"),
+            single_phase_options,
             single_layer_mode,
             single_freeze_backbone,
             widgets.HTML("<h4 style='color: #17a2b8; margin: 15px 0 10px 0;'>⚙️ System Options</h4>"),
@@ -283,6 +283,7 @@ def create_unified_training_form(config: Dict[str, Any]) -> widgets.Widget:
             'early_stopping_min_delta': min_delta,
             'single_phase_layer_mode': single_layer_mode,
             'single_phase_freeze_backbone': single_freeze_backbone,
+            'single_phase_options': single_phase_options,
             'force_cpu': force_cpu,
             'verbose': verbose,
             'checkpoint_dir': checkpoint_dir
@@ -385,6 +386,7 @@ def create_unified_training_form(config: Dict[str, Any]) -> widgets.Widget:
         
         # Initial visibility setup
         is_single_phase = training_mode_dropdown.value == 'single_phase'
+        single_phase_options.layout.display = 'block' if is_single_phase else 'none'
         single_layer_mode.layout.display = 'block' if is_single_phase else 'none'
         single_freeze_backbone.layout.display = 'block' if is_single_phase else 'none'
         

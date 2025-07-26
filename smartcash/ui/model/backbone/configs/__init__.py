@@ -1,3 +1,0 @@
-"""
-Backbone configuration module initialization.
-"""

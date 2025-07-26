@@ -28,31 +28,27 @@ Updated 22 Juli 2025, 20:
 
 # DEPENDENCY MODULE
 - [NEW] Refactor operation container menggunakan signature yang tepat
-- [NEW] Integrasikan dual progress tracker yang benar pada semua operations kecuali save dan reset.
+- [NEW] Integrasikan dual progress tracker dengan methods yang benar pada semua operasi kecuali save dan reset, contoh penerapan progress tracker pada downloader module 
 
 # DOWNLOAD MODULE
 - [NEW] Format summary masih belum menggunakan markdown seperti summary pada preprocessing module
 
 # PREPROCESSING MODULE
-- [NEW] Integrasikan dual progress tracker dengan methods yang benar
-
-# SPLIT MODULE
-- N/A
+- [NEW] Integrasikan dual progress tracker dengan methods yang benar pada semua operasi kecuali save dan reset, contoh penerapan progress tracker pada downloader module 
 
 # AUGMENTATION MODULE
 - [NEW] Summary container belum muncul. Refaktro augmentation_ui tanpa mengubah form original. Pastikan semua kontainer menggunakan signature yang tepat. 
+- [NEW] Integrasikan dual progress tracker dengan methods yang benar pada semua operasi kecuali save dan reset, contoh penerapan progress tracker pada downloader module 
 
 # PRETRAINED MODULE
-- N/A
-
-# BACKBONE MODULE
-- N/A
+- [NEW] Refaktor operation menjadi one-click download button. Satu button untuk chexk existing -> download jika pretrained module tidak ditemukan -> validasi -> hapus file (jika berbeda dengan yang baru) lama jika ada.
 
 # TRAINING MODULE
-- N/A
+- [NEW] Integrasikan triple progress tracker dengan methods yang benar pada semua operasi kecuali save dan reset.
+- [NEW] Integrasilam log_callback, live_chart callback, metrics callback.
 
 # EVALUATION MODULE
-- N/A 
+- [NEW] Integrasikan dual progress tracker dengan methods yang benar pada semua operasi kecuali save dan reset, contoh penerapan progress tracker pada downloader module 
 
 # VISUALIZATION MODULE
-
+- [NEW] Dashboard Cards masih tidak muncul. Periksa urutan dan timing inisialisasi. Jangan update statistik sebelum semua UI components rendered. 

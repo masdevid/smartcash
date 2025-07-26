@@ -51,17 +51,13 @@ def _create_augment_ui_components(config: Dict[str, Any]) -> Dict[str, Any]:
     # 5. Create operation container
     operation_container = _create_operation_container()
     
-    # 6. Create footer with info box
-    footer_container = _create_footer()
-    
-    # 7. Assemble main container
+    # 6. Assemble main container
     main_container = _assemble_main_container(
         header_container=header,
         form_container=form_widgets['container'],
         action_container=action_container,
         summary_container=summary_container.container,
         operation_container=operation_container,
-        footer_container=footer_container
     )
     
     # Extract generate button from preview widget
@@ -78,7 +74,6 @@ def _create_augment_ui_components(config: Dict[str, Any]) -> Dict[str, Any]:
         'form_container': form_widgets,
         'action_container': action_container,
         'operation_container': operation_container,
-        'footer_container': footer_container,
         'summary_container': summary_container,
         'generate': generate_button,
         **form_widgets['widgets'],

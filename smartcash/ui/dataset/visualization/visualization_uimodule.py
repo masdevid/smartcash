@@ -387,7 +387,6 @@ class VisualizationUIModule(BaseUIModule):
         except Exception as e:
             error_msg = f"Gagal memperbarui visualisasi: {str(e)}"
             self.log_error(error_msg)
-            self.update_operation_status(error_msg, "error")
     
     def _render_chart(self, chart_type: str) -> None:
         """Render a chart visualization.

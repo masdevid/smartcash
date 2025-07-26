@@ -194,10 +194,37 @@ class DownloaderUIModule(BaseUIModule):
                 danger_mode = False
                 confirm_text = "Lanjutkan"
             
+            def execute_download():
+                """Execute download and properly update UI state."""
+                try:
+                    # Update progress to show download is starting
+                    self.update_progress(75, "📥 Memulai download...")
+                    
+                    result = self._execute_download_operation()
+                    
+                    if result.get('success'):
+                        # Log success and complete progress
+                        success_msg = result.get('message', 'Download berhasil diselesaikan')
+                        self.log(f"✅ {success_msg}", 'success')
+                        self.complete_progress("Download selesai")
+                        self.log_operation_complete("Download Dataset")
+                    else:
+                        # Log error and show error progress
+                        error_msg = result.get('message', 'Download gagal')
+                        self.log(f"❌ {error_msg}", 'error')
+                        self.error_progress(error_msg)
+                    
+                    return result
+                except Exception as e:
+                    error_msg = f"Error executing download: {e}"
+                    self.log(f"❌ {error_msg}", 'error')
+                    self.error_progress(error_msg)
+                    return {'success': False, 'message': error_msg}
+            
             return self._show_confirmation_dialog(
                 title="Konfirmasi Download Dataset",
                 message=message,
-                confirm_action=self._execute_download_operation,
+                confirm_action=execute_download,
                 confirm_text=confirm_text,
                 danger_mode=danger_mode
             )
@@ -238,7 +265,31 @@ class DownloaderUIModule(BaseUIModule):
             )
             
             def execute_cleanup():
-                return self._execute_cleanup_operation_with_targets(operation, targets_result)
+                """Execute cleanup and properly update UI state."""
+                try:
+                    # Update progress to show cleanup is starting
+                    self.update_progress(75, "🧹 Menjalankan pembersihan...")
+                    
+                    result = self._execute_cleanup_operation_with_targets(operation, targets_result)
+                    
+                    if result.get('success'):
+                        # Log success and complete progress
+                        success_msg = result.get('message', 'Pembersihan berhasil diselesaikan')
+                        self.log(f"✅ {success_msg}", 'success')
+                        self.complete_progress("Pembersihan selesai")
+                        self.log_operation_complete("Cleanup Dataset")
+                    else:
+                        # Log error and show error progress
+                        error_msg = result.get('message', 'Pembersihan gagal')
+                        self.log(f"❌ {error_msg}", 'error')
+                        self.error_progress(error_msg)
+                    
+                    return result
+                except Exception as e:
+                    error_msg = f"Error executing cleanup: {e}"
+                    self.log(f"❌ {error_msg}", 'error')
+                    self.error_progress(error_msg)
+                    return {'success': False, 'message': error_msg}
             
             return self._show_confirmation_dialog(
                 title="⚠️ Konfirmasi Pembersihan Dataset", 
@@ -400,10 +451,12 @@ class DownloaderUIModule(BaseUIModule):
                 cancel_text="Batal",
                 danger_mode=danger_mode
             )
-            return {'success': True, 'message': 'Dialog konfirmasi ditampilkan'}
+            # Return a special status to prevent operation wrapper from showing success message
+            # The actual success will be handled by the confirm_action callback
+            return {'success': True, 'message': 'Dialog konfirmasi ditampilkan', 'dialog_shown': True}
         else:
-            self.log_error("Dialog not available, cannot proceed with confirmation required action")
-            return {'success': False, 'message': 'Dialog konfirmasi tidak tersedia. Operasi tidak dapat dilanjutkan.'}
+            self.log_warning("Dialog not available, executing action directly")
+            return confirm_action()
 
     def _show_info_dialog(self, title: str, message: str) -> Dict[str, Any]:
         """Show information dialog."""

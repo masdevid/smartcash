@@ -40,39 +40,27 @@ class CheckOperationHandler(BasePreprocessingOperation):
 
     def _format_status_summary(self, status: Dict[str, Any]) -> str:
         """Formats the backend status into a user-friendly markdown summary."""
-        service_ready = status.get('service_ready', False)
-        service_status_icon = "✅" if service_ready else "❌"
-        service_status_text = "Siap" if service_ready else "Tidak Siap"
-
-        stats = status.get('file_statistics', {}).get('train', {})
-        raw_images = stats.get('raw_images', 0)
-        preprocessed_files = stats.get('preprocessed_files', 0)
-        missing_files = stats.get('missing_files', 0)
-
-        paths = status.get('paths', {})
-        raw_path = paths.get('raw_data_path', 'N/A')
-        preprocessed_path = paths.get('preprocessed_data_path', 'N/A')
-
-        return f"""
-### Ringkasan Status Pra-pemrosesan
-
-| Kategori | Status |
-| :--- | :--- |
-| **Status Layanan** | {service_status_icon} {service_status_text} |
-| **Gambar Mentah** | 🖼️ {raw_images} |
-| **File Diproses** | ✨ {preprocessed_files} |
-| **File Hilang** | ❓ {missing_files} |
-
----
-
-#### Lokasi Dataset
-- **Data Mentah:** `{raw_path}`
-- **Data Diproses:** `{preprocessed_path}`
-
----
-
-**Pesan dari Backend:** *{status.get('message', 'Pemeriksaan selesai.')}*
-"""
+        from smartcash.ui.core.utils.summary_formatter import UnifiedSummaryFormatter
+        
+        # Transform status data to match formatter expectations
+        formatted_result = {
+            'success': status.get('service_ready', False),
+            'message': status.get('message', 'Pemeriksaan selesai.'),
+            'statistics': {
+                'files_processed': status.get('file_statistics', {}).get('train', {}).get('preprocessed_files', 0),
+                'files_missing': status.get('file_statistics', {}).get('train', {}).get('missing_files', 0),
+                'raw_images': status.get('file_statistics', {}).get('train', {}).get('raw_images', 0)
+            },
+            'dataset_path': status.get('paths', {}).get('raw_data_path', 'N/A'),
+            'output_path': status.get('paths', {}).get('preprocessed_data_path', 'N/A')
+        }
+        
+        return UnifiedSummaryFormatter.format_dataset_summary(
+            module_name="preprocessing",
+            operation_type="status check", 
+            result=formatted_result,
+            include_paths=True
+        )
 
 # Alias for compatibility
 CheckOperation = CheckOperationHandler

@@ -57,7 +57,16 @@ def create_operation_container(
         'update_triple_progress': container.update_triple_progress,
         'complete_triple_progress': container.complete_triple_progress,
         'error_triple_progress': container.error_triple_progress,
-        'log': container.log
+        'error_progress': container.error_progress,
+        'complete_progress': container.complete_progress,
+        'reset_progress': container.reset_progress,
+        'log': container.log,
+        'log_debug': container.log_debug,
+        'debug': container.debug,
+        'info': container.info,
+        'warning': container.warning,
+        'error': container.error,
+        'clear_logs': container.clear_logs
     }
 
 

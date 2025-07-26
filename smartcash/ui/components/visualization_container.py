@@ -5,36 +5,37 @@ Custom container untuk menata layout visualisasi dengan dashboard cards.
 """
 from typing import Dict, Any, Optional, List
 import ipywidgets as widgets
-from .main_container import MainContainer
-from .stats_card import create_dashboard_cards
 
-class VisualizationContainer(MainContainer):
+class VisualizationContainer:
     """Container khusus untuk tata letak visualisasi dengan dashboard cards."""
     
     def __init__(self, **kwargs):
         """Inisialisasi container visualisasi.
         
         Args:
-            **kwargs: Argumen tambahan untuk MainContainer
+            **kwargs: Argumen layout tambahan
         """
-        super().__init__(**kwargs)
         self._dashboard_cards = None
+        self._container = None
         self._initialize_ui()
     
     def _initialize_ui(self):
         """Inisialisasi komponen UI."""
-        # Buat dashboard cards
-        dashboard = create_dashboard_cards()
-        self._dashboard_cards = dashboard["cards"]
-        
-        # Buat container untuk cards
-        self.cards_container = dashboard["container"]
-        
-        # Tambahkan cards ke dalam layout
-        self.add_widget(self.cards_container, 'dashboard_cards')
-        
-        # Atur posisi cards di bagian atas
-        self.move_to_top('dashboard_cards')
+        # Create a simple VBox container for visualization content
+        self._container = widgets.VBox(
+            layout=widgets.Layout(
+                width='100%',
+                margin='10px 0',
+                padding='10px',
+                border='1px solid #e0e0e0',
+                border_radius='5px'
+            )
+        )
+    
+    @property
+    def container(self):
+        """Get the main container widget."""
+        return self._container
     
     def update_stats(self, stats: Dict[str, Dict[str, Any]]) -> None:
         """Perbarui statistik pada dashboard cards.

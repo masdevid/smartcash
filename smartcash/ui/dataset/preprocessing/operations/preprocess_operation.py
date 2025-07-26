@@ -44,29 +44,12 @@ class PreprocessOperation(BasePreprocessingOperation):
 
     def _format_preprocess_summary(self, result: Dict[str, Any]) -> str:
         """Formats the preprocessing result into a user-friendly markdown summary."""
-        success = result.get('success', False)
-        status_icon = "✅" if success else "❌"
-        status_text = "Berhasil" if success else "Gagal"
-
-        stats = result.get('statistics', {})
-        files_processed = stats.get('files_processed', 0)
-        files_skipped = stats.get('files_skipped', 0)
-        files_failed = stats.get('files_failed', 0)
-        total_time = result.get('total_time_seconds', 0)
-
-        return f"""
-### Ringkasan Operasi Pra-pemrosesan
-
-| Kategori | Status |
-| :--- | :--- |
-| **Status Operasi** | {status_icon} {status_text} |
-| **File Diproses** | ✔️ {files_processed} |
-| **File Dilewati** | ⏭️ {files_skipped} |
-| **File Gagal** | ❌ {files_failed} |
-| **Total Waktu** | ⏱️ {total_time:.2f} detik |
-
----
-
-**Pesan dari Backend:** *{result.get('message', 'Pra-pemrosesan selesai.')}*
-"""
+        from smartcash.ui.core.utils.summary_formatter import UnifiedSummaryFormatter
+        
+        return UnifiedSummaryFormatter.format_dataset_summary(
+            module_name="preprocessing",
+            operation_type="preprocessing", 
+            result=result,
+            include_paths=True
+        )
 

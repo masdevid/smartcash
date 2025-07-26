@@ -108,24 +108,46 @@ class AugmentationUIModule(BaseUIModule):
         def validate_augment():
             return {'valid': True}  # Add validation logic here
         
-        def execute_augment():
-            self.log("🎨 Starting augmentation...", 'info')
-            return self._execute_augment_operation()
-        
-        # Show confirmation dialog before augmenting
-        confirmation_result = self._show_confirmation_dialog(
-            title="Confirm Augmentation",
-            message="Are you sure you want to proceed with data augmentation? This will add new data to the existing dataset.",
-            confirm_text="Yes, Augment",
-            cancel_text="Cancel"
-        )
-        
-        if not confirmation_result:
-            return {'success': False, 'message': 'Augmentation cancelled by user'}
+        def execute_augment_with_confirmation():
+            """Execute augmentation with user confirmation."""
+            def execute_augment():
+                """Execute augmentation and properly update UI state."""
+                try:
+                    # Update progress to show augmentation is starting
+                    self.update_progress(75, "🎨 Memulai augmentasi...")
+                    
+                    result = self._execute_augment_operation()
+                    
+                    if result.get('success'):
+                        # Log success and complete progress
+                        success_msg = result.get('message', 'Augmentasi berhasil diselesaikan')
+                        self.log(f"✅ {success_msg}", 'success')
+                        self.complete_progress("Augmentasi selesai")
+                        self.log_operation_complete("Augment Dataset")
+                    else:
+                        # Log error and show error progress
+                        error_msg = result.get('message', 'Augmentasi gagal')
+                        self.log(f"❌ {error_msg}", 'error')
+                        self.error_progress(error_msg)
+                    
+                    return result
+                except Exception as e:
+                    error_msg = f"Error executing augmentation: {e}"
+                    self.log(f"❌ {error_msg}", 'error')
+                    self.error_progress(error_msg)
+                    return {'success': False, 'message': error_msg}
+            
+            return self._show_confirmation_dialog(
+                title="Konfirmasi Augmentasi",
+                message="Apakah Anda yakin ingin melanjutkan augmentasi data? Ini akan menambahkan data baru ke dataset yang ada.",
+                confirm_action=execute_augment,
+                confirm_text="Ya, Augmentasi",
+                cancel_text="Batal"
+            )
         
         return self._execute_operation_with_wrapper(
             operation_name="Data Augmentation",
-            operation_func=execute_augment,
+            operation_func=execute_augment_with_confirmation,
             button=button,
             validation_func=validate_augment,
             success_message="Data augmentation completed successfully",
@@ -155,24 +177,47 @@ class AugmentationUIModule(BaseUIModule):
         def validate_cleanup():
             return {'valid': True}  # Add validation logic here
         
-        def execute_cleanup():
-            self.log("🧹 Cleaning augmentation data...", 'info')
-            return self._execute_cleanup_operation()
-        
-        # Show confirmation dialog before cleanup
-        confirmation_result = self._show_confirmation_dialog(
-            title="Confirm Cleanup",
-            message="⚠️ WARNING: This will delete all existing augmentation files. This action cannot be undone. Continue?",
-            confirm_text="Yes, Delete",
-            cancel_text="Cancel"
-        )
-        
-        if not confirmation_result:
-            return {'success': False, 'message': 'Cleanup cancelled by user'}
+        def execute_cleanup_with_confirmation():
+            """Execute cleanup with user confirmation."""
+            def execute_cleanup():
+                """Execute cleanup and properly update UI state."""
+                try:
+                    # Update progress to show cleanup is starting
+                    self.update_progress(75, "🧹 Memulai pembersihan...")
+                    
+                    result = self._execute_cleanup_operation()
+                    
+                    if result.get('success'):
+                        # Log success and complete progress
+                        success_msg = result.get('message', 'Pembersihan berhasil diselesaikan')
+                        self.log(f"✅ {success_msg}", 'success')
+                        self.complete_progress("Pembersihan selesai")
+                        self.log_operation_complete("Cleanup Dataset")
+                    else:
+                        # Log error and show error progress
+                        error_msg = result.get('message', 'Pembersihan gagal')
+                        self.log(f"❌ {error_msg}", 'error')
+                        self.error_progress(error_msg)
+                    
+                    return result
+                except Exception as e:
+                    error_msg = f"Error executing cleanup: {e}"
+                    self.log(f"❌ {error_msg}", 'error')
+                    self.error_progress(error_msg)
+                    return {'success': False, 'message': error_msg}
+            
+            return self._show_confirmation_dialog(
+                title="Konfirmasi Pembersihan",
+                message="⚠️ PERINGATAN: Ini akan menghapus semua file augmentasi yang ada. Tindakan ini tidak dapat dibatalkan. Lanjutkan?",
+                confirm_action=execute_cleanup,
+                confirm_text="Ya, Hapus",
+                cancel_text="Batal",
+                danger_mode=True
+            )
         
         return self._execute_operation_with_wrapper(
             operation_name="Data Cleanup",
-            operation_func=execute_cleanup,
+            operation_func=execute_cleanup_with_confirmation,
             button=button,
             validation_func=validate_cleanup,
             success_message="Data cleanup completed successfully",
@@ -282,29 +327,32 @@ class AugmentationUIModule(BaseUIModule):
     
     # ==================== HELPER METHODS ====================
     
-    def _show_confirmation_dialog(self, title: str, message: str, confirm_text: str = "Ya", cancel_text: str = "Batal") -> bool:
-        """Show confirmation dialog and return user choice."""
+    def _show_confirmation_dialog(self, title: str, message: str, confirm_action, 
+                                 confirm_text: str = "Ya", cancel_text: str = "Batal", danger_mode: bool = False) -> Dict[str, Any]:
+        """Show confirmation dialog and execute action on confirm."""
         try:
             # Get the operation container's dialog method
             operation_container = self.get_component('operation_container')
-            if operation_container and 'show_dialog' in operation_container:
+            if operation_container and hasattr(operation_container, 'show_dialog'):
                 # Use the operation container's dialog functionality
-                dialog_result = operation_container['show_dialog'](
+                operation_container.show_dialog(
                     title=title,
                     message=message,
-                    on_confirm=lambda: True,
-                    on_cancel=lambda: False,
+                    on_confirm=confirm_action,
                     confirm_text=confirm_text,
-                    cancel_text=cancel_text
+                    cancel_text=cancel_text,
+                    danger_mode=danger_mode
                 )
-                return dialog_result
+                # Return a special status to prevent operation wrapper from showing success message
+                # The actual success will be handled by the confirm_action callback
+                return {'success': True, 'message': 'Dialog konfirmasi ditampilkan', 'dialog_shown': True}
             else:
-                # Fallback: Log the confirmation and return True
-                self.log(f"Konfirmasi: {title} - {message}", 'info')
-                return True  # Default to proceed
+                # Fallback: Log the confirmation and execute directly
+                self.log(f"Dialog not available, executing action directly: {title}", 'info')
+                return confirm_action()
         except Exception as e:
             self.log(f"Error in confirmation dialog: {e}", 'error')
-            return True  # Default to proceed if dialog fails
+            return {'success': False, 'message': f'Dialog error: {e}'}
     
     # ==================== OPERATION EXECUTION METHODS ====================
     
@@ -420,19 +468,44 @@ class AugmentationUIModule(BaseUIModule):
         except Exception as e:
             return {'success': False, 'message': f"Error in preview operation: {e}"}
     
-    def _update_operation_summary(self, content: str) -> None:
-        """Updates the operation summary container with new content using markdown formatter."""
+    def _update_operation_summary(self, content) -> None:
+        """Updates the operation summary container with new content using unified formatter."""
         try:
             # Get summary container from UI components
             summary_container = self.get_component('summary_container')
             if summary_container and hasattr(summary_container, 'set_content'):
-                # Convert markdown content to HTML using the new formatter
-                from smartcash.ui.core.utils import format_summary_to_html
-                formatted_content = format_summary_to_html(
-                    content, 
-                    title="🎨 Augmentation Summary", 
-                    module_name="augmentation"
-                )
+                # If content is a string (legacy), use it directly
+                if isinstance(content, str):
+                    # Convert markdown content to HTML using the new formatter
+                    from smartcash.ui.core.utils import format_summary_to_html
+                    formatted_content = format_summary_to_html(
+                        content, 
+                        title="🎨 Augmentation Summary", 
+                        module_name="augmentation"
+                    )
+                # If content is a dict (operation result), use unified formatter
+                elif isinstance(content, dict):
+                    from smartcash.ui.core.utils.summary_formatter import UnifiedSummaryFormatter
+                    from smartcash.ui.core.utils import format_summary_to_html
+                    
+                    # Format using unified formatter
+                    markdown_content = UnifiedSummaryFormatter.format_dataset_summary(
+                        module_name="augmentation",
+                        operation_type=content.get('operation_type', 'operation'),
+                        result=content,
+                        include_paths=True
+                    )
+                    
+                    # Convert to HTML
+                    formatted_content = format_summary_to_html(
+                        markdown_content, 
+                        title="🎨 Augmentation Summary", 
+                        module_name="augmentation"
+                    )
+                else:
+                    # Fallback for other types
+                    formatted_content = str(content)
+                
                 summary_container.set_content(formatted_content)
                 
                 # Make summary container visible after updating content

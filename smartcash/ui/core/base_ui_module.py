@@ -815,15 +815,21 @@ class BaseUIModule(
             
             # Handle result (optimized logging for one-click operations)
             if result.get('success'):
-                success_msg = success_message or result.get('message', f'{operation_name} berhasil diselesaikan')
-                
-                if not reduce_logging:
-                    self.log_operation_complete(operation_name)
-                    self.log(f"✅ {success_msg}", "info")
+                # Check if this is a dialog display - don't show success message for dialog displays
+                # The actual success will be handled by the dialog callback
+                if result.get('dialog_shown'):
+                    # Just update progress to indicate dialog is shown, don't show success message
+                    self.update_progress(50, "⏳ Menunggu konfirmasi user...")
+                else:
+                    success_msg = success_message or result.get('message', f'{operation_name} berhasil diselesaikan')
                     
-                # Always log success to operation container for user feedback
-                self.log(f"✅ {success_msg}", 'success')
-                self.complete_progress(f"{operation_name} selesai")
+                    if not reduce_logging:
+                        self.log_operation_complete(operation_name)
+                        self.log(f"✅ {success_msg}", "info")
+                        
+                    # Always log success to operation container for user feedback
+                    self.log(f"✅ {success_msg}", 'success')
+                    self.complete_progress(f"{operation_name} selesai")
             else:
                 error_prefix = error_message or f'{operation_name} gagal'
                 error_msg = result.get('message', 'Operasi gagal')

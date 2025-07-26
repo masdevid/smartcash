@@ -25,6 +25,7 @@ from smartcash.ui.components.summary_container import create_summary_container
 from smartcash.ui.components.operation_container import create_operation_container
 from smartcash.ui.components.footer_container import create_footer_container
 from smartcash.ui.components.main_container import create_main_container
+from smartcash.ui.components.visualization_container import VisualizationContainer
 from smartcash.ui.core.decorators import handle_ui_errors
 
 # Module imports
@@ -227,6 +228,14 @@ def create_visualization_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -
     # Simpan dashboard container
     ui_components['dashboard'] = dashboard_container
     
+    # === 5.2 Buat Visualization Container ===
+    # Buat VisualizationContainer untuk visualisasi data
+    visualization_container = VisualizationContainer()
+    
+    # Simpan visualization container
+    ui_components['visualization_container'] = visualization_container
+    ui_components['containers'] = {'visualization': visualization_container}  # For backwards compatibility
+    
     # === 7. Buat Main Container ===
     # Siapkan komponen untuk container utama
     components = [
@@ -238,12 +247,14 @@ def create_visualization_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -
         {'type': 'action', 'component': action_container['container'], 'order': 3},
         # Dashboard container
         {'type': 'dashboard', 'component': dashboard_container, 'order': 1},
+        # Visualization container (VisualizationContainer object)
+        {'type': 'visualization', 'component': visualization_container.container, 'order': 4},
         # Summary container (objek dengan atribut .container)
-        {'type': 'summary', 'component': summary_container.container, 'order': 4},
+        {'type': 'summary', 'component': summary_container.container, 'order': 5},
         # Operation container (dictionary dengan kunci 'container')
-        {'type': 'operation', 'component': operation_container['container'], 'order': 5},
+        {'type': 'operation', 'component': operation_container['container'], 'order': 6},
         # Footer container (objek dengan atribut .container)
-        {'type': 'footer', 'component': footer_container.container, 'order': 6}
+        {'type': 'footer', 'component': footer_container.container, 'order': 7}
     ]
     
     # Buat container utama dengan semua komponen

@@ -223,7 +223,10 @@ class PreprocessingUIModule(BaseUIModule):
             handler = CheckOperationHandler(
                 ui_module=self,
                 config=self.get_current_config(),
-                callbacks={'on_success': self._update_operation_summary}
+                callbacks={
+                    'on_success': self._update_operation_summary,
+                    'on_complete': self._update_service_status_from_check
+                }
             )
             
             result = handler.execute()
@@ -249,6 +252,26 @@ class PreprocessingUIModule(BaseUIModule):
         except Exception as e:
             return {'success': False, 'message': f"Error in cleanup operation: {e}"}
 
+    def _update_service_status_from_check(self, *args) -> None:
+        """Update service ready status after check operation completes."""
+        try:
+            from smartcash.dataset.preprocessor.api.preprocessing_api import get_preprocessing_status
+            
+            # Get current status from backend
+            status = get_preprocessing_status(config=self.get_current_config())
+            
+            # Update service ready flag based on backend response
+            self._service_ready = status.get('service_ready', False)
+            
+            if self._service_ready:
+                self.log_debug("✅ Service status updated: ready")
+            else:
+                self.log_debug("⚠️ Service status updated: not ready")
+                
+        except Exception as e:
+            self.log_error(f"❌ Failed to update service status: {e}")
+            # Don't change the service status if we can't check it
+
     # Validation Methods
     def _validate_ui_ready(self) -> Dict[str, Any]:
         """Validate that UI components are ready and service is ready."""
@@ -258,7 +281,7 @@ class PreprocessingUIModule(BaseUIModule):
         if not self._service_ready:
             return {
                 'valid': False, 
-                'message': "Service belum siap - struktur direktori preprocessing tidak ditemukan. Pastikan direktori data telah dibuat dengan benar."
+                'message': "Service belum siap. Silakan klik tombol 'Check' terlebih dahulu untuk mempersiapkan service."
             }
         
         return {'valid': True}
@@ -268,7 +291,7 @@ class PreprocessingUIModule(BaseUIModule):
         if not self._service_ready:
             return {
                 'valid': False, 
-                'message': "Service belum siap - tidak dapat melakukan cleanup. Pastikan direktori data telah dibuat dengan benar."
+                'message': "Service belum siap. Silakan klik tombol 'Check' terlebih dahulu untuk mempersiapkan service."
             }
             
         try:
@@ -312,7 +335,9 @@ class PreprocessingUIModule(BaseUIModule):
                 cancel_text="Batal",
                 danger_mode=danger_mode
             )
-            return {'success': True, 'message': 'Dialog konfirmasi ditampilkan'}
+            # Return a special status to prevent operation wrapper from showing success message
+            # The actual success will be handled by the confirm_action callback
+            return {'success': True, 'message': 'Dialog konfirmasi ditampilkan', 'dialog_shown': True}
         else:
             self.log_warning("Dialog not available, executing action directly")
             return confirm_action()

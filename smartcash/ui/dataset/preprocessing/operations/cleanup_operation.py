@@ -50,23 +50,21 @@ class CleanupOperationHandler(BasePreprocessingOperation):
 
     def _format_cleanup_summary(self, result: Dict[str, Any]) -> str:
         """Formats the cleanup result into a user-friendly markdown summary."""
-        success = result.get('success', False)
-        status_icon = "✅" if success else "❌"
-        status_text = "Berhasil" if success else "Gagal"
-
-        files_deleted = result.get('files_deleted', 0)
-        space_reclaimed = result.get('space_reclaimed_mb', 0)
-
-        return f"""
-### Ringkasan Operasi Pembersihan
-
-| Kategori | Status |
-| :--- | :--- |
-| **Status Operasi** | {status_icon} {status_text} |
-| **File Dihapus** | 🗑️ {files_deleted} |
-| **Ruang Kosong** | 💾 {space_reclaimed:.2f} MB |
-
----
-
-**Pesan dari Backend:** *{result.get('message', 'Pembersihan selesai.')}*
-"""
+        from smartcash.ui.core.utils.summary_formatter import UnifiedSummaryFormatter
+        
+        # Transform cleanup data to match formatter expectations
+        formatted_result = {
+            'success': result.get('success', False),
+            'message': result.get('message', 'Pembersihan selesai.'),
+            'statistics': {
+                'files_deleted': result.get('files_deleted', 0),
+                'space_reclaimed_mb': result.get('space_reclaimed_mb', 0)
+            }
+        }
+        
+        return UnifiedSummaryFormatter.format_dataset_summary(
+            module_name="preprocessing",
+            operation_type="cleanup", 
+            result=formatted_result,
+            include_paths=False
+        )

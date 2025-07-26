@@ -9,6 +9,7 @@ from .unified_training_defaults import (
     get_unified_training_defaults,
     validate_unified_training_config
 )
+from ..utils.environment_detector import get_recommended_training_config, detect_environment
 
 
 class TrainingConfigHandler:
@@ -43,6 +44,9 @@ class TrainingConfigHandler:
         self._default_config = get_unified_training_defaults()
         self._config = self._default_config.copy()
         
+        # Detect environment and apply recommended settings
+        self._apply_environment_config()
+        
         # Update with provided config if any
         if config:
             self._config.update(config)
@@ -51,6 +55,32 @@ class TrainingConfigHandler:
         self.ui_sync_sections = ['training', 'model_selection', 'monitoring', 'charts', 'ui']
         
         self.logger.info("✅ Training config handler initialized")
+
+    def _apply_environment_config(self) -> None:
+        """Apply environment-specific configuration settings."""
+        try:
+            # Detect environment
+            env_info = detect_environment()
+            self.logger.info(f"🔍 Environment detected: {env_info.get('platform', 'unknown')}")
+            
+            # Get recommended configuration updates
+            recommended_config = get_recommended_training_config(env_info)
+            
+            if recommended_config:
+                # Apply to training section
+                if 'training' not in self._config:
+                    self._config['training'] = {}
+                
+                for key, value in recommended_config.items():
+                    self._config['training'][key] = value
+                    self.logger.info(f"🔧 Environment setting applied: {key}={value}")
+                
+                # Log special cases
+                if recommended_config.get('force_cpu'):
+                    self.logger.warning("⚠️ CPU training forced due to environment constraints")
+                
+        except Exception as e:
+            self.logger.error(f"❌ Failed to apply environment configuration: {e}")
 
     # --- Core Configuration Methods ---
 

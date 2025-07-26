@@ -15,6 +15,7 @@ from smartcash.model.core.model_builder import ModelBuilder
 from smartcash.model.core.checkpoint_manager import CheckpointManager
 from smartcash.model.utils.device_utils import setup_device, get_device_info
 from smartcash.model.utils.progress_bridge import ModelProgressBridge
+from smartcash.model.utils.memory_optimizer import get_memory_optimizer
 
 class SmartCashModelAPI:
     """🎯 API inti untuk operasi model SmartCash dengan progress tracking"""
@@ -28,6 +29,10 @@ class SmartCashModelAPI:
         self.config = self._load_config(config_path)
         self.device = setup_device(self.config.get('device', {}))
         
+        # Initialize memory optimizer
+        self.memory_optimizer = get_memory_optimizer(self.device)
+        memory_config = self.memory_optimizer.setup_memory_efficient_settings()
+        
         # Initialize core components
         self.model_builder = ModelBuilder(self.config, self.progress_bridge)
         self.checkpoint_manager = CheckpointManager(self.config, self.progress_bridge)
@@ -35,6 +40,9 @@ class SmartCashModelAPI:
         # Model state
         self.model = None
         self.is_model_built = False
+        
+        # Store memory configuration
+        self.memory_config = memory_config
         
         self.logger.info(f"🚀 SmartCash Model API initialized | Device: {self.device}")
         self._log_device_info()
@@ -102,13 +110,18 @@ class SmartCashModelAPI:
             self.progress_bridge.update(2, "🔧 Initializing model components...")
             self.model = self.model_builder.build(**self.config['model'])
             
-            # Transfer ke device
-            self.progress_bridge.update(3, f"📱 Transferring to {self.device}...")
-            self.model = self.model.to(self.device)
+            # Optimize model with memory optimizer
+            self.progress_bridge.update(3, f"🧠 Optimizing for {self.device} training...")
+            backbone = self.config['model'].get('backbone', 'cspdarknet')
+            optimization_result = self.memory_optimizer.optimize_for_training(self.model, backbone)
+            self.model = optimization_result['model']
+            
+            # Store optimization info
+            self.optimization_info = optimization_result
             
             # Finalize
             self.is_model_built = True
-            self.progress_bridge.complete(4, "✅ Model built successfully!")
+            self.progress_bridge.complete(4, "✅ Model built and optimized successfully!")
             
             # Return model info
             return self._get_model_info()
@@ -325,7 +338,7 @@ class SmartCashModelAPI:
         total_params = sum(p.numel() for p in self.model.parameters())
         trainable_params = sum(p.numel() for p in self.model.parameters() if p.requires_grad)
         
-        return {
+        result = {
             'status': 'built',
             'model_name': self.config['model']['model_name'],
             'backbone': self.config['model']['backbone'],
@@ -339,6 +352,17 @@ class SmartCashModelAPI:
             'feature_optimization': self.config['model']['feature_optimization'] if isinstance(self.config['model']['feature_optimization'], bool) else self.config['model']['feature_optimization']['enabled'],
             'memory_usage': f"{torch.cuda.memory_allocated(self.device) / 1024**2:.1f} MB" if self.device.type == 'cuda' else 'N/A'
         }
+        
+        # Add memory optimization info if available
+        if hasattr(self, 'optimization_info'):
+            result['memory_optimization'] = {
+                'enabled': True,
+                'platform': self.optimization_info['platform_info']['device_type'],
+                'batch_config': self.optimization_info['batch_config'],
+                'memory_efficient_settings': self.memory_config
+            }
+        
+        return result
     
     def _get_model_info_dict(self) -> Dict[str, Any]:
         """Get model info as dict for saving (without status)"""

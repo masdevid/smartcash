@@ -43,6 +43,7 @@ from smartcash.model.training.utils.resume_utils import (
 from smartcash.model.training.utils.setup_utils import prepare_training_environment
 from smartcash.model.training.training_phase_manager import TrainingPhaseManager
 from smartcash.model.utils.device_utils import setup_device, model_to_device
+from smartcash.model.utils.memory_optimizer import get_memory_optimizer, cleanup_training_memory, emergency_cleanup
 
 logger = get_logger(__name__)
 
@@ -73,6 +74,7 @@ class UnifiedTrainingPipeline:
         self.model_api = None
         self.model = None
         self.visualization_manager = None
+        self.memory_optimizer = None
         
         # UI Integration callbacks
         self.log_callback = log_callback
@@ -134,10 +136,12 @@ class UnifiedTrainingPipeline:
                 logger.info(f"   Phase 1 epochs: {phase_1_epochs}")
                 logger.info(f"   Phase 2 epochs: {phase_2_epochs}")
             else:
-                total_epochs = phase_1_epochs + phase_2_epochs
+                total_epochs = phase_1_epochs  # Only use phase_1_epochs for single phase
                 logger.info(f"   Single phase epochs: {total_epochs}")
                 logger.info(f"   Layer mode: {single_phase_layer_mode}")
                 logger.info(f"   Backbone frozen: {single_phase_freeze_backbone}")
+                if phase_2_epochs > 0:
+                    logger.info(f"   Note: phase_2_epochs ({phase_2_epochs}) ignored in single phase mode")
             logger.info(f"   Checkpoint dir: {checkpoint_dir}")
             if resume_info:
                 logger.info(f"   Resuming from: Phase {resume_info['phase']}, Epoch {resume_info['epoch']}")
@@ -236,6 +240,11 @@ class UnifiedTrainingPipeline:
             }
             self._emit_log('info', 'Training pipeline completed successfully', final_log_data)
             
+            # Final memory cleanup
+            if self.memory_optimizer:
+                self.memory_optimizer.cleanup_memory(aggressive=True)
+                logger.info("🧹 Final memory cleanup completed")
+            
             return {
                 'success': True,
                 'message': 'Unified training pipeline completed successfully',
@@ -248,6 +257,17 @@ class UnifiedTrainingPipeline:
             
         except Exception as e:
             logger.error(f"❌ Unified training pipeline failed: {str(e)}")
+            
+            # Emergency memory cleanup on failure
+            try:
+                if self.memory_optimizer:
+                    self.memory_optimizer.emergency_memory_cleanup()
+                else:
+                    emergency_cleanup()
+                logger.info("🚨 Emergency memory cleanup completed")
+            except Exception as cleanup_error:
+                logger.warning(f"⚠️ Emergency cleanup failed: {cleanup_error}")
+            
             return {
                 'success': False,
                 'error': str(e),
@@ -276,6 +296,16 @@ class UnifiedTrainingPipeline:
             
             if result.get('success'):
                 self.config = result['config']
+                
+                # Initialize memory optimizer with detected device
+                self.progress_tracker.update_phase(60, 100, "Initializing memory optimization")
+                device = setup_device(self.config.get('device', {}))
+                self.memory_optimizer = get_memory_optimizer(device)
+                
+                # Setup memory-efficient settings
+                memory_config = self.memory_optimizer.setup_memory_efficient_settings()
+                self.config['memory_optimization'] = memory_config
+                
                 self.progress_tracker.update_phase(100, 100, "Preparation completed")
                 self.progress_tracker.complete_phase(result)
                 return result
@@ -315,24 +345,32 @@ class UnifiedTrainingPipeline:
             else:
                 raise RuntimeError("Model not found in build result")
             
-            # Step 3: Move model to device
-            self.progress_tracker.update_phase(75, 100, "Moving model to device")
-            device_config = self.config['device']
-            device = setup_device({
-                'auto_detect': device_config.get('auto_detect', True), 
-                'preferred': device_config['device']
-            })
-            self.model = model_to_device(self.model, device)
+            # Step 3: Optimize model with memory optimizer
+            self.progress_tracker.update_phase(75, 100, "Optimizing model for training")
+            if self.memory_optimizer:
+                optimization_result = self.memory_optimizer.optimize_for_training(
+                    self.model, self.config['model']['backbone']
+                )
+                self.model = optimization_result['model']
+                device = optimization_result['device']  # Store device for later reference
+                
+                # Update config with memory optimization settings
+                self.config['data'].update(optimization_result['batch_config'])
+                
+                logger.info(f"✅ Model optimized for {device} training")
+            else:
+                # Fallback: move model to device manually
+                device_config = self.config['device']
+                device = setup_device({
+                    'auto_detect': device_config.get('auto_detect', True), 
+                    'preferred': device_config['device']
+                })
+                self.model = model_to_device(self.model, device)
             
-            # Step 4: Setup model compilation if supported
-            self.progress_tracker.update_phase(90, 100, "Applying model optimizations")
-            training_config = self.config['training']
-            if training_config.get('compile_model', False) and hasattr(torch, 'compile'):
-                try:
-                    self.model = torch.compile(self.model)
-                    logger.info("✅ Model compiled with torch.compile")
-                except Exception as e:
-                    logger.warning(f"⚠️ Model compilation failed: {e}")
+            # Step 4: Clean memory after model setup
+            self.progress_tracker.update_phase(90, 100, "Applying final optimizations")
+            if self.memory_optimizer:
+                self.memory_optimizer.cleanup_memory()
             
             self.progress_tracker.update_phase(100, 100, "Model build completed")
             

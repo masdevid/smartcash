@@ -24,7 +24,7 @@ class ModelBuilder:
         
     def build(self, backbone: str = 'efficientnet_b4', detection_layers: List[str] = None, 
               layer_mode: str = 'single', num_classes: int = 7, img_size: int = 640,
-              feature_optimization: Dict = None, **kwargs) -> nn.Module:
+              feature_optimization: Dict = None, pretrained: bool = False, **kwargs) -> nn.Module:
         """🔧 Build complete model dengan konfigurasi yang diberikan"""
         
         try:
@@ -44,7 +44,7 @@ class ModelBuilder:
                 
             backbone_model = self.backbone_factory.create_backbone(
                 backbone, 
-                pretrained=True,
+                pretrained=pretrained,
                 feature_optimization=feature_opt_enabled
             )
             

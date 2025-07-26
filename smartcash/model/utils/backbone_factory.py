@@ -21,7 +21,7 @@ class BackboneFactory:
             'efficientnet_b4': EfficientNetB4Backbone
         }
     
-    def create_backbone(self, backbone_type: str, pretrained: bool = True, 
+    def create_backbone(self, backbone_type: str, pretrained: bool = False, 
                        feature_optimization: bool = False, **kwargs) -> 'BackboneBase':
         """🔧 Create backbone berdasarkan type yang diminta"""
         
@@ -82,7 +82,7 @@ class BackboneBase(nn.Module):
 class CSPDarknetBackbone(BackboneBase):
     """🌑 CSPDarknet backbone untuk YOLOv5 baseline"""
     
-    def __init__(self, pretrained: bool = True, feature_optimization: bool = False, **kwargs):
+    def __init__(self, pretrained: bool = False, feature_optimization: bool = False, **kwargs):
         super().__init__()
         self.pretrained = pretrained
         self.feature_optimization = feature_optimization
@@ -240,7 +240,7 @@ class CSPDarknetBackbone(BackboneBase):
 class EfficientNetB4Backbone(BackboneBase):
     """🚀 EfficientNet-B4 backbone untuk enhanced performance"""
     
-    def __init__(self, pretrained: bool = True, feature_optimization: bool = False, **kwargs):
+    def __init__(self, pretrained: bool = False, feature_optimization: bool = False, **kwargs):
         super().__init__()
         self.pretrained = pretrained
         self.feature_optimization = feature_optimization
@@ -329,10 +329,10 @@ class ChannelAttention(nn.Module):
 
 
 # Factory convenience functions
-def create_cspdarknet_backbone(pretrained: bool = True, **kwargs) -> CSPDarknetBackbone:
+def create_cspdarknet_backbone(pretrained: bool = False, **kwargs) -> CSPDarknetBackbone:
     """🌑 Create CSPDarknet backbone"""
     return CSPDarknetBackbone(pretrained=pretrained, **kwargs)
 
-def create_efficientnet_backbone(pretrained: bool = True, feature_optimization: bool = False, **kwargs) -> EfficientNetB4Backbone:
+def create_efficientnet_backbone(pretrained: bool = False, feature_optimization: bool = False, **kwargs) -> EfficientNetB4Backbone:
     """🚀 Create EfficientNet-B4 backbone"""
     return EfficientNetB4Backbone(pretrained=pretrained, feature_optimization=feature_optimization, **kwargs)

@@ -279,10 +279,6 @@ class CSPDarknet(BaseBackbone):
     
     def _verify_model_structure(self):
         """Verifikasi struktur model dan output channels."""
-        # Skip verifikasi jika dalam mode testing
-        if self.testing_mode:
-            self.logger.info("🧪 Skip verifikasi model dalam mode testing")
-            return
             
         # Validasi feature indices
         if max(self.feature_indices) >= len(self.backbone):

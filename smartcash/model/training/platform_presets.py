@@ -27,6 +27,7 @@ from typing import Dict, Any
 
 from smartcash.common.worker_utils import get_optimal_worker_count, optimal_mixed_workers
 from smartcash.common.logger import get_logger
+from smartcash.model.utils.memory_optimizer import get_memory_optimizer
 
 logger = get_logger(__name__)
 
@@ -112,17 +113,33 @@ class PlatformPresets:
             }
     
     def get_data_config(self, backbone: str = 'cspdarknet') -> Dict[str, Any]:
-        """Get optimized data loading configuration."""
+        """Get optimized data loading configuration with memory optimization."""
         device_config = self.get_device_config()
         
-        # Base configuration using worker_utils
-        config = {
-            'num_workers': optimal_mixed_workers(),  # Mixed I/O and CPU operations
-            'pin_memory': device_config['device'] == 'cuda',  # Only beneficial for CUDA
-            'persistent_workers': True,
-            'prefetch_factor': 2,
-            'drop_last': True
-        }
+        # Get memory-optimized batch configuration
+        try:
+            memory_optimizer = get_memory_optimizer()
+            batch_config = memory_optimizer.get_optimal_batch_config(backbone)
+            
+            # Use memory optimizer configuration as base
+            config = {
+                'batch_size': batch_config['batch_size'],
+                'num_workers': batch_config['num_workers'],
+                'pin_memory': batch_config['pin_memory'],
+                'persistent_workers': batch_config['persistent_workers'],
+                'prefetch_factor': batch_config['prefetch_factor'],
+                'drop_last': batch_config['drop_last']
+            }
+        except Exception as e:
+            logger.warning(f"⚠️ Memory optimizer unavailable, using fallback config: {e}")
+            # Fallback configuration
+            config = {
+                'num_workers': optimal_mixed_workers(),  # Mixed I/O and CPU operations
+                'pin_memory': device_config['device'] == 'cuda',  # Only beneficial for CUDA
+                'persistent_workers': True,
+                'prefetch_factor': 2,
+                'drop_last': True
+            }
         
         # Platform-specific optimizations
         if self.platform_info['is_colab']:
@@ -183,6 +200,13 @@ class PlatformPresets:
                 'type': 'cosine',
                 'eta_min': 1e-6,
                 'warmup_epochs': 0  # Will be set per phase
+            },
+            'early_stopping': {  # Add early stopping configuration
+                'enabled': True,
+                'patience': 10,
+                'metric': 'val_map50',
+                'mode': 'max',
+                'min_delta': 0.002
             }
         }
         
@@ -299,21 +323,32 @@ class PlatformPresets:
         }
     
     def setup_platform_optimizations(self):
-        """Apply platform-specific PyTorch optimizations."""
-        if self.platform_info['is_cuda_workstation'] or self.platform_info['is_colab']:
-            # CUDA optimizations
-            if torch.cuda.is_available():
-                torch.backends.cudnn.benchmark = True
-                torch.backends.cudnn.deterministic = False
-                torch.cuda.empty_cache()
-        
-        elif self.platform_info['is_m1_mac']:
-            # MPS optimizations
-            if self.platform_info['mps_available']:
-                torch.mps.empty_cache()
-        
-        # General optimizations
-        torch.set_float32_matmul_precision('medium')  # Allow TensorFloat-32
+        """Apply platform-specific PyTorch optimizations with memory optimization."""
+        try:
+            # Use memory optimizer for comprehensive optimization
+            memory_optimizer = get_memory_optimizer()
+            memory_config = memory_optimizer.setup_memory_efficient_settings()
+            logger.info(f"✅ Memory optimization applied: {memory_config.get('device', 'unknown')}")
+            return memory_config
+        except Exception as e:
+            logger.warning(f"⚠️ Memory optimizer unavailable, using fallback optimizations: {e}")
+            
+            # Fallback platform optimizations
+            if self.platform_info['is_cuda_workstation'] or self.platform_info['is_colab']:
+                # CUDA optimizations
+                if torch.cuda.is_available():
+                    torch.backends.cudnn.benchmark = True
+                    torch.backends.cudnn.deterministic = False
+                    torch.cuda.empty_cache()
+            
+            elif self.platform_info['is_m1_mac']:
+                # MPS optimizations
+                if self.platform_info['mps_available']:
+                    torch.mps.empty_cache()
+            
+            # General optimizations
+            torch.set_float32_matmul_precision('medium')  # Allow TensorFloat-32
+            return {'fallback': True}
 
 
 # Global instance for easy access
@@ -334,6 +369,6 @@ def get_platform_config(backbone: str = 'cspdarknet',
     return presets.get_full_config(backbone, phase_1_epochs, phase_2_epochs)
 
 def setup_platform_optimizations():
-    """Setup platform-specific optimizations."""
+    """Setup platform-specific optimizations with memory optimization."""
     presets = get_platform_presets()
-    presets.setup_platform_optimizations()
+    return presets.setup_platform_optimizations()

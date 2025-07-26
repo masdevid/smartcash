@@ -6,6 +6,7 @@ Description: Simplified training form for unified training pipeline integration.
 import ipywidgets as widgets
 from typing import Dict, Any
 from smartcash.ui.logger import get_module_logger
+from ..utils.environment_detector import detect_environment, should_force_cpu_training
 
 
 def create_unified_training_form(config: Dict[str, Any]) -> widgets.Widget:
@@ -20,6 +21,10 @@ def create_unified_training_form(config: Dict[str, Any]) -> widgets.Widget:
     logger = get_module_logger("smartcash.ui.model.training.components")
     
     try:
+        # Detect environment for adaptive UI
+        env_info = detect_environment()
+        force_cpu_recommended, cpu_reason = should_force_cpu_training(env_info)
+        
         # Extract config sections with defaults matching unified_training_example.py
         training_config = config.get('training', {})
         
@@ -182,11 +187,16 @@ def create_unified_training_form(config: Dict[str, Any]) -> widgets.Widget:
             layout=widgets.Layout(width='auto')
         )
         
-        # System options
+        # System options - with environment detection
+        force_cpu_value = training_config.get('force_cpu', False) or force_cpu_recommended
+        force_cpu_description = "Force CPU Training"
+        if force_cpu_recommended:
+            force_cpu_description += f" (Recommended: {cpu_reason})"
+        
         force_cpu = widgets.Checkbox(
-            description="Force CPU Training",
-            value=training_config.get('force_cpu', False),
-            style={'description_width': '120px'},
+            description=force_cpu_description,
+            value=force_cpu_value,
+            style={'description_width': '200px'},
             layout=widgets.Layout(width='auto')
         )
         
@@ -194,6 +204,21 @@ def create_unified_training_form(config: Dict[str, Any]) -> widgets.Widget:
             description="Verbose Logging",
             value=training_config.get('verbose', True),
             style={'description_width': '120px'},
+            layout=widgets.Layout(width='auto')
+        )
+        
+        # Model configuration options
+        pretrained = widgets.Checkbox(
+            description="Use Pretrained Weights",
+            value=training_config.get('pretrained', False),
+            style={'description_width': '150px'},
+            layout=widgets.Layout(width='auto')
+        )
+        
+        feature_optimization = widgets.Checkbox(
+            description="Enable Feature Optimization",
+            value=training_config.get('feature_optimization', True),
+            style={'description_width': '180px'},
             layout=widgets.Layout(width='auto')
         )
         
@@ -253,6 +278,9 @@ def create_unified_training_form(config: Dict[str, Any]) -> widgets.Widget:
             widgets.HTML("<h4 style='color: #17a2b8; margin: 15px 0 10px 0;'>⚙️ System Options</h4>"),
             force_cpu,
             verbose,
+            widgets.HTML("<h4 style='color: #6c757d; margin: 15px 0 10px 0;'>🔧 Model Configuration</h4>"),
+            pretrained,
+            feature_optimization,
             checkpoint_dir
         ], layout=widgets.Layout(padding='10px', width='48%'))
         
@@ -261,6 +289,28 @@ def create_unified_training_form(config: Dict[str, Any]) -> widgets.Widget:
             advanced_left_column,
             advanced_right_column
         ], layout=widgets.Layout(width='100%', justify_content='space-between'))
+        
+        # Environment information display
+        platform_name = env_info.get('platform', 'unknown')
+        device_info = 'CPU only'
+        if env_info.get('cuda_available'):
+            device_info = f"CUDA GPU ({env_info.get('device_count', 0)} devices)"
+        elif env_info.get('mps_available'):
+            device_info = "Apple MPS"
+        
+        env_style = "background: #e8f5e8; padding: 10px; border-radius: 5px; margin: 10px 0;"
+        if force_cpu_recommended:
+            env_style = "background: #fff3cd; padding: 10px; border-radius: 5px; margin: 10px 0; border-left: 4px solid #ffc107;"
+        
+        env_display = widgets.HTML(
+            value=f"""
+            <div style="{env_style}">
+                <strong>🖥️ Environment:</strong> {platform_name.replace('_', ' ').title()} | 
+                <strong>🎮 Compute:</strong> {device_info}
+                {f'<br><strong>⚠️ Recommendation:</strong> {cpu_reason}' if force_cpu_recommended else ''}
+            </div>
+            """
+        )
         
         # Create accordion
         form_accordion = widgets.Accordion(children=[basic_section, advanced_section])
@@ -289,6 +339,8 @@ def create_unified_training_form(config: Dict[str, Any]) -> widgets.Widget:
             'single_phase_options': single_phase_options,
             'force_cpu': force_cpu,
             'verbose': verbose,
+            'pretrained': pretrained,
+            'feature_optimization': feature_optimization,
             'checkpoint_dir': checkpoint_dir
         }
         
@@ -321,6 +373,8 @@ def create_unified_training_form(config: Dict[str, Any]) -> widgets.Widget:
                     'single_phase_freeze_backbone': form_widgets['single_phase_freeze_backbone'].value,
                     'force_cpu': form_widgets['force_cpu'].value,
                     'verbose': form_widgets['verbose'].value,
+                    'pretrained': form_widgets['pretrained'].value,
+                    'feature_optimization': form_widgets['feature_optimization'].value,
                     'checkpoint_dir': form_widgets['checkpoint_dir'].value
                 }
             except Exception as e:
@@ -357,6 +411,8 @@ def create_unified_training_form(config: Dict[str, Any]) -> widgets.Widget:
                 form_widgets['single_phase_freeze_backbone'].value = training_config.get('single_phase_freeze_backbone', False)
                 form_widgets['force_cpu'].value = training_config.get('force_cpu', False)
                 form_widgets['verbose'].value = training_config.get('verbose', True)
+                form_widgets['pretrained'].value = training_config.get('pretrained', False)
+                form_widgets['feature_optimization'].value = training_config.get('feature_optimization', True)
                 form_widgets['checkpoint_dir'].value = training_config.get('checkpoint_dir', 'data/checkpoints')
                 
                 logger.debug("✅ Unified form updated from configuration")
@@ -399,13 +455,20 @@ def create_unified_training_form(config: Dict[str, Any]) -> widgets.Widget:
         es_mode.layout.display = 'block' if is_early_stopping else 'none'
         min_delta.layout.display = 'block' if is_early_stopping else 'none'
         
-        # Attach methods to form
-        form_accordion.get_form_values = get_form_values
-        form_accordion.update_from_config = update_from_config
-        form_accordion._widgets = form_widgets
+        # Create final container with environment info and form
+        final_container = widgets.VBox([
+            env_display,
+            form_accordion
+        ], layout=widgets.Layout(width='100%'))
         
-        logger.debug("✅ Unified training configuration form created")
-        return form_accordion
+        # Attach methods to final container
+        final_container.get_form_values = get_form_values
+        final_container.update_from_config = update_from_config
+        final_container._widgets = form_widgets
+        final_container._form_accordion = form_accordion
+        
+        logger.debug("✅ Unified training configuration form created with environment detection")
+        return final_container
         
     except Exception as e:
         logger.error(f"Failed to create unified training form: {e}")

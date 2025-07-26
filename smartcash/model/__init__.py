@@ -13,7 +13,7 @@ from .utils.progress_bridge import ModelProgressBridge
 # Initialize backbone factory
 backbone_factory = BackboneFactory()
 
-def create_backbone(backbone_type: str, pretrained: bool = True, **kwargs):
+def create_backbone(backbone_type: str, pretrained: bool = False, **kwargs):
     """Create a backbone model using the factory"""
     return backbone_factory.create_backbone(backbone_type, pretrained, **kwargs)
 

@@ -39,32 +39,78 @@ def _get_phase_number(phase: str) -> str:
     """Get phase number from phase name."""
     return "1" if phase == 'training_phase_1' else "2"
 
-def _calculate_layer_averages(metrics: dict) -> tuple:
-    """Calculate average layer metrics."""
-    layer_accs = [metrics.get(f'layer_{i}_accuracy', 0) for i in [1, 2, 3]]
-    layer_f1s = [metrics.get(f'layer_{i}_f1', 0) for i in [1, 2, 3]]
+def create_metrics_callback(verbose: bool = True):
+    """Create a metrics callback that handles metrics separately from progress."""
+    latest_metrics = {}
     
-    avg_acc = sum(acc for acc in layer_accs if acc > 0) / max(1, len([acc for acc in layer_accs if acc > 0]))
-    avg_f1 = sum(f1 for f1 in layer_f1s if f1 > 0) / max(1, len([f1 for f1 in layer_f1s if f1 > 0]))
-    
-    return avg_acc, avg_f1
-
-def _print_layer_metrics(metrics: dict, phase_num: str, epoch: int, verbose: bool = True) -> None:
-    """Print detailed layer metrics."""
-    if not (verbose and metrics):
-        return
+    def metrics_callback(phase: str, epoch: int, metrics: dict, **kwargs):
+        """Handle metrics updates from training."""
+        # Store latest metrics for use by progress callback
+        latest_metrics[phase] = {
+            'epoch': epoch,
+            'metrics': metrics,
+            **kwargs
+        }
         
-    print(f"\n📊 Phase {phase_num} - Epoch {epoch} COMPLETED:")
-    print(f"    Loss: Train={metrics.get('train_loss', 0):.4f} Val={metrics.get('val_loss', 0):.4f}")
+        # Print detailed metrics for completed epochs if verbose
+        if verbose and metrics and kwargs.get('epoch_completed', False):
+            phase_num = "1" if phase == 'training_phase_1' else "2"
+            _print_epoch_metrics_summary(metrics, phase_num, epoch)
     
+    # Store reference to latest metrics for progress callback access
+    metrics_callback.get_latest = lambda phase=None: latest_metrics.get(phase, {})
+    metrics_callback.get_all = lambda: latest_metrics
+    
+    return metrics_callback
+
+def _print_epoch_metrics_summary(metrics: dict, phase_num: str, epoch: int) -> None:
+    """Print clean epoch metrics summary."""
+    print(f"\n📊 Phase {phase_num} - Epoch {epoch} COMPLETED:")
+    
+    # Loss metrics
+    train_loss = metrics.get('train_loss', 0)
+    val_loss = metrics.get('val_loss', 0)
+    if train_loss > 0 or val_loss > 0:
+        print(f"    Loss: Train={train_loss:.4f} Val={val_loss:.4f}")
+    
+    # Layer-specific metrics
+    active_layers = []
     for layer in ['layer_1', 'layer_2', 'layer_3']:
         acc = metrics.get(f'{layer}_accuracy', 0)
         prec = metrics.get(f'{layer}_precision', 0)
         rec = metrics.get(f'{layer}_recall', 0)
         f1 = metrics.get(f'{layer}_f1', 0)
         
-        if acc > 0 or prec > 0 or rec > 0 or f1 > 0:
+        if any(metric > 0 for metric in [acc, prec, rec, f1]):
+            active_layers.append((layer, acc, prec, rec, f1))
+    
+    if active_layers:
+        for layer, acc, prec, rec, f1 in active_layers:
             print(f"    {layer.upper()}: Acc={acc:.3f} Prec={prec:.3f} Rec={rec:.3f} F1={f1:.3f}")
+    
+    # Overall metrics if available
+    map50 = metrics.get('val_map50', 0)
+    if map50 > 0:
+        print(f"    mAP@0.5: {map50:.4f}")
+
+def _calculate_simple_averages(metrics: dict) -> dict:
+    """Calculate simple averages for display."""
+    result = {}
+    
+    # Calculate layer averages
+    layer_accs = [metrics.get(f'layer_{i}_accuracy', 0) for i in [1, 2, 3]]
+    layer_f1s = [metrics.get(f'layer_{i}_f1', 0) for i in [1, 2, 3]]
+    
+    active_accs = [acc for acc in layer_accs if acc > 0]
+    active_f1s = [f1 for f1 in layer_f1s if f1 > 0]
+    
+    if active_accs:
+        result['avg_acc'] = sum(active_accs) / len(active_accs)
+    if active_f1s:
+        result['avg_f1'] = sum(active_f1s) / len(active_f1s)
+    
+    return result
+
 
 def _handle_training_phase_progress(phase: str, current: int, total: int, message: str, 
                                    progress_bars: dict, verbose: bool, use_tqdm: bool, **kwargs) -> None:
@@ -139,13 +185,13 @@ def _handle_tqdm_training_progress(phase: str, current: int, total: int, epoch: 
         if metrics:
             loss = metrics.get('train_loss', 0)
             val_loss = metrics.get('val_loss', 0)
-            avg_acc, avg_f1 = _calculate_layer_averages(metrics)
+            avg_metrics = _calculate_simple_averages(metrics)
             
             epoch_postfix.update({
                 'Train_Loss': f"{loss:.4f}",
                 'Val_Loss': f"{val_loss:.4f}",
-                'Avg_Acc': f"{avg_acc:.3f}",
-                'Avg_F1': f"{avg_f1:.3f}"
+                'Avg_Acc': f"{avg_metrics.get('avg_acc', 0):.3f}",
+                'Avg_F1': f"{avg_metrics.get('avg_f1', 0):.3f}"
             })
         
         epoch_bar.set_postfix(epoch_postfix)
@@ -154,7 +200,6 @@ def _handle_tqdm_training_progress(phase: str, current: int, total: int, epoch: 
         if current >= total:
             epoch_bar.close()
             del progress_bars[epoch_bar_key]
-            _print_layer_metrics(metrics, phase_num, epoch, verbose)
 
 def _handle_simple_training_progress(phase: str, current: int, total: int, epoch: int,
                                    batch_idx: int, batch_total: int, metrics: dict,
@@ -169,7 +214,8 @@ def _handle_simple_training_progress(phase: str, current: int, total: int, epoch
               f"Loss: {loss:.4f} | L1_Acc: {layer1_acc:.3f} | L1_F1: {layer1_f1:.3f}")
     
     elif current == total and metrics:
-        _print_layer_metrics(metrics, phase_num, epoch, verbose)
+        # Metrics will be handled by the metrics callback
+        pass
 
 def _handle_tqdm_phase_progress(phase: str, current: int, total: int, message: str,
                                progress_bars: dict, phase_display: str) -> None:
@@ -222,12 +268,14 @@ Examples:
   # Two-phase training (traditional)
   %(prog)s --backbone cspdarknet --phase1-epochs 2 --phase2-epochs 3
   %(prog)s --backbone efficientnet_b4 --phase1-epochs 1 --phase2-epochs 1 --verbose
+  %(prog)s --backbone efficientnet_b4 --pretrained --phase1-epochs 2 --phase2-epochs 1  # With pretrained weights
   
   # Single-phase training (flexible)
   %(prog)s --training-mode single_phase --phase1-epochs 3 --phase2-epochs 2  # 5 epochs unified training
   %(prog)s --training-mode single_phase --single-layer-mode single --phase1-epochs 2  # Single layer training
   %(prog)s --training-mode single_phase --single-freeze-backbone --phase1-epochs 3  # Frozen backbone
   %(prog)s --training-mode single_phase --single-layer-mode multi --phase1-epochs 5  # Multi-layer unfrozen
+  %(prog)s --training-mode single_phase --pretrained --phase1-epochs 3  # Single phase with pretrained weights
   
   # Other options
   %(prog)s --backbone cspdarknet --checkpoint-dir custom/checkpoints
@@ -243,6 +291,8 @@ Examples:
     parser.add_argument('--backbone', type=str, default='cspdarknet',
                        choices=['cspdarknet', 'efficientnet_b4'],
                        help='Model backbone architecture (default: cspdarknet)')
+    parser.add_argument('--pretrained', action='store_true',
+                       help='Use pretrained weights for backbone (default: False, train from scratch)')
     parser.add_argument('--phase1-epochs', type=int, default=1,
                        help='Number of epochs for phase 1 (frozen backbone training) (default: 1)')
     parser.add_argument('--phase2-epochs', type=int, default=1,
@@ -308,6 +358,7 @@ def _print_configuration(args):
     # Basic configuration
     print(f"📋 Configuration:")
     print(f"   • Backbone: {args.backbone}")
+    print(f"   • Pretrained weights: {'Enabled' if args.pretrained else 'Disabled (training from scratch)'}")
     print(f"   • Training mode: {args.training_mode}")
     
     if args.training_mode == 'two_phase':
@@ -443,6 +494,7 @@ def _print_training_summary(args, pipeline_summary: dict, viz_result: dict) -> N
     print(f"\n📋 Complete Training Summary:")
     summary_items = [
         ("Backbone", args.backbone),
+        ("Pretrained weights", "Enabled" if args.pretrained else "Disabled"),
         ("Training mode", args.training_mode),
         ("Total phases", "6 (all completed)"),
         ("Training duration", f"{total_duration:.1f}s")
@@ -554,9 +606,10 @@ def main():
     _print_configuration(args)
     
     try:
-        # Create progress callback (tqdm or simple text-based)
+        # Create callbacks
         use_tqdm = not args.no_tqdm
         progress_callback = create_progress_callback(use_tqdm, args.verbose)
+        metrics_callback = create_metrics_callback(args.verbose)
         print(f"📊 Using {'tqdm progress bars' if use_tqdm else 'simple text progress output'}")
         
         # Run the unified training pipeline
@@ -565,10 +618,12 @@ def main():
         
         result = run_full_training_pipeline(
             backbone=args.backbone,
+            pretrained=args.pretrained,  # Add pretrained parameter
             phase_1_epochs=args.phase1_epochs,
             phase_2_epochs=args.phase2_epochs,
             checkpoint_dir=args.checkpoint_dir,
             progress_callback=progress_callback,
+            metrics_callback=metrics_callback,
             verbose=args.verbose,
             force_cpu=args.force_cpu,
             training_mode=args.training_mode,

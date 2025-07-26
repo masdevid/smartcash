@@ -4,6 +4,7 @@ Description: Simplified training UI that uses the unified training pipeline with
 """
 
 from typing import Dict, Any, Optional
+import ipywidgets as widgets
 from smartcash.ui.logger import get_module_logger
 
 # Standard container imports
@@ -18,6 +19,99 @@ from smartcash.ui.components import (
 from smartcash.ui.components.form_container import LayoutType
 from smartcash.ui.core.decorators import handle_ui_errors
 from .unified_training_form import create_unified_training_form
+from .training_charts import create_dual_charts_layout
+from .training_metrics import generate_metrics_table_html, get_initial_metrics_html
+
+
+def create_charts_and_metrics_section(config: Dict[str, Any]) -> widgets.Widget:
+    """Create collapsible charts and metrics section.
+    
+    Args:
+        config: Configuration for charts and metrics
+        
+    Returns:
+        Accordion widget containing charts and metrics
+    """
+    logger = get_module_logger("smartcash.ui.model.training.components")
+    
+    try:
+        # Create chart configuration
+        chart_config = config.get('charts', {
+            'charts': {
+                'loss_chart': {'update_frequency': 'epoch'},
+                'map_chart': {'update_frequency': 'epoch'}
+            },
+            'monitoring': {'primary_metric': 'mAP@0.5'}
+        })
+        
+        # Create dual charts
+        charts = create_dual_charts_layout(chart_config, config.get('ui', {}))
+        
+        # Create charts container
+        charts_container = widgets.HBox([
+            charts['loss_chart'],
+            charts['map_chart']
+        ], layout=widgets.Layout(width='100%', padding='10px'))
+        
+        # Create metrics display
+        metrics_display = widgets.HTML(
+            value=get_initial_metrics_html(),
+            layout=widgets.Layout(width='100%', padding='10px')
+        )
+        
+        # Create accordion for charts and metrics
+        accordion = widgets.Accordion(children=[
+            charts_container,
+            metrics_display
+        ])
+        
+        accordion.set_title(0, "📈 Live Training Charts")
+        accordion.set_title(1, "📊 Performance Metrics")
+        accordion.selected_index = None  # Start collapsed
+        
+        # Add update methods to the accordion for external access
+        accordion._charts = charts
+        accordion._metrics_display = metrics_display
+        
+        def update_charts_data(data: Dict[str, Any]):
+            """Update charts with training data."""
+            try:
+                charts['update_loss'](data)
+                charts['update_map'](data)
+            except Exception as e:
+                logger.warning(f"Failed to update charts: {e}")
+        
+        def update_metrics_display_func(metrics: Dict[str, Any]):
+            """Update metrics display with new data."""
+            try:
+                metrics_html = generate_metrics_table_html(metrics)
+                metrics_display.value = metrics_html
+            except Exception as e:
+                logger.warning(f"Failed to update metrics display: {e}")
+        
+        def reset_charts_and_metrics():
+            """Reset both charts and metrics to initial state."""
+            try:
+                charts['reset_charts']()
+                metrics_display.value = get_initial_metrics_html()
+            except Exception as e:
+                logger.warning(f"Failed to reset charts and metrics: {e}")
+        
+        # Attach methods to accordion
+        accordion.update_charts = update_charts_data
+        accordion.update_metrics = update_metrics_display_func
+        accordion.reset_all = reset_charts_and_metrics
+        
+        logger.debug("✅ Charts and metrics section created successfully")
+        return accordion
+        
+    except Exception as e:
+        logger.error(f"Failed to create charts and metrics section: {e}")
+        # Return a simple placeholder on error
+        return widgets.HTML(
+            value="<div style='padding: 20px; text-align: center; color: #6c757d;'>Charts and metrics will be available during training</div>",
+            layout=widgets.Layout(width='100%', padding='10px')
+        )
 
 
 @handle_ui_errors(error_component_title="Unified Training UI Creation Error")
@@ -89,7 +183,10 @@ def create_unified_training_ui(config: Optional[Dict[str, Any]] = None, **kwargs
         collapsed=False
     )
     
-    # 5. Create Summary Container
+    # 5. Create Charts and Metrics Section
+    charts_and_metrics = create_charts_and_metrics_section(config)
+    
+    # 6. Create Summary Container
     summary_container = create_summary_container(
         theme='default',
         title='📈 Training Summary',
@@ -101,7 +198,7 @@ def create_unified_training_ui(config: Optional[Dict[str, Any]] = None, **kwargs
         <div style="padding: 15px; background: #f8f9fa; border-radius: 8px;">
             <h4 style="color: #495057; margin: 0 0 10px 0;">📊 Training Summary</h4>
             <p style="margin: 5px 0; color: #6c757d;">
-                Training results and metrics will appear here after completion.
+                Training results and final metrics will appear here after completion.
             </p>
             <p style="margin: 5px 0; color: #6c757d;">
                 Charts and visualizations will be saved to <code>data/visualization/</code>
@@ -109,24 +206,26 @@ def create_unified_training_ui(config: Optional[Dict[str, Any]] = None, **kwargs
         </div>
         ''')
     
-    # 6. Create Main Container
+    # 7. Create Main Container
     main_container = create_main_container(
         components=[
             {'component': header_container.container, 'type': 'header'},
             {'component': form_container['container'], 'type': 'form'},
             {'component': action_container['container'], 'type': 'action'},
             {'component': operation_container['container'], 'type': 'operation'},
+            {'component': charts_and_metrics, 'type': 'charts'},
             {'component': summary_container.container, 'type': 'summary'}
         ]
     )
     
-    # 7. Create UI components dictionary
+    # 8. Create UI components dictionary
     ui_components = {
         'main_container': main_container.container,
         'header_container': header_container,
         'form_container': form_container,
         'action_container': action_container,
         'operation_container': operation_container,
+        'charts_and_metrics': charts_and_metrics,
         'summary_container': summary_container,
         
         # Individual action buttons for easy access
@@ -146,7 +245,12 @@ def create_unified_training_ui(config: Optional[Dict[str, Any]] = None, **kwargs
         # Form access methods
         'form_widgets': getattr(form_widgets, '_widgets', {}),
         'get_form_values': getattr(form_widgets, 'get_form_values', lambda: {}),
-        'update_form_from_config': getattr(form_widgets, 'update_from_config', lambda x: None)
+        'update_form_from_config': getattr(form_widgets, 'update_from_config', lambda x: None),
+        
+        # Charts and metrics methods
+        'update_charts': getattr(charts_and_metrics, 'update_charts', lambda x: None),
+        'update_metrics': getattr(charts_and_metrics, 'update_metrics', lambda x: None),
+        'reset_charts_and_metrics': getattr(charts_and_metrics, 'reset_all', lambda: None)
     }
     
     logger.debug("✅ Unified training UI created successfully with standard containers")
@@ -181,7 +285,7 @@ def update_training_buttons_state(ui_components: Dict[str, Any],
 
 
 def update_summary_display(ui_components: Dict[str, Any], result: Dict[str, Any]):
-    """Update summary display with training results.
+    """Update summary display with training results and final metrics.
     
     Args:
         ui_components: UI components dictionary
@@ -196,6 +300,25 @@ def update_summary_display(ui_components: Dict[str, Any], result: Dict[str, Any]
             # Get training results
             training_result = result.get('final_training_result', {})
             best_metrics = training_result.get('best_metrics', {})
+            
+            # Update charts and metrics with final results
+            update_charts = ui_components.get('update_charts')
+            update_metrics = ui_components.get('update_metrics')
+            
+            if update_charts and best_metrics:
+                # Update charts with final training data
+                final_chart_data = {
+                    'epoch': best_metrics.get('epoch', 0),
+                    'train_loss': best_metrics.get('train_loss', 0.0),
+                    'val_loss': best_metrics.get('val_loss', 0.0),
+                    'mAP@0.5': best_metrics.get('val_map50', 0.0),
+                    'mAP@0.75': best_metrics.get('val_map75', 0.0)
+                }
+                update_charts(final_chart_data)
+            
+            if update_metrics and best_metrics:
+                # Update metrics display with final results
+                update_metrics(best_metrics)
             
             # Get visualization results
             viz_result = result.get('visualization_result', {})
@@ -254,3 +377,51 @@ def update_summary_display(ui_components: Dict[str, Any], result: Dict[str, Any]
     except Exception as e:
         logger = get_module_logger("smartcash.ui.model.training.components")
         logger.warning(f"Failed to update summary display: {e}")
+
+
+def update_training_progress(ui_components: Dict[str, Any], 
+                           epoch_data: Dict[str, Any] = None,
+                           metrics_data: Dict[str, Any] = None):
+    """Update charts and metrics during training progress.
+    
+    Args:
+        ui_components: UI components dictionary
+        epoch_data: Data for updating charts (loss, mAP per epoch)
+        metrics_data: Current metrics for display
+    """
+    try:
+        logger = get_module_logger("smartcash.ui.model.training.components")
+        
+        # Update charts if epoch data is provided
+        if epoch_data and ui_components.get('update_charts'):
+            ui_components['update_charts'](epoch_data)
+            logger.debug(f"📈 Updated charts for epoch {epoch_data.get('epoch', 'N/A')}")
+        
+        # Update metrics display if metrics data is provided
+        if metrics_data and ui_components.get('update_metrics'):
+            ui_components['update_metrics'](metrics_data)
+            logger.debug(f"📊 Updated metrics display")
+            
+    except Exception as e:
+        logger = get_module_logger("smartcash.ui.model.training.components")
+        logger.warning(f"Failed to update training progress: {e}")
+
+
+def reset_training_displays(ui_components: Dict[str, Any]):
+    """Reset charts and metrics displays to initial state.
+    
+    Args:
+        ui_components: UI components dictionary
+    """
+    try:
+        logger = get_module_logger("smartcash.ui.model.training.components")
+        
+        # Reset charts and metrics
+        reset_func = ui_components.get('reset_charts_and_metrics')
+        if reset_func:
+            reset_func()
+            logger.debug("🔄 Reset charts and metrics displays")
+            
+    except Exception as e:
+        logger = get_module_logger("smartcash.ui.model.training.components")
+        logger.warning(f"Failed to reset training displays: {e}")

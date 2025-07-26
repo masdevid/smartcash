@@ -543,3 +543,55 @@ class BaseOperationHandler(LoggingMixin, OperationMixin):
     def complete_progress(self, message: str = "Operation completed") -> None:
         """Set progress to 100% and show completion message."""
         self.update_progress(100, message)
+        
+    def _run_pip_command(self, operation: str, package: str, **kwargs) -> Dict[str, Any]:
+        """
+        Run a pip command with error handling and progress updates.
+        
+        Args:
+            operation: The pip operation to run ('install', 'uninstall', 'upgrade')
+            package: The package name to operate on
+            **kwargs: Additional arguments for the pip command
+            
+        Returns:
+            Dictionary with command results
+        """
+        try:
+            # Build the pip command
+            command = self._build_pip_command(operation, package, **kwargs)
+            
+            # Log the command being run
+            self.log(f"🔧 Running command: {' '.join(command)}", 'info')
+            
+            # Define progress callback
+            def progress_callback(progress: float, message: str) -> None:
+                self.update_progress(progress, message)
+            
+            # Execute the command
+            result = self._execute_command(
+                command=command,
+                progress_callback=progress_callback,
+                timeout=300  # 5 minute timeout
+            )
+            
+            # Log the result
+            if result['success']:
+                self.log(f"✅ Successfully completed {operation} for {package}", 'success')
+            else:
+                error_msg = result.get('error', 'Unknown error')
+                self.log(f"❌ Failed to {operation} {package}: {error_msg}", 'error')
+                if 'stdout' in result and result['stdout']:
+                    self.log(f"📝 Output: {result['stdout']}", 'info')
+                if 'stderr' in result and result['stderr']:
+                    self.log(f"❌ Error: {result['stderr']}", 'error')
+            
+            return result
+            
+        except Exception as e:
+            error_msg = f"Error running pip {operation} for {package}: {str(e)}"
+            self.log(error_msg, 'error')
+            return {
+                'success': False,
+                'error': error_msg,
+                'returncode': -1
+            }

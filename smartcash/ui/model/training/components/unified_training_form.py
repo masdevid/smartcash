@@ -32,7 +32,7 @@ def create_unified_training_form(config: Dict[str, Any]) -> widgets.Widget:
             ],
             value=training_config.get('backbone', 'cspdarknet'),
             style={'description_width': '120px'},
-            layout=widgets.Layout(width='300px')
+            layout=widgets.Layout(width='auto')
         )
         
         # Training mode selection
@@ -44,7 +44,7 @@ def create_unified_training_form(config: Dict[str, Any]) -> widgets.Widget:
             ],
             value=training_config.get('training_mode', 'two_phase'),
             style={'description_width': '120px'},
-            layout=widgets.Layout(width='300px')
+            layout=widgets.Layout(width='auto')
         )
         
         # Phase epochs
@@ -53,7 +53,7 @@ def create_unified_training_form(config: Dict[str, Any]) -> widgets.Widget:
             value=training_config.get('phase_1_epochs', 1),
             min=1, max=20, step=1,
             style={'description_width': '120px'},
-            layout=widgets.Layout(width='300px')
+            layout=widgets.Layout(width='auto')
         )
         
         phase2_epochs = widgets.IntSlider(
@@ -61,7 +61,7 @@ def create_unified_training_form(config: Dict[str, Any]) -> widgets.Widget:
             value=training_config.get('phase_2_epochs', 1),
             min=1, max=20, step=1,
             style={'description_width': '120px'},
-            layout=widgets.Layout(width='300px')
+            layout=widgets.Layout(width='auto')
         )
         
         # Loss type
@@ -75,7 +75,7 @@ def create_unified_training_form(config: Dict[str, Any]) -> widgets.Widget:
             ],
             value=training_config.get('loss_type', 'uncertainty_multi_task'),
             style={'description_width': '120px'},
-            layout=widgets.Layout(width='300px')
+            layout=widgets.Layout(width='auto')
         )
         
         # Learning rates
@@ -85,7 +85,7 @@ def create_unified_training_form(config: Dict[str, Any]) -> widgets.Widget:
             base=10, min=-6, max=-1, step=0.1,
             readout_format='.1e',
             style={'description_width': '120px'},
-            layout=widgets.Layout(width='300px')
+            layout=widgets.Layout(width='auto')
         )
         
         head_lr_p2 = widgets.FloatLogSlider(
@@ -94,7 +94,7 @@ def create_unified_training_form(config: Dict[str, Any]) -> widgets.Widget:
             base=10, min=-6, max=-1, step=0.1,
             readout_format='.1e',
             style={'description_width': '120px'},
-            layout=widgets.Layout(width='300px')
+            layout=widgets.Layout(width='auto')
         )
         
         backbone_lr = widgets.FloatLogSlider(
@@ -103,7 +103,7 @@ def create_unified_training_form(config: Dict[str, Any]) -> widgets.Widget:
             base=10, min=-7, max=-3, step=0.1,
             readout_format='.1e',
             style={'description_width': '120px'},
-            layout=widgets.Layout(width='300px')
+            layout=widgets.Layout(width='auto')
         )
         
         # Batch size with auto-detection option
@@ -112,7 +112,7 @@ def create_unified_training_form(config: Dict[str, Any]) -> widgets.Widget:
             value=str(training_config.get('batch_size', 'auto')),
             placeholder="auto (platform optimized) or number",
             style={'description_width': '120px'},
-            layout=widgets.Layout(width='300px')
+            layout=widgets.Layout(width='auto')
         )
         
         # Early stopping configuration
@@ -120,7 +120,7 @@ def create_unified_training_form(config: Dict[str, Any]) -> widgets.Widget:
             description="Enable Early Stopping",
             value=training_config.get('early_stopping_enabled', True),
             style={'description_width': '120px'},
-            layout=widgets.Layout(width='300px')
+            layout=widgets.Layout(width='auto')
         )
         
         patience = widgets.IntSlider(
@@ -128,7 +128,7 @@ def create_unified_training_form(config: Dict[str, Any]) -> widgets.Widget:
             value=training_config.get('early_stopping_patience', 15),
             min=3, max=50, step=1,
             style={'description_width': '120px'},
-            layout=widgets.Layout(width='300px')
+            layout=widgets.Layout(width='auto')
         )
         
         es_metric = widgets.Dropdown(
@@ -142,7 +142,7 @@ def create_unified_training_form(config: Dict[str, Any]) -> widgets.Widget:
             ],
             value=training_config.get('early_stopping_metric', 'val_map50'),
             style={'description_width': '120px'},
-            layout=widgets.Layout(width='300px')
+            layout=widgets.Layout(width='auto')
         )
         
         es_mode = widgets.Dropdown(
@@ -153,14 +153,14 @@ def create_unified_training_form(config: Dict[str, Any]) -> widgets.Widget:
             ],
             value=training_config.get('early_stopping_mode', 'max'),
             style={'description_width': '120px'},
-            layout=widgets.Layout(width='300px')
+            layout=widgets.Layout(width='auto')
         )
         
         min_delta = widgets.FloatText(
             description="Min Delta:",
             value=training_config.get('early_stopping_min_delta', 0.001),
             style={'description_width': '120px'},
-            layout=widgets.Layout(width='300px')
+            layout=widgets.Layout(width='auto')
         )
         
         # Single-phase specific options
@@ -172,14 +172,14 @@ def create_unified_training_form(config: Dict[str, Any]) -> widgets.Widget:
             ],
             value=training_config.get('single_phase_layer_mode', 'multi'),
             style={'description_width': '120px'},
-            layout=widgets.Layout(width='300px')
+            layout=widgets.Layout(width='auto')
         )
         
         single_freeze_backbone = widgets.Checkbox(
             description="Freeze Backbone (Single-phase)",
             value=training_config.get('single_phase_freeze_backbone', False),
             style={'description_width': '120px'},
-            layout=widgets.Layout(width='300px')
+            layout=widgets.Layout(width='auto')
         )
         
         # System options
@@ -187,14 +187,14 @@ def create_unified_training_form(config: Dict[str, Any]) -> widgets.Widget:
             description="Force CPU Training",
             value=training_config.get('force_cpu', False),
             style={'description_width': '120px'},
-            layout=widgets.Layout(width='300px')
+            layout=widgets.Layout(width='auto')
         )
         
         verbose = widgets.Checkbox(
             description="Verbose Logging",
             value=training_config.get('verbose', True),
             style={'description_width': '120px'},
-            layout=widgets.Layout(width='300px')
+            layout=widgets.Layout(width='auto')
         )
         
         # Checkpoint directory
@@ -202,15 +202,8 @@ def create_unified_training_form(config: Dict[str, Any]) -> widgets.Widget:
             description="Checkpoint Dir:",
             value=training_config.get('checkpoint_dir', 'data/checkpoints'),
             style={'description_width': '120px'},
-            layout=widgets.Layout(width='300px')
+            layout=widgets.Layout(width='auto')
         )
-        
-        # Set all input widths to auto
-        for widget in [backbone_dropdown, training_mode_dropdown, phase1_epochs, phase2_epochs, 
-                      loss_type_dropdown, head_lr_p1, head_lr_p2, backbone_lr, batch_size_text,
-                      early_stopping_checkbox, patience, es_metric, es_mode, min_delta,
-                      single_layer_mode, single_freeze_backbone, force_cpu, verbose, checkpoint_dir]:
-            widget.layout.width = 'auto'
         
         # Create form sections in two columns
         # Basic section - left column

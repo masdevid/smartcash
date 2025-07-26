@@ -16,22 +16,37 @@ class CheckOperationHandler(BasePreprocessingOperation):
     def execute(self) -> Dict[str, Any]:
         """Executes the validation check by calling the backend service."""
         self.log_info("🔍 Menghubungkan ke backend untuk memeriksa status...")
+        
+        # Initialize progress tracking
+        self.update_progress(0, "Memulai pemeriksaan status...")
+        
         try:
+            # Update progress during status check
+            self.update_progress(25, "Menghubungkan ke backend...")
+            
             status = get_preprocessing_status(config=self.config)
+            
+            self.update_progress(75, "Memproses status dari backend...")
+            
             summary = self._format_status_summary(status)
+            
+            self.update_progress(90, "Memformat ringkasan status...")
 
             if status.get('service_ready'):
+                self.update_progress(100, "Pemeriksaan berhasil diselesaikan")
                 self.log_success("✅ Pemeriksaan berhasil. Ringkasan status dibuat.")
                 self._execute_callback('on_success', summary)
                 return {'success': True, 'message': 'Pemeriksaan berhasil diselesaikan'}
             else:
                 error_message = f"❌ Backend melaporkan layanan belum siap."
+                self.update_progress(100, "Pemeriksaan selesai - layanan belum siap")
                 self.log_error(error_message)
                 self._execute_callback('on_failure', summary) # Still show summary on failure
                 return {'success': False, 'message': 'Backend tidak siap'}
 
         except Exception as e:
             error_message = f"Gagal memanggil backend pemeriksaan status: {e}"
+            self.update_progress(100, f"Error: {e}")
             self.log_error(f"❌ {error_message}")
             self._execute_callback('on_failure', error_message)
             return {'success': False, 'message': f'Error: {e}'}

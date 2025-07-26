@@ -189,24 +189,24 @@ class TrainingConfigHandler:
         """Validate training configuration section."""
         # Check epochs
         epochs = training_config.get('epochs', 100)
-        min_epochs = TRAINING_VALIDATION_CONFIG.get('min_epochs', 1)
-        max_epochs = TRAINING_VALIDATION_CONFIG.get('max_epochs', 1000)
+        min_epochs = 1
+        max_epochs = 200
         if not (min_epochs <= epochs <= max_epochs):
             self.logger.error(f"epochs must be between {min_epochs} and {max_epochs}")
             return False
         
         # Check batch size
         batch_size = training_config.get('batch_size', 16)
-        min_batch = TRAINING_VALIDATION_CONFIG.get('min_batch_size', 1)
-        max_batch = TRAINING_VALIDATION_CONFIG.get('max_batch_size', 256)
+        min_batch = 1
+        max_batch = 32
         if not (min_batch <= batch_size <= max_batch):
             self.logger.error(f"batch_size must be between {min_batch} and {max_batch}")
             return False
         
         # Check learning rate
         lr = training_config.get('learning_rate', 0.001)
-        min_lr = TRAINING_VALIDATION_CONFIG.get('min_learning_rate', 1e-6)
-        max_lr = TRAINING_VALIDATION_CONFIG.get('max_learning_rate', 1.0)
+        min_lr = 1e-7
+        max_lr = 1e-1
         if not (min_lr <= lr <= max_lr):
             self.logger.error(f"learning_rate must be between {min_lr} and {max_lr}")
             return False

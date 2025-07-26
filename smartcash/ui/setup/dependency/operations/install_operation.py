@@ -39,16 +39,22 @@ class InstallOperationHandler(BaseOperationHandler):
         self.log("🚀 Memulai instalasi paket...", 'info')
         self._cancelled = False
         
+        # Initialize dual progress tracking
+        self.reset_progress()
+        
         try:
             # Get packages to install
+            self.update_progress(5, "📋 Menganalisis paket yang dipilih...")
             packages = self._get_packages_to_process()
             if not packages:
                 self.log("⚠️ Tidak ada paket yang dipilih untuk diinstal", 'warning')
                 return {'success': False, 'error': 'Tidak ada paket yang dipilih'}
             
             # Check which packages are missing and need installation
+            self.update_progress(10, "🔍 Memeriksa paket yang sudah terinstal...")
             missing_packages = self._filter_missing_packages(packages)
             if not missing_packages:
+                self.complete_progress("✅ Semua paket sudah terinstal")
                 self.log("✅ Semua paket sudah terinstal", 'success')
                 return {'success': True, 'message': 'Semua paket sudah terinstal'}
             
@@ -65,9 +71,34 @@ class InstallOperationHandler(BaseOperationHandler):
             self._save_config_to_file(self.config)
             
             # Execute installation only for missing packages
+            self.update_progress(20, f"📦 Memulai instalasi {len(missing_packages)} paket...")
             start_time = time.time()
-            results = self._install_packages(missing_packages)
+            
+            # Use _process_packages with dual progress tracking
+            def install_single_package(package: str) -> Dict[str, Any]:
+                """Install a single package with progress updates."""
+                try:
+                    self.log(f"📦 Menginstal {package}...", 'info')
+                    result = self._run_pip_command('install', package)
+                    if result.get('success'):
+                        self.log(f"✅ {package} berhasil diinstal", 'success')
+                    else:
+                        self.log(f"❌ Gagal menginstal {package}: {result.get('error', 'Unknown error')}", 'error')
+                    return result
+                except Exception as e:
+                    error_msg = str(e)
+                    self.log(f"❌ Error menginstal {package}: {error_msg}", 'error')
+                    return {'success': False, 'error': error_msg}
+            
+            # Process packages with progress tracking (this handles dual progress internally)
+            package_results = self._process_packages(
+                missing_packages, 
+                install_single_package,
+                progress_message="📦 Menginstal paket"
+            )
+            
             duration = time.time() - start_time
+            results = package_results.get('details', [])
             
             # Process results
             success_count = sum(1 for r in results if r.get('success'))
@@ -75,12 +106,15 @@ class InstallOperationHandler(BaseOperationHandler):
             
             if self._cancelled:
                 status_msg = f"⏹️ Instalasi dibatalkan: {success_count}/{total} paket berhasil diinstal"
+                self.update_progress(success_count * 100 // total if total > 0 else 0, status_msg)
                 self.log(status_msg, 'warning')
             elif success_count == total:
                 status_msg = f"✅ Berhasil menginstal {success_count}/{total} paket dalam {duration:.1f} detik"
+                self.complete_progress(status_msg)
                 self.log(status_msg, 'success')
             else:
                 status_msg = f"⚠️ Berhasil menginstal {success_count}/{total} paket dalam {duration:.1f} detik"
+                self.update_progress(success_count * 100 // total if total > 0 else 0, status_msg)
                 self.log(status_msg, 'warning')
             
             return {

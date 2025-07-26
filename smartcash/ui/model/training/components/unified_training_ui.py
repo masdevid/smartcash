@@ -77,12 +77,12 @@ def create_unified_training_ui(config: Optional[Dict[str, Any]] = None, **kwargs
         show_save_reset=True  # Use standard save/reset buttons
     )
     
-    # 4. Create Operation Container
+    # 4. Create Operation Container with triple progress tracker
     operation_container = create_operation_container(
         show_progress=True,
         show_dialog=True,
         show_logs=True,
-        progress_levels='dual',
+        progress_levels='triple',
         log_module_name="Training",
         log_height="200px",
         collapsible=True,
@@ -153,7 +153,7 @@ def create_unified_training_ui(config: Optional[Dict[str, Any]] = None, **kwargs
     return ui_components
 
 
-def update_trainings_state(ui_components: Dict[str, Any], 
+def update_training_buttons_state(ui_components: Dict[str, Any], 
                                 is_training: bool = False,
                                 has_model: bool = True):
     """Update training button states based on current conditions.

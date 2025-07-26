@@ -142,7 +142,7 @@ def _assemble_main_container(
         {'type': 'form', 'component': form_container, 'order': 1, 'name': 'form'},
         {'type': 'action', 'component': action_container['container'], 'order': 2, 'name': 'actions'},
         {'type': 'operation', 'component': operation_container['container'], 'order': 3, 'name': 'operations'},
-        {'type': 'summary', 'component': summary_container, 'order': 4, 'name': 'summary', 'visible': False},
+        {'type': 'summary', 'component': summary_container, 'order': 4, 'name': 'summary'},
     ]
     
     return create_main_container(

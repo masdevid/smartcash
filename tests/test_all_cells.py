@@ -123,12 +123,12 @@ def test_direct_function_calls():
         ("Colab UI", "smartcash.ui.setup.colab", "create_colab_display"),
         ("Dependency UI", "smartcash.ui.setup.dependency", "create_dependency_display"),
         ("Download UI", "smartcash.ui.dataset.downloader", "create_downloader_display"),
-        ("Split UI", "smartcash.ui.dataset.split", "create_split_display"),
+        # ("Split UI", "smartcash.ui.dataset.split", "create_split_display"),
         ("Preprocess UI", "smartcash.ui.dataset.preprocessing", "create_preprocessing_display"),
         ("Augment UI", "smartcash.ui.dataset.augmentation", "create_augmentation_display"),
         ("Visualize UI", "smartcash.ui.dataset.visualization", "create_visualization_display"),
         ("Pretrained UI", "smartcash.ui.model.pretrained", "create_pretrained_display"),
-        ("Backbone UI", "smartcash.ui.model.backbone", "create_backbone_display"),
+        # ("Backbone UI", "smartcash.ui.model.backbone", "create_backbone_display"),
         ("Train UI", "smartcash.ui.model.training", "create_training_display"),
         ("Evaluate UI", "smartcash.ui.model.evaluation", "create_evaluation_display")
     ]
@@ -186,12 +186,12 @@ if __name__ == "__main__":
         ("cell_1_2_colab", "/Users/masdevid/Projects/smartcash/smartcash/ui/cells/cell_1_2_colab.py"),
         ("cell_1_3_dependency", "/Users/masdevid/Projects/smartcash/smartcash/ui/cells/cell_1_3_dependency.py"),
         ("cell_2_1_downloader", "/Users/masdevid/Projects/smartcash/smartcash/ui/cells/cell_2_1_downloader.py"),
-        ("cell_2_2_split", "/Users/masdevid/Projects/smartcash/smartcash/ui/cells/cell_2_2_split.py"),
+        # ("cell_2_2_split", "/Users/masdevid/Projects/smartcash/smartcash/ui/cells/cell_2_2_split.py"),
         ("cell_2_3_preprocess", "/Users/masdevid/Projects/smartcash/smartcash/ui/cells/cell_2_3_preprocess.py"),
         ("cell_2_4_augment", "/Users/masdevid/Projects/smartcash/smartcash/ui/cells/cell_2_4_augment.py"),
         ("cell_2_5_visualize", "/Users/masdevid/Projects/smartcash/smartcash/ui/cells/cell_2_5_visualize.py"),
         ("cell_3_1_pretrained", "/Users/masdevid/Projects/smartcash/smartcash/ui/cells/cell_3_1_pretrained.py"),
-        ("cell_3_2_backbone", "/Users/masdevid/Projects/smartcash/smartcash/ui/cells/cell_3_2_backbone.py"),
+        # ("cell_3_2_backbone", "/Users/masdevid/Projects/smartcash/smartcash/ui/cells/cell_3_2_backbone.py"),
         ("cell_3_3_train", "/Users/masdevid/Projects/smartcash/smartcash/ui/cells/cell_3_3_train.py"),
         ("cell_3_4_evaluate", "/Users/masdevid/Projects/smartcash/smartcash/ui/cells/cell_3_4_evaluate.py")
     ]

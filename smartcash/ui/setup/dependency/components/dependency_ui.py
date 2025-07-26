@@ -126,23 +126,26 @@ def create_dependency_ui_components(module_config: Optional[Dict[str, Any]] = No
         show_save_reset=True
     )
     
-    # 4. Operation Container - optimized configuration
+    # 4. Operation Container with correct signature
     operation_container = create_operation_container(
         show_progress=True,
-        show_dialog=False,  # Prevent double progress indicators
+        show_dialog=True,
         show_logs=True,
-        log_module_name="Manajemen Paket",
-        log_height="200px",
-        progress_style="minimal",  # Reduced visual impact
-        progress_levels='single'  # Single progress bar to prevent duplication
+        progress_levels='dual',
+        log_module_name="Dependency",
+        log_height="150px",
+        collapsible=True,
+        collapsed=False
     )
     
-    # 5. Main Container - final assembly
+    # 5. Main Container with correct components structure
     main_container = create_main_container(
-        header_container=header_container.container,
-        form_container=form_container['container'],
-        action_container=action_container['container'],
-        operation_container=operation_container['container']
+        components=[
+            {'component': header_container.container, 'type': 'header'},
+            {'component': form_container['container'], 'type': 'form'},
+            {'component': action_container['container'], 'type': 'action'},
+            {'component': operation_container['container'], 'type': 'operation'}
+        ]
     )
     
     # Store components in optimized cache with consistent naming

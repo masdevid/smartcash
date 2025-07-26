@@ -83,11 +83,52 @@ class BasePreprocessingOperation(OperationMixin, LoggingMixin, ABC):
                     secondary_message=message
                 )
         else:
-            # Single progress mode (simplified to just use percentage and message)
+            # Single progress mode - use the new update_progress method
             self.update_progress(
                 progress=int(percentage),
                 message=message
             )
+
+    def update_progress(
+        self, 
+        progress: int, 
+        message: str = "", 
+        secondary_progress: Optional[int] = None, 
+        secondary_message: str = ""
+    ) -> None:
+        """
+        Update dual progress tracker for preprocessing operations.
+        
+        Args:
+            progress: Main progress percentage (0-100)
+            message: Main progress message
+            secondary_progress: Secondary progress percentage (0-100), optional
+            secondary_message: Secondary progress message
+        """
+        try:
+            # Get operation container from UI module
+            if hasattr(self, '_ui_module') and self._ui_module:
+                operation_container = self._ui_module.get_component('operation_container')
+                
+                if operation_container and hasattr(operation_container, 'get'):
+                    update_func = operation_container.get('update_progress')
+                    if update_func:
+                        # Call with dual progress parameters
+                        if secondary_progress is not None:
+                            update_func(
+                                progress=max(0, min(100, progress)),
+                                message=message,
+                                secondary_progress=max(0, min(100, secondary_progress)),
+                                secondary_message=secondary_message
+                            )
+                        else:
+                            # Single progress mode
+                            update_func(progress=max(0, min(100, progress)), message=message)
+                        
+        except Exception as e:
+            # Fail silently on progress update errors to not break operations
+            if hasattr(self, 'logger'):
+                self.logger.debug(f"Progress update failed: {e}")
 
     @abstractmethod
     def execute(self) -> Dict[str, Any]:

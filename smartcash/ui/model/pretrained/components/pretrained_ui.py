@@ -55,32 +55,20 @@ def create_pretrained_ui_components(module_config: Dict[str, Any]) -> Dict[str, 
         for item in form_items:
             form_container['add_item'](item, height="auto")
         
-        # 3. Action Container with model operation buttons
+        # 3. Action Container with one-click setup button
         action_container = create_action_container(
             buttons=[
                 {
-                    'id': 'download',
-                    'text': '📥 Download Models',
+                    'id': 'oneclick_setup',
+                    'text': '🚀 One-Click Setup',
                     'style': 'success',
-                    'tooltip': 'Download YOLOv5s and EfficientNet-B4 models'
-                },
-                {
-                    'id': 'validate', 
-                    'text': '🔍 Validate Models',
-                    'style': 'info',
-                    'tooltip': 'Validate downloaded models and check integrity'
+                    'tooltip': 'Complete setup: check existing → download missing → validate → cleanup invalid files'
                 },
                 {
                     'id': 'refresh',
                     'text': '🔄 Refresh Status',
-                    'style': 'warning',
+                    'style': 'info',
                     'tooltip': 'Refresh model status and directory contents'
-                },
-                {
-                    'id': 'cleanup',
-                    'text': '🗑️ Clean Up',
-                    'style': 'danger', 
-                    'tooltip': 'Remove corrupted or invalid model files'
                 }
             ],
             title="🤖 Model Operations",
@@ -104,12 +92,15 @@ def create_pretrained_ui_components(module_config: Dict[str, Any]) -> Dict[str, 
                     title="💡 Pretrained Models Guide",
                     content="""
                     <div style="padding: 10px;">
-                        <ul>
-                            <li><strong>Download Models:</strong> Download YOLOv5s and EfficientNet-B4 models</li>
-                            <li><strong>Validate Models:</strong> Check model integrity and file sizes</li>
-                            <li><strong>Refresh Status:</strong> Update model status and directory contents</li>
-                            <li><strong>Clean Up:</strong> Remove corrupted or invalid model files</li>
-                        </ul>
+                        <h4>🚀 One-Click Setup</h4>
+                        <p>Automatically handles the complete model setup workflow:</p>
+                        <ol>
+                            <li><strong>Check Existing:</strong> Scan for already downloaded models</li>
+                            <li><strong>Download Missing:</strong> Download YOLOv5s and EfficientNet-B4 if needed</li>
+                            <li><strong>Validate All:</strong> Check integrity and file sizes</li>
+                            <li><strong>Cleanup Invalid:</strong> Remove corrupted or invalid files</li>
+                        </ol>
+                        <p><strong>Refresh Status:</strong> Update model status and directory contents manually</p>
                     </div>
                     """,
                     style="info",
@@ -147,10 +138,8 @@ def create_pretrained_ui_components(module_config: Dict[str, Any]) -> Dict[str, 
             'validate_checkbox': form_widgets['validate_checkbox'],
             
             # Button references from action container
-            'download': action_container.get('buttons', {}).get('download'),
-            'validate': action_container.get('buttons', {}).get('validate'),
+            'oneclick_setup': action_container.get('buttons', {}).get('oneclick_setup'),
             'refresh': action_container.get('buttons', {}).get('refresh'),
-            'cleanup': action_container.get('buttons', {}).get('cleanup'),
             'save': action_container.get('buttons', {}).get('save'),
             'reset': action_container.get('buttons', {}).get('reset'),
             

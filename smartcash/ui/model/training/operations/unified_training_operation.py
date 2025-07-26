@@ -3,6 +3,7 @@ File: smartcash/ui/model/training/operations/unified_training_operation.py
 Description: Unified training operation that directly uses the unified training pipeline.
 """
 
+import time
 from typing import Dict, Any, Callable, Optional
 from smartcash.ui.logger import get_module_logger
 from smartcash.model.api.core import run_full_training_pipeline
@@ -129,6 +130,49 @@ class UnifiedTrainingOperation:
         
         return progress_callback
     
+    def update_progress(
+        self,
+        overall_progress: int = None,
+        overall_message: str = "",
+        phase_progress: int = None,
+        phase_message: str = "",
+        epoch_progress: int = None,
+        epoch_message: str = ""
+    ) -> None:
+        """
+        Update triple progress tracker for training operations.
+        
+        Args:
+            overall_progress: Overall training progress (0-100)
+            overall_message: Overall progress message
+            phase_progress: Current phase progress (0-100)
+            phase_message: Phase progress message  
+            epoch_progress: Current epoch progress (0-100)
+            epoch_message: Epoch progress message
+        """
+        try:
+            # Get operation container from UI module
+            if hasattr(self, 'ui_module') and self.ui_module:
+                operation_container = self.ui_module.get_component('operation_container')
+                
+                if operation_container and hasattr(operation_container, 'get'):
+                    update_func = operation_container.get('update_progress')
+                    if update_func:
+                        # Call with triple progress parameters
+                        update_func(
+                            progress=overall_progress if overall_progress is not None else 0,
+                            message=overall_message,
+                            secondary_progress=phase_progress,
+                            secondary_message=phase_message,
+                            tertiary_progress=epoch_progress,
+                            tertiary_message=epoch_message
+                        )
+                        
+        except Exception as e:
+            # Fail silently on progress update errors
+            if hasattr(self, 'logger'):
+                self.logger.debug(f"Progress update failed: {e}")
+    
     def _handle_training_phase_progress(self, phase: str, current: int, total: int, 
                                       message: str, percentage: float, **kwargs):
         """Handle progress updates for training phases."""
@@ -136,9 +180,23 @@ class UnifiedTrainingOperation:
         
         if 'epoch' in kwargs:
             epoch = kwargs['epoch']
+            epochs_total = kwargs.get('total_epochs', total)
             
-            # Update UI with epoch progress
-            epoch_msg = f"Phase {phase_num} - Epoch {epoch}/{total}"
+            # Calculate overall training progress (across both phases)
+            overall_progress = self._calculate_overall_progress(phase, current, total, **kwargs)
+            
+            # Update triple progress tracker
+            self.update_progress(
+                overall_progress=overall_progress,
+                overall_message=f"Training Progress",
+                phase_progress=int(percentage),
+                phase_message=f"Phase {phase_num}",
+                epoch_progress=int((current / total) * 100) if total > 0 else 0,
+                epoch_message=f"Epoch {epoch}/{epochs_total}"
+            )
+            
+            # Log epoch progress
+            epoch_msg = f"Phase {phase_num} - Epoch {epoch}/{epochs_total}"
             self._log_info(f"🔄 {epoch_msg}: {percentage:.0f}%")
             
             # Handle epoch completion with metrics
@@ -146,17 +204,57 @@ class UnifiedTrainingOperation:
                 metrics = kwargs['metrics']
                 self._handle_epoch_completion(phase_num, epoch, metrics)
         else:
-            # General phase progress
+            # General phase progress - update phase level only
+            overall_progress = self._calculate_overall_progress(phase, current, total, **kwargs)
+            
+            self.update_progress(
+                overall_progress=overall_progress,
+                overall_message=f"Training Progress",
+                phase_progress=int(percentage),
+                phase_message=f"Phase {phase_num}"
+            )
+            
             self._log_info(f"🔄 Phase {phase_num}: {percentage:.0f}%")
     
     def _handle_general_phase_progress(self, phase_display: str, percentage: float, message: str):
         """Handle progress updates for non-training phases."""
+        # Update overall progress for non-training phases
+        self.update_progress(
+            overall_progress=int(percentage),
+            overall_message=f"{phase_display}: {message}" if message else phase_display
+        )
+        
         if percentage >= 100:
             self._log_success(f"✅ {phase_display}: Complete")
         elif message:
             self._log_info(f"🔄 {phase_display} ({percentage:.0f}%): {message}")
         else:
             self._log_info(f"🔄 {phase_display}: {percentage:.0f}%")
+    
+    def _calculate_overall_progress(self, phase: str, current: int, total: int, **kwargs) -> int:
+        """Calculate overall training progress across both phases."""
+        try:
+            # Get phase configuration
+            phase_1_epochs = self.config.get('training', {}).get('phase_1_epochs', 1)
+            phase_2_epochs = self.config.get('training', {}).get('phase_2_epochs', 1)
+            total_epochs = phase_1_epochs + phase_2_epochs
+            
+            if phase == 'training_phase_1':
+                # Phase 1: 0% to 50% of overall progress
+                phase_progress = (current / total) if total > 0 else 0
+                return int((phase_progress * phase_1_epochs / total_epochs) * 100)
+            elif phase == 'training_phase_2':
+                # Phase 2: 50% to 100% of overall progress
+                phase_1_weight = phase_1_epochs / total_epochs
+                phase_progress = (current / total) if total > 0 else 0
+                return int((phase_1_weight + (phase_progress * phase_2_epochs / total_epochs)) * 100)
+            else:
+                # Non-training phases or unknown phases
+                return int((current / total) * 100) if total > 0 else 0
+                
+        except Exception as e:
+            self.logger.debug(f"Error calculating overall progress: {e}")
+            return int((current / total) * 100) if total > 0 else 0
     
     def _handle_epoch_completion(self, phase_num: str, epoch: int, metrics: Dict[str, Any]):
         """Handle epoch completion with metrics display."""
@@ -175,9 +273,9 @@ class UnifiedTrainingOperation:
             if acc > 0 or f1 > 0:
                 self._log_info(f"   {layer.upper()}: Acc={acc:.3f} F1={f1:.3f}")
         
-        # Update charts if callback available
-        if 'on_chart_update' in self.callbacks:
-            self.callbacks['on_chart_update'](metrics)
+        # Execute additional callbacks
+        self._execute_metrics_callback(phase_num, epoch, metrics)
+        self._execute_chart_callback(metrics)
     
     def _handle_training_success(self, result: Dict[str, Any]):
         """Handle successful training completion."""
@@ -204,9 +302,18 @@ class UnifiedTrainingOperation:
             self._log_info(f"📊 Generated {charts_count} visualization charts")
             self._log_info(f"📁 Charts saved to: data/visualization/{session_id}/")
         
-        # Call success callback
-        if 'on_success' in self.callbacks:
-            self.callbacks['on_success']("Training completed successfully")
+        # Execute completion callbacks
+        self._execute_success_callback(result)
+        
+        # Update final progress
+        self.update_progress(
+            overall_progress=100,
+            overall_message="Training completed successfully!",
+            phase_progress=100,
+            phase_message="Complete",
+            epoch_progress=100,
+            epoch_message="Complete"
+        )
     
     def _handle_training_failure(self, error_msg: str):
         """Handle training failure."""
@@ -237,21 +344,97 @@ class UnifiedTrainingOperation:
         self.logger.info(message)
         if hasattr(self.ui_module, 'log_info'):
             self.ui_module.log_info(message)
+        self._execute_log_callback(message, 'info')
     
     def _log_success(self, message: str):
         """Log success message to UI."""
         self.logger.info(message)
         if hasattr(self.ui_module, 'log_success'):
             self.ui_module.log_success(message)
+        self._execute_log_callback(message, 'success')
     
     def _log_warning(self, message: str):
         """Log warning message to UI."""
         self.logger.warning(message)
         if hasattr(self.ui_module, 'log_warning'):
             self.ui_module.log_warning(message)
+        self._execute_log_callback(message, 'warning')
     
     def _log_error(self, message: str):
         """Log error message to UI."""
         self.logger.error(message)
         if hasattr(self.ui_module, 'log_error'):
             self.ui_module.log_error(message)
+        self._execute_log_callback(message, 'error')
+    
+    # Enhanced callback system methods
+    
+    def _execute_metrics_callback(self, phase_num: str, epoch: int, metrics: Dict[str, Any]) -> None:
+        """Execute metrics callback for epoch completion."""
+        try:
+            if 'on_metrics_update' in self.callbacks:
+                callback_data = {
+                    'phase': phase_num,
+                    'epoch': epoch,
+                    'metrics': metrics,
+                    'timestamp': time.time()
+                }
+                self.callbacks['on_metrics_update'](callback_data)
+        except Exception as e:
+            self.logger.debug(f"Metrics callback error: {e}")
+    
+    def _execute_chart_callback(self, metrics: Dict[str, Any]) -> None:
+        """Execute chart update callback."""
+        try:
+            if 'on_chart_update' in self.callbacks:
+                self.callbacks['on_chart_update'](metrics)
+        except Exception as e:
+            self.logger.debug(f"Chart callback error: {e}")
+    
+    def _execute_success_callback(self, result: Dict[str, Any]) -> None:
+        """Execute success callback with full result data."""
+        try:
+            if 'on_success' in self.callbacks:
+                self.callbacks['on_success'](result)
+            
+            # Also call the simple success callback for backward compatibility
+            if 'on_training_complete' in self.callbacks:
+                self.callbacks['on_training_complete']("Training completed successfully")
+        except Exception as e:
+            self.logger.debug(f"Success callback error: {e}")
+    
+    def _execute_log_callback(self, message: str, level: str = 'info') -> None:
+        """Execute log callback for real-time log updates."""
+        try:
+            if 'on_log_update' in self.callbacks:
+                log_data = {
+                    'message': message,
+                    'level': level,
+                    'timestamp': time.time(),
+                    'module': 'training'
+                }
+                self.callbacks['on_log_update'](log_data)
+        except Exception as e:
+            self.logger.debug(f"Log callback error: {e}")
+    
+    def _execute_live_chart_callback(self, chart_data: Dict[str, Any]) -> None:
+        """Execute live chart callback for real-time chart updates."""
+        try:
+            if 'on_live_chart_update' in self.callbacks:
+                self.callbacks['on_live_chart_update'](chart_data)
+        except Exception as e:
+            self.logger.debug(f"Live chart callback error: {e}")
+    
+    def register_additional_callbacks(self, additional_callbacks: Dict[str, Callable]) -> None:
+        """Register additional callbacks for extended functionality.
+        
+        Args:
+            additional_callbacks: Dictionary of callback names and functions
+                Supported callbacks:
+                - on_metrics_update: Called after each epoch with metrics
+                - on_chart_update: Called when charts need updating
+                - on_log_update: Called for real-time log updates
+                - on_live_chart_update: Called for live chart updates
+                - on_training_complete: Called when training completes
+        """
+        self.callbacks.update(additional_callbacks)

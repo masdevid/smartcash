@@ -60,14 +60,11 @@ class AugmentationUIModule(BaseUIModule):
     @suppress_ui_init_logs(duration=3.0)
     def initialize(self) -> bool:
         """Initialize the Augmentation module."""
-        # Initialize base and create UI components
+        # Initialize base - this already creates UI components via BaseUIModule
         if not super().initialize():
             return False
         
-        if not hasattr(self, '_ui_components') or not self._ui_components:
-            self._ui_components = self.create_ui_components(self.get_current_config())
-        
-        # Set UI components in config handler
+        # Set UI components in config handler (components already created by BaseUIModule)
         if hasattr(self, '_config_handler') and self._config_handler:
             if hasattr(self._config_handler, 'set_ui_components'):
                 self._config_handler.set_ui_components(self._ui_components)

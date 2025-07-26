@@ -241,7 +241,10 @@ def create_unified_training_form(config: Dict[str, Any]) -> widgets.Widget:
             es_mode,
             min_delta
         ], layout=widgets.Layout(padding='10px', width='48%'))
-        single_phase_options = widgets.HTML("<h4 style='color: #6f42c1; margin: 10px 0;'>🔧 Single-Phase Options</h4>"),
+        
+        # Single-phase options header
+        single_phase_options = widgets.HTML("<h4 style='color: #6f42c1; margin: 10px 0;'>🔧 Single-Phase Options</h4>")
+        
         # Advanced section - right column
         advanced_right_column = widgets.VBox([
             single_phase_options,

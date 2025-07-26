@@ -70,7 +70,7 @@ UI_CONFIG = {
 MODULE_METADATA = {
     'name': 'pretrained',
     'title': 'Pretrained Models',
-    'description': 'Pretrained model management module with download, validation, and cleanup operations',
+    'description': 'Pretrained model management module with one-click setup and refresh operations',
     'version': '2.0.0',
     'category': 'model',
     'author': 'SmartCash',

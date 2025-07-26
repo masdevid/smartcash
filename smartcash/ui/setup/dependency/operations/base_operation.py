@@ -48,6 +48,11 @@ class BaseOperationHandler(LoggingMixin, OperationMixin):
         self.parent_module = 'dependency.setup'
         
         # Set UI components for mixins
+        self._set_ui_components(ui_components)
+        
+        # Progress tracking for dual progress system
+        self._overall_progress = 0
+        self._secondary_progress = 0
         self._ui_components = ui_components
         
         # Set operation container for logging
@@ -457,3 +462,59 @@ class BaseOperationHandler(LoggingMixin, OperationMixin):
             
         command.append(package)
         return command
+    
+    def update_progress(
+        self, 
+        progress: int, 
+        message: str = "", 
+        secondary_progress: Optional[int] = None, 
+        secondary_message: str = ""
+    ) -> None:
+        """
+        Update dual progress tracker with main and secondary progress.
+        
+        Args:
+            progress: Main progress percentage (0-100)
+            message: Main progress message
+            secondary_progress: Secondary progress percentage (0-100), optional
+            secondary_message: Secondary progress message
+        """
+        try:
+            # Update internal progress tracking
+            self._overall_progress = max(0, min(100, progress))
+            if secondary_progress is not None:
+                self._secondary_progress = max(0, min(100, secondary_progress))
+            
+            # Update operation container if available
+            if hasattr(self, '_ui_components') and 'operation_container' in self._ui_components:
+                operation_container = self._ui_components['operation_container']
+                
+                # Call operation container's update_progress method
+                if hasattr(operation_container, 'get') and operation_container.get('update_progress'):
+                    update_func = operation_container.get('update_progress')
+                    if secondary_progress is not None:
+                        # Dual progress mode
+                        update_func(
+                            progress=self._overall_progress,
+                            message=message,
+                            secondary_progress=self._secondary_progress,
+                            secondary_message=secondary_message
+                        )
+                    else:
+                        # Single progress mode
+                        update_func(progress=self._overall_progress, message=message)
+                        
+        except Exception as e:
+            # Fail silently on progress update errors to not break operations
+            if hasattr(self, 'logger'):
+                self.logger.debug(f"Progress update failed: {e}")
+    
+    def reset_progress(self) -> None:
+        """Reset both progress trackers to 0."""
+        self._overall_progress = 0
+        self._secondary_progress = 0
+        self.update_progress(0, "Initializing...")
+    
+    def complete_progress(self, message: str = "Operation completed") -> None:
+        """Set progress to 100% and show completion message."""
+        self.update_progress(100, message)

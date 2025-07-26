@@ -41,7 +41,7 @@ class PretrainedUIModule(ModelConfigSyncMixin, BackendServiceMixin, BaseUIModule
     Pretrained Module implementation using BaseUIModule pattern.
     
     Manages YOLOv5s and EfficientNet-B4 models with download, validation, 
-    refresh, and cleanup operations.
+    and refresh operations with a simplified one-click setup workflow.
     """
     
     def __init__(self):
@@ -90,10 +90,8 @@ class PretrainedUIModule(ModelConfigSyncMixin, BackendServiceMixin, BaseUIModule
         
         # Add Pretrained-specific handlers
         pretrained_handlers = {
-            'download': self._operation_download,
-            'validate': self._operation_validate,
-            'refresh': self._operation_refresh,
-            'cleanup': self._operation_cleanup
+            'oneclick_setup': self._operation_oneclick_setup,
+            'refresh': self._operation_refresh
         }
         
         # Merge with base handlers
@@ -165,27 +163,6 @@ class PretrainedUIModule(ModelConfigSyncMixin, BackendServiceMixin, BaseUIModule
     
     # ==================== OPERATION HANDLERS ====================
     
-    def _operation_download(self, button=None) -> Dict[str, Any]:
-        """Handle model download operation."""
-        return self._execute_operation_with_wrapper(
-            operation_name="Model Download",
-            operation_func=lambda: self._execute_download_operation({}),
-            button=button,
-            validation_func=lambda: self._validate_models(),
-            success_message="Model download completed successfully",
-            error_message="Model download failed"
-        )
-    
-    def _operation_validate(self, button=None) -> Dict[str, Any]:
-        """Handle model validation operation."""
-        return self._execute_operation_with_wrapper(
-            operation_name="Model Validation",
-            operation_func=lambda: self._execute_validate_operation(),
-            button=button,
-            validation_func=lambda: self._validate_models(),
-            success_message="Model validation completed successfully",
-            error_message="Model validation failed"
-        )
     
     def _operation_refresh(self, button=None) -> Dict[str, Any]:
         """Handle model refresh operation."""
@@ -198,16 +175,17 @@ class PretrainedUIModule(ModelConfigSyncMixin, BackendServiceMixin, BaseUIModule
             error_message="Model refresh failed"
         )
     
-    def _operation_cleanup(self, button=None) -> Dict[str, Any]:
-        """Handle model cleanup operation."""
+    def _operation_oneclick_setup(self, button=None) -> Dict[str, Any]:
+        """Handle one-click model setup operation."""
         return self._execute_operation_with_wrapper(
-            operation_name="Model Cleanup",
-            operation_func=lambda: self._execute_cleanup_operation(),
+            operation_name="One-Click Model Setup",
+            operation_func=lambda: self._execute_oneclick_setup_operation(),
             button=button,
-            validation_func=lambda: {'valid': True},
-            success_message="Model cleanup completed successfully",
-            error_message="Model cleanup failed"
+            validation_func=lambda: {'valid': True},  # No pre-validation needed for one-click
+            success_message="One-click model setup completed successfully",
+            error_message="One-click model setup failed"
         )
+    
     
     # ==================== OPERATION EXECUTION METHODS ====================
     
@@ -215,7 +193,7 @@ class PretrainedUIModule(ModelConfigSyncMixin, BackendServiceMixin, BaseUIModule
         """Execute pretrained operation using factory pattern.
         
         Args:
-            operation_type: Type of operation to execute (download, validate, refresh, cleanup)
+            operation_type: Type of operation to execute (oneclick_setup, refresh)
             config: Optional configuration overrides
             
         Returns:
@@ -275,21 +253,15 @@ class PretrainedUIModule(ModelConfigSyncMixin, BackendServiceMixin, BaseUIModule
                 "message": f"Failed to execute {operation_type} operation"
             }
     
-    def _execute_download_operation(self, config: Dict[str, Any]) -> Dict[str, Any]:
-        """Execute download operation."""
-        return self._execute_pretrained_operation('download', config)
-    
-    def _execute_validate_operation(self) -> Dict[str, Any]:
-        """Execute validation operation."""
-        return self._execute_pretrained_operation('validate')
     
     def _execute_refresh_operation(self) -> Dict[str, Any]:
         """Execute refresh operation."""
         return self._execute_pretrained_operation('refresh')
     
-    def _execute_cleanup_operation(self) -> Dict[str, Any]:
-        """Execute cleanup operation."""
-        return self._execute_pretrained_operation('cleanup')
+    def _execute_oneclick_setup_operation(self) -> Dict[str, Any]:
+        """Execute one-click setup operation."""
+        return self._execute_pretrained_operation('oneclick_setup')
+    
     
     # ==================== PRETRAINED-SPECIFIC METHODS ====================
     

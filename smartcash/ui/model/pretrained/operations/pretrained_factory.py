@@ -6,18 +6,14 @@ from typing import Dict, Any, Type
 from enum import Enum
 
 from .pretrained_base_operation import PretrainedBaseOperation
-from .pretrained_download_operation import PretrainedDownloadOperation
-from .pretrained_validate_operation import PretrainedValidateOperation
 from .pretrained_refresh_operation import PretrainedRefreshOperation
-from .pretrained_cleanup_operation import PretrainedCleanupOperation
+from .pretrained_oneclick_operation import PretrainedOneClickOperation
 
 
 class PretrainedOperationType(Enum):
     """Available pretrained operation types."""
-    DOWNLOAD = "download"
-    VALIDATE = "validate"
+    ONECLICK_SETUP = "oneclick_setup"
     REFRESH = "refresh"
-    CLEANUP = "cleanup"
 
 
 class PretrainedOperationFactory:
@@ -25,10 +21,8 @@ class PretrainedOperationFactory:
     
     # Registry of operation types to classes
     _operation_registry: Dict[str, Type[PretrainedBaseOperation]] = {
-        PretrainedOperationType.DOWNLOAD.value: PretrainedDownloadOperation,
-        PretrainedOperationType.VALIDATE.value: PretrainedValidateOperation,
+        PretrainedOperationType.ONECLICK_SETUP.value: PretrainedOneClickOperation,
         PretrainedOperationType.REFRESH.value: PretrainedRefreshOperation,
-        PretrainedOperationType.CLEANUP.value: PretrainedCleanupOperation,
     }
     
     @classmethod

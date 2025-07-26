@@ -112,11 +112,11 @@ class EvaluationBaseOperation(OperationMixin, LoggingMixin):
                 progress_percent = int((completed_scenarios / total_scenarios) * 100)
                 self._overall_progress = progress_percent
                 
-                if self._progress_tracker:
-                    self._progress_tracker.update_overall_progress(
-                        progress_percent, 
-                        message or f"Completed {completed_scenarios}/{total_scenarios} scenarios"
-                    )
+                # Use the new dual progress method as main progress
+                self.update_progress(
+                    progress=progress_percent,
+                    message=message or f"Completed {completed_scenarios}/{total_scenarios} scenarios"
+                )
                 
                 # Log to UI
                 self._ui_module.log_info(f"📊 Overall: {completed_scenarios}/{total_scenarios} scenarios ({progress_percent}%)")
@@ -135,11 +135,13 @@ class EvaluationBaseOperation(OperationMixin, LoggingMixin):
         try:
             self._current_scenario_progress = current_percent
             
-            if self._progress_tracker:
-                self._progress_tracker.update_current_progress(
-                    current_percent,
-                    message or f"Current scenario: {current_percent}%"
-                )
+            # Use the new dual progress method as secondary progress
+            self.update_progress(
+                progress=self._overall_progress,  # Keep main progress as overall
+                message=f"Completed {len(self._completed_scenarios)}/{self._total_scenarios} scenarios",
+                secondary_progress=current_percent,
+                secondary_message=message or f"Current scenario: {current_percent}%"
+            )
             
             # Log to UI for detailed progress
             if current_percent % 25 == 0 or current_percent == 100:  # Log at 25%, 50%, 75%, 100%
@@ -218,6 +220,47 @@ class EvaluationBaseOperation(OperationMixin, LoggingMixin):
             
         except Exception as e:
             self.logger.error(f"Failed to complete operation: {e}")
+
+    def update_progress(
+        self, 
+        progress: int, 
+        message: str = "", 
+        secondary_progress: Optional[int] = None, 
+        secondary_message: str = ""
+    ) -> None:
+        """
+        Update dual progress tracker for evaluation operations.
+        
+        Args:
+            progress: Main progress percentage (0-100) - typically overall scenarios progress
+            message: Main progress message
+            secondary_progress: Secondary progress percentage (0-100) - typically current scenario progress
+            secondary_message: Secondary progress message
+        """
+        try:
+            # Get operation container from UI module
+            if hasattr(self, '_ui_module') and self._ui_module:
+                operation_container = self._ui_module.get_component('operation_container')
+                
+                if operation_container and hasattr(operation_container, 'get'):
+                    update_func = operation_container.get('update_progress')
+                    if update_func:
+                        # Call with dual progress parameters
+                        if secondary_progress is not None:
+                            update_func(
+                                progress=max(0, min(100, progress)),
+                                message=message,
+                                secondary_progress=max(0, min(100, secondary_progress)),
+                                secondary_message=secondary_message
+                            )
+                        else:
+                            # Single progress mode
+                            update_func(progress=max(0, min(100, progress)), message=message)
+                        
+        except Exception as e:
+            # Fail silently on progress update errors to not break operations
+            if hasattr(self, 'logger'):
+                self.logger.debug(f"Progress update failed: {e}")
 
     def clear_operation_logs(self) -> None:
         """Clear operation logs from the operation container before starting a new operation."""

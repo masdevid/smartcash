@@ -438,4 +438,58 @@ class AugmentationBaseOperation(OperationMixin, LoggingMixin):
             'is_running': self._is_running,
             'errors': self._errors.copy()
         }
+    
+    def update_progress(
+        self, 
+        progress: int, 
+        message: str = "", 
+        secondary_progress: Optional[int] = None, 
+        secondary_message: str = ""
+    ) -> None:
+        """
+        Update dual progress tracker with main and secondary progress.
+        
+        Args:
+            progress: Main progress percentage (0-100)
+            message: Main progress message
+            secondary_progress: Secondary progress percentage (0-100), optional
+            secondary_message: Secondary progress message
+        """
+        try:
+            # Update internal progress tracking
+            self._progress = max(0, min(100, progress))
+            
+            # Update operation container if available via UI module
+            if hasattr(self, 'ui_module') and self.ui_module:
+                operation_container = self.ui_module.get_component('operation_container')
+                
+                if operation_container and hasattr(operation_container, 'get'):
+                    # Call operation container's update_progress method
+                    update_func = operation_container.get('update_progress')
+                    if update_func:
+                        if secondary_progress is not None:
+                            # Dual progress mode
+                            update_func(
+                                progress=self._progress,
+                                message=message,
+                                secondary_progress=max(0, min(100, secondary_progress)),
+                                secondary_message=secondary_message
+                            )
+                        else:
+                            # Single progress mode
+                            update_func(progress=self._progress, message=message)
+                        
+        except Exception as e:
+            # Fail silently on progress update errors to not break operations
+            if hasattr(self, 'logger'):
+                self.logger.debug(f"Progress update failed: {e}")
+    
+    def reset_progress(self) -> None:
+        """Reset progress tracker to 0."""
+        self._progress = 0
+        self.update_progress(0, "Initializing...")
+    
+    def complete_progress(self, message: str = "Operation completed") -> None:
+        """Set progress to 100% and show completion message."""
+        self.update_progress(100, message)
 

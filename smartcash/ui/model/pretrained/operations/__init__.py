@@ -6,10 +6,8 @@ This module provides a factory-based approach for managing pretrained model oper
 
 from .pretrained_base_operation import PretrainedBaseOperation
 from .pretrained_factory import PretrainedOperationFactory, PretrainedOperationType
-from .pretrained_download_operation import PretrainedDownloadOperation
-from .pretrained_validate_operation import PretrainedValidateOperation
 from .pretrained_refresh_operation import PretrainedRefreshOperation
-from .pretrained_cleanup_operation import PretrainedCleanupOperation
+from .pretrained_oneclick_operation import PretrainedOneClickOperation
 
 __all__ = [
     # Base classes
@@ -20,8 +18,6 @@ __all__ = [
     'PretrainedOperationType',
     
     # Individual operations
-    'PretrainedDownloadOperation',
-    'PretrainedValidateOperation',
-    'PretrainedRefreshOperation',
-    'PretrainedCleanupOperation'
+    'PretrainedOneClickOperation',
+    'PretrainedRefreshOperation'
 ]

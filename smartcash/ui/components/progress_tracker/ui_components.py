@@ -160,9 +160,14 @@ class UIComponentsManager:
     
     def update_status(self, message: str, style: str = None):
         """Update status message dengan modern design dan adaptive logging level"""
+        # Map 'danger' to 'error' for backward compatibility
+        if style == 'danger':
+            style = 'error'
+            
         color_map = {
             'success': '#16a34a', 'info': '#0ea5e9', 
-            'warning': '#f59e0b', 'error': '#ef4444'
+            'warning': '#f59e0b', 'error': '#ef4444',
+            'primary': '#007bff', 'secondary': '#6c757d'
         }
         color = color_map.get(style, '#64748b')
         
@@ -174,7 +179,9 @@ class UIComponentsManager:
             'success': 'linear-gradient(135deg, rgba(22, 163, 74, 0.08) 0%, rgba(22, 163, 74, 0.04) 100%)',
             'info': 'linear-gradient(135deg, rgba(14, 165, 233, 0.08) 0%, rgba(14, 165, 233, 0.04) 100%)',
             'warning': 'linear-gradient(135deg, rgba(245, 158, 11, 0.08) 0%, rgba(245, 158, 11, 0.04) 100%)',
-            'error': 'linear-gradient(135deg, rgba(239, 68, 68, 0.08) 0%, rgba(239, 68, 68, 0.04) 100%)'
+            'error': 'linear-gradient(135deg, rgba(239, 68, 68, 0.08) 0%, rgba(239, 68, 68, 0.04) 100%)',
+            'primary': 'linear-gradient(135deg, rgba(0, 123, 255, 0.08) 0%, rgba(0, 123, 255, 0.04) 100%)',
+            'secondary': 'linear-gradient(135deg, rgba(108, 117, 125, 0.08) 0%, rgba(108, 117, 125, 0.04) 100%)'
         }
         bg_color = bg_colors.get(style, 'linear-gradient(135deg, rgba(100, 116, 139, 0.05) 0%, rgba(100, 116, 139, 0.02) 100%)')
         
@@ -183,7 +190,10 @@ class UIComponentsManager:
             'success': '✅',
             'info': 'ℹ️',
             'warning': '⚠️',
-            'error': '❌'
+            'error': '❌',
+            'primary': '🔵',
+            'secondary': '⚪',
+            'danger': '❌'  # Added for backward compatibility
         }
         icon = icons.get(style, '📋')
         

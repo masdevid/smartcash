@@ -60,6 +60,31 @@ class BaseOperationHandler(LoggingMixin, OperationMixin):
             self._operation_container = ui_components['operation_container']
         
         self.logger.debug(f"✅ BaseOperationHandler initialized: {operation_type}")
+        
+    def _set_ui_components(self, ui_components: Dict[str, Any]) -> None:
+        """Set UI components for the operation handler.
+        
+        Args:
+            ui_components: Dictionary of UI components
+        """
+        # Store UI components for use by mixins
+        self.ui_components = ui_components
+        
+        # Set up operation container if available
+        if 'operation_container' in ui_components:
+            self.operation_container = ui_components['operation_container']
+            
+        # Set up progress tracking if available
+        if 'progress_tracker' in ui_components:
+            self.progress_tracker = ui_components['progress_tracker']
+            
+        # Set up log accordion if available
+        if 'log_accordion' in ui_components:
+            self.log_accordion = ui_components['log_accordion']
+            
+        # Set up primary button if available
+        if 'primary_button' in ui_components:
+            self.primary_button = ui_components['primary_button']
     
     def _get_config_path(self, filename: str = 'dependency_config.yaml') -> str:
         """Get environment-aware config file path with log suppression."""

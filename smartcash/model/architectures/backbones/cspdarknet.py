@@ -18,13 +18,13 @@ from smartcash.common.logger import SmartCashLogger
 from smartcash.common.exceptions import BackboneError
 from smartcash.common.utils.progress_utils import download_with_progress
 from smartcash.model.architectures.backbones.base import BaseBackbone
-from smartcash.model.config.model_constants import YOLOV5_CONFIG, YOLO_CHANNELS
+from smartcash.model.config.model_constants import YOLOV5_CONFIG
 
 class CSPDarknet(BaseBackbone):
     """Enhanced CSPDarknet backbone dengan multi-layer detection support dan model building capabilities."""
     
     def __init__(self, pretrained: bool = True, model_size: str = 'yolov5s', weights_path: Optional[str] = None, 
-                 fallback_to_local: bool = True, pretrained_dir: str = './pretrained', testing_mode: bool = False, 
+                 fallback_to_local: bool = True, pretrained_dir: str = './pretrained', 
                  build_mode: str = 'detection', multi_layer_heads: bool = False, 
                  logger: Optional[SmartCashLogger] = None):
         """Inisialisasi CSPDarknet backbone dengan konfigurasi model dan pretrained weights."""
@@ -39,13 +39,10 @@ class CSPDarknet(BaseBackbone):
         self.model_size, self.config, self.pretrained_dir = model_size, YOLOV5_CONFIG[model_size], Path(pretrained_dir)
         self.feature_indices, self.expected_channels = self.config['feature_indices'], self.config['expected_channels']
         self.out_channels = self.expected_channels  # Ensure out_channels is set for BaseBackbone compatibility
-        self.testing_mode = testing_mode
         
         try:
             # Setup model
-            if testing_mode:
-                self._setup_dummy_model_for_testing()
-            elif pretrained:
+            if pretrained:
                 self._setup_pretrained_model(weights_path, fallback_to_local)
             else:
                 self._setup_model_from_scratch()
@@ -132,33 +129,6 @@ class CSPDarknet(BaseBackbone):
             self.logger.error(f"❌ Gagal memuat model: {str(e)}")
             raise BackboneError(f"Gagal memuat model: {str(e)}")
     
-    def _setup_dummy_model_for_testing(self):
-        """Buat model dummy untuk testing tanpa perlu mengunduh model pretrained."""
-        self.logger.info("🧪 Membuat model dummy untuk testing...")
-        
-        # Gunakan YOLO_CHANNELS langsung untuk output channels
-        self.expected_channels = YOLO_CHANNELS
-        
-        # Buat layer dummy untuk setiap output channel yang diharapkan
-        self.dummy_layers = nn.ModuleList()
-        in_channels = 3
-        
-        # Buat layer dummy untuk setiap feature map yang diharapkan
-        for i, out_ch in enumerate(self.expected_channels):
-            # Buat layer konvolusi sederhana yang langsung menghasilkan channel yang diharapkan
-            layer = nn.Sequential(
-                nn.Conv2d(in_channels, out_ch, kernel_size=3, stride=2, padding=1),
-                nn.BatchNorm2d(out_ch),
-                nn.ReLU(inplace=True)
-            )
-            self.dummy_layers.append(layer)
-            in_channels = out_ch
-        
-        # Override metode forward untuk menggunakan model dummy
-        self.forward = self._forward_dummy
-        
-        self.logger.info(f"✅ Model dummy berhasil dibuat dengan {len(self.dummy_layers)} feature maps")
-        self.logger.info(f"   • Output channels: {self.expected_channels} (sesuai dengan YOLO_CHANNELS)")
     
     def _setup_model_from_scratch(self):
         """Setup model dari awal tanpa pretrained weights."""
@@ -346,35 +316,6 @@ class CSPDarknet(BaseBackbone):
                             nn.Conv2d(out_channels, out_channels//2, kernel_size=1, bias=False), nn.BatchNorm2d(out_channels//2), nn.SiLU(inplace=True),
                             nn.Conv2d(out_channels//2, out_channels, kernel_size=3, padding=1, bias=False), nn.BatchNorm2d(out_channels), nn.SiLU(inplace=True))
     
-    def _forward_dummy(self, x: torch.Tensor) -> List[torch.Tensor]:
-        """Forward pass dengan model dummy untuk testing."""
-        features = []
-        
-        # Buat dummy feature maps dengan channel yang sesuai dengan YOLO_CHANNELS
-        for i, out_ch in enumerate(self.expected_channels):
-            # Downsample input sesuai dengan level feature map
-            # P3 = 1/8, P4 = 1/16, P5 = 1/32 dari input asli
-            scale_factor = 1 / (2 ** (i + 3))
-            h, w = x.shape[2], x.shape[3]
-            new_h, new_w = int(h * scale_factor), int(w * scale_factor)
-            
-            # Buat dummy tensor dengan channel yang sesuai
-            batch_size = x.shape[0]
-            dummy_feature = torch.zeros(batch_size, out_ch, new_h, new_w, device=x.device)
-            
-            # Isi dengan nilai random untuk simulasi feature map
-            dummy_feature.normal_(0, 0.02)
-            
-            features.append(dummy_feature)
-            
-            # Log untuk debugging
-            self.logger.debug(f"🔍 Feature map {i}: shape={dummy_feature.shape}, channels={dummy_feature.shape[1]}")
-        
-        # Pastikan jumlah feature maps sesuai dengan yang diharapkan
-        if len(features) != len(self.expected_channels):
-            self.logger.warning(f"⚠️ Jumlah feature maps ({len(features)}) tidak sesuai dengan yang diharapkan ({len(self.expected_channels)})")
-        
-        return features
     
     def forward(self, x: torch.Tensor) -> List[torch.Tensor]:
         """Forward pass, mengembalikan feature maps P3, P4, P5."""
@@ -400,7 +341,7 @@ class CSPDarknet(BaseBackbone):
             'variant': self.model_size,
             'out_channels': self.expected_channels,
             'feature_stages': self.feature_indices,
-            'pretrained': not self.testing_mode,
+            'pretrained': hasattr(self, 'pretrained_weights_loaded'),
             'build_mode': self.build_mode,
             'multi_layer_heads': self.multi_layer_heads,
             'num_parameters': sum(p.numel() for p in self.parameters()),

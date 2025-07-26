@@ -229,7 +229,7 @@ class PlatformPresets:
         
         config = {
             'backbone': backbone,
-            'pretrained': True,            # Always use pretrained
+            'pretrained': False,           # Use non-pretrained models for training from scratch
             'feature_optimization': True,  # Always enable
             'layer_mode': 'multi',
             'detection_layers': ['layer_1', 'layer_2', 'layer_3'],

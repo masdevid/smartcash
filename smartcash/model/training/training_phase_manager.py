@@ -328,7 +328,7 @@ class TrainingPhaseManager:
                 'layers': layer_chart_data,
                 'phase': phase_num
             }, {
-                'title': f'Layer Performance - {'Single Phase' if self._is_single_phase else f'Phase {phase_num}'}',
+                'title': f'Layer Performance - {"Single Phase" if self._is_single_phase else "Phase " + str(phase_num)}',
                 'xlabel': 'Layer',
                 'ylabel': 'Metric Value'
             })

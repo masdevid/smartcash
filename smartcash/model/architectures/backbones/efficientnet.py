@@ -5,15 +5,13 @@ Deskripsi: Fixed EfficientNet backbone dengan guaranteed 3 feature maps output u
 
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
-from typing import List, Tuple, Optional, Dict, Any, Union
-from pathlib import Path
+from typing import List, Tuple, Optional, Dict, Any
 import timm
 
 from smartcash.common.logger import SmartCashLogger
-from smartcash.common.exceptions import BackboneError, UnsupportedBackboneError
+from smartcash.common.exceptions import BackboneError
 from smartcash.model.architectures.backbones.base import BaseBackbone
-from smartcash.model.config.model_constants import SUPPORTED_EFFICIENTNET_MODELS, EFFICIENTNET_CHANNELS, YOLO_CHANNELS, DEFAULT_EFFICIENTNET_INDICES
+from smartcash.model.config.model_constants import SUPPORTED_EFFICIENTNET_MODELS, YOLO_CHANNELS, DEFAULT_EFFICIENTNET_INDICES
 
 class FeatureAdapter(nn.Module):
     """Adapter untuk memetakan feature maps dari EfficientNet ke format YOLOv5"""
@@ -52,13 +50,12 @@ class EfficientNetBackbone(BaseBackbone):
     
     def __init__(self, model_name: str = 'efficientnet_b4', pretrained: bool = True, 
                  feature_indices: Optional[List[int]] = None, out_channels: Optional[List[int]] = None,
-                 use_attention: bool = True, testing_mode: bool = False, 
-                 pretrained_source: str = 'timm', build_mode: str = 'detection',
-                 multi_layer_heads: bool = False, logger: Optional[SmartCashLogger] = None):
+                 use_attention: bool = True, pretrained_source: str = 'timm', 
+                 build_mode: str = 'detection', multi_layer_heads: bool = False, 
+                 logger: Optional[SmartCashLogger] = None):
         super().__init__(logger=logger)
         
         self.model_name = model_name
-        self.testing_mode = testing_mode
         self.feature_indices = feature_indices or DEFAULT_EFFICIENTNET_INDICES
         self.use_attention = use_attention
         self.pretrained_source = pretrained_source
@@ -72,11 +69,8 @@ class EfficientNetBackbone(BaseBackbone):
         self.out_channels = out_channels or YOLO_CHANNELS
         len(self.out_channels) == 3 or self._raise_error(f"❌ Output channels harus 3 untuk FPN-PAN, ditemukan {len(self.out_channels)}")
         
-        # Initialize model berdasarkan mode
-        if testing_mode:
-            self._setup_dummy_model()
-        else:
-            self._setup_real_model(pretrained)
+        # Initialize model
+        self._setup_real_model(pretrained)
         
         self.logger.info(f"✅ EfficientNet {model_name} initialized: {len(self.out_channels)} feature maps -> {self.out_channels}")
         self.logger.info(f"🏗️ Build mode: {build_mode}, Multi-layer heads: {multi_layer_heads}, Source: {pretrained_source}")
@@ -112,33 +106,9 @@ class EfficientNetBackbone(BaseBackbone):
         except Exception as e:
             self._raise_error(f"❌ Error setup EfficientNet model: {str(e)}")
     
-    def _setup_dummy_model(self):
-        """Setup dummy model untuk testing dengan guaranteed 3 outputs"""
-        self.logger.info(f"🧪 Creating dummy {self.model_name} dengan {len(self.out_channels)} feature maps")
-        
-        # Create dummy layers yang menghasilkan tepat 3 feature maps
-        self.dummy_layers = nn.ModuleList()
-        in_channels = 3
-        
-        for i, out_ch in enumerate(self.out_channels):
-            # Calculate proper stride untuk feature map sizes (1/8, 1/16, 1/32)
-            stride = 2 ** (i + 3)  # 8, 16, 32
-            
-            layer = nn.Sequential(
-                nn.Conv2d(in_channels, out_ch, kernel_size=3, stride=2, padding=1),
-                nn.BatchNorm2d(out_ch),
-                nn.ReLU(inplace=True),
-                nn.AdaptiveAvgPool2d((80 // (2**i), 80 // (2**i)))  # Proper feature map sizes
-            )
-            self.dummy_layers.append(layer)
-            in_channels = out_ch
-        
-        self.logger.info(f"✅ Dummy model: {len(self.dummy_layers)} layers -> {self.out_channels} channels")
     
     def forward(self, x: torch.Tensor) -> List[torch.Tensor]:
         """Forward pass dengan guaranteed 3 feature maps output"""
-        if self.testing_mode:
-            return self._forward_dummy(x)
         
         try:
             # Extract features dari EfficientNet
@@ -163,26 +133,6 @@ class EfficientNetBackbone(BaseBackbone):
         except Exception as e:
             self._raise_error(f"❌ Forward pass error: {str(e)}")
     
-    def _forward_dummy(self, x: torch.Tensor) -> List[torch.Tensor]:
-        """Dummy forward dengan guaranteed 3 feature maps"""
-        features = []
-        current = x
-        
-        for i, layer in enumerate(self.dummy_layers):
-            # Progressive downsampling untuk simulate real feature pyramid
-            if i > 0:
-                current = F.avg_pool2d(current, kernel_size=2, stride=2)
-            
-            # Apply layer transformation
-            feat = layer(current)
-            features.append(feat)
-            
-            self.logger.debug(f"🧪 Dummy feature {i}: {feat.shape}")
-        
-        # Final validation untuk dummy
-        len(features) == 3 or self._raise_error(f"❌ Dummy model harus menghasilkan 3 features, got {len(features)}")
-        
-        return features
     
     def get_output_channels(self) -> List[int]:
         """Get output channels dengan validation"""
@@ -201,7 +151,7 @@ class EfficientNetBackbone(BaseBackbone):
             'out_channels': self.out_channels,
             'feature_indices': self.feature_indices,
             'actual_channels': getattr(self, 'actual_channels', self.out_channels),
-            'pretrained': not self.testing_mode,
+            'pretrained': hasattr(self, 'pretrained_weights_loaded'),
             'pretrained_source': self.pretrained_source,
             'build_mode': self.build_mode,
             'multi_layer_heads': self.multi_layer_heads,

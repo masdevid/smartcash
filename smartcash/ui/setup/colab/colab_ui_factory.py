@@ -5,11 +5,10 @@ File ini menyediakan factory khusus untuk membuat dan menampilkan
 modul UI Colab menggunakan BaseUIModule dan UI Factory pattern.
 """
 
-from typing import Dict, Any, Optional, Callable
+from typing import Dict, Any, Optional
 from smartcash.ui.core.ui_factory import UIFactory
 from smartcash.ui.setup.colab.colab_uimodule import ColabUIModule
 from smartcash.ui.core.utils import create_ui_factory_method, create_display_function
-from smartcash.ui.logger import get_module_logger
 
 class ColabUIFactory(UIFactory):
     """
@@ -19,10 +18,10 @@ class ColabUIFactory(UIFactory):
     modul UI Colab dengan konfigurasi default yang sesuai.
     
     Features (compliant with optimization.md):
-    - Leverages parent's cache lifecycle management for component reuse
-    - Lazy loading of UI components
-    - Proper widget lifecycle cleanup
-    - Minimal logging for performance
+    - 🚀 Leverages parent's cache lifecycle management for component reuse
+    - 💾 Lazy loading of UI components
+    - 🧹 Proper widget lifecycle cleanup
+    - 📝 Minimal logging for performance
     """
     
     @classmethod
@@ -39,7 +38,7 @@ class ColabUIFactory(UIFactory):
         """
         module = ColabUIModule()
         
-        # Initialize the module with config if provided
+        # Apply config if provided
         if config is not None and hasattr(module, 'update_config'):
             module.update_config(config)
             
@@ -112,5 +111,6 @@ def create_colab_display(**kwargs) -> callable:
     """
     def display_fn():
         ColabUIFactory.create_and_display_colab(**kwargs)
+        return None
     
     return display_fn

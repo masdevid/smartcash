@@ -43,7 +43,8 @@ class TrainingUIModule(ModelConfigSyncMixin, BackendServiceMixin, BaseUIModule, 
         
         self.logger = get_module_logger("smartcash.ui.model.training")
         
-        # Initialize module-specific components
+        # Lazy initialization flags
+        self._ui_components_created = False
         self._config_handler: Optional[TrainingConfigHandler] = None
         self._training_state = {'phase': 'idle'}
         
@@ -78,7 +79,12 @@ class TrainingUIModule(ModelConfigSyncMixin, BackendServiceMixin, BaseUIModule, 
         return get_unified_training_defaults()
     
     def create_ui_components(self, config: Dict[str, Any]) -> Dict[str, Any]:
-        """Create simplified UI components for unified training pipeline."""
+        """Create simplified UI components for unified training pipeline with lazy initialization."""
+        # Prevent double initialization
+        if self._ui_components_created and hasattr(self, '_ui_components') and self._ui_components:
+            self.logger.debug("⏭️ Skipping UI component creation - already created")
+            return self._ui_components
+            
         try:
             from .components.unified_training_ui import create_unified_training_ui
             
@@ -87,6 +93,8 @@ class TrainingUIModule(ModelConfigSyncMixin, BackendServiceMixin, BaseUIModule, 
             if not ui_components:
                 raise RuntimeError("Failed to create UI components")
             
+            # Mark as created to prevent reinitalization
+            self._ui_components_created = True
             return ui_components
             
         except Exception as e:

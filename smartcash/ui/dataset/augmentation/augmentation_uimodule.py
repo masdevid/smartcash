@@ -37,6 +37,9 @@ class AugmentationUIModule(BaseUIModule):
         )
         self.log_debug("AugmentationUIModule diinisialisasi.")
         
+        # Lazy initialization flags
+        self._ui_components_created = False
+        
         self._required_components = [
             'main_container',
             'header_container',
@@ -76,8 +79,25 @@ class AugmentationUIModule(BaseUIModule):
         return True
     
     def create_ui_components(self, config: Dict[str, Any]) -> Dict[str, Any]:
-        """Create and configure all UI components for this module."""
-        return create_augment_ui(config=config)
+        """Create and configure all UI components for this module with lazy initialization."""
+        # Prevent double initialization
+        if self._ui_components_created and hasattr(self, '_ui_components') and self._ui_components:
+            self.log_debug("⏭️ Skipping UI component creation - already created")
+            return self._ui_components
+            
+        try:
+            ui_components = create_augment_ui(config=config)
+            
+            if not ui_components:
+                raise RuntimeError("Failed to create UI components")
+            
+            # Mark as created to prevent reinitalization
+            self._ui_components_created = True
+            return ui_components
+            
+        except Exception as e:
+            self.log_error(f"Failed to create UI components: {e}")
+            raise
     
     def create_ui(self) -> Dict[str, Any]:
         """Create UI components for testing compatibility."""

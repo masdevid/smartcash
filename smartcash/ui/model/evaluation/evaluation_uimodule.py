@@ -16,6 +16,10 @@ class EvaluationUIModule(ModelDiscoveryMixin, ModelConfigSyncMixin, BackendServi
     
     def __init__(self):
         super().__init__(module_name='evaluation', parent_module='model', enable_environment=True)
+        
+        # Lazy initialization flags
+        self._ui_components_created = False
+        
         self._required_components = ['main_container', 'action_container', 'operation_container', 'summary_container']
         self.evaluation_service = self.checkpoint_selector = self.progress_bridge = None
         self.report_generator = EvaluationReportGenerator()
@@ -26,8 +30,26 @@ class EvaluationUIModule(ModelDiscoveryMixin, ModelConfigSyncMixin, BackendServi
     def get_default_config(self) -> Dict[str, Any]: return get_default_evaluation_config()
     def create_config_handler(self, config: Dict[str, Any]) -> EvaluationConfigHandler: return EvaluationConfigHandler(config=config)
     def create_ui_components(self, config: Dict[str, Any]) -> Dict[str, Any]:
-        from .components.evaluation_ui import create_evaluation_ui
-        return create_evaluation_ui(config=config)
+        """Create UI components with lazy initialization."""
+        # Prevent double initialization
+        if self._ui_components_created and hasattr(self, '_ui_components') and self._ui_components:
+            self.log_debug("⏭️ Skipping UI component creation - already created")
+            return self._ui_components
+            
+        try:
+            from .components.evaluation_ui import create_evaluation_ui
+            ui_components = create_evaluation_ui(config=config)
+            
+            if not ui_components:
+                raise RuntimeError("Failed to create UI components")
+            
+            # Mark as created to prevent reinitalization
+            self._ui_components_created = True
+            return ui_components
+            
+        except Exception as e:
+            self.log_error(f"Failed to create UI components: {e}")
+            raise
     
     def _get_module_button_handlers(self) -> Dict[str, Any]:
         """Get module-specific button handlers."""

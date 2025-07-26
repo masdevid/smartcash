@@ -26,6 +26,10 @@ class PreprocessingUIModule(BaseUIModule):
             parent_module='dataset',
             enable_environment=enable_environment
         )
+        
+        # Lazy initialization flags
+        self._ui_components_created = False
+        
         self._required_components = [
             'main_container',
             'header_container', 
@@ -48,8 +52,25 @@ class PreprocessingUIModule(BaseUIModule):
         return PreprocessingConfigHandler(config)
 
     def create_ui_components(self, config: Dict[str, Any]) -> Dict[str, Any]:
-        """Create the UI components for the module."""
-        return create_preprocessing_ui_components(config=config)
+        """Create the UI components for the module with lazy initialization."""
+        # Prevent double initialization
+        if self._ui_components_created and hasattr(self, '_ui_components') and self._ui_components:
+            self.log_debug("⏭️ Skipping UI component creation - already created")
+            return self._ui_components
+            
+        try:
+            ui_components = create_preprocessing_ui_components(config=config)
+            
+            if not ui_components:
+                raise RuntimeError("Failed to create UI components")
+            
+            # Mark as created to prevent reinitalization
+            self._ui_components_created = True
+            return ui_components
+            
+        except Exception as e:
+            self.log_error(f"Failed to create UI components: {e}")
+            raise
 
     def _post_init_tasks(self) -> None:
         """Run post-initialization tasks including service readiness check."""

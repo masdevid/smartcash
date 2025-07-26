@@ -24,6 +24,7 @@ class ColabUIModule(ModelConfigSyncMixin, BackendServiceMixin, BaseUIModule):
         self._required_components = ['main_container', 'action_container', 'operation_container', 'environment_container']
         self._initialized = False
         self._ui_components = None
+        self._ui_components_created = False
         self._operation_sequence = ['init', 'drive', 'symlink', 'folders', 'config', 'env', 'verify']
         self._operation_status = {op: 'pending' for op in self._operation_sequence}
         self._current_operation_index = 0
@@ -33,10 +34,26 @@ class ColabUIModule(ModelConfigSyncMixin, BackendServiceMixin, BaseUIModule):
     def get_default_config(self) -> Dict[str, Any]: return get_default_colab_config()
     def create_config_handler(self, config: Dict[str, Any]) -> ColabConfigHandler: return ColabConfigHandler(config)
     def create_ui_components(self, config: Dict[str, Any]) -> Dict[str, Any]:
-        if self._ui_components is None:
+        """Create UI components with lazy initialization."""
+        # Prevent double initialization
+        if self._ui_components_created and self._ui_components is not None:
+            self.log_debug("⏭️ Skipping UI component creation - already created")
+            return self._ui_components
+            
+        try:
             self.log_debug("Creating Colab UI components...")
             self._ui_components = create_colab_ui(config=config)
-        return self._ui_components
+            
+            if not self._ui_components:
+                raise RuntimeError("Failed to create UI components")
+            
+            # Mark as created to prevent reinitalization
+            self._ui_components_created = True
+            return self._ui_components
+            
+        except Exception as e:
+            self.log_error(f"Failed to create UI components: {e}")
+            raise
     
     def _detect_colab_environment(self) -> bool:
         """Detect if running in Google Colab environment."""

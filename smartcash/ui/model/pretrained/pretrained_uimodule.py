@@ -56,6 +56,9 @@ class PretrainedUIModule(ModelConfigSyncMixin, BackendServiceMixin, BaseUIModule
         # Ensure the logger is properly initialized with the module namespace
         self._update_logging_context()
         
+        # Lazy initialization flags
+        self._ui_components_created = False
+        
         # Set required components for validation
         self._required_components = [
             'main_container',
@@ -107,7 +110,12 @@ class PretrainedUIModule(ModelConfigSyncMixin, BackendServiceMixin, BaseUIModule
         return handler
     
     def create_ui_components(self, config: Dict[str, Any]) -> Dict[str, Any]:
-        """Create UI components for Pretrained module (BaseUIModule requirement)."""
+        """Create UI components for Pretrained module with lazy initialization."""
+        # Prevent double initialization
+        if self._ui_components_created and hasattr(self, '_ui_components') and self._ui_components:
+            self.log_debug("⏭️ Skipping UI component creation - already created")
+            return self._ui_components
+            
         try:
             self.log_debug("Creating Pretrained UI components...")
             ui_components = create_pretrained_ui_components(module_config=config)
@@ -115,6 +123,8 @@ class PretrainedUIModule(ModelConfigSyncMixin, BackendServiceMixin, BaseUIModule
             if not ui_components:
                 raise RuntimeError("Failed to create UI components")
             
+            # Mark as created to prevent reinitalization
+            self._ui_components_created = True
             self.log_debug(f"✅ Created {len(ui_components)} UI components")
             return ui_components
             

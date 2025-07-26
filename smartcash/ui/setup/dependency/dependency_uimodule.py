@@ -42,6 +42,7 @@ class DependencyUIModule(BaseUIModule):
         # Lazy initialization flags
         self._initialized = False
         self._ui_components = None
+        self._ui_components_created = False
         
         # Operation overlap prevention
         self._operation_running = False
@@ -100,7 +101,7 @@ class DependencyUIModule(BaseUIModule):
     
     def create_ui_components(self, config: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Create and return UI components for the dependency module.
+        Create and return UI components for the dependency module with lazy initialization.
         
         Args:
             config: Configuration dictionary for the UI components
@@ -108,19 +109,24 @@ class DependencyUIModule(BaseUIModule):
         Returns:
             Dictionary of UI components
         """
-        if self._ui_components is None:
-            try:
-                # Optimized UI creation with minimal logging
-                self._ui_components = create_dependency_ui_components(module_config=config)
-                
-                if not self._ui_components:
-                    raise RuntimeError("Failed to create UI components")
-                
-                # Success - minimal logging for performance
-                
-            except Exception as e:
-                self.log_error(f"Error creating UI components: {str(e)}")
-                raise
+        # Prevent double initialization
+        if self._ui_components_created and self._ui_components is not None:
+            self.log_debug("⏭️ Skipping UI component creation - already created")
+            return self._ui_components
+            
+        try:
+            # Optimized UI creation with minimal logging
+            self._ui_components = create_dependency_ui_components(module_config=config)
+            
+            if not self._ui_components:
+                raise RuntimeError("Failed to create UI components")
+            
+            # Mark as created to prevent reinitalization
+            self._ui_components_created = True
+            
+        except Exception as e:
+            self.log_error(f"Error creating UI components: {str(e)}")
+            raise
                 
         return self._ui_components
     

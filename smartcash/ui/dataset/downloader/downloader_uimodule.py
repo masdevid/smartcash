@@ -35,6 +35,9 @@ class DownloaderUIModule(BaseUIModule):
             enable_environment=True  # Enable environment management features
         )
         
+        # Lazy initialization flags
+        self._ui_components_created = False
+        
         # Set required components for validation
         self._required_components = [
             'main_container',
@@ -48,7 +51,12 @@ class DownloaderUIModule(BaseUIModule):
         self.log_debug("✅ DownloaderUIModule initialized")
     
     def create_ui_components(self, config: Dict[str, Any]) -> Dict[str, Any]:
-        """Create UI components for Downloader module (BaseUIModule requirement)."""
+        """Create UI components for Downloader module with lazy initialization."""
+        # Prevent double initialization
+        if self._ui_components_created and hasattr(self, '_ui_components') and self._ui_components:
+            self.log_debug("⏭️ Skipping UI component creation - already created")
+            return self._ui_components
+            
         try:
             self.log_debug("Creating Downloader UI components...")
             ui_components = create_downloader_ui_components(module_config=config)
@@ -56,6 +64,8 @@ class DownloaderUIModule(BaseUIModule):
             if not ui_components:
                 raise RuntimeError("Failed to create UI components")
             
+            # Mark as created to prevent reinitalization
+            self._ui_components_created = True
             self.log_debug(f"✅ Created {len(ui_components)} UI components")
             return ui_components
             

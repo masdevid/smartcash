@@ -56,6 +56,12 @@ class VisualizationUIModule(BaseUIModule):
             enable_environment=enable_environment
         )
         
+        # Lazy initialization flags
+        self._ui_components_created = False
+        self._dashboard_initialized = False
+        self._sample_viewer_initialized = False
+        self._chart_container_initialized = False
+        
         # Initialize instance attributes
         self._current_visualization = None
         self._datasets = {}
@@ -76,19 +82,6 @@ class VisualizationUIModule(BaseUIModule):
         
         # Initialize operations
         self._initialize_operations()
-        
-        # Initialize UI components
-        self.components = self.create_ui_components(self._config)
-        self._ui_components = self.components  # For backward compatibility
-        
-        # Initialize dashboard cards first
-        self._initialize_dashboard()
-        
-        # Initialize sample comparison viewer
-        self._initialize_sample_viewer()
-        
-        # Initialize chart container
-        self._initialize_chart_container()
     
     def _initialize_config(self) -> None:
         """Initialize configuration and config handler."""
@@ -112,8 +105,19 @@ class VisualizationUIModule(BaseUIModule):
     
     def _update_dashboard_stats(self) -> None:
         """Update statistics on the dashboard cards with placeholder stats."""
+        # Ensure dashboard is initialized first
+        if not self._dashboard_initialized:
+            self.log_debug("🔄 Dashboard not initialized, attempting initialization now...")
+            self._initialize_dashboard()
+            
         if not hasattr(self, '_dashboard_cards') or not self._dashboard_cards:
-            self.log_debug("❌ Dashboard cards not available for stats update")
+            self.log_warning("❌ Dashboard cards not available for stats update - initialization may have failed")
+            # Try fallback initialization one more time
+            try:
+                if not self._dashboard_initialized:
+                    self._initialize_dashboard()
+            except Exception as e:
+                self.log_error(f"❌ Fallback dashboard initialization failed: {e}")
             return
         
         # Initialize with placeholder stats (shows as placeholder until refresh)
@@ -147,14 +151,45 @@ class VisualizationUIModule(BaseUIModule):
             self.log_error("❌ Dashboard cards object missing update_all_cards method")
     
     def _initialize_dashboard(self):
-        """Initialize the dashboard with enhanced visualization stats cards."""
+        """Initialize the dashboard with enhanced visualization stats cards (lazy)."""
+        # Prevent double initialization
+        if self._dashboard_initialized:
+            self.log_debug("⏭️ Skipping dashboard initialization - already initialized")
+            return
+            
         try:
             from .components.visualization_stats_cards import create_visualization_stats_dashboard
             
-            # Find dashboard container first
-            dashboard_container = self.components.get('dashboard') if hasattr(self, 'components') else None
+            # Find dashboard container using multiple lookup methods
+            dashboard_container = None
             
-            if not dashboard_container:
+            # Try components first
+            if hasattr(self, 'components') and self.components:
+                dashboard_container = self.components.get('dashboard')
+                
+            # Try _ui_components as fallback
+            if not dashboard_container and hasattr(self, '_ui_components') and self._ui_components:
+                dashboard_container = self._ui_components.get('dashboard')
+                
+            # Try containers sub-dictionary
+            if not dashboard_container and hasattr(self, 'components') and self.components:
+                containers = self.components.get('containers', {})
+                dashboard_container = containers.get('dashboard_container') or containers.get('dashboard')
+            
+            # Debug logging to help identify the issue
+            if dashboard_container:
+                self.log_debug(f"✅ Found dashboard container: {type(dashboard_container).__name__}")
+            else:
+                # Log available components for debugging
+                if hasattr(self, 'components') and self.components:
+                    available_keys = list(self.components.keys())
+                    self.log_debug(f"❌ No dashboard container found. Available components: {available_keys}")
+                    containers = self.components.get('containers', {})
+                    if containers:
+                        container_keys = list(containers.keys())
+                        self.log_debug(f"📋 Available container keys: {container_keys}")
+                else:
+                    self.log_debug("❌ No components available at all")
                 self.log_error("❌ Dashboard container not found - cannot initialize cards")
                 return
             
@@ -185,6 +220,9 @@ class VisualizationUIModule(BaseUIModule):
                     
             else:
                 self.log_error("❌ Failed to get cards container from dashboard object")
+                
+            # Mark as initialized
+            self._dashboard_initialized = True
                 
         except Exception as e:
             self.log_error(f"❌ Failed to initialize dashboard: {e}", exc_info=True)
@@ -239,7 +277,7 @@ class VisualizationUIModule(BaseUIModule):
         
     def create_ui_components(self, config: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Create and return UI components for the visualization module.
+        Create and return UI components for the visualization module with lazy initialization.
         
         Args:
             config: Configuration dictionary
@@ -247,14 +285,75 @@ class VisualizationUIModule(BaseUIModule):
         Returns:
             Dictionary of UI components
         """
-        return create_visualization_ui(config=config)
+        # Prevent double initialization
+        if self._ui_components_created and hasattr(self, '_ui_components') and self._ui_components:
+            self.log_debug("⏭️ Skipping UI component creation - already created")
+            return self._ui_components
+            
+        try:
+            ui_components = create_visualization_ui(config=config)
+            
+            if not ui_components:
+                raise RuntimeError("Failed to create UI components")
+            
+            # Store components for backward compatibility
+            self.components = ui_components
+            
+            # Mark as created to prevent reinitalization
+            self._ui_components_created = True
+            
+            # Defer initialization of dashboard, sample viewer, and chart container
+            # This will be called after BaseUIModule completes initialization
+            # Don't initialize immediately as UI components may not be fully set up yet
+            
+            return ui_components
+            
+        except Exception as e:
+            self.log_error(f"Failed to create UI components: {e}")
+            raise
+    
+    def _lazy_initialize_components(self):
+        """Lazy initialize dashboard, sample viewer, and chart container."""
+        try:
+            # Only initialize if components are fully ready
+            if not hasattr(self, '_ui_components') or not self._ui_components:
+                self.log_debug("⏸️ Deferring component initialization - UI components not ready yet")
+                return
+                
+            # Initialize dashboard cards first
+            self._initialize_dashboard()
+            
+            # Initialize sample comparison viewer
+            self._initialize_sample_viewer()
+            
+            # Initialize chart container
+            self._initialize_chart_container()
+            
+            self.log_info("✅ All visualization components initialized successfully")
+            
+        except Exception as e:
+            self.log_error(f"Failed to lazy initialize components: {e}")
+    
+    def _post_init_tasks(self) -> None:
+        """Run post-initialization tasks after BaseUIModule completes initialization."""
+        try:
+            # Initialize all lazy components after BaseUIModule setup is complete
+            self._lazy_initialize_components()
+            
+            # Set up initial dashboard with placeholder data
+            self._update_dashboard_stats()
+            
+            self.log_info("✅ Visualization post-initialization completed")
+            
+        except Exception as e:
+            self.log_error(f"❌ Visualization post-initialization failed: {e}")
     
     def _initialize_components(self):
-        """Initialize all visualization components."""
-        # Initialize UI components
-        self._ui_components = create_visualization_ui()
-        
-        # Set up event handlers
+        """Initialize all visualization components (legacy method)."""
+        # This method is kept for backward compatibility but no longer used
+        # Components are now initialized lazily in _post_init_tasks
+        self.log_debug("Legacy _initialize_components called - components now initialized in _post_init_tasks")
+        pass
     
     def _get_module_button_handlers(self) -> Dict[str, Any]:
         """Get Visualization module-specific button handlers.
@@ -580,7 +679,12 @@ class VisualizationUIModule(BaseUIModule):
         return getattr(self, '_latest_stats', None)
     
     def _initialize_sample_viewer(self):
-        """Initialize the sample comparison viewer."""
+        """Initialize the sample comparison viewer (lazy)."""
+        # Prevent double initialization
+        if self._sample_viewer_initialized:
+            self.log_debug("⏭️ Skipping sample viewer initialization - already initialized")
+            return
+            
         try:
             from .components.sample_comparison_viewer import create_sample_comparison_viewer
             
@@ -612,6 +716,9 @@ class VisualizationUIModule(BaseUIModule):
                         viewer_widget = self._sample_viewer.get_widget()
                         summary_container.children = list(summary_container.children) + [viewer_widget]
             
+            # Mark as initialized
+            self._sample_viewer_initialized = True
+            
             if hasattr(self, 'log_info'):
                 self.log_info("✅ Sample comparison viewer initialized")
                 
@@ -629,7 +736,12 @@ class VisualizationUIModule(BaseUIModule):
         return getattr(self, '_sample_viewer', None)
     
     def _initialize_chart_container(self):
-        """Initialize the tabbed chart container."""
+        """Initialize the tabbed chart container (lazy)."""
+        # Prevent double initialization
+        if self._chart_container_initialized:
+            self.log_debug("⏭️ Skipping chart container initialization - already initialized")
+            return
+            
         try:
             from .components.charts import create_tabbed_chart_container
             
@@ -649,6 +761,9 @@ class VisualizationUIModule(BaseUIModule):
                 elif hasattr(viz_container, 'set_content'):
                     chart_widget = self._chart_container.get_widget()
                     viz_container.set_content(chart_widget)
+            
+            # Mark as initialized
+            self._chart_container_initialized = True
             
             if hasattr(self, 'log_info'):
                 self.log_info("✅ Tabbed chart container initialized")

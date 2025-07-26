@@ -61,7 +61,7 @@ def create_unified_training_ui(config: Optional[Dict[str, Any]] = None, **kwargs
     form_container['add_item'](form_widgets, "training_form")
     
     # 3. Create Action Container (only Start Training button)
-    action_buttons = [
+    actions = [
         {
             'id': 'start_training',
             'text': '🚀 Start Training',
@@ -73,7 +73,7 @@ def create_unified_training_ui(config: Optional[Dict[str, Any]] = None, **kwargs
     
     action_container = create_action_container(
         title="🎯 Training Actions",
-        buttons=action_buttons,
+        buttons=actions,
         show_save_reset=True  # Use standard save/reset buttons
     )
     
@@ -130,9 +130,9 @@ def create_unified_training_ui(config: Optional[Dict[str, Any]] = None, **kwargs
         'summary_container': summary_container,
         
         # Individual action buttons for easy access
-        'start_training_button': action_container['buttons'].get('start_training'),
-        'save_button': action_container['buttons'].get('save'),
-        'reset_button': action_container['buttons'].get('reset'),
+        'start_training': action_container['buttons'].get('start_training'),
+        'save': action_container['buttons'].get('save'),
+        'reset': action_container['buttons'].get('reset'),
         
         # Operation container methods
         'update_progress': operation_container.get('update_progress'),
@@ -153,7 +153,7 @@ def create_unified_training_ui(config: Optional[Dict[str, Any]] = None, **kwargs
     return ui_components
 
 
-def update_training_buttons_state(ui_components: Dict[str, Any], 
+def update_trainings_state(ui_components: Dict[str, Any], 
                                 is_training: bool = False,
                                 has_model: bool = True):
     """Update training button states based on current conditions.
@@ -164,16 +164,16 @@ def update_training_buttons_state(ui_components: Dict[str, Any],
         has_model: Whether a model is available for training
     """
     try:
-        start_button = ui_components.get('start_training_button')
+        start = ui_components.get('start_training')
         
-        if start_button and hasattr(start_button, 'disabled'):
-            start_button.disabled = is_training or not has_model
+        if start and hasattr(start, 'disabled'):
+            start.disabled = is_training or not has_model
             if not has_model:
-                start_button.tooltip = "No model available - configure backbone first"
+                start.tooltip = "No model available - configure backbone first"
             elif is_training:
-                start_button.tooltip = "Training in progress"
+                start.tooltip = "Training in progress"
             else:
-                start_button.tooltip = "Start unified training pipeline"
+                start.tooltip = "Start unified training pipeline"
                 
     except Exception as e:
         logger = get_module_logger("smartcash.ui.model.training.components")

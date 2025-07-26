@@ -158,6 +158,9 @@ class SmartCashLogger:
         self.name = name
         self.logger = logging.getLogger(name)
         
+        # Prevent duplicate log messages by disabling propagation to root logger
+        self.logger.propagate = False
+        
         # Auto-detect settings based on environment if not explicitly provided
         if log_to_console is None:
             log_to_console = not should_disable_console_logging()

@@ -11,6 +11,13 @@ def setup_device(device_config: Dict[str, Any]) -> torch.device:
     """🎮 Setup device berdasarkan konfigurasi dengan auto-detection"""
     logger = get_logger("model.device")
     
+    # Check if device is explicitly set (force_cpu mode)
+    explicit_device = device_config.get('device')
+    if explicit_device:
+        device = torch.device(explicit_device)
+        logger.info(f"🔧 Device explicitly set to: {device}")
+        return device
+    
     auto_detect = device_config.get('auto_detect', True)
     preferred = device_config.get('preferred', 'cuda')
     

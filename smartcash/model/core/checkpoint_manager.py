@@ -23,7 +23,6 @@ class CheckpointManager:
         # Checkpoint configuration
         checkpoint_config = config.get('checkpoint', {})
         self.save_dir = Path(checkpoint_config.get('save_dir', '/data/checkpoints'))
-        self.format_template = checkpoint_config.get('format', 'best_{model_name}_{backbone}_{date:%Y%m%d}.pt')
         self.max_checkpoints = checkpoint_config.get('max_checkpoints', 5)
         self.auto_cleanup = checkpoint_config.get('auto_cleanup', True)
         
@@ -188,41 +187,71 @@ class CheckpointManager:
             return []
     
     def _generate_checkpoint_name(self, metrics: Optional[Dict] = None, **kwargs) -> str:
-        """📝 Generate checkpoint filename berdasarkan template"""
+        """📝 Generate checkpoint filename using new naming convention
         
-        # Get model info
-        model_config = self.config.get('model', {})
+        Format: best_{backbone}_{two_phase|single_phase}_{single|multi}_{frozen|unfrozen}_{pretrained:if true}_{yyyymmdd}.pt
+        """
         
-        # Template variables
-        current_date = datetime.now()
-        variables = {
-            'model_name': model_config.get('model_name', 'smartcash'),
-            'backbone': model_config.get('backbone', 'unknown'),
-            'layer_mode': model_config.get('layer_mode', 'single'),
-            'date': current_date,  # Pass datetime object for strftime formatting
-            'time': current_date.strftime('%H%M'),
-            'epoch': kwargs.get('epoch', 0)
-        }
-        
-        # Add metric info jika ada
-        if metrics:
-            # Extract numeric metrics only for comparison
-            numeric_metrics = {k: v for k, v in metrics.items() if isinstance(v, (int, float))}
-            if numeric_metrics:
-                best_metric = min(numeric_metrics.values())
-                variables['metric'] = f"{best_metric:.4f}".replace('.', '')
-            else:
-                variables['metric'] = "0000"
-        
-        # Format filename
         try:
-            filename = self.format_template.format(**variables)
-        except KeyError as e:
-            self.logger.warning(f"⚠️ Template variable missing: {e}, using default")
+            # Get model configuration
+            model_config = self.config.get('model', {})
+            training_config = self.config.get('training', {})
+            
+            # Extract naming components
+            backbone = model_config.get('backbone', 'unknown')
+            
+            # Determine training mode (phase mode)
+            training_mode = training_config.get('training_mode', 'two_phase')
+            if training_mode not in ['single_phase', 'two_phase']:
+                # Fallback: determine from phases configuration
+                total_phases = len([k for k in self.config.get('training_phases', {}) if 'phase_' in k])
+                training_mode = 'single_phase' if total_phases == 1 else 'two_phase'
+            
+            # Determine layer mode
+            layer_mode = model_config.get('layer_mode', 'multi')
+            if 'detection_layers' in model_config:
+                num_layers = len(model_config['detection_layers'])
+                layer_mode = 'single' if num_layers == 1 else 'multi'
+            
+            # Determine freeze status
+            freeze_backbone = model_config.get('freeze_backbone', False)
+            freeze_status = 'frozen' if freeze_backbone else 'unfrozen'
+            
+            # Check if pretrained is enabled
+            pretrained = model_config.get('pretrained', False)
+            pretrained_suffix = 'pretrained' if pretrained else ''
+            
+            # Get current date
+            current_date = datetime.now()
             date_str = current_date.strftime('%Y%m%d')
-            filename = f"best_{variables['model_name']}_{variables['backbone']}_{date_str}.pt"
-        
-        return filename
+            
+            # Build checkpoint name parts
+            name_parts = [
+                'best',
+                backbone,
+                training_mode,
+                layer_mode,
+                freeze_status
+            ]
+            
+            # Add pretrained suffix only if True
+            if pretrained_suffix:
+                name_parts.append(pretrained_suffix)
+            
+            name_parts.append(date_str)
+            filename = '_'.join(name_parts) + '.pt'
+            
+            self.logger.debug(f"📝 Generated checkpoint name: {filename}")
+            return filename
+            
+        except Exception as e:
+            self.logger.warning(f"⚠️ Error generating checkpoint name: {e}, using fallback")
+            # Fallback to simple naming
+            model_config = self.config.get('model', {})
+            backbone = model_config.get('backbone', 'unknown')
+            date_str = datetime.now().strftime('%Y%m%d')
+            filename = f"best_{backbone}_{date_str}.pt"
+            return filename
     
     def _find_best_checkpoint(self) -> Optional[str]:
         """🔍 Find best checkpoint berdasarkan naming pattern"""

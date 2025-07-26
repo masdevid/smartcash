@@ -473,7 +473,7 @@ class UnifiedTrainingPipeline:
         
         try:
             # Freeze backbone
-            self._freeze_backbone()
+            self._freeze_backbone("phase 1")
             
             # Run training using manager
             result = training_manager.run_training_phase(1, epochs, start_epoch=start_epoch)
@@ -515,7 +515,7 @@ class UnifiedTrainingPipeline:
         
         try:
             # Unfreeze backbone
-            self._unfreeze_backbone()
+            self._unfreeze_backbone("phase 2")
             
             # Run training using manager
             result = training_manager.run_training_phase(2, epochs, start_epoch=start_epoch)
@@ -558,11 +558,9 @@ class UnifiedTrainingPipeline:
         try:
             # Handle backbone freezing based on configuration
             if freeze_backbone:
-                self._freeze_backbone()
-                logger.info(f"🔒 Backbone frozen for single phase training")
+                self._freeze_backbone("single phase training")
             else:
-                self._unfreeze_backbone()
-                logger.info(f"🔓 Backbone unfrozen for single phase training")
+                self._unfreeze_backbone("single phase training")
             
             # Store original configurations for restoration (with safe access)
             original_loss_config = {}
@@ -670,19 +668,19 @@ class UnifiedTrainingPipeline:
             self.progress_tracker.complete_phase(result)
             return result
     
-    def _freeze_backbone(self):
-        """Freeze backbone parameters for phase 1."""
+    def _freeze_backbone(self, context: str = "phase 1"):
+        """Freeze backbone parameters."""
         if hasattr(self.model, 'backbone'):
             for param in self.model.backbone.parameters():
                 param.requires_grad = False
-            logger.info("🔒 Backbone frozen for phase 1")
+            logger.info(f"🔒 Backbone frozen for {context}")
     
-    def _unfreeze_backbone(self):
-        """Unfreeze backbone parameters for phase 2."""
+    def _unfreeze_backbone(self, context: str = "phase 2"):
+        """Unfreeze backbone parameters."""
         if hasattr(self.model, 'backbone'):
             for param in self.model.backbone.parameters():
                 param.requires_grad = True
-            logger.info("🔓 Backbone unfrozen for phase 2")
+            logger.info(f"🔓 Backbone unfrozen for {context}")
     
     # Methods removed - functionality moved to TrainingPhaseManager
     

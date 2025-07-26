@@ -37,7 +37,14 @@ def _format_phase_display(phase: str) -> str:
 
 def _get_phase_number(phase: str) -> str:
     """Get phase number from phase name."""
-    return "1" if phase == 'training_phase_1' else "2"
+    if phase == 'training_phase_1':
+        return "1"
+    elif phase == 'training_phase_2':
+        return "2"
+    elif phase == 'training_phase_single':
+        return "Single"
+    else:
+        return "?"
 
 def create_metrics_callback(verbose: bool = True):
     """Create a metrics callback that handles metrics separately from progress."""
@@ -54,7 +61,7 @@ def create_metrics_callback(verbose: bool = True):
         
         # Print detailed metrics for completed epochs if verbose
         if verbose and metrics and kwargs.get('epoch_completed', False):
-            phase_num = "1" if phase == 'training_phase_1' else "2"
+            phase_num = _get_phase_number(phase)
             _print_epoch_metrics_summary(metrics, phase_num, epoch)
     
     # Store reference to latest metrics for progress callback access
@@ -244,7 +251,7 @@ def create_progress_callback(use_tqdm: bool = True, verbose: bool = True):
         """Unified progress callback with configurable output mode."""
         phase_display = _format_phase_display(phase)
         
-        if phase in ['training_phase_1', 'training_phase_2']:
+        if phase in ['training_phase_1', 'training_phase_2', 'training_phase_single']:
             _handle_training_phase_progress(phase, current, total, message, 
                                           progress_bars, verbose, use_tqdm, **kwargs)
         else:
@@ -375,6 +382,13 @@ def _print_configuration(args):
         print(f"   • Backbone: {backbone_status}")
     
     print(f"   • Checkpoint directory: {args.checkpoint_dir}")
+    
+    # Show checkpoint naming example
+    example_layer_mode = 'single' if args.training_mode == 'single_phase' and args.single_layer_mode == 'single' else 'multi'
+    example_freeze_status = 'frozen' if args.training_mode == 'single_phase' and args.single_freeze_backbone else 'unfrozen'
+    example_pretrained = '_pretrained' if args.pretrained else ''
+    example_checkpoint_name = f"best_{args.backbone}_{args.training_mode}_{example_layer_mode}_{example_freeze_status}{example_pretrained}_YYYYMMDD.pt"
+    print(f"   • Checkpoint naming: {example_checkpoint_name}")
     
     # Training parameters
     print(f"\n🎛️ Training Parameters:")
@@ -571,7 +585,14 @@ def _process_training_results(result: dict, args) -> int:
         
         print(f"\n💾 Checkpoint Management:")
         print(f"   • All checkpoints saved to: {args.checkpoint_dir}")
-        print(f"   • Unified naming convention applied")
+        print(f"   • Naming format: best_{{backbone}}_{{training_mode}}_{{layer_mode}}_{{freeze_status}}_{{pretrained}}_{{date}}.pt")
+        
+        # Generate example checkpoint name based on current configuration
+        example_layer_mode = 'single' if args.training_mode == 'single_phase' and args.single_layer_mode == 'single' else 'multi'
+        example_freeze_status = 'frozen' if args.training_mode == 'single_phase' and args.single_freeze_backbone else 'unfrozen'
+        example_pretrained = '_pretrained' if args.pretrained else ''
+        example_name = f"best_{args.backbone}_{args.training_mode}_{example_layer_mode}_{example_freeze_status}{example_pretrained}_YYYYMMDD.pt"
+        print(f"   • Example: {example_name}")
         
         _print_training_summary(args, pipeline_summary, viz_result)
         

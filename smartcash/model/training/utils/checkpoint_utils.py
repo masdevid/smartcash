@@ -81,6 +81,7 @@ def generate_checkpoint_name(
 ) -> str:
     """
     Generate checkpoint filename according to naming conventions.
+    Format: best_{backbone}_{two_phase|single_phase}_{single|multi}_{frozen|unfrozen}_{pretrained:if true}_{yyyymmdd}.pt
     
     Args:
         backbone: Model backbone name
@@ -92,32 +93,52 @@ def generate_checkpoint_name(
         Checkpoint filename
     """
     try:
-        # Determine phase mode
-        total_phases = len([k for k in config.get('training_phases', {}) if 'phase_' in k])
-        phase_mode = 'single_phase' if total_phases == 1 else 'two_phase'
+        # Determine training mode (phase mode)
+        training_config = config.get('training', {})
+        training_mode = training_config.get('training_mode', 'two_phase')
+        if training_mode not in ['single_phase', 'two_phase']:
+            # Fallback: determine from phases configuration
+            total_phases = len([k for k in config.get('training_phases', {}) if 'phase_' in k])
+            training_mode = 'single_phase' if total_phases == 1 else 'two_phase'
         
         # Determine layer mode from config
-        layer_mode = config['model'].get('layer_mode', 'multi')
-        if 'detection_layers' in config['model']:
-            num_layers = len(config['model']['detection_layers'])
+        model_config = config.get('model', {})
+        layer_mode = model_config.get('layer_mode', 'multi')
+        if 'detection_layers' in model_config:
+            num_layers = len(model_config['detection_layers'])
             layer_mode = 'single' if num_layers == 1 else 'multi'
         
-        # Determine device type
-        device = next(model.parameters()).device
-        device_type = 'cpu' if device.type == 'cpu' else ('mps' if device.type == 'mps' else 'gpu')
+        # Determine freeze status
+        freeze_backbone = model_config.get('freeze_backbone', False)
+        freeze_status = 'frozen' if freeze_backbone else 'unfrozen'
         
-        # Get batch size
-        batch_size = config.get('training', {}).get('data', {}).get('batch_size', 'auto')
+        # Check if pretrained is enabled
+        pretrained = model_config.get('pretrained', False)
+        pretrained_suffix = 'pretrained' if pretrained else ''
         
         # Get current date
         date_str = datetime.now().strftime('%Y%m%d')
         
         # Generate name based on type
         if is_best:
-            checkpoint_name = f"best_{backbone}_{phase_mode}_{layer_mode}_{device_type}_{batch_size}_{date_str}.pt"
+            # Build checkpoint name parts
+            name_parts = [
+                'best',
+                backbone,
+                training_mode,
+                layer_mode,
+                freeze_status
+            ]
+            
+            # Add pretrained suffix only if True
+            if pretrained_suffix:
+                name_parts.append(pretrained_suffix)
+            
+            name_parts.append(date_str)
+            checkpoint_name = '_'.join(name_parts) + '.pt'
         else:
             timestamp = int(time.time())
-            checkpoint_name = f"{backbone}_{phase_mode}_{layer_mode}_{device_type}_{batch_size}_{timestamp}.pt"
+            checkpoint_name = f"{backbone}_{training_mode}_{layer_mode}_{freeze_status}_{timestamp}.pt"
         
         return checkpoint_name
         

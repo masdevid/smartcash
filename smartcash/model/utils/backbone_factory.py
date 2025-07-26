@@ -94,30 +94,36 @@ class CSPDarknetBackbone(BackboneBase):
     
     def _build_backbone(self):
         """Build CSPDarknet architecture"""
-        try:
-            # Try to use YOLOv5 from ultralytics with PyTorch 2.6+ compatibility
-            import torch
-            
-            # Handle PyTorch 2.6+ weights_only requirement
-            original_load = torch.load
-            def patched_load(*args, **kwargs):
-                if 'weights_only' not in kwargs:
-                    kwargs['weights_only'] = False
-                return original_load(*args, **kwargs)
-            
-            torch.load = patched_load
-            
+        if self.pretrained:
+            # Only attempt hub loading when pretrained weights are requested
             try:
-                # YOLOv5 has complex layer connections, so we can't just extract backbone as Sequential
-                # Instead, we'll use the custom implementation as it's more reliable
-                raise Exception("YOLOv5 architecture too complex for simple Sequential extraction")
+                # Try to use YOLOv5 from ultralytics with PyTorch 2.6+ compatibility
+                import torch
                 
-            finally:
-                # Restore original torch.load
-                torch.load = original_load
-            
-        except Exception as e:
-            self.logger.warning(f"⚠️ Failed to load from hub: {str(e)}, building custom implementation")
+                # Handle PyTorch 2.6+ weights_only requirement
+                original_load = torch.load
+                def patched_load(*args, **kwargs):
+                    if 'weights_only' not in kwargs:
+                        kwargs['weights_only'] = False
+                    return original_load(*args, **kwargs)
+                
+                torch.load = patched_load
+                
+                try:
+                    # YOLOv5 has complex layer connections, so we can't just extract backbone as Sequential
+                    # Instead, we'll use the custom implementation as it's more reliable
+                    raise Exception("YOLOv5 architecture too complex for simple Sequential extraction")
+                    
+                finally:
+                    # Restore original torch.load
+                    torch.load = original_load
+                
+            except Exception as e:
+                self.logger.warning(f"⚠️ Failed to load from hub: {str(e)}, building custom implementation")
+                self._build_custom_csp_darknet()
+        else:
+            # When pretrained=False, directly build custom implementation without hub attempt
+            self.logger.debug("Building custom CSPDarknet from scratch (pretrained=False)")
             self._build_custom_csp_darknet()
     
     def _build_custom_csp_darknet(self):

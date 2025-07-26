@@ -113,33 +113,17 @@ class PlatformPresets:
             }
     
     def get_data_config(self, backbone: str = 'cspdarknet') -> Dict[str, Any]:
-        """Get optimized data loading configuration with memory optimization."""
+        """Get optimized data loading configuration with deferred memory optimization."""
         device_config = self.get_device_config()
         
-        # Get memory-optimized batch configuration
-        try:
-            memory_optimizer = get_memory_optimizer()
-            batch_config = memory_optimizer.get_optimal_batch_config(backbone)
-            
-            # Use memory optimizer configuration as base
-            config = {
-                'batch_size': batch_config['batch_size'],
-                'num_workers': batch_config['num_workers'],
-                'pin_memory': batch_config['pin_memory'],
-                'persistent_workers': batch_config['persistent_workers'],
-                'prefetch_factor': batch_config['prefetch_factor'],
-                'drop_last': batch_config['drop_last']
-            }
-        except Exception as e:
-            logger.warning(f"⚠️ Memory optimizer unavailable, using fallback config: {e}")
-            # Fallback configuration
-            config = {
-                'num_workers': optimal_mixed_workers(),  # Mixed I/O and CPU operations
-                'pin_memory': device_config['device'] == 'cuda',  # Only beneficial for CUDA
-                'persistent_workers': True,
-                'prefetch_factor': 2,
-                'drop_last': True
-            }
+        # Use platform-optimized configuration (memory optimizer will be applied later during training)
+        config = {
+            'num_workers': optimal_mixed_workers(),  # Mixed I/O and CPU operations
+            'pin_memory': device_config['device'] == 'cuda',  # Only beneficial for CUDA
+            'persistent_workers': True,
+            'prefetch_factor': 2,
+            'drop_last': True
+        }
         
         # Platform-specific optimizations
         if self.platform_info['is_colab']:

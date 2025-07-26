@@ -43,7 +43,7 @@ class MemoryOptimizer:
             try:
                 torch.mps.empty_cache()
                 device = torch.device('mps')
-                logger.info("🚀 Using MPS with memory optimization")
+                # Device selection logged in __init__
                 return device
             except RuntimeError as e:
                 logger.warning(f"⚠️ MPS cache error: {e}, continuing with MPS")
@@ -51,7 +51,7 @@ class MemoryOptimizer:
         elif torch.cuda.is_available():
             device = torch.device('cuda')
             torch.cuda.empty_cache()
-            logger.info("🚀 Using CUDA with memory optimization")
+            # Device selection logged in __init__
             return device
         else:
             device = torch.device('cpu')
@@ -87,7 +87,7 @@ class MemoryOptimizer:
             config['compile_model'] = True
             logger.info("⚡ CUDA memory optimization enabled")
             
-        elif self.platform_info['is_apple_silicon']:
+        elif self.device.type == 'mps':
             # MPS optimizations - aggressive memory management
             if 'PYTORCH_MPS_HIGH_WATERMARK_RATIO' in os.environ:
                 del os.environ['PYTORCH_MPS_HIGH_WATERMARK_RATIO']
@@ -113,7 +113,7 @@ class MemoryOptimizer:
         # Common optimizations
         torch.backends.cudnn.benchmark = False  # Reduce memory fragmentation
         config['device'] = self.device
-        logger.info("⚙️ Memory optimization settings applied")
+        # Remove redundant message - already logged device-specific optimization above
         
         return config
     
@@ -254,8 +254,10 @@ class MemoryOptimizer:
     def optimize_for_training(self, model: torch.nn.Module, 
                             backbone: str = 'cspdarknet') -> Dict[str, Any]:
         """Optimize model and get training configuration."""
-        # Setup memory efficient settings
-        memory_config = self.setup_memory_efficient_settings()
+        # Setup memory efficient settings (check cache first)
+        if not hasattr(self, '_memory_config_cache'):
+            self._memory_config_cache = self.setup_memory_efficient_settings()
+        memory_config = self._memory_config_cache
         
         # Get optimal batch configuration
         batch_config = self.get_optimal_batch_config(backbone)
@@ -282,7 +284,7 @@ class MemoryOptimizer:
             'platform_info': self.platform_info
         }
         
-        logger.info(f"🎯 Model optimized for {self.device} training")
+        # Remove redundant message - optimization already logged during initialization
         return result
     
     def create_memory_monitor_callback(self) -> callable:

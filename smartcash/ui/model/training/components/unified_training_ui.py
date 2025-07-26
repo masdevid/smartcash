@@ -117,21 +117,12 @@ def create_unified_training_ui(config: Optional[Dict[str, Any]] = None, **kwargs
             {'component': action_container['container'], 'type': 'action'},
             {'component': operation_container['container'], 'type': 'operation'},
             {'component': summary_container.container, 'type': 'summary'}
-        ],
-        container_style={
-            'width': '100%',
-            'max_width': '1200px',
-            'margin': '0 auto',
-            'padding': '20px',
-            'border': '1px solid #e0e0e0',
-            'border_radius': '8px',
-            'background_color': '#ffffff'
-        }
+        ]
     )
     
     # 7. Create UI components dictionary
     ui_components = {
-        'main_container': main_container,
+        'main_container': main_container.container,
         'header_container': header_container,
         'form_container': form_container,
         'action_container': action_container,

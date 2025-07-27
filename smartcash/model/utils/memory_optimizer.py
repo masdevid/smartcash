@@ -88,15 +88,15 @@ class MemoryOptimizer:
             logger.info("⚡ CUDA memory optimization enabled")
             
         elif self.device.type == 'mps':
-            # MPS optimizations - aggressive memory management
-            if 'PYTORCH_MPS_HIGH_WATERMARK_RATIO' in os.environ:
-                del os.environ['PYTORCH_MPS_HIGH_WATERMARK_RATIO']
+            # MPS optimizations - set valid watermark ratios
+            os.environ['PYTORCH_MPS_HIGH_WATERMARK_RATIO'] = '0.8'  # Valid range: 0.0 to 1.0
+            os.environ['PYTORCH_MPS_LOW_WATERMARK_RATIO'] = '0.3'   # Must be < HIGH_WATERMARK_RATIO
             
             # Conservative MPS settings
             config['mixed_precision'] = False  # MPS doesn't support AMP
-            config['compile_model'] = False   # torch.compile issues on M1
+            config['compile_model'] = False    # torch.compile issues on M1
             config['memory_efficient'] = True
-            logger.info("🧠 MPS conservative memory management enabled")
+            logger.info("🧠 MPS memory management enabled with conservative watermarks")
             
         else:
             # CPU optimizations to prevent semaphore leaking

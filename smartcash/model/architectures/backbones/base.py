@@ -30,7 +30,17 @@ class BaseBackbone(nn.Module, ABC):
     
     def load_state_dict_from_path(self, state_dict_path: Union[str, Path], strict: bool = False):
         """Muat state dict dari checkpoint dengan dukungan berbagai format."""
-        checkpoint = torch.load(state_dict_path, map_location='cpu')
+        # Use safe globals for PyTorch 2.6+ compatibility
+        import torch.serialization
+        try:
+            from models.yolo import Model as YOLOModel
+            from models.common import Conv, C3, SPPF, Bottleneck
+            safe_globals = [YOLOModel, Conv, C3, SPPF, Bottleneck]
+        except ImportError:
+            safe_globals = []
+        
+        with torch.serialization.safe_globals(safe_globals):
+            checkpoint = torch.load(state_dict_path, map_location='cpu')
         state_dict = checkpoint.get('state_dict') or checkpoint.get('model') or checkpoint if isinstance(checkpoint, dict) else checkpoint
         self.load_state_dict(state_dict, strict=strict)
     

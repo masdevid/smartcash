@@ -154,7 +154,17 @@ class CheckpointManager:
             for checkpoint_file in self.save_dir.glob("*.pt"):
                 try:
                     # Load metadata dari checkpoint
-                    checkpoint_data = torch.load(checkpoint_file, map_location='cpu')
+                    # Use safe globals for PyTorch 2.6+ compatibility
+                    import torch.serialization
+                    try:
+                        from models.yolo import Model as YOLOModel
+                        from models.common import Conv, C3, SPPF, Bottleneck
+                        safe_globals = [YOLOModel, Conv, C3, SPPF, Bottleneck]
+                    except ImportError:
+                        safe_globals = []
+                    
+                    with torch.serialization.safe_globals(safe_globals):
+                        checkpoint_data = torch.load(checkpoint_file, map_location='cpu')
                     
                     # Extract info
                     file_stat = checkpoint_file.stat()

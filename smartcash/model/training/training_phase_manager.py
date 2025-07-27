@@ -275,20 +275,64 @@ class TrainingPhaseManager:
         running_val_loss = 0.0
         num_batches = len(val_loader)
         
+        # Initialize metrics dictionary
+        metrics = {}
+        
         with torch.no_grad():
             for batch_idx, (images, targets) in enumerate(val_loader):
                 device = next(self.model.parameters()).device
                 images = images.to(device, non_blocking=True)
                 targets = targets.to(device, non_blocking=True)
                 
+                # Get model predictions
                 predictions = self.model(images)
                 if not isinstance(predictions, dict):
                     predictions = {'layer_1': predictions}
                 
-                loss, _ = loss_manager.compute_loss(predictions, targets, images.shape[-1])
+                # Compute loss and metrics
+                loss, loss_breakdown = loss_manager.compute_loss(predictions, targets, images.shape[-1])
                 running_val_loss += loss.item()
+                
+                # Update metrics from loss breakdown
+                for k, v in loss_breakdown.items():
+                    if isinstance(v, torch.Tensor):
+                        v = v.item()
+                    if k.startswith('val_') or k in ['map50', 'map50_95', 'precision', 'recall', 'f1', 'accuracy']:
+                        if k not in metrics:
+                            metrics[k] = 0.0
+                        metrics[k] += v
+                
+                # Update progress
+                if batch_idx % 10 == 0 or batch_idx == num_batches - 1:
+                    avg_loss = running_val_loss / (batch_idx + 1)
+                    self.progress_tracker.update_phase(
+                        epoch, total_epochs,
+                        f"Val Batch {batch_idx + 1}/{num_batches}",
+                        epoch=epoch + 1,
+                        batch_idx=batch_idx + 1,
+                        batch_total=num_batches,
+                        metrics={'val_loss': avg_loss, **{k: v / (batch_idx + 1) for k, v in metrics.items()}}
+                    )
         
-        return {'val_loss': running_val_loss / num_batches if num_batches > 0 else 0.0}
+        # Calculate average metrics
+        if num_batches > 0:
+            metrics = {k: v / num_batches for k, v in metrics.items()}
+        
+        # Ensure all required metrics are present
+        base_metrics = {
+            'val_loss': running_val_loss / num_batches if num_batches > 0 else 0.0,
+            'val_map50': 0.0,
+            'val_map50_95': 0.0,
+            'val_precision': 0.0,
+            'val_recall': 0.0,
+            'val_f1': 0.0,
+            'val_accuracy': 0.0
+        }
+        
+        # Update with calculated metrics
+        base_metrics.update(metrics)
+        
+        return base_metrics
     
     def _emit_training_charts(self, epoch: int, phase_num: int, final_metrics: dict, layer_metrics: dict):
         """Emit live chart data for training visualization."""

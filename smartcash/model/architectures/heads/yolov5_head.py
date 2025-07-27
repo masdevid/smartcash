@@ -384,6 +384,10 @@ class YOLOv5HeadAdapter:
 # Register custom head for YOLOv5 model parsing
 def register_yolov5_components():
     """Register custom components with YOLOv5 for model parsing"""
+    # Check if already registered to prevent duplicate messages
+    if hasattr(register_yolov5_components, '_registered'):
+        return
+    
     try:
         import models.yolo as yolo_module
         
@@ -394,6 +398,9 @@ def register_yolov5_components():
         globals()['SmartCashMultiDetect'] = YOLOv5MultiLayerDetect
         
         print("✅ Registered SmartCash components with YOLOv5")
+        
+        # Mark as registered
+        register_yolov5_components._registered = True
         
     except ImportError:
         print("⚠️ Could not register components - YOLOv5 not available")

@@ -95,7 +95,18 @@ class CSPDarknet(BaseBackbone):
             if weights_path is not None:
                 # Load from local path
                 self.logger.info(f"📂 Memuat model dari: {weights_path}")
-                model = torch.load(weights_path, map_location='cpu')
+                
+                # Use safe globals for PyTorch 2.6+ compatibility
+                import torch.serialization
+                try:
+                    from models.yolo import Model as YOLOModel
+                    from models.common import Conv, C3, SPPF, Bottleneck
+                    safe_globals = [YOLOModel, Conv, C3, SPPF, Bottleneck]
+                except ImportError:
+                    safe_globals = []
+                
+                with torch.serialization.safe_globals(safe_globals):
+                    model = torch.load(weights_path, map_location='cpu')
                 
                 # Check if it's a YOLOv5 model format
                 if isinstance(model, dict) and 'model' in model:

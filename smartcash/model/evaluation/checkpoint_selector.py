@@ -86,7 +86,17 @@ class CheckpointSelector:
         
         # Load dan validate checkpoint
         try:
-            checkpoint_data = torch.load(checkpoint_path, map_location='cpu')
+            # Use safe globals for PyTorch 2.6+ compatibility
+            import torch.serialization
+            try:
+                from models.yolo import Model as YOLOModel
+                from models.common import Conv, C3, SPPF, Bottleneck
+                safe_globals = [YOLOModel, Conv, C3, SPPF, Bottleneck]
+            except ImportError:
+                safe_globals = []
+            
+            with torch.serialization.safe_globals(safe_globals):
+                checkpoint_data = torch.load(checkpoint_path, map_location='cpu')
             
             # Extract metadata
             metadata = self._extract_checkpoint_metadata(checkpoint_path, checkpoint_data)

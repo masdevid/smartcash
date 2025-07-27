@@ -125,7 +125,9 @@ class SmartCashYOLOv5Integration:
             except ImportError as e:
                 self.logger.warning(f"Could not access YOLOv5 model module: {e}")
             
-            self.logger.info("🔧 Registered SmartCash components with YOLOv5")
+            # Only log if this is the first registration
+            if not hasattr(register_yolov5_components, '_registered'):
+                self.logger.info("🔧 Registered SmartCash components with YOLOv5")
             
         except Exception as e:
             self.logger.error(f"❌ Failed to register components: {e}", exc_info=True)
@@ -302,13 +304,45 @@ class SmartCashYOLOv5Integration:
                                 try:
                                     # Initialize the model using YOLOv5's Model class which handles the config properly
                                     from models.yolo import Model as YOLOModel
-                                    temp_model = YOLOModel(temp_yaml_path, ch=config['ch'])
                                     
-                                    # Initialize model weights
-                                    initialize_weights(temp_model)
+                                    # Add safe globals for PyTorch 2.6+ weights_only loading
+                                    import torch.serialization
+                                    safe_globals = [YOLOModel]
+                                    # Also add any other model classes that might be in checkpoints
+                                    try:
+                                        from models.common import Conv, C3, SPPF, Bottleneck
+                                        safe_globals.extend([Conv, C3, SPPF, Bottleneck])
+                                    except ImportError:
+                                        pass
                                     
-                                    # Set model to evaluation mode
-                                    temp_model.eval()
+                                    # Temporarily suppress YOLOv5 verbose logging during model creation
+                                    import logging
+                                    from utils.general import LOGGER
+                                    original_level = LOGGER.level
+                                    LOGGER.setLevel(logging.ERROR)  # Only show errors during model creation
+                                    
+                                    try:
+                                        # Handle PyTorch version compatibility
+                                        if hasattr(torch.serialization, 'safe_globals'):
+                                            # PyTorch 2.6.0+ with safe_globals
+                                            with torch.serialization.safe_globals(safe_globals):
+                                                temp_model = YOLOModel(temp_yaml_path, ch=config['ch'])
+                                        else:
+                                            # Fallback for older PyTorch versions
+                                            self.logger.warning("PyTorch version < 2.6.0 detected, using fallback model loading")
+                                            temp_model = YOLOModel(temp_yaml_path, ch=config['ch'])
+                                        
+                                        # Initialize model weights
+                                        initialize_weights(temp_model)
+                                        
+                                        # Set model to evaluation mode
+                                        temp_model.eval()
+                                    except Exception as e:
+                                        self.logger.error(f"Error during model initialization: {str(e)}")
+                                        raise
+                                    finally:
+                                        # Restore original logging level
+                                        LOGGER.setLevel(original_level)
                                     
                                 finally:
                                     # Restore original globals to avoid pollution
@@ -340,7 +374,10 @@ class SmartCashYOLOv5Integration:
                         # Initialize model with pretrained weights if specified
                         if hasattr(self, 'pretrained_weights'):
                             try:
-                                ckpt = torch.load(self.pretrained_weights, map_location='cpu')
+                                # Use safe globals context manager for PyTorch 2.6+ compatibility
+                                with torch.serialization.safe_globals(safe_globals):
+                                    ckpt = torch.load(self.pretrained_weights, map_location='cpu')
+                                
                                 if 'model' in ckpt:
                                     csd = ckpt['model'].float().state_dict()
                                     # Filter state dict to match model architecture

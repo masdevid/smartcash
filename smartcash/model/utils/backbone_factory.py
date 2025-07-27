@@ -176,7 +176,17 @@ class CSPDarknetBackbone(BackboneBase):
         
         if pretrained_path.exists():
             try:
-                checkpoint = torch.load(pretrained_path, map_location='cpu')
+                # Use safe globals for PyTorch 2.6+ compatibility
+                import torch.serialization
+                try:
+                    from models.yolo import Model as YOLOModel
+                    from models.common import Conv, C3, SPPF, Bottleneck
+                    safe_globals = [YOLOModel, Conv, C3, SPPF, Bottleneck]
+                except ImportError:
+                    safe_globals = []
+                
+                with torch.serialization.safe_globals(safe_globals):
+                    checkpoint = torch.load(pretrained_path, map_location='cpu')
                 if 'model' in checkpoint:
                     state_dict = checkpoint['model'].state_dict()
                 else:

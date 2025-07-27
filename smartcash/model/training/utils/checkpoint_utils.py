@@ -45,7 +45,17 @@ def check_for_resumable_checkpoint(checkpoint_dir: str, backbone: str) -> Option
         # Try to load the most recent checkpoint
         for checkpoint_file in checkpoint_files:
             try:
-                checkpoint = torch.load(checkpoint_file, map_location='cpu')
+                # Use safe globals for PyTorch 2.6+ compatibility
+                import torch.serialization
+                try:
+                    from models.yolo import Model as YOLOModel
+                    from models.common import Conv, C3, SPPF, Bottleneck
+                    safe_globals = [YOLOModel, Conv, C3, SPPF, Bottleneck]
+                except ImportError:
+                    safe_globals = []
+                
+                with torch.serialization.safe_globals(safe_globals):
+                    checkpoint = torch.load(checkpoint_file, map_location='cpu')
                 
                 # Extract information from checkpoint
                 resume_info = {
@@ -271,7 +281,17 @@ def load_checkpoint_for_resume(checkpoint_path: str) -> Optional[Dict[str, Any]]
         Checkpoint data dictionary or None if failed
     """
     try:
-        checkpoint = torch.load(checkpoint_path, map_location='cpu')
+        # Use safe globals for PyTorch 2.6+ compatibility
+        import torch.serialization
+        try:
+            from models.yolo import Model as YOLOModel
+            from models.common import Conv, C3, SPPF, Bottleneck
+            safe_globals = [YOLOModel, Conv, C3, SPPF, Bottleneck]
+        except ImportError:
+            safe_globals = []
+        
+        with torch.serialization.safe_globals(safe_globals):
+            checkpoint = torch.load(checkpoint_path, map_location='cpu')
         
         # Validate checkpoint structure
         required_keys = ['model_state_dict', 'epoch', 'phase']

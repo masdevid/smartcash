@@ -53,6 +53,9 @@ Examples:
                        help='Model backbone architecture (default: cspdarknet)')
     parser.add_argument('--pretrained', action='store_true',
                        help='Use pretrained weights for backbone (default: False, train from scratch)')
+    parser.add_argument('--architecture-type', type=str, default='auto',
+                       choices=['auto', 'legacy', 'yolov5'],
+                       help='Architecture type: auto (intelligent selection), legacy (SmartCash only), yolov5 (force YOLOv5 integration) (default: auto)')
     parser.add_argument('--phase1-epochs', type=int, default=1,
                        help='Number of epochs for phase 1 (frozen backbone training) (default: 1)')
     parser.add_argument('--phase2-epochs', type=int, default=1,
@@ -198,6 +201,7 @@ def get_training_kwargs(args: Any) -> dict:
     return {
         'backbone': args.backbone,
         'pretrained': args.pretrained,
+        'architecture_type': getattr(args, 'architecture_type', 'auto'),
         'phase_1_epochs': args.phase1_epochs,
         'phase_2_epochs': args.phase2_epochs,
         'checkpoint_dir': args.checkpoint_dir,

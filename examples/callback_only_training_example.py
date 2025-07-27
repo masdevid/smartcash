@@ -282,8 +282,27 @@ def main():
         metrics_callback = create_metrics_callback(args.verbose)
         progress_callback = create_progress_callback(args.verbose)
         
-        # Get training arguments and add callbacks
+        # Get training arguments
         training_kwargs = get_training_kwargs(args)
+        
+        # Set checkpoint directory to be relative to project root
+        training_kwargs['checkpoint_dir'] = str(Path(project_root) / 'data' / 'checkpoints')
+        
+        # Set model configuration using arguments from args
+        # Use enhanced model builder with YOLOv5 integration
+        training_kwargs['model'] = {
+            'model_name': 'smartcash_yolov5_integrated',
+            'backbone': args.backbone,
+            'pretrained': args.pretrained,
+            'layer_mode': 'multi' if args.training_mode == 'two_phase' else args.single_layer_mode,
+            'detection_layers': ['layer_1', 'layer_2', 'layer_3'],
+            'num_classes': 7,  # Fixed for banknote detection
+            'img_size': 640,   # Standard size for YOLO models
+            'feature_optimization': {'enabled': True},
+            'architecture_type': getattr(args, 'architecture_type', 'auto')  # Use from args or default to auto
+        }
+        
+        # Create callbacks
         training_kwargs.update({
             'log_callback': log_callback,
             'metrics_callback': metrics_callback,

@@ -107,7 +107,7 @@ class MemoryOptimizer:
             config['mixed_precision'] = False
             config['compile_model'] = False
             config['memory_efficient'] = True
-            config['num_workers'] = 0  # Prevent semaphore leaking
+            config['num_workers'] = max(2, min(4, self.platform_info['cpu_count'] // 2))  # Minimum 2 workers
             logger.info("🖥️ CPU semaphore leak prevention enabled")
         
         # Common optimizations
@@ -149,7 +149,7 @@ class MemoryOptimizer:
         else:  # CPU
             batch_size = config['cpu_batch']
             gradient_accumulation_steps = max(1, config['target_effective_batch'] // batch_size)
-            num_workers = 0  # Prevent semaphore leaking
+            num_workers = max(2, min(4, self.platform_info['cpu_count'] // 2))  # Minimum 2 workers
             pin_memory = False
         
         effective_batch_size = batch_size * gradient_accumulation_steps

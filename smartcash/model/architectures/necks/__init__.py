@@ -16,5 +16,5 @@ __all__ = [
     'FeatureProcessingNeck',
     'FPN_PAN',
     'FeaturePyramidNetwork',
-    'PathAggregationNetwork'
+    'PathAggregationNetwork',
 ]

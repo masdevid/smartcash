@@ -1,9 +1,22 @@
 """
-File: smartcash/model/architectures/heads/__init__.py
-Deskripsi: Ekspor komponen detection head
+SmartCash Model Architecture - Detection Heads
+YOLOv5-Compatible Multi-Layer Detection Heads
 """
 
-from smartcash.model.architectures.heads.detection_head import DetectionHead
-from smartcash.model.config.model_constants import LAYER_CONFIG
+from smartcash.model.architectures.heads.yolov5_head import (
+    YOLOv5MultiLayerDetect,
+    YOLOv5HeadAdapter,
+    register_yolov5_components
+)
+from smartcash.model.architectures.heads.multi_layer_head import (
+    MultiLayerHead,
+    ChannelAttention
+)
 
-__all__ = ['DetectionHead', 'LAYER_CONFIG']
+__all__ = [
+    'YOLOv5MultiLayerDetect',
+    'YOLOv5HeadAdapter', 
+    'register_yolov5_components',
+    'MultiLayerHead',
+    'ChannelAttention'
+]

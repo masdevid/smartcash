@@ -52,21 +52,21 @@ def create_unified_training_form(config: Dict[str, Any]) -> widgets.Widget:
             layout=widgets.Layout(width='auto')
         )
         
-        # Phase epochs
-        phase1_epochs = widgets.IntSlider(
+        # Phase epochs (using BoundedIntText for direct input)
+        phase1_epochs = widgets.BoundedIntText(
             description="Phase 1 Epochs:",
             value=training_config.get('phase_1_epochs', 1),
-            min=20, max=200, step=1,
+            min=1, max=200, step=1,
             style={'description_width': '120px'},
-            layout=widgets.Layout(width='auto')
+            layout=widgets.Layout(width='150px')
         )
         
-        phase2_epochs = widgets.IntSlider(
+        phase2_epochs = widgets.BoundedIntText(
             description="Phase 2 Epochs:",
             value=training_config.get('phase_2_epochs', 1),
-            min=50, max=200, step=1,
+            min=1, max=200, step=1,
             style={'description_width': '120px'},
-            layout=widgets.Layout(width='auto')
+            layout=widgets.Layout(width='150px')
         )
         
         # Loss type

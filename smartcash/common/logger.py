@@ -309,7 +309,7 @@ def get_logger(name: str = None,
         Configured SmartCashLogger instance
     """
     if name is None:
-        return logger
+        return SmartCashLogger('smartcash')
     return SmartCashLogger(
         name=name,
         level=level or LogLevel.INFO,

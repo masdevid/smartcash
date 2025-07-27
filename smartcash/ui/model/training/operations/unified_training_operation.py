@@ -11,10 +11,10 @@ from smartcash.model.api.core import run_full_training_pipeline
 
 class UnifiedTrainingOperation:
     """
-    Unified training operation handler that directly uses the unified training pipeline.
+    Unified training operation handler that directly uses the training pipeline.
     
     This replaces the complex training operation system with a direct call to the
-    unified training pipeline from smartcash.model.training.unified_training_pipeline.
+    training pipeline from smartcash.model.training.training_pipeline.
     """
     
     def __init__(self, ui_module, config: Dict[str, Any], callbacks: Dict[str, Callable]):

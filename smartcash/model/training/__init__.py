@@ -22,7 +22,7 @@ from .utils.early_stopping import (
 )
 from .visualization_manager import ComprehensiveMetricsTracker, create_visualization_manager
 from .platform_presets import PlatformPresets, get_platform_presets, get_platform_config
-from .unified_training_pipeline import UnifiedTrainingPipeline
+from .training_pipeline import TrainingPipeline, UnifiedTrainingPipeline
 # run_full_training_pipeline moved to smartcash.model.api.core
 
 # Main training API - now uses unified training pipeline
@@ -96,5 +96,5 @@ __all__ = [
     
     # Platform-aware training
     'PlatformPresets', 'get_platform_presets', 'get_platform_config',
-    'UnifiedTrainingPipeline'
+    'TrainingPipeline', 'UnifiedTrainingPipeline'
 ]

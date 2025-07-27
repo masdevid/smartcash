@@ -15,4 +15,12 @@ from smartcash.model.config.model_constants import (
     EFFICIENTNET_CHANNELS as EXPECTED_CHANNELS
 )
 
-__all__ = ['BaseBackbone', 'EfficientNetBackbone', 'SUPPORTED_MODELS', 'EXPECTED_CHANNELS', 'FeatureAdapter', 'CSPDarknet', 'ChannelAttention']
+__all__ = [
+    'BaseBackbone', 
+    'EfficientNetBackbone', 
+    'SUPPORTED_MODELS', 
+    'EXPECTED_CHANNELS', 
+    'FeatureAdapter', 
+    'CSPDarknet', 
+    'ChannelAttention',
+]

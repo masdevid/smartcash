@@ -22,7 +22,7 @@ class CheckpointManager:
         
         # Checkpoint configuration
         checkpoint_config = config.get('checkpoint', {})
-        self.save_dir = Path(checkpoint_config.get('save_dir', '/data/checkpoints'))
+        self.save_dir = Path(checkpoint_config.get('save_dir', 'data/checkpoints'))
         self.max_checkpoints = checkpoint_config.get('max_checkpoints', 5)
         self.auto_cleanup = checkpoint_config.get('auto_cleanup', True)
         

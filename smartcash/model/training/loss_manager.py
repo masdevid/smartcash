@@ -213,7 +213,13 @@ class YOLOLoss(nn.Module):
                     # Regression (box) loss with gradient clipping for stability
                     with torch.no_grad():
                         pxy = ps[:, :2].sigmoid() * 2.0 - 0.5
-                        pwh = (ps[:, 2:4].sigmoid() * 2) ** 2 * anchors[i].to(device=ps.device)
+                        # Add bounds checking for anchors access
+                        if i >= len(anchors):
+                            self.logger.warning(f"Index {i} out of bounds for anchors with size {len(anchors)}. Using last available anchors.")
+                            anchor_tensor = anchors[-1].to(device=ps.device)
+                        else:
+                            anchor_tensor = anchors[i].to(device=ps.device)
+                        pwh = (ps[:, 2:4].sigmoid() * 2) ** 2 * anchor_tensor
                         pbox = torch.cat((pxy, pwh), 1).clamp(0, 1)
                 # Calculate IoU and box loss
                 with torch.no_grad():
@@ -420,8 +426,29 @@ class YOLOLoss(nn.Module):
             # Get the number of classes
             num_classes = pred_shape[-1] - 5  # x, y, w, h, obj + classes
             
-            # Get the current anchors for this scale
-            anchors_i = self.anchors[i].clone().to(targets.device)
+            # Get the current anchors for this scale with bounds checking
+            if not hasattr(self, 'anchors') or self.anchors is None or len(self.anchors) == 0:
+                # If no anchors are defined, use default anchors
+                default_anchors = torch.tensor([
+                    [[10, 13], [16, 30], [33, 23]],      # P3/8
+                    [[30, 61], [62, 45], [59, 119]],     # P4/16
+                    [[116, 90], [156, 198], [373, 326]]  # P5/32
+                ], device=targets.device).float()
+                anchors_i = default_anchors[min(i, len(default_anchors) - 1)]
+                self.logger.warning(f"No anchors defined. Using default anchors for scale {i}.")
+            elif i >= len(self.anchors):
+                # If index is out of bounds, use the last available anchors
+                anchors_i = self.anchors[-1].clone().to(targets.device)
+                self.logger.warning(f"Index {i} out of bounds for anchors with size {len(self.anchors)}. Using last available anchors.")
+            else:
+                # Use the anchors for the current scale
+                anchors_i = self.anchors[i].clone().to(targets.device)
+                
+            # Ensure anchors_i has the correct shape [num_anchors, 2]
+            if len(anchors_i.shape) == 1:
+                anchors_i = anchors_i.view(-1, 2)
+            elif len(anchors_i.shape) == 3 and anchors_i.shape[0] == 1:
+                anchors_i = anchors_i.squeeze(0)
             
             # Initialize gain tensor with the correct shape
             gain = torch.ones(7, device=targets.device)

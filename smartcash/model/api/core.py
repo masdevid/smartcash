@@ -304,6 +304,72 @@ class SmartCashModelAPI:
                 'error': str(e)
             }
     
+    def save_checkpoint(self, **kwargs) -> str:
+        """
+        Save model checkpoint with enhanced metadata.
+        
+        Args:
+            **kwargs: Checkpoint parameters including:
+                - epoch: Current epoch number
+                - phase: Training phase number
+                - metrics: Training metrics dictionary
+                - is_best: Whether this is the best checkpoint
+                - config: Configuration dictionary
+                - session_id: Training session ID (optional)
+                
+        Returns:
+            Path to saved checkpoint
+        """
+        if not self.is_model_built:
+            raise RuntimeError("Model not built yet")
+        
+        try:
+            # Extract parameters
+            epoch = kwargs.get('epoch', 0)
+            phase = kwargs.get('phase', 1)
+            metrics = kwargs.get('metrics', {})
+            is_best = kwargs.get('is_best', False)
+            config = kwargs.get('config', self.config)
+            session_id = kwargs.get('session_id')
+            
+            # Prepare metadata
+            metadata = {
+                'epoch': epoch,
+                'phase': phase,
+                'metrics': metrics,
+                'is_best': is_best,
+                'config': config,
+                'session_id': session_id,
+                'architecture_type': 'yolov5',
+                'build_timestamp': datetime.now().isoformat(),
+                'device': str(self.device)
+            }
+            
+            # Generate checkpoint name if not provided
+            checkpoint_name = kwargs.get('checkpoint_name')
+            if not checkpoint_name:
+                # Create a copy of kwargs without metrics to avoid duplicate argument error
+                name_kwargs = {k: v for k, v in kwargs.items() if k != 'metrics'}
+                checkpoint_name = self.checkpoint_manager._generate_checkpoint_name(metrics, **name_kwargs)
+            
+            # Save checkpoint using checkpoint manager
+            checkpoint_path = self.checkpoint_manager.save_checkpoint(
+                model=self.model,
+                metrics=metrics,
+                checkpoint_name=checkpoint_name,
+                epoch=epoch,
+                phase=phase,
+                is_best=is_best,
+                config=config,
+                session_id=session_id
+            )
+            
+            return checkpoint_path
+            
+        except Exception as e:
+            self.logger.error(f"❌ Checkpoint saving failed: {str(e)}")
+            raise RuntimeError(f"Checkpoint saving failed: {str(e)}")
+    
     def load_model(self, checkpoint_path: str) -> Dict[str, Any]:
         """Load model from checkpoint"""
         try:

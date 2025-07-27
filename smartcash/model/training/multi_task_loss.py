@@ -96,23 +96,38 @@ class UncertaintyMultiTaskLoss(nn.Module):
                 layer_preds = predictions[layer_name]
                 layer_targets = targets[layer_name]
                 
-                if len(layer_targets) > 0:  # Only compute loss if there are targets
+                # Ensure layer_preds is a list of tensors on the right device
+                if not isinstance(layer_preds, (list, tuple)):
+                    layer_preds = [layer_preds]
+                layer_preds = [p.to(device) if isinstance(p, torch.Tensor) else p for p in layer_preds]
+                
+                # Ensure layer_targets is a tensor on the right device
+                if isinstance(layer_targets, (list, tuple)) and len(layer_targets) > 0:
+                    layer_targets = layer_targets[0]  # Take first element if it's a list
+                if isinstance(layer_targets, torch.Tensor):
+                    layer_targets = layer_targets.to(device)
+                
+                if layer_targets is not None and (not isinstance(layer_targets, (list, tuple)) or len(layer_targets) > 0):
                     # Compute YOLO loss for this layer
                     loss_fn = self.layer_losses[layer_name]
-                    layer_loss, layer_components = loss_fn(layer_preds, layer_targets, img_size)
-                    
-                    layer_losses[layer_name] = layer_loss
-                    
-                    # Store individual loss components with layer prefix
-                    for comp_name, comp_value in layer_components.items():
-                        loss_breakdown[f"{layer_name}_{comp_name}"] = comp_value
+                    try:
+                        layer_loss, layer_components = loss_fn(layer_preds, layer_targets, img_size)
+                        layer_losses[layer_name] = layer_loss
+                        
+                        # Store individual loss components with layer prefix
+                        for comp_name, comp_value in layer_components.items():
+                            loss_breakdown[f"{layer_name}_{comp_name}"] = comp_value
+                    except Exception as e:
+                        self.logger.error(f"Error computing loss for layer {layer_name}: {str(e)}")
+                        layer_losses[layer_name] = torch.tensor(0.0, device=device, requires_grad=True)
+                        loss_breakdown[f"{layer_name}_total_loss"] = torch.tensor(0.0, device=device)
                 else:
                     # No targets for this layer
-                    layer_losses[layer_name] = torch.tensor(0.0, device=device)
+                    layer_losses[layer_name] = torch.tensor(0.0, device=device, requires_grad=True)
                     loss_breakdown[f"{layer_name}_total_loss"] = torch.tensor(0.0, device=device)
             else:
                 # Layer not in predictions or targets
-                layer_losses[layer_name] = torch.tensor(0.0, device=device)
+                layer_losses[layer_name] = torch.tensor(0.0, device=device, requires_grad=True)
                 loss_breakdown[f"{layer_name}_total_loss"] = torch.tensor(0.0, device=device)
         
         # Apply uncertainty-based weighting

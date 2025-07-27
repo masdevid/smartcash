@@ -11,6 +11,8 @@ from typing import List, Dict, Tuple, Any, Optional, Union
 import math
 from typing import Dict, List, Tuple, Optional, Any
 
+from smartcash.common.logger import get_logger
+
 class YOLOLoss(nn.Module):
     """YOLO loss implementation untuk currency detection"""
     
@@ -106,38 +108,88 @@ class YOLOLoss(nn.Module):
                 # Calculate the expected number of features per anchor box
                 num_features = pred_shape[-1]
                 
-                # Try to calculate grid size based on the tensor size
-                total_elements = pred_shape[0] * pred_shape[1] * pred_shape[2]
-                expected_elements = pred_shape[0] * self.na * num_features  # Per grid cell
+                # For YOLOv5 format: [batch, 25200, num_classes + 5]
+                # 25200 = 3 anchors * (80² + 40² + 20²) = 3 * 8400
+                batch_size, total_predictions, num_features = pred_shape
                 
-                # Calculate grid size that would make the tensor size match
-                grid_size_squared = total_elements // (pred_shape[0] * self.na * num_features)
-                grid_size = int(math.isqrt(grid_size_squared))
+                # YOLOv5 has 3 detection layers with different grid sizes
+                # Standard YOLOv5 grid sizes: 80x80, 40x40, 20x20 for 640x640 input
+                yolo_grid_sizes = [80, 40, 20]  # P3, P4, P5
+                total_grid_cells = sum(gs * gs for gs in yolo_grid_sizes)
+                expected_total = self.na * total_grid_cells
                 
-                # Ensure grid_size is reasonable (should be a power of 2 between 8 and 80)
-                grid_size = max(8, min(80, grid_size))
-                grid_size = 2 ** int(round(math.log2(grid_size)))
-                grid_y = grid_x = grid_size
-                
-                try:
-                    # Reshape to [batch, grid_y, grid_x, anchors, num_classes + 5]
-                    pred = pred.view(
-                        pred_shape[0],  # batch
-                        grid_y,
-                        grid_x,
-                        self.na,  # anchors
-                        -1  # num_classes + 5
-                    ).permute(0, 3, 1, 2, 4).contiguous()  # [batch, anchors, grid_y, grid_x, num_classes + 5]
-                except RuntimeError as e:
-                    # If reshaping fails, log the error and skip this prediction
-                    self.logger.warning(f"Failed to reshape prediction tensor with shape {pred_shape} to [batch, {grid_y}, {grid_x}, {self.na}, -1]: {e}")
-                    # Skip this prediction by returning zero losses
-                    return torch.zeros(1, device=pred.device), \
-                           {'box_loss': torch.zeros(1, device=pred.device),
-                            'obj_loss': torch.zeros(1, device=pred.device),
-                            'cls_loss': torch.zeros(1, device=pred.device),
-                            'num_targets': 0,
-                            'num_preds': 0}
+                if total_predictions == expected_total:
+                    # This is a concatenated multi-scale YOLOv5 output
+                    # We need to process each scale separately
+                    self.logger.debug(f"Processing YOLOv5 multi-scale output: {pred_shape}")
+                    
+                    # For loss calculation, we'll split by the largest grid size
+                    # and process as if it's a single-scale output for now
+                    largest_grid = max(yolo_grid_sizes)
+                    cells_per_anchor = largest_grid * largest_grid
+                    
+                    # Calculate how many complete grid sets we can extract
+                    available_predictions = total_predictions // self.na
+                    
+                    if available_predictions >= cells_per_anchor:
+                        # Reshape to use the largest grid size
+                        try:
+                            # Take first portion that matches largest grid
+                            subset_size = self.na * cells_per_anchor
+                            pred_subset = pred[:, :subset_size, :]
+                            
+                            pred = pred_subset.view(
+                                batch_size,
+                                self.na,
+                                largest_grid,
+                                largest_grid,
+                                num_features
+                            ).contiguous()
+                            
+                            self.logger.debug(f"Reshaped YOLOv5 prediction to: {pred.shape}")
+                            
+                        except RuntimeError as e:
+                            self.logger.warning(f"Failed to reshape YOLOv5 multi-scale prediction {pred_shape}: {e}")
+                            # Return zero losses for this prediction
+                            return torch.zeros(1, device=pred.device), \
+                                   {'box_loss': torch.zeros(1, device=pred.device),
+                                    'obj_loss': torch.zeros(1, device=pred.device),
+                                    'cls_loss': torch.zeros(1, device=pred.device),
+                                    'num_targets': 0,
+                                    'num_preds': 0}
+                    else:
+                        self.logger.warning(f"Insufficient predictions for grid calculation: {available_predictions} < {cells_per_anchor}")
+                        return torch.zeros(1, device=pred.device), \
+                               {'box_loss': torch.zeros(1, device=pred.device),
+                                'obj_loss': torch.zeros(1, device=pred.device),
+                                'cls_loss': torch.zeros(1, device=pred.device),
+                                'num_targets': 0,
+                                'num_preds': 0}
+                else:
+                    # Fall back to original grid size calculation for non-standard shapes
+                    grid_size_squared = total_predictions // self.na
+                    grid_size = int(math.isqrt(grid_size_squared))
+                    
+                    # Ensure grid_size is reasonable
+                    grid_size = max(8, min(80, grid_size))
+                    grid_size = 2 ** int(round(math.log2(grid_size)))
+                    
+                    try:
+                        pred = pred.view(
+                            batch_size,
+                            self.na,
+                            grid_size,
+                            grid_size,
+                            num_features
+                        ).contiguous()
+                    except RuntimeError as e:
+                        self.logger.warning(f"Failed to reshape prediction tensor {pred_shape} to [batch, {self.na}, {grid_size}, {grid_size}, {num_features}]: {e}")
+                        return torch.zeros(1, device=pred.device), \
+                               {'box_loss': torch.zeros(1, device=pred.device),
+                                'obj_loss': torch.zeros(1, device=pred.device),
+                                'cls_loss': torch.zeros(1, device=pred.device),
+                                'num_targets': 0,
+                                'num_preds': 0}
             else:
                 raise ValueError(f"Unexpected prediction shape: {pred_shape}")
             
@@ -307,8 +359,11 @@ class YOLOLoss(nn.Module):
                 try:
                     # Try to convert to tensor, handling the case where p might be a list of tensors
                     if isinstance(p, (list, tuple)) and all(torch.is_tensor(x) for x in p):
-                        # If it's a list of tensors, stack them
-                        tensor_predictions.append(torch.stack(p))
+                        # If it's a list of tensors with different spatial dimensions, process each separately
+                        # Don't stack them - add each scale separately for multi-scale processing
+                        for tensor_item in p:
+                            if torch.is_tensor(tensor_item):
+                                tensor_predictions.append(tensor_item)
                     else:
                         # Otherwise, try to convert to tensor directly
                         tensor_predictions.append(torch.tensor(p, device=targets.device) if hasattr(targets, 'device') 
@@ -577,6 +632,7 @@ class LossManager:
     
     def __init__(self, config: Dict[str, Any]):
         self.config = config
+        self.logger = get_logger(__name__)
         loss_config = config.get('training', {}).get('loss', {})
         
         self.box_weight = loss_config.get('box_weight', 0.05)

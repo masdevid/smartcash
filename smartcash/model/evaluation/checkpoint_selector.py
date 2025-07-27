@@ -136,7 +136,17 @@ class CheckpointSelector:
                 return False, f"File tidak ditemukan: {checkpoint_path.name}"
             
             # Load checkpoint header
-            checkpoint_data = torch.load(checkpoint_path, map_location='cpu')
+            # Use safe globals for PyTorch 2.6+ compatibility
+            import torch.serialization
+            try:
+                from models.yolo import Model as YOLOModel
+                from models.common import Conv, C3, SPPF, Bottleneck
+                safe_globals = [YOLOModel, Conv, C3, SPPF, Bottleneck]
+            except ImportError:
+                safe_globals = []
+            
+            with torch.serialization.safe_globals(safe_globals):
+                checkpoint_data = torch.load(checkpoint_path, map_location='cpu')
             
             # Validate required keys
             missing_keys = [key for key in self.required_keys if key not in checkpoint_data]
@@ -214,7 +224,17 @@ class CheckpointSelector:
                                    checkpoint_data: Dict[str, Any] = None) -> Dict[str, Any]:
         """📊 Extract metadata dari checkpoint"""
         if checkpoint_data is None:
-            checkpoint_data = torch.load(checkpoint_path, map_location='cpu')
+            # Use safe globals for PyTorch 2.6+ compatibility
+            import torch.serialization
+            try:
+                from models.yolo import Model as YOLOModel
+                from models.common import Conv, C3, SPPF, Bottleneck
+                safe_globals = [YOLOModel, Conv, C3, SPPF, Bottleneck]
+            except ImportError:
+                safe_globals = []
+            
+            with torch.serialization.safe_globals(safe_globals):
+                checkpoint_data = torch.load(checkpoint_path, map_location='cpu')
         
         # Parse filename pattern: best_{model}_{backbone}_{mode}_{date}.pt
         # Enhanced pattern to handle various backbone naming conventions

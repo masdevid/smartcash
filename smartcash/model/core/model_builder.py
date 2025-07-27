@@ -84,10 +84,9 @@ class ModelBuilder:
     
     def build(self, backbone: str = 'efficientnet_b4', detection_layers: List[str] = None,
               layer_mode: str = 'multi', num_classes: int = 7, img_size: int = 640,
-              feature_optimization: Dict = None, pretrained: bool = True,
-              architecture_type: str = 'auto', **kwargs) -> nn.Module:
+              feature_optimization: Dict = None, pretrained: bool = True, **kwargs) -> nn.Module:
         """
-        Build model with enhanced architecture selection
+        Build model with YOLOv5 architecture
         
         Args:
             backbone: Backbone type ('cspdarknet', 'efficientnet_b4')
@@ -97,22 +96,18 @@ class ModelBuilder:
             img_size: Input image size
             feature_optimization: Feature optimization settings
             pretrained: Use pretrained weights
-            architecture_type: 'legacy', 'yolov5', 'auto'
             **kwargs: Additional arguments
             
         Returns:
-            Model instance
+            YOLOv5 integrated model instance
         """
         detection_layers = detection_layers or ['layer_1', 'layer_2', 'layer_3']
         feature_optimization = feature_optimization or {'enabled': True}
         
-        self.logger.info(f"🏗️ Building SmartCash YOLOv5 model: {backbone} | Mode: {layer_mode} | Architecture: {architecture_type}")
+        self.logger.info(f"🏗️ Building SmartCash YOLOv5 model: {backbone} | Mode: {layer_mode} | Architecture: yolov5")
         
-        # Determine architecture type
-        if architecture_type == 'auto':
-            architecture_type = self._auto_select_architecture(backbone, layer_mode)
-        
-        if architecture_type == 'yolov5' and self.yolov5_integration:
+        # Always use YOLOv5 architecture
+        if self.yolov5_integration:
             return self._build_yolov5_model(
                 backbone=backbone,
                 detection_layers=detection_layers,
@@ -123,35 +118,8 @@ class ModelBuilder:
                 **kwargs
             )
         else:
-            return self._build_legacy_model(
-                backbone=backbone,
-                detection_layers=detection_layers,
-                layer_mode=layer_mode,
-                num_classes=num_classes,
-                img_size=img_size,
-                feature_optimization=feature_optimization,
-                pretrained=pretrained,
-                **kwargs
-            )
+            raise RuntimeError("❌ YOLOv5 integration is required but not available. Please ensure YOLOv5 is properly installed.")
     
-    def _auto_select_architecture(self, backbone: str, layer_mode: str) -> str:
-        """
-        Automatically select architecture type based on configuration
-        
-        Args:
-            backbone: Backbone type
-            layer_mode: Layer mode
-            
-        Returns:
-            Architecture type ('legacy' or 'yolov5')
-        """
-        # Prefer YOLOv5 integration if available and using supported backbones
-        if (YOLOV5_INTEGRATION_AVAILABLE and 
-            backbone in ['cspdarknet', 'efficientnet_b4'] and
-            layer_mode == 'multi'):
-            return 'yolov5'
-        else:
-            return 'legacy'
     
     def _optimize_model_features(self, model: nn.Module, optimization_config: Dict) -> nn.Module:
         """
@@ -254,93 +222,6 @@ class ModelBuilder:
             self.logger.error(f"YOLOv5 model building failed: {e}", exc_info=True)
             raise ValueError(f"Failed to build YOLOv5 model: {str(e)}") from e
     
-    def _build_legacy_model(self, backbone: str, detection_layers: List[str],
-                           layer_mode: str, num_classes: int, img_size: int,
-                           feature_optimization: Dict, pretrained: bool,
-                           **kwargs) -> nn.Module:
-        """Build model using legacy architecture"""
-        
-        if self.progress_bridge:
-            self.progress_bridge.update_substep(1, 4, f"🔧 Building legacy {backbone} model...")
-        
-        if self.legacy_builder:
-            return self.legacy_builder.build(
-                backbone=backbone,
-                detection_layers=detection_layers,
-                layer_mode=layer_mode,
-                num_classes=num_classes,
-                img_size=img_size,
-                feature_optimization=feature_optimization,
-                pretrained=pretrained,
-                **kwargs
-            )
-        else:
-            # Fallback implementation
-            return self._build_simple_legacy_model(
-                backbone=backbone,
-                num_classes=num_classes,
-                pretrained=pretrained
-            )
-    
-    def _build_simple_legacy_model(self, backbone: str, num_classes: int, pretrained: bool):
-        """Simple fallback model implementation"""
-        
-        from smartcash.model.utils.backbone_factory import BackboneFactory
-        
-        backbone_factory = BackboneFactory()
-        
-        try:
-            backbone_model = backbone_factory.create_backbone(
-                backbone,
-                pretrained=pretrained,
-                feature_optimization=True
-            )
-            
-            # Simple head for compatibility
-            from smartcash.model.core.yolo_head import YOLOHead
-            
-            head = YOLOHead(
-                in_channels=backbone_model.get_output_channels(),
-                detection_layers=['layer_1'],
-                layer_mode='single',
-                num_classes=num_classes,
-                img_size=640
-            )
-            
-            # Simple neck (identity for now)
-            class SimpleNeck(nn.Module):
-                def __init__(self, channels):
-                    super().__init__()
-                    self.channels = channels
-                
-                def forward(self, x):
-                    return x
-                
-                def get_output_channels(self):
-                    return self.channels
-            
-            neck = SimpleNeck(backbone_model.get_output_channels())
-            
-            # Assemble model
-            model = SmartCashYOLO(
-                backbone=backbone_model,
-                neck=neck,
-                head=head,
-                config={
-                    'backbone': backbone,
-                    'detection_layers': ['layer_1'],
-                    'layer_mode': 'single',
-                    'num_classes': num_classes,
-                    'img_size': 640
-                }
-            )
-            
-            self.logger.info(f"✅ Simple legacy model built: {backbone}")
-            return model
-            
-        except Exception as e:
-            self.logger.error(f"❌ Simple model building failed: {str(e)}")
-            raise RuntimeError(f"Model building failed: {str(e)}")
     
     def _count_parameters(self, model: nn.Module) -> int:
         """Count total parameters in model"""
@@ -353,13 +234,9 @@ class ModelBuilder:
             architectures.append('yolov5')
         return architectures
     
-    def get_available_backbones(self, architecture_type: str = 'auto') -> List[str]:
-        """Get list of available backbones for given architecture"""
-        if architecture_type == 'yolov5' and YOLOV5_INTEGRATION_AVAILABLE:
-            return ['cspdarknet', 'efficientnet_b4']
-        else:
-            # Legacy backbones
-            return ['efficientnet_b4', 'cspdarknet', 'resnet50']
+    def get_available_backbones(self, architecture_type: str = 'yolov5') -> List[str]:
+        """Get list of available backbones for YOLOv5 architecture"""
+        return ['cspdarknet', 'efficientnet_b4']
     
     def get_model_info(self, model: nn.Module) -> Dict[str, Any]:
         """Get comprehensive model information"""
@@ -416,23 +293,20 @@ class ModelBuilder:
         return info
 
 
-def create_model(backbone: str = 'cspdarknet', architecture_type: str = 'auto',
-                 **kwargs) -> nn.Module:
+def create_model(backbone: str = 'cspdarknet', **kwargs) -> nn.Module:
     """
     Convenience function to create SmartCash YOLOv5 model
     
     Args:
         backbone: Backbone type
-        architecture_type: Architecture type ('legacy', 'yolov5', 'auto')
         **kwargs: Model parameters
         
     Returns:
-        Model instance
+        YOLOv5 integrated model instance
     """
     builder = ModelBuilder(config={})
     return builder.build(
         backbone=backbone,
-        architecture_type=architecture_type,
         **kwargs
     )
 

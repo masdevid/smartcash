@@ -62,7 +62,6 @@ class SmartCashModelAPI:
         # Model state
         self.model = None
         self.is_model_built = False
-        self.architecture_type = None
         
         # Store memory configuration
         self.memory_config = memory_config
@@ -86,7 +85,6 @@ class SmartCashModelAPI:
                 'device': {'type': 'auto'},
                 'model': {
                     'backbone': 'cspdarknet',
-                    'architecture_type': 'auto',
                     'num_classes': 7,
                     'img_size': 640
                 },
@@ -123,17 +121,12 @@ class SmartCashModelAPI:
             
             # Set defaults
             backbone = model_config.get('backbone', 'cspdarknet')
-            architecture_type = model_config.get('architecture_type', 'auto')
             
-            if not self.use_yolov5_integration:
-                architecture_type = 'legacy'
-            
-            self.logger.info(f"🔧 Building model: {backbone} | Architecture: {architecture_type}")
+            self.logger.info(f"🔧 Building model: {backbone} | Architecture: yolov5")
             
             # Build model
             self.model = self.model_builder.build(
                 backbone=backbone,
-                architecture_type=architecture_type,
                 detection_layers=model_config.get('detection_layers', ['layer_1', 'layer_2', 'layer_3']),
                 layer_mode=model_config.get('layer_mode', 'multi'),
                 num_classes=model_config.get('num_classes', 7),
@@ -145,7 +138,6 @@ class SmartCashModelAPI:
             # Move to device
             self.model = self.model.to(self.device)
             self.is_model_built = True
-            self.architecture_type = architecture_type
             
             # Get model info
             model_info = self.model_builder.get_model_info(self.model)
@@ -156,7 +148,7 @@ class SmartCashModelAPI:
                 'success': True,
                 'model': self.model,
                 'model_info': model_info,
-                'architecture_type': architecture_type,
+                'architecture_type': 'yolov5',
                 'device': str(self.device),
                 'memory_config': self.memory_config
             }
@@ -178,9 +170,9 @@ class SmartCashModelAPI:
         """Get list of available architecture types"""
         return self.model_builder.get_available_architectures()
     
-    def get_available_backbones(self, architecture_type: str = 'auto') -> List[str]:
-        """Get list of available backbones for given architecture"""
-        return self.model_builder.get_available_backbones(architecture_type)
+    def get_available_backbones(self) -> List[str]:
+        """Get list of available backbones for YOLOv5 architecture"""
+        return self.model_builder.get_available_backbones('yolov5')
     
     def validate_model(self, input_size: tuple = (1, 3, 640, 640)) -> Dict[str, Any]:
         """
@@ -266,7 +258,7 @@ class SmartCashModelAPI:
         
         summary = {
             'is_built': self.is_model_built,
-            'architecture_type': self.architecture_type,
+            'architecture_type': 'yolov5',
             'device': str(self.device)
         }
         
@@ -275,7 +267,7 @@ class SmartCashModelAPI:
         summary.update(model_info)
         
         # Get device info
-        device_info = get_device_info(self.device)
+        device_info = get_device_info()
         summary['device_info'] = device_info
         
         return summary
@@ -291,7 +283,7 @@ class SmartCashModelAPI:
                 metadata = {}
             
             metadata.update({
-                'architecture_type': self.architecture_type,
+                'architecture_type': 'yolov5',
                 'build_timestamp': datetime.now().isoformat(),
                 'device': str(self.device)
             })
@@ -321,11 +313,8 @@ class SmartCashModelAPI:
                 self.model = result['model'].to(self.device)
                 self.is_model_built = True
                 
-                # Extract architecture type from metadata
-                metadata = result.get('metadata', {})
-                self.architecture_type = metadata.get('architecture_type', 'unknown')
-                
-                self.logger.info(f"✅ Model loaded: {self.architecture_type}")
+                # Set architecture type for loaded model
+                self.logger.info(f"✅ Model loaded: yolov5")
             
             return result
             

@@ -44,8 +44,10 @@ class TrainingPipeline(UnifiedTrainingPipeline):
             **kwargs: Arguments for parent class
         """
         super().__init__(**kwargs)
+        
+        # Store training mode for later progress tracker setup
+        self._training_mode = None
         self.use_yolov5_integration = use_yolov5_integration
-        self.architecture_type = None
         self.model_api = None
         
         logger.info(f"🚀 SmartCash training pipeline initialized")
@@ -63,7 +65,6 @@ class TrainingPipeline(UnifiedTrainingPipeline):
                                   single_phase_layer_mode: str = 'multi',
                                   single_phase_freeze_backbone: bool = False,
                                   model: Optional[Dict[str, Any]] = None,
-                                  architecture_type: str = 'auto',
                                   **kwargs) -> Dict[str, Any]:
         """
         SmartCash training pipeline with YOLOv5 architecture
@@ -80,7 +81,6 @@ class TrainingPipeline(UnifiedTrainingPipeline):
             single_phase_layer_mode: Layer mode for single phase
             single_phase_freeze_backbone: Freeze backbone in single phase
             model: Model configuration dictionary
-            architecture_type: 'legacy', 'yolov5', 'auto'
             **kwargs: Additional arguments
             
         Returns:
@@ -91,12 +91,22 @@ class TrainingPipeline(UnifiedTrainingPipeline):
             self.training_session_id = str(uuid.uuid4())[:8]
             self.training_start_time = time.time()
             
+            # Set up enhanced progress tracker with training mode
+            if self._training_mode != training_mode:
+                self._training_mode = training_mode
+                # Get the progress callback from existing progress tracker
+                current_callback = getattr(self.progress_tracker, 'progress_callback', None)
+                self.progress_tracker = UnifiedProgressTracker(
+                    progress_callback=current_callback,
+                    verbose=self.verbose,
+                    training_mode=training_mode
+                )
+            
             # Log training start
             if self.log_callback:
                 self.log_callback('info', f"🚀 Starting training pipeline", {
                     'session_id': self.training_session_id,
                     'backbone': backbone,
-                    'architecture_type': architecture_type,
                     'training_mode': training_mode
                 })
             
@@ -111,7 +121,6 @@ class TrainingPipeline(UnifiedTrainingPipeline):
                 single_phase_layer_mode=single_phase_layer_mode,
                 single_phase_freeze_backbone=single_phase_freeze_backbone,
                 model=model,
-                architecture_type=architecture_type,
                 force_cpu=force_cpu,
                 **kwargs
             )
@@ -151,15 +160,15 @@ class TrainingPipeline(UnifiedTrainingPipeline):
             if not training_result['success']:
                 return training_result
             
-            # Phase 6: Summary & Visualization
-            self.progress_tracker.start_phase('summary_visualization', 3)
-            summary_result = self._phase_summary_visualization(training_result)
+            # Final Phase: Finalize (Summary & Visualization)
+            self.progress_tracker.start_phase('finalize', 3)
+            summary_result = self._phase_finalize(training_result)
             
             # Final success result
             return {
                 'success': True,
                 'session_id': self.training_session_id,
-                'architecture_type': self.architecture_type,
+                'architecture_type': 'yolov5',
                 'training_duration': time.time() - self.training_start_time,
                 'checkpoint_path': training_result.get('checkpoint_path'),
                 'metrics': training_result.get('final_metrics', {}),
@@ -195,7 +204,6 @@ class TrainingPipeline(UnifiedTrainingPipeline):
         config = {
             'backbone': kwargs.get('backbone', 'cspdarknet'),
             'pretrained': kwargs.get('pretrained', True),
-            'architecture_type': kwargs.get('architecture_type', 'auto'),
             'training_mode': kwargs.get('training_mode', 'two_phase'),
             'phase_1_epochs': kwargs.get('phase_1_epochs', 1),
             'phase_2_epochs': kwargs.get('phase_2_epochs', 1),
@@ -214,8 +222,7 @@ class TrainingPipeline(UnifiedTrainingPipeline):
             'detection_layers': model_config.get('detection_layers', ['layer_1', 'layer_2', 'layer_3']),
             'num_classes': model_config.get('num_classes', 7),
             'img_size': model_config.get('img_size', 640),
-            'feature_optimization': model_config.get('feature_optimization', {'enabled': True}),
-            'architecture_type': config['architecture_type']
+            'feature_optimization': model_config.get('feature_optimization', {'enabled': True})
         }
         
         # Training phases configuration for TrainingPhaseManager
@@ -248,20 +255,16 @@ class TrainingPipeline(UnifiedTrainingPipeline):
             }
         }
         
-        # Auto-select architecture if needed
-        if config['architecture_type'] == 'auto':
-            if self.use_yolov5_integration and config['backbone'] in ['cspdarknet', 'efficientnet_b4']:
-                config['architecture_type'] = 'yolov5'
-            else:
-                config['architecture_type'] = 'legacy'
+        # Paths configuration
+        config['paths'] = {
+            'checkpoints': str(config['checkpoint_dir']),
+            'visualization': 'data/visualization',
+            'logs': 'data/logs'
+        }
         
-        # Override architecture if YOLOv5 integration is disabled
-        if not self.use_yolov5_integration:
-            config['architecture_type'] = 'legacy'
+        # Always use YOLOv5 architecture
         
-        self.architecture_type = config['architecture_type']
-        
-        logger.info(f"🔧 Training configuration setup: {config['backbone']} | {config['architecture_type']}")
+        logger.info(f"🔧 Training configuration setup: {config['backbone']} | yolov5")
         return config
     
     def _phase_build_model(self) -> Dict[str, Any]:
@@ -276,14 +279,12 @@ class TrainingPipeline(UnifiedTrainingPipeline):
             )
             
             model_config = self.config.get('model', {})
-            architecture_type = model_config.get('architecture_type', 'auto')
             
-            self.progress_tracker.update_phase(2, 4, f"🏗️ Building {architecture_type} model...")
+            self.progress_tracker.update_phase(2, 4, f"🏗️ Building yolov5 model...")
             
             # Build model
             build_result = self.model_api.build_model(
-                model_config=model_config,
-                architecture_type=architecture_type
+                model_config=model_config
             )
             
             if not build_result['success']:
@@ -305,7 +306,7 @@ class TrainingPipeline(UnifiedTrainingPipeline):
             
             if self.log_callback:
                 self.log_callback('info', f"Model built successfully", {
-                    'architecture_type': self.architecture_type,
+                    'architecture_type': 'yolov5',
                     'backbone': self.config.get('backbone', 'unknown'),
                     'parameters': build_result.get('model_info', {}).get('total_parameters', 0)
                 })
@@ -314,7 +315,7 @@ class TrainingPipeline(UnifiedTrainingPipeline):
                 'success': True,
                 'model': self.model,
                 'model_info': build_result.get('model_info', {}),
-                'architecture_type': self.architecture_type,
+                'architecture_type': 'yolov5',
                 'device': str(device)
             }
             
@@ -406,7 +407,7 @@ class TrainingPipeline(UnifiedTrainingPipeline):
                 # Log validation results
                 if self.log_callback:
                     self.log_callback('info', "Model validation successful", {
-                        'architecture_type': self.architecture_type,
+                        'architecture_type': 'yolov5',
                         'validation_info': validation_result
                     })
             
@@ -421,7 +422,7 @@ class TrainingPipeline(UnifiedTrainingPipeline):
                 'error': f"Model validation failed: {str(e)}"
             }
     
-    def _phase_summary_visualization(self, training_result: Dict[str, Any] = None) -> Dict[str, Any]:
+    def _phase_finalize(self, training_result: Dict[str, Any] = None) -> Dict[str, Any]:
         """Run summary phase with model information"""
         try:
             self.progress_tracker.update_phase(1, 3, "📊 Generating summary...")
@@ -434,7 +435,7 @@ class TrainingPipeline(UnifiedTrainingPipeline):
             # Generate summary with architecture information
             summary_data = {
                 'session_id': self.training_session_id,
-                'architecture_type': self.architecture_type,
+                'architecture_type': 'yolov5',
                 'model_summary': model_summary,
                 'training_config': self.config,
                 'training_results': training_result or {},
@@ -446,7 +447,7 @@ class TrainingPipeline(UnifiedTrainingPipeline):
             
             # Enhance with architecture-specific information
             if summary_result.get('success'):
-                summary_result['architecture_type'] = self.architecture_type
+                summary_result['architecture_type'] = 'yolov5'
                 summary_result['model_summary'] = model_summary
             
             return summary_result

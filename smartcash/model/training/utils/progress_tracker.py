@@ -14,30 +14,61 @@ logger = get_logger(__name__)
 
 
 class UnifiedProgressTracker:
-    """Progress tracker for the unified training pipeline with 6 phases."""
+    """
+    Progress tracker for the unified training pipeline with 3-level progress:
+    1. Overall: Preparation -> Build Model -> Validate Model -> Start Train Phase 1 -> [Start Train Phase 2] -> Finalize
+    2. Epoch: Current epoch progress (with early stopping support)
+    3. Batch: Current batch progress within epoch
+    """
     
-    def __init__(self, progress_callback: Optional[Callable] = None, verbose: bool = True):
+    def __init__(self, progress_callback: Optional[Callable] = None, verbose: bool = True, training_mode: str = 'two_phase'):
         """Initialize the progress tracker.
         
         Args:
             progress_callback: Optional callback function for progress updates
             verbose: Whether to enable verbose logging
+            training_mode: 'single_phase' or 'two_phase' to determine total phases
         """
         self.progress_callback = progress_callback
         self.verbose = verbose
-        self.phases = [
-            'preparation',
-            'build_model', 
-            'validate_model',
-            'training_phase_1',
-            'training_phase_2',
-            'summary_visualization'
-        ]
+        self.training_mode = training_mode
+        
+        # Overall phases - 5 phases for single, 6 phases for two_phase
+        if training_mode == 'single_phase':
+            self.phases = [
+                'preparation',
+                'build_model', 
+                'validate_model',
+                'training_phase_1',
+                'finalize'
+            ]
+        else:  # two_phase
+            self.phases = [
+                'preparation',
+                'build_model', 
+                'validate_model',
+                'training_phase_1',
+                'training_phase_2',
+                'finalize'
+            ]
+        
+        # Overall progress tracking
         self.current_phase = None
         self.current_phase_index = -1
         self.phase_start_time = None
         self.phase_results = {}
         self.pipeline_start_time = time.time()
+        
+        # Epoch progress tracking
+        self.current_epoch = 0
+        self.total_epochs = 0
+        self.epoch_completed = False
+        self.early_stopping_triggered = False
+        
+        # Batch progress tracking
+        self.current_batch = 0
+        self.total_batches = 0
+        self.batch_progress_active = False
     
     def start_phase(self, phase_name: str, total_steps: int, description: str = ""):
         """Start a new phase."""
@@ -56,8 +87,74 @@ class UnifiedProgressTracker:
         if not self.current_phase:
             return
             
+        # Calculate overall progress
+        phase_progress = (self.current_phase_index / len(self.phases)) * 100
+        step_progress = (current_step / total_steps) * (100 / len(self.phases))
+        overall_progress = phase_progress + step_progress
+            
         if self.progress_callback:
-            self.progress_callback(self.current_phase, current_step, total_steps, message, **kwargs)
+            self.progress_callback('overall', overall_progress, 100, message, **kwargs)
+    
+    def start_epoch_tracking(self, total_epochs: int):
+        """Start epoch progress tracking."""
+        self.total_epochs = total_epochs
+        self.current_epoch = 0
+        self.epoch_completed = False
+        self.early_stopping_triggered = False
+        
+        if self.progress_callback:
+            self.progress_callback('epoch', 0, total_epochs, f"Starting epoch training ({total_epochs} epochs)")
+    
+    def update_epoch_progress(self, current_epoch: int, total_epochs: int = None, message: str = ""):
+        """Update epoch progress."""
+        self.current_epoch = current_epoch
+        if total_epochs:
+            self.total_epochs = total_epochs
+            
+        if self.progress_callback:
+            self.progress_callback('epoch', current_epoch, self.total_epochs, message)
+    
+    def complete_epoch_early_stopping(self, final_epoch: int, message: str = "Early stopping triggered"):
+        """Complete epoch tracking due to early stopping."""
+        self.early_stopping_triggered = True
+        self.current_epoch = final_epoch
+        
+        # Set progress to 100% when early stopping
+        if self.progress_callback:
+            self.progress_callback('epoch', 100, 100, message)
+    
+    def start_batch_tracking(self, total_batches: int):
+        """Start batch progress tracking."""
+        self.total_batches = total_batches
+        self.current_batch = 0
+        self.batch_progress_active = True
+        
+        if self.progress_callback:
+            self.progress_callback('batch', 0, total_batches, f"Starting batch processing ({total_batches} batches)")
+    
+    def update_batch_progress(self, current_batch: int, total_batches: int = None, message: str = "", loss: float = None, **kwargs):
+        """Update batch progress."""
+        if not self.batch_progress_active:
+            return
+            
+        self.current_batch = current_batch
+        if total_batches:
+            self.total_batches = total_batches
+        
+        # Add loss to message if provided
+        if loss is not None:
+            message = f"{message} (Loss: {loss:.4f})" if message else f"Loss: {loss:.4f}"
+            
+        if self.progress_callback:
+            # Pass through additional kwargs (like epoch) to the callback
+            self.progress_callback('batch', current_batch, self.total_batches, message, loss=loss, **kwargs)
+    
+    def complete_batch_tracking(self):
+        """Complete batch progress tracking."""
+        self.batch_progress_active = False
+        
+        if self.progress_callback:
+            self.progress_callback('batch', 100, 100, "Batch processing completed")
     
     def complete_phase(self, result: Dict[str, Any]):
         """Complete the current phase."""

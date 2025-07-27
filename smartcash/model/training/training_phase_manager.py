@@ -90,8 +90,14 @@ class TrainingPhaseManager:
             best_metrics = {}
             best_checkpoint_path = None
             
+            # Start epoch tracking
+            self.progress_tracker.start_epoch_tracking(epochs)
+            
             for epoch in range(start_epoch, epochs):
                 epoch_start_time = time.time()
+                
+                # Update epoch progress
+                self.progress_tracker.update_epoch_progress(epoch, epochs, f"Training epoch {epoch + 1}/{epochs}")
                 
                 # Training
                 train_metrics = self._train_epoch(train_loader, optimizer, loss_manager, scaler, epoch, epochs, phase_num)
@@ -162,16 +168,19 @@ class TrainingPhaseManager:
                         best_metrics = final_metrics.copy()
                     if not best_checkpoint_path:
                         best_checkpoint_path = self._save_checkpoint(epoch, final_metrics, phase_num)
+                    
+                    # Complete epoch tracking due to early stopping
+                    self.progress_tracker.complete_epoch_early_stopping(
+                        epoch + 1, 
+                        f"Early stopping triggered - no improvement for {early_stopping.patience} epochs"
+                    )
                     break
                 
-                # Update progress
+                # Update epoch progress - normal completion
                 epoch_duration = time.time() - epoch_start_time
-                self.progress_tracker.update_phase(
+                self.progress_tracker.update_epoch_progress(
                     epoch + 1, epochs,
-                    f"Epoch {epoch + 1}/{epochs} completed in {epoch_duration:.1f}s",
-                    batch_idx=len(train_loader),
-                    batch_total=len(train_loader),
-                    metrics=final_metrics
+                    f"Epoch {epoch + 1}/{epochs} completed in {epoch_duration:.1f}s - Loss: {final_metrics.get('train_loss', 0):.4f}"
                 )
             
             # Ensure we have valid results even if early stopped
@@ -207,6 +216,9 @@ class TrainingPhaseManager:
         
         # Progress update frequency for performance
         update_freq = max(1, num_batches // 20)  # Update 20 times per epoch max
+        
+        # Start batch tracking
+        self.progress_tracker.start_batch_tracking(num_batches)
         
         for batch_idx, (images, targets) in enumerate(train_loader):
             # Move data to device efficiently
@@ -252,19 +264,21 @@ class TrainingPhaseManager:
             if batch_idx % update_freq == 0 or batch_idx == num_batches - 1:
                 avg_loss = running_loss / (batch_idx + 1)
                 
-                self.progress_tracker.update_phase(
-                    epoch, total_epochs,
-                    f"Batch {batch_idx + 1}/{num_batches}",
-                    epoch=epoch + 1,
-                    batch_idx=batch_idx + 1,
-                    batch_total=num_batches,
-                    metrics={'train_loss': avg_loss}
+                # Update batch progress
+                self.progress_tracker.update_batch_progress(
+                    batch_idx + 1, num_batches,
+                    f"Training batch {batch_idx + 1}/{num_batches}",
+                    loss=avg_loss,
+                    epoch=epoch + 1
                 )
         
         # Store for final metrics calculation
         if last_predictions and last_targets:
             self._last_predictions = last_predictions
             self._last_targets = last_targets
+        
+        # Complete batch tracking
+        self.progress_tracker.complete_batch_tracking()
         
         return {'train_loss': running_loss / num_batches}
     

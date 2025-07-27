@@ -381,11 +381,14 @@ class YOLOv5HeadAdapter:
         )
 
 
-# Register custom head for YOLOv5 model parsing
+# Global registration guard - use a global variable that persists across imports
+import sys
+_GLOBAL_REGISTRATION_KEY = 'smartcash_yolov5_components_registered'
+
 def register_yolov5_components():
     """Register custom components with YOLOv5 for model parsing"""
-    # Check if already registered to prevent duplicate messages
-    if hasattr(register_yolov5_components, '_registered'):
+    # Use a global system-wide guard that works across all module imports
+    if hasattr(sys, _GLOBAL_REGISTRATION_KEY):
         return
     
     try:
@@ -399,8 +402,8 @@ def register_yolov5_components():
         
         print("✅ Registered SmartCash components with YOLOv5")
         
-        # Mark as registered
-        register_yolov5_components._registered = True
+        # Mark as registered globally - this persists across all module imports
+        setattr(sys, _GLOBAL_REGISTRATION_KEY, True)
         
     except ImportError:
         print("⚠️ Could not register components - YOLOv5 not available")

@@ -74,14 +74,21 @@ def create_metrics_callback(verbose: bool = True):
 
 
 def create_progress_callback(use_tqdm: bool = True, verbose: bool = True):
-    """Create a triple tqdm progress callback for visual training progress."""
+    """Create a triple tqdm progress callback for the new 3-level progress system."""
     
     # Storage for progress bars
     progress_bars = {}
     
     def _format_phase_display(phase: str) -> str:
         """Format phase name for display."""
-        return phase.replace('_', ' ').title()
+        if phase == 'overall':
+            return 'Overall Training'
+        elif phase == 'epoch':
+            return 'Epoch Progress'
+        elif phase == 'batch':
+            return 'Batch Progress'
+        else:
+            return phase.replace('_', ' ').title()
     
     def _get_phase_number(phase: str) -> str:
         """Get phase number from phase name."""
@@ -94,112 +101,7 @@ def create_progress_callback(use_tqdm: bool = True, verbose: bool = True):
         else:
             return "?"
     
-    def _handle_training_phase_progress(phase: str, current: int, total: int, message: str, **kwargs):
-        """Handle training phase progress with triple tqdm bars."""
-        if not use_tqdm:
-            # Fallback to simple text
-            percentage = (current / total) * 100 if total > 0 else 0
-            phase_display = _format_phase_display(phase)
-            print(f"🔄 PROGRESS [{phase_display}] {percentage:.0f}% ({current}/{total}): {message}")
-            return
-        
-        if 'epoch' in kwargs:
-            epoch = kwargs['epoch']
-            batch_idx = kwargs.get('batch_idx', 0)
-            batch_total = kwargs.get('batch_total', 1)
-            metrics = kwargs.get('metrics', {})
-            phase_num = _get_phase_number(phase)
-            
-            # Level 1: Overall Training Progress Bar (position 0)
-            overall_bar_key = "overall_training"
-            if overall_bar_key not in progress_bars:
-                # Calculate total steps across all training phases
-                total_steps = total  # This is the total epochs for current phase
-                progress_bars[overall_bar_key] = tqdm(
-                    total=100, desc="🚀 Overall Training", unit="%", 
-                    position=0, leave=True, colour='blue'
-                )
-            
-            # Level 2: Phase Epoch Progress Bar (position 1)
-            epoch_bar_key = f"{phase}_epoch"
-            if epoch_bar_key not in progress_bars:
-                progress_bars[epoch_bar_key] = tqdm(
-                    total=total, desc=f"📚 Phase {phase_num} Epochs", unit="epoch", 
-                    position=1, leave=True, colour='green'
-                )
-            
-            # Level 3: Batch Progress Bar (position 2)
-            batch_bar_key = f"{phase}_batch_{epoch}"
-            if batch_bar_key not in progress_bars and batch_total > 1:
-                progress_bars[batch_bar_key] = tqdm(
-                    total=batch_total, desc=f"⚡ Phase {phase_num} Epoch {epoch} Batches", 
-                    unit="batch", position=2, leave=False, colour='yellow'
-                )
-            
-            # Update batch progress if available
-            if batch_bar_key in progress_bars and batch_idx >= 0:
-                batch_bar = progress_bars[batch_bar_key]
-                postfix = {}
-                
-                if metrics:
-                    loss = metrics.get('train_loss', 0)
-                    layer1_acc = metrics.get('layer_1_accuracy', 0)
-                    layer1_f1 = metrics.get('layer_1_f1', 0)
-                    
-                    if loss > 0: postfix['Loss'] = f"{loss:.4f}"
-                    if layer1_acc > 0: postfix['L1_Acc'] = f"{layer1_acc:.3f}"
-                    if layer1_f1 > 0: postfix['L1_F1'] = f"{layer1_f1:.3f}"
-                
-                batch_bar.set_postfix(postfix)
-                batch_bar.n = batch_idx
-                batch_bar.refresh()
-            
-            # Update epoch progress when epoch completes
-            if current == total:
-                # Close batch bar for this epoch
-                if batch_bar_key in progress_bars:
-                    progress_bars[batch_bar_key].close()
-                    del progress_bars[batch_bar_key]
-                
-                # Update epoch bar
-                epoch_bar = progress_bars[epoch_bar_key]
-                epoch_postfix = {}
-                if metrics:
-                    loss = metrics.get('train_loss', 0)
-                    val_loss = metrics.get('val_loss', 0)
-                    
-                    epoch_postfix.update({
-                        'Train_Loss': f"{loss:.4f}",
-                        'Val_Loss': f"{val_loss:.4f}"
-                    })
-                
-                epoch_bar.set_postfix(epoch_postfix)
-                epoch_bar.update(1)
-                
-                # Close epoch bar when training phase completes
-                if current >= total:
-                    epoch_bar.close()
-                    del progress_bars[epoch_bar_key]
-                    
-                    # Update overall progress
-                    overall_bar = progress_bars.get(overall_bar_key)
-                    if overall_bar:
-                        # Estimate overall progress (this is approximate)
-                        if phase == 'training_phase_1':
-                            overall_progress = 60  # 60% when phase 1 completes
-                        elif phase == 'training_phase_2':
-                            overall_progress = 90  # 90% when phase 2 completes
-                        elif phase == 'training_phase_single':
-                            overall_progress = 90  # 90% when single phase completes
-                        else:
-                            overall_progress = min(95, overall_bar.n + 10)
-                        
-                        overall_bar.n = overall_progress
-                        overall_bar.set_description(f"🚀 Overall Training - {phase_display} Complete")
-                        overall_bar.refresh()
-        else:
-            # Handle non-training phase progress
-            _handle_phase_progress(phase, current, total, message)
+    # Old training phase progress handling removed - now using 3-level system
     
     def _handle_phase_progress(phase: str, current: int, total: int, message: str):
         """Handle non-training phase progress."""
@@ -222,7 +124,7 @@ def create_progress_callback(use_tqdm: bool = True, verbose: bool = True):
         overall_bar = progress_bars[overall_bar_key]
         percentage = (current / total) * 100 if total > 0 else 0
         
-        # Map phases to overall progress ranges
+        # Map phases to overall progress ranges - updated for new phase names
         phase_progress_map = {
             'preparation': (0, 10),
             'build_model': (10, 30),
@@ -230,7 +132,7 @@ def create_progress_callback(use_tqdm: bool = True, verbose: bool = True):
             'training_phase_1': (50, 70),
             'training_phase_2': (70, 90),
             'training_phase_single': (50, 90),
-            'summary_visualization': (90, 100)
+            'finalize': (90, 100)  # Updated from 'summary_visualization'
         }
         
         if phase in phase_progress_map:
@@ -242,7 +144,7 @@ def create_progress_callback(use_tqdm: bool = True, verbose: bool = True):
         
         # Handle phase completion
         if percentage >= 100:
-            if phase == 'summary_visualization':
+            if phase == 'finalize':  # Updated from 'summary_visualization'
                 # Training is complete
                 overall_bar.n = 100
                 overall_bar.set_description("🚀 Training Complete!")
@@ -250,14 +152,101 @@ def create_progress_callback(use_tqdm: bool = True, verbose: bool = True):
                 overall_bar.close()
                 del progress_bars[overall_bar_key]
     
-    def progress_callback(phase: str, current: int, total: int, message: str = "", **kwargs):
-        """Main progress callback with triple tqdm support."""
-        phase_display = _format_phase_display(phase)
+    def progress_callback(progress_type: str, current: int, total: int, message: str = "", **kwargs):
+        """
+        Main progress callback with 3-level progress system:
+        1. 'overall' - Overall pipeline progress (5-6 phases)
+        2. 'epoch' - Epoch progress within training phases  
+        3. 'batch' - Batch progress within epochs
+        """
+        if not use_tqdm:
+            # Fallback to simple text output
+            percentage = (current / total) * 100 if total > 0 else 0
+            display_name = _format_phase_display(progress_type)
+            print(f"🔄 PROGRESS [{display_name}] {percentage:.0f}% ({current}/{total}): {message}")
+            return
         
-        if phase in ['training_phase_1', 'training_phase_2', 'training_phase_single']:
-            _handle_training_phase_progress(phase, current, total, message, **kwargs)
+        # Handle the 3-level progress system
+        if progress_type == 'overall':
+            _handle_overall_progress(current, total, message, **kwargs)
+        elif progress_type == 'epoch':
+            _handle_epoch_progress(current, total, message, **kwargs)
+        elif progress_type == 'batch':
+            _handle_batch_progress(current, total, message, **kwargs)
         else:
-            _handle_phase_progress(phase, current, total, message)
+            # Legacy support for old phase-based progress
+            _handle_phase_progress(progress_type, current, total, message)
+    
+    def _handle_overall_progress(current: int, total: int, message: str, **kwargs):
+        """Handle overall pipeline progress (Level 1)."""
+        bar_key = "overall"
+        if bar_key not in progress_bars:
+            progress_bars[bar_key] = tqdm(
+                total=total, desc="🚀 Overall Training", unit="%", 
+                position=0, leave=True, colour='blue'
+            )
+        
+        bar = progress_bars[bar_key]
+        bar.n = current
+        bar.set_description(f"🚀 Overall Training - {message}")
+        bar.refresh()
+        
+        # Close when complete
+        if current >= total:
+            bar.close()
+            del progress_bars[bar_key]
+    
+    def _handle_epoch_progress(current: int, total: int, message: str, **kwargs):
+        """Handle epoch progress (Level 2)."""
+        bar_key = "epoch"
+        if bar_key not in progress_bars:
+            progress_bars[bar_key] = tqdm(
+                total=total, desc="📚 Epoch Progress", unit="epoch", 
+                position=1, leave=True, colour='green'
+            )
+        
+        bar = progress_bars[bar_key]
+        bar.n = current
+        bar.set_description(f"📚 Epoch Progress - {message}")
+        
+        # Add postfix with additional info
+        postfix = {}
+        if 'phase' in kwargs:
+            postfix['Phase'] = kwargs['phase']
+        bar.set_postfix(postfix)
+        bar.refresh()
+        
+        # Close when complete or early stopping
+        if current >= total or "Early stopping" in message or "100%" in message:
+            bar.close()
+            del progress_bars[bar_key]
+    
+    def _handle_batch_progress(current: int, total: int, message: str, **kwargs):
+        """Handle batch progress (Level 3)."""
+        bar_key = "batch"
+        if bar_key not in progress_bars:
+            progress_bars[bar_key] = tqdm(
+                total=total, desc="⚡ Batch Progress", unit="batch", 
+                position=2, leave=False, colour='yellow'
+            )
+        
+        bar = progress_bars[bar_key]
+        bar.n = current
+        bar.set_description(f"⚡ Batch Progress - {message}")
+        
+        # Add loss and other metrics to postfix
+        postfix = {}
+        if 'loss' in kwargs:
+            postfix['Loss'] = f"{kwargs['loss']:.4f}"
+        if 'epoch' in kwargs:
+            postfix['Epoch'] = kwargs['epoch']
+        bar.set_postfix(postfix)
+        bar.refresh()
+        
+        # Close when complete
+        if current >= total:
+            bar.close()
+            del progress_bars[bar_key]
     
     return progress_callback
 
@@ -299,7 +288,6 @@ def main():
             'num_classes': 7,  # Fixed for banknote detection
             'img_size': 640,   # Standard size for YOLO models
             'feature_optimization': {'enabled': True},
-            'architecture_type': getattr(args, 'architecture_type', 'auto')  # Use from args or default to auto
         }
         
         # Create callbacks

@@ -305,15 +305,21 @@ class SmartCashYOLOv5Integration:
                                     # Initialize the model using YOLOv5's Model class which handles the config properly
                                     from models.yolo import Model as YOLOModel
                                     
-                                    # Add safe globals for PyTorch 2.6+ weights_only loading
+                                    # Disable PyTorch 2.6+ weights_only loading for YOLOv5 compatibility
+                                    # YOLOv5 checkpoints contain complex model structures that are safe to load
                                     import torch.serialization
-                                    safe_globals = [YOLOModel]
-                                    # Also add any other model classes that might be in checkpoints
-                                    try:
-                                        from models.common import Conv, C3, SPPF, Bottleneck
-                                        safe_globals.extend([Conv, C3, SPPF, Bottleneck])
-                                    except ImportError:
-                                        pass
+                                    
+                                    # Set weights_only=False for YOLOv5 pretrained weights loading
+                                    # This is safe because we're loading official YOLOv5 weights from ultralytics
+                                    original_load = torch.load
+                                    
+                                    def safe_yolo_load(f, map_location=None, pickle_module=None, **kwargs):
+                                        # Force weights_only=False for YOLOv5 model loading
+                                        return original_load(f, map_location=map_location, 
+                                                           pickle_module=pickle_module, weights_only=False)
+                                    
+                                    # Temporarily replace torch.load during model creation
+                                    torch.load = safe_yolo_load
                                     
                                     # Temporarily suppress YOLOv5 verbose logging during model creation
                                     import logging
@@ -322,15 +328,8 @@ class SmartCashYOLOv5Integration:
                                     LOGGER.setLevel(logging.ERROR)  # Only show errors during model creation
                                     
                                     try:
-                                        # Handle PyTorch version compatibility
-                                        if hasattr(torch.serialization, 'safe_globals'):
-                                            # PyTorch 2.6.0+ with safe_globals
-                                            with torch.serialization.safe_globals(safe_globals):
-                                                temp_model = YOLOModel(temp_yaml_path, ch=config['ch'])
-                                        else:
-                                            # Fallback for older PyTorch versions
-                                            self.logger.warning("PyTorch version < 2.6.0 detected, using fallback model loading")
-                                            temp_model = YOLOModel(temp_yaml_path, ch=config['ch'])
+                                        # Create YOLOv5 model with disabled weights_only loading
+                                        temp_model = YOLOModel(temp_yaml_path, ch=config['ch'])
                                         
                                         # Initialize model weights
                                         initialize_weights(temp_model)
@@ -341,7 +340,8 @@ class SmartCashYOLOv5Integration:
                                         self.logger.error(f"Error during model initialization: {str(e)}")
                                         raise
                                     finally:
-                                        # Restore original logging level
+                                        # Restore original torch.load and logging level
+                                        torch.load = original_load
                                         LOGGER.setLevel(original_level)
                                     
                                 finally:
@@ -374,9 +374,8 @@ class SmartCashYOLOv5Integration:
                         # Initialize model with pretrained weights if specified
                         if hasattr(self, 'pretrained_weights'):
                             try:
-                                # Use safe globals context manager for PyTorch 2.6+ compatibility
-                                with torch.serialization.safe_globals(safe_globals):
-                                    ckpt = torch.load(self.pretrained_weights, map_location='cpu')
+                                # Load YOLOv5 checkpoint with weights_only=False for compatibility
+                                ckpt = torch.load(self.pretrained_weights, map_location='cpu', weights_only=False)
                                 
                                 if 'model' in ckpt:
                                     csd = ckpt['model'].float().state_dict()
@@ -411,7 +410,9 @@ class SmartCashYOLOv5Integration:
             
             # Store pretrained weights path if specified
             if kwargs.get('pretrained', False):
-                model.pretrained_weights = kwargs.get('weights', 'yolov5s.pt')
+                # Get pretrained weights path, downloading to /data/pretrained if needed
+                weights_name = kwargs.get('weights', 'yolov5s.pt')
+                model.pretrained_weights = self._get_pretrained_weights_path(weights_name)
                 model.logger = self.logger
             
             # Initialize model with dummy input to set strides
@@ -436,6 +437,82 @@ class SmartCashYOLOv5Integration:
             return config_dir / f"smartcash_yolov5{model_size}_efficientnet.yaml"
         else:
             raise ValueError(f"Unsupported backbone type: {backbone_type}")
+    
+    def _get_pretrained_weights_path(self, weights_name="yolov5s.pt"):
+        """
+        Get path for pretrained weights, handling download if necessary
+        
+        Args:
+            weights_name: Name of the weights file (e.g., 'yolov5s.pt')
+            
+        Returns:
+            Path to the weights file in /data/pretrained/ folder
+        """
+        from pathlib import Path
+        import os
+        
+        # Create data/pretrained directory if it doesn't exist
+        project_root = Path(__file__).parent.parent.parent.parent  # Go up to project root
+        pretrained_dir = project_root / "data" / "pretrained"
+        pretrained_dir.mkdir(parents=True, exist_ok=True)
+        
+        weights_path = pretrained_dir / weights_name
+        
+        # If weights file doesn't exist, let YOLOv5 download it to our directory
+        if not weights_path.exists():
+            self.logger.info(f"📥 Downloading pretrained weights {weights_name} to {pretrained_dir}")
+            
+            # Import YOLOv5's download function
+            try:
+                import sys
+                from pathlib import Path
+                yolov5_path = Path(__file__).parent.parent.parent.parent / "yolov5"
+                if str(yolov5_path) not in sys.path:
+                    sys.path.append(str(yolov5_path))
+                
+                from utils.downloads import attempt_download
+                import shutil
+                
+                # Change to the pretrained directory and download there
+                original_cwd = Path.cwd()
+                try:
+                    os.chdir(str(pretrained_dir))
+                    
+                    # Download to current directory (pretrained_dir)
+                    downloaded_path = attempt_download(weights_name)
+                    
+                    # Check if the file was downloaded to the pretrained directory
+                    if not weights_path.exists():
+                        # If not in pretrained dir, try to find and move it
+                        possible_locations = [
+                            original_cwd / weights_name,  # Original directory
+                            Path.home() / '.cache' / 'torch' / 'hub' / weights_name,  # Torch cache
+                            yolov5_path / weights_name,  # YOLOv5 directory
+                        ]
+                        
+                        for possible_path in possible_locations:
+                            if possible_path.exists():
+                                shutil.move(str(possible_path), str(weights_path))
+                                self.logger.info(f"📁 Moved {weights_name} to {weights_path}")
+                                break
+                        else:
+                            self.logger.warning(f"⚠️ Could not locate downloaded {weights_name}")
+                            
+                finally:
+                    # Always restore original working directory
+                    os.chdir(str(original_cwd))
+                
+            except ImportError as e:
+                self.logger.warning(f"⚠️ Could not import YOLOv5 download utilities: {e}")
+                # Fallback: return the path anyway, YOLOv5 will handle downloading
+                return str(weights_path)
+            except Exception as e:
+                self.logger.warning(f"⚠️ Error downloading pretrained weights: {e}")
+                # Fallback: return the path anyway
+                return str(weights_path)
+        
+        self.logger.info(f"📂 Using pretrained weights from {weights_path}")
+        return str(weights_path)
     
     def _load_config(self, config_path: str) -> dict:
         """

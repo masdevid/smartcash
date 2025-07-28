@@ -175,16 +175,23 @@ class UnifiedProgressTracker:
         result['duration'] = duration
         self.phase_results[self.current_phase] = result
         
-        status = "✅" if result.get('success', False) else "❌"
+        success = result.get('success', False)
+        status = "✅" if success else "❌"
         phase_display = self.current_phase.replace('_', ' ').title()
         
         logger.info(f"{status} {phase_display} completed in {duration:.1f}s")
         
         if self.progress_callback:
-            message = f"{phase_display} completed"
-            if not result.get('success', False):
-                message = f"{phase_display} failed: {result.get('error', 'Unknown error')}"
-            self.progress_callback(self.current_phase, 100, 100, message)
+            if success:
+                # Successful completion - report 100%
+                message = f"✅ {phase_display} completed"
+                self.progress_callback(self.current_phase, 100, 100, message)
+            else:
+                # Failed completion - report partial progress to avoid confusion
+                error_msg = result.get('error', 'Unknown error')
+                message = f"❌ {phase_display} failed: {error_msg}"
+                # Report 99% instead of 100% to indicate incomplete/failed state
+                self.progress_callback(self.current_phase, 99, 100, message)
     
     def get_summary(self) -> Dict[str, Any]:
         """Get complete pipeline summary."""

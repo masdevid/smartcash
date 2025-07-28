@@ -99,7 +99,37 @@ class UncertaintyMultiTaskLoss(nn.Module):
                 # Ensure layer_preds is a list of tensors on the right device
                 if not isinstance(layer_preds, (list, tuple)):
                     layer_preds = [layer_preds]
-                layer_preds = [p.to(device) if isinstance(p, torch.Tensor) else p for p in layer_preds]
+                
+                # Convert and move tensors to device, handling various input types
+                processed_preds = []
+                for p in layer_preds:
+                    if isinstance(p, torch.Tensor):
+                        processed_preds.append(p.to(device))
+                    elif isinstance(p, (list, tuple)):
+                        # Handle nested lists/tuples of tensors
+                        nested_tensors = []
+                        for nested_p in p:
+                            if isinstance(nested_p, torch.Tensor):
+                                nested_tensors.append(nested_p.to(device))
+                            else:
+                                # Skip non-tensor elements
+                                self.logger.warning(f"Skipping non-tensor element in nested predictions: {type(nested_p)}")
+                                continue
+                        if nested_tensors:
+                            processed_preds.extend(nested_tensors)
+                    else:
+                        # Skip non-tensor, non-list elements
+                        self.logger.warning(f"Skipping non-tensor prediction element: {type(p)}")
+                        continue
+                
+                layer_preds = processed_preds
+                
+                # Skip if no valid predictions were found
+                if not layer_preds:
+                    self.logger.warning(f"No valid tensor predictions found for layer {layer_name}")
+                    layer_losses[layer_name] = torch.tensor(0.0, device=device, requires_grad=True)
+                    loss_breakdown[f"{layer_name}_total_loss"] = torch.tensor(0.0, device=device)
+                    continue
                 
                 # Ensure layer_targets is a tensor on the right device
                 if isinstance(layer_targets, (list, tuple)) and len(layer_targets) > 0:

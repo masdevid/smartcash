@@ -105,6 +105,7 @@ class TrainingUIModule(ModelConfigSyncMixin, BackendServiceMixin, BaseUIModule, 
         """Get module-specific button handlers for unified training."""
         return {
             'start_training': self._handle_start_unified_training,
+            'resume_training': self._handle_resume_unified_training,
             'stop_training': self._handle_stop_unified_training,
             'save': self._handle_save_config,
             'reset': self._handle_reset_config
@@ -135,6 +136,9 @@ class TrainingUIModule(ModelConfigSyncMixin, BackendServiceMixin, BaseUIModule, 
         try:
             # Start training button is always available (unified pipeline handles validation)
             self.set_button_dependency('start_training', self._check_start_training_dependency)
+            
+            # Resume training button has same dependency as start training
+            self.set_button_dependency('resume_training', self._check_start_training_dependency)
             
             # Stop training button depends on training being active
             self.set_button_dependency('stop_training', self._check_stop_training_dependency)
@@ -194,12 +198,14 @@ class TrainingUIModule(ModelConfigSyncMixin, BackendServiceMixin, BaseUIModule, 
             # Define button conditions for unified training
             button_conditions = {
                 'start_training': not self._is_training_active,
+                'resume_training': not self._is_training_active,
                 'stop_training': self._is_training_active
             }
             
             # Define reasons for disabled buttons
             button_reasons = {
                 'start_training': "Training in progress" if self._is_training_active else None,
+                'resume_training': "Training in progress" if self._is_training_active else None,
                 'stop_training': "No active training to stop" if not self._is_training_active else None
             }
             
@@ -264,6 +270,55 @@ class TrainingUIModule(ModelConfigSyncMixin, BackendServiceMixin, BaseUIModule, 
             # Reset training state on error
             self._update_training_state(is_training_active=False)
             self.log_error(f"Unified training error: {e}")
+    
+    def _handle_resume_unified_training(self, button=None) -> None:
+        """Handle resume unified training button click."""
+        try:
+            self.log_info("🔄 Resuming unified training pipeline...")
+            
+            # Update state to indicate training is starting
+            self._update_training_state(is_training_active=True)
+            
+            # Get current configuration from form
+            current_config = self._get_form_configuration()
+            
+            # Check if resume checkpoint path is provided
+            resume_path = current_config.get('training', {}).get('resume_checkpoint_path', '')
+            if not resume_path or resume_path.strip() == '':
+                self._update_training_state(is_training_active=False)
+                self.log_error("❌ No checkpoint path provided for resume training")
+                return
+            
+            # Validate configuration
+            validation_result = validate_unified_training_config(current_config)
+            if not validation_result['success']:
+                error_msg = f"Configuration validation failed: {'; '.join(validation_result['errors'])}"
+                self._update_training_state(is_training_active=False)
+                self.log_error(error_msg)
+                return
+            
+            # Show warnings if any
+            for warning in validation_result.get('warnings', []):
+                self.log_warning(f"⚠️ {warning}")
+            
+            # Set resume flag in config
+            current_config['training']['resume_training'] = True
+            self.log_info(f"📂 Resuming from checkpoint: {resume_path}")
+            
+            result = self.execute_unified_training(current_config)
+            
+            if result.get('success'):
+                self.log_success(f"🎉 {result.get('message', 'Resume training completed successfully')}")
+                self._handle_training_completion(result)
+            else:
+                # Reset training state if training failed
+                self._update_training_state(is_training_active=False)
+                self.log_error(f"❌ Resume training failed: {result.get('message', 'Unknown error')}")
+                
+        except Exception as e:
+            # Reset training state on error
+            self._update_training_state(is_training_active=False)
+            self.log_error(f"Resume training error: {e}")
     
     def _handle_stop_unified_training(self, button=None) -> None:
         """Handle stop unified training button click."""
@@ -363,11 +418,15 @@ class TrainingUIModule(ModelConfigSyncMixin, BackendServiceMixin, BaseUIModule, 
             self.logger.warning(f"Failed to handle training completion: {e}")
     
     def _get_operation_callbacks(self) -> Dict[str, Callable]:
-        """Get callbacks for unified training operation."""
+        """Get callbacks for unified training operation with comprehensive callback support."""
         return {
             'on_progress': self._handle_operation_progress,
             'on_success': self._handle_operation_success,
-            'on_failure': self._handle_operation_failure
+            'on_failure': self._handle_operation_failure,
+            'on_metrics_update': self._handle_metrics_update,
+            'on_chart_update': self._handle_chart_update,
+            'on_live_chart_update': self._handle_live_chart_update,
+            'on_log_update': self._handle_log_update
         }
     
     def _handle_operation_progress(self, progress: int, message: str = "") -> None:
@@ -387,6 +446,72 @@ class TrainingUIModule(ModelConfigSyncMixin, BackendServiceMixin, BaseUIModule, 
     def _handle_operation_failure(self, message: str) -> None:
         """Handle operation failure."""
         self.log_error(message)
+    
+    def _handle_metrics_update(self, callback_data: Dict[str, Any]) -> None:
+        """Handle metrics updates with intelligent layer filtering applied."""
+        try:
+            phase = callback_data.get('phase', 'unknown')
+            epoch = callback_data.get('epoch', 0)
+            metrics = callback_data.get('metrics', {})
+            
+            # Update metrics display in UI using the correct component name
+            update_metrics_func = self._ui_components.get('update_metrics')
+            if update_metrics_func:
+                update_metrics_func(metrics)
+            
+            # Log key metrics for user feedback (only meaningful ones to reduce clutter)
+            train_loss = metrics.get('train_loss', 0)
+            val_loss = metrics.get('val_loss', 0)
+            val_map50 = metrics.get('val_map50', 0)
+            
+            # Only log if we have meaningful values
+            if train_loss > 0 or val_loss > 0 or val_map50 > 0:
+                self.log_info(f"📊 Epoch {epoch} [{phase}]: Train={train_loss:.4f}, Val={val_loss:.4f}, mAP@0.5={val_map50:.4f}")
+            
+        except Exception as e:
+            self.log_warning(f"Failed to handle metrics update: {e}")
+    
+    def _handle_chart_update(self, metrics: Dict[str, Any]) -> None:
+        """Handle chart updates with filtered metrics."""
+        try:
+            # Update charts using the correct component reference
+            update_charts_func = self._ui_components.get('update_charts')
+            if update_charts_func:
+                update_charts_func(metrics)
+            
+        except Exception as e:
+            self.log_warning(f"Failed to handle chart update: {e}")
+    
+    def _handle_live_chart_update(self, chart_data: Dict[str, Any]) -> None:
+        """Handle live chart updates with intelligent layer filtering."""
+        try:
+            # For live charts, use the same update function as regular charts
+            # since the UI has a unified chart update system
+            update_charts_func = self._ui_components.get('update_charts')
+            if update_charts_func:
+                update_charts_func(chart_data)
+            
+        except Exception as e:
+            self.log_warning(f"Failed to handle live chart update: {e}")
+    
+    def _handle_log_update(self, log_data: Dict[str, Any]) -> None:
+        """Handle log updates for real-time training feedback."""
+        try:
+            message = log_data.get('message', '')
+            level = log_data.get('level', 'info')
+            
+            # Route to appropriate log level
+            if level == 'error':
+                self.log_error(message)
+            elif level == 'warning':
+                self.log_warning(message)
+            elif level == 'debug':
+                self.log_debug(message)
+            else:
+                self.log_info(message)
+                
+        except Exception as e:
+            self.log_warning(f"Failed to handle log update: {e}")
     
     def _sync_config_to_ui(self) -> None:
         """Sync current configuration to unified training form."""

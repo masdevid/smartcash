@@ -127,7 +127,7 @@ class SmartCashYOLOv5Integration:
             
             # Only log if this is the first registration
             if not hasattr(register_yolov5_components, '_registered'):
-                self.logger.info("🔧 Registered SmartCash components with YOLOv5")
+                self.logger.debug("🔧 Registered SmartCash components with YOLOv5")
             
         except Exception as e:
             self.logger.error(f"❌ Failed to register components: {e}", exc_info=True)
@@ -174,6 +174,17 @@ class SmartCashYOLOv5Integration:
             # Get input channels and number of classes
             ch = config['ch']
             nc = config['nc']
+            
+            # Handle multi-layer num_classes configuration early
+            if isinstance(nc, dict):
+                # Multi-layer configuration: convert dict to total classes for YOLOv5
+                # Store original multi-layer config for later use
+                config['multi_layer_nc'] = nc
+                # Calculate total classes for YOLOv5 compatibility  
+                nc = sum(nc.values()) if nc else 80
+                config['nc'] = nc  # Update config to use integer
+                self.logger.info(f"Multi-layer config detected: {config['multi_layer_nc']} -> total classes: {nc}")
+            
             anchors = config.get('anchors')
             
             # Create a wrapper model that handles the input properly
@@ -208,8 +219,36 @@ class SmartCashYOLOv5Integration:
                         # Get the model configuration
                         config = deepcopy(self.config)
                         
+                        # Comprehensive multi-layer configuration cleanup
+                        # Ensure ALL dict references are converted to integers for YOLOv5 compatibility
+                        def convert_multiclass_dicts(obj):
+                            """Recursively convert any multi-layer class dicts to integers"""
+                            if isinstance(obj, dict):
+                                # Check if this looks like a multi-layer class dict
+                                if all(k.startswith('layer_') for k in obj.keys()) and all(isinstance(v, int) for v in obj.values()):
+                                    total_classes = sum(obj.values())
+                                    self.logger.info(f"Converting multi-layer dict {obj} -> {total_classes}")
+                                    return total_classes  # Convert to total classes
+                                else:
+                                    # Recursively process nested dicts
+                                    return {k: convert_multiclass_dicts(v) for k, v in obj.items()}
+                            elif isinstance(obj, list):
+                                return [convert_multiclass_dicts(item) for item in obj]
+                            elif isinstance(obj, tuple):
+                                return tuple(convert_multiclass_dicts(item) for item in obj)
+                            else:
+                                return obj
+                        
+                        # Apply conversion to entire config
+                        config = convert_multiclass_dicts(config)
+                        
+                        # Set default nc value if not provided
+                        config.setdefault('nc', 80)
+                        
+                        # Log the final nc value
+                        self.logger.info(f"Final nc value for YOLOv5: {config['nc']}")
+                        
                         # Set default values if not provided
-                        config['nc'] = config.get('nc', 80)  # number of classes
                         config['depth_multiple'] = config.get('depth_multiple', 0.33)  # model depth multiple
                         config['width_multiple'] = config.get('width_multiple', 0.50)  # layer channel multiple
                         
@@ -253,7 +292,7 @@ class SmartCashYOLOv5Integration:
                                 [-1, 1, 'Conv', [512, 3, 2]],
                                 [[-1, 10], 1, 'Concat', [1]],  # cat head P5
                                 [-1, 3, 'C3', [1024, False]],
-                                [[17, 20, 23], 1, 'Detect', [config['nc'], config['anchors']]],  # Detect(P3, P4, P5)
+                                [[17, 20, 23], 1, 'Detect', [config['nc'], config['anchors']]],  # Detect(P3, P4, P5) - nc is now integer
                             ]
                         
                         # Ensure all required fields are in the config
@@ -329,7 +368,15 @@ class SmartCashYOLOv5Integration:
                                     
                                     try:
                                         # Create YOLOv5 model with disabled weights_only loading
-                                        temp_model = YOLOModel(temp_yaml_path, ch=config['ch'])
+                                        # Check if we should use our custom SmartCash model for multi-layer support
+                                        if 'multi_layer_nc' in config:
+                                            # Multi-layer configuration detected, but for now use standard YOLOModel
+                                            # The multi-layer logic will be handled in the training phase manager
+                                            self.logger.info("Using standard YOLOModel with multi-layer workaround")
+                                            temp_model = YOLOModel(temp_yaml_path, ch=config['ch'])
+                                        else:
+                                            # Standard single-layer configuration
+                                            temp_model = YOLOModel(temp_yaml_path, ch=config['ch'])
                                         
                                         # Initialize model weights
                                         initialize_weights(temp_model)
@@ -369,6 +416,12 @@ class SmartCashYOLOv5Integration:
                         
                         # Store the actual model
                         self.model = temp_model
+                        
+                        # Store multi-layer configuration on the model for later access
+                        if 'multi_layer_nc' in config:
+                            self.model.multi_layer_config = config['multi_layer_nc']
+                            self.logger.info(f"Stored multi-layer config on model: {config['multi_layer_nc']}")
+                        
                         self.initialized = True
                         
                         # Initialize model with pretrained weights if specified
@@ -432,9 +485,9 @@ class SmartCashYOLOv5Integration:
         config_dir = Path(__file__).parent / "configs"
         
         if backbone_type == "cspdarknet":
-            return config_dir / f"smartcash_yolov5{model_size}_cspdarknet.yaml"
-        elif backbone_type == "efficientnet_b4":
-            return config_dir / f"smartcash_yolov5{model_size}_efficientnet.yaml"
+            return config_dir / "models" / "yolov5" / "cspdarknet" / f"smartcash_yolov5{model_size}_cspdarknet.yaml"
+        elif backbone_type == "efficientnet":
+            return config_dir / "models" / "yolov5" / "efficientnet" / f"smartcash_yolov5{model_size}_efficientnet.yaml"
         else:
             raise ValueError(f"Unsupported backbone type: {backbone_type}")
     
@@ -707,12 +760,27 @@ class SmartCashTrainingCompatibilityWrapper(nn.Module):
         self.yolov5_model = yolov5_model
         self.logger = logger or SmartCashLogger(__name__)
         
+        # Initialize phase tracking
+        self.current_phase = 1  # Default to phase 1
+        
+        # Store multi-layer configuration if available
+        self.multi_layer_config = getattr(yolov5_model, 'multi_layer_config', None)
+        
         # Extract components for compatibility
         self.backbone = self._extract_backbone()
         self.neck = self._extract_neck()
         self.head = self._extract_head()
         
         self.logger.info("🔄 Created training compatibility wrapper")
+        
+        # Propagate phase to all model components
+        self._propagate_phase_to_components()
+    
+    def __setattr__(self, name, value):
+        """Override setattr to propagate phase changes"""
+        super().__setattr__(name, value)
+        if name == 'current_phase' and hasattr(self, 'yolov5_model'):
+            self._propagate_phase_to_components()
     
     def _extract_backbone(self):
         """Extract backbone component"""
@@ -765,6 +833,38 @@ class SmartCashTrainingCompatibilityWrapper(nn.Module):
         self.eval()
         with torch.no_grad():
             return self.yolov5_model(x)
+    
+    def _propagate_phase_to_components(self):
+        """Propagate current_phase to all model components"""
+        try:
+            # Set phase on YOLOv5 model (force create the attribute)
+            if hasattr(self, 'yolov5_model') and self.yolov5_model is not None:
+                self.yolov5_model.current_phase = self.current_phase
+            
+            # Set phase on nested model components
+            if hasattr(self, 'yolov5_model') and hasattr(self.yolov5_model, 'model'):
+                nested_model = self.yolov5_model.model
+                nested_model.current_phase = self.current_phase
+                
+                # Set phase on detection head if it exists
+                if hasattr(nested_model, 'model') and hasattr(nested_model.model, '__iter__'):
+                    try:
+                        if len(nested_model.model) > 0:
+                            last_layer = nested_model.model[-1]
+                            last_layer.current_phase = self.current_phase
+                    except:
+                        pass
+            
+            # Set phase on extracted components
+            if hasattr(self, 'head') and self.head:
+                self.head.current_phase = self.current_phase
+            if hasattr(self, 'backbone') and self.backbone:
+                self.backbone.current_phase = self.current_phase
+            if hasattr(self, 'neck') and self.neck:
+                self.neck.current_phase = self.current_phase
+                
+        except Exception as e:
+            self.logger.debug(f"Phase propagation encountered an issue: {e}")
     
     def get_model_summary(self):
         """Get model summary compatible with existing interface"""

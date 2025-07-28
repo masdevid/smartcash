@@ -373,14 +373,51 @@ class EvaluationMetrics:
         self.logger.info(f"📊 Confusion matrix generated ({num_classes}x{num_classes})")
         return confusion_matrix
     
+    def _flatten_multi_layer_predictions(self, predictions: List[Dict]) -> List[Dict]:
+        """🔄 Flatten multi-layer predictions from latest model architecture for evaluation"""
+        flattened = []
+        
+        for pred in predictions:
+            detections = pred.get('detections', [])
+            
+            # If detections already flattened, use as-is
+            if isinstance(detections, list) and all(isinstance(d, dict) for d in detections):
+                flattened.append(pred)
+                continue
+            
+            # If detections are layered (dict with layer_1, layer_2, etc.), flatten them
+            if isinstance(detections, dict):
+                all_detections = []
+                for layer_name, layer_detections in detections.items():
+                    if isinstance(layer_detections, list):
+                        # Add layer info to each detection for traceability
+                        for detection in layer_detections:
+                            if isinstance(detection, dict):
+                                detection_copy = detection.copy()
+                                detection_copy['source_layer'] = layer_name
+                                all_detections.append(detection_copy)
+                
+                # Create flattened prediction
+                flattened_pred = pred.copy()
+                flattened_pred['detections'] = all_detections
+                flattened.append(flattened_pred)
+            else:
+                # Unknown format, use as-is
+                flattened.append(pred)
+        
+        return flattened
+    
     def get_metrics_summary(self, predictions: List[Dict], ground_truths: List[Dict], 
                            inference_times: List[float] = None) -> Dict[str, Any]:
-        """📋 Generate comprehensive metrics summary"""
+        """📋 Generate comprehensive metrics summary for evaluation scenarios"""
         summary = {}
+        
+        # Flatten multi-layer predictions for evaluation if needed
+        flattened_predictions = self._flatten_multi_layer_predictions(predictions)
         
         # Calculate all metrics
         if self.metrics_config.get('map', {}).get('enabled', True):
-            summary.update(self.compute_map(predictions, ground_truths))
+            summary.update(self.compute_map(flattened_predictions, ground_truths))
         
         if self.metrics_config.get('accuracy', {}).get('enabled', True):
             summary.update(self.compute_accuracy(predictions, ground_truths))

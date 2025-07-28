@@ -154,7 +154,7 @@ def create_unified_training_ui(config: Optional[Dict[str, Any]] = None, **kwargs
     # Add the form accordion to the form container
     form_container['add_item'](form_widgets, "training_form")
     
-    # 3. Create Action Container (only Start Training button)
+    # 3. Create Action Container with Start and Resume buttons
     actions = [
         {
             'id': 'start_training',
@@ -162,6 +162,13 @@ def create_unified_training_ui(config: Optional[Dict[str, Any]] = None, **kwargs
             'style': 'success',
             'tooltip': 'Start unified training pipeline',
             'order': 1
+        },
+        {
+            'id': 'resume_training',
+            'text': '🔄 Resume Training',
+            'style': 'info',
+            'tooltip': 'Resume training from selected checkpoint',
+            'order': 2
         }
     ]
     
@@ -230,6 +237,7 @@ def create_unified_training_ui(config: Optional[Dict[str, Any]] = None, **kwargs
         
         # Individual action buttons for easy access
         'start_training': action_container['buttons'].get('start_training'),
+        'resume_training': action_container['buttons'].get('resume_training'),
         'save': action_container['buttons'].get('save'),
         'reset': action_container['buttons'].get('reset'),
         

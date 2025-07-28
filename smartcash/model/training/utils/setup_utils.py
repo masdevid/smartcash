@@ -176,8 +176,9 @@ def apply_configuration_overrides(config: Dict[str, Any], **kwargs) -> Dict[str,
                 training_overrides['training_phases'][phase]['learning_rates'] = training_overrides['training_phases'][phase].get('learning_rates', {})
                 training_overrides['training_phases'][phase]['learning_rates']['backbone'] = kwargs['backbone_lr']
     
-    # Early stopping configuration overrides
-    early_stopping_keys = ['early_stopping_enabled', 'early_stopping_patience', 'early_stopping_metric', 
+    # Early stopping configuration overrides (including phase-specific)
+    early_stopping_keys = ['early_stopping_enabled', 'early_stopping_phase_1_enabled', 'early_stopping_phase_2_enabled',
+                         'early_stopping_patience', 'early_stopping_metric', 
                          'early_stopping_mode', 'early_stopping_min_delta']
     if any(es_key in kwargs for es_key in early_stopping_keys):
         training_overrides['training'] = training_overrides.get('training', {})
@@ -186,6 +187,10 @@ def apply_configuration_overrides(config: Dict[str, Any], **kwargs) -> Dict[str,
         # Map parameters to config structure
         if 'early_stopping_enabled' in kwargs:
             training_overrides['training']['early_stopping']['enabled'] = kwargs['early_stopping_enabled']
+        if 'early_stopping_phase_1_enabled' in kwargs:
+            training_overrides['training']['early_stopping']['phase_1_enabled'] = kwargs['early_stopping_phase_1_enabled']
+        if 'early_stopping_phase_2_enabled' in kwargs:
+            training_overrides['training']['early_stopping']['phase_2_enabled'] = kwargs['early_stopping_phase_2_enabled']
         if 'early_stopping_patience' in kwargs:
             training_overrides['training']['early_stopping']['patience'] = kwargs['early_stopping_patience']
         if 'early_stopping_metric' in kwargs:
@@ -231,6 +236,86 @@ def deep_merge_dict(base_dict: dict, override_dict: dict) -> dict:
             result[key] = value
     
     return result
+
+
+def apply_training_overrides(config: Dict[str, Any], **kwargs) -> Dict[str, Any]:
+    """
+    Apply training parameter overrides from command line arguments to configuration.
+    
+    Args:
+        config: Base training configuration
+        **kwargs: Command line arguments and overrides
+        
+    Returns:
+        Updated configuration with command line overrides applied
+    """
+    # Early stopping overrides (especially patience)
+    if 'patience' in kwargs and kwargs['patience'] is not None:
+        if 'training' not in config:
+            config['training'] = {}
+        if 'early_stopping' not in config['training']:
+            config['training']['early_stopping'] = {}
+        config['training']['early_stopping']['patience'] = kwargs['patience']
+        logger.info(f"🎯 Early stopping patience override applied: {kwargs['patience']}")
+    
+    # Phase-specific epoch overrides
+    if 'phase1_epochs' in kwargs and kwargs['phase1_epochs'] is not None:
+        if 'training_phases' not in config:
+            config['training_phases'] = {}
+        if 'phase_1' not in config['training_phases']:
+            config['training_phases']['phase_1'] = {}
+        config['training_phases']['phase_1']['epochs'] = kwargs['phase1_epochs']
+        logger.info(f"🎯 Phase 1 epochs override applied: {kwargs['phase1_epochs']}")
+    
+    if 'phase2_epochs' in kwargs and kwargs['phase2_epochs'] is not None:
+        if 'training_phases' not in config:
+            config['training_phases'] = {}
+        if 'phase_2' not in config['training_phases']:
+            config['training_phases']['phase_2'] = {}
+        config['training_phases']['phase_2']['epochs'] = kwargs['phase2_epochs']
+        logger.info(f"🎯 Phase 2 epochs override applied: {kwargs['phase2_epochs']}")
+    
+    # Training mode override
+    if 'training_mode' in kwargs and kwargs['training_mode']:
+        if 'training' not in config:
+            config['training'] = {}
+        config['training']['training_mode'] = kwargs['training_mode']
+        logger.info(f"🎯 Training mode override applied: {kwargs['training_mode']}")
+    
+    # Backbone override
+    if 'backbone' in kwargs and kwargs['backbone']:
+        if 'model' not in config:
+            config['model'] = {}
+        config['model']['backbone'] = kwargs['backbone']
+        logger.info(f"🎯 Backbone override applied: {kwargs['backbone']}")
+    
+    # Pretrained override
+    if 'pretrained' in kwargs and kwargs['pretrained'] is not None:
+        if 'model' not in config:
+            config['model'] = {}
+        config['model']['pretrained'] = kwargs['pretrained']
+        logger.info(f"🎯 Pretrained override applied: {kwargs['pretrained']}")
+    
+    # Verbose override
+    if 'verbose' in kwargs and kwargs['verbose'] is not None:
+        if 'training' not in config:
+            config['training'] = {}
+        config['training']['verbose'] = kwargs['verbose']
+        logger.info(f"🎯 Verbose override applied: {kwargs['verbose']}")
+    
+    # Force CPU override
+    if 'force_cpu' in kwargs and kwargs['force_cpu']:
+        config = apply_force_cpu_configuration(config)
+        logger.info("🎯 Force CPU override applied")
+    
+    # Single layer mode override
+    if 'single_layer_mode' in kwargs and kwargs['single_layer_mode']:
+        if 'model' not in config:
+            config['model'] = {}
+        config['model']['layer_mode'] = kwargs['single_layer_mode']
+        logger.info(f"🎯 Single layer mode override applied: {kwargs['single_layer_mode']}")
+    
+    return config
 
 
 def configure_single_phase_settings(config: Dict[str, Any], layer_mode: str) -> Dict[str, Any]:

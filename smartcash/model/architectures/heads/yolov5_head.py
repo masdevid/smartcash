@@ -400,7 +400,7 @@ def register_yolov5_components():
         # Also add to local namespace for eval() in parse_model
         globals()['SmartCashMultiDetect'] = YOLOv5MultiLayerDetect
         
-        print("✅ Registered SmartCash components with YOLOv5")
+        # Silently register components (reduce noise in output)
         
         # Mark as registered globally - this persists across all module imports
         setattr(sys, _GLOBAL_REGISTRATION_KEY, True)

@@ -145,8 +145,9 @@ class PlatformPresets:
                 'prefetch_factor': 1  # Conservative memory usage
             })
             
-            # Set MPS memory environment
-            os.environ['PYTORCH_MPS_HIGH_WATERMARK_RATIO'] = '0.7'
+            # Set MPS memory environment with valid ratios
+            os.environ['PYTORCH_MPS_HIGH_WATERMARK_RATIO'] = '0.8'  # Valid range: 0.0 to 1.0
+            os.environ['PYTORCH_MPS_LOW_WATERMARK_RATIO'] = '0.3'   # Must be < HIGH_WATERMARK_RATIO
             os.environ['PYTORCH_MPS_ALLOCATOR_POLICY'] = 'native'
         
         elif self.platform_info['is_cuda_workstation']:

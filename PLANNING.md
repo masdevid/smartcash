@@ -223,6 +223,16 @@ All cells are created minimalistic with single execution `initialize_[module]_ui
    - `cell_3_3_training.py`: `initialize_training_ui(display=True)` - Train the model with configurable parameters
    - `cell_3_4_evaluation.py`: `initialize_evaluation_ui(display=True)` - Evaluate model performance on test set
 
+# Training Backend:
+1. Single-Phase + Multi-Layer (training_mode='single_phase', layer_mode='multi'):
+    - Return 3 predictions: {'layer_1': pred, 'layer_2': pred, 'layer_3': pred}
+    - Processes all layers in a single training phase
+2. Single-Phase + Single-Layer (training_mode='single_phase', layer_mode='single'):
+    - Return 1 prediction: {'layer_1': pred}
+    - Processes only the primary layer
+3. Two-Phase Mode:
+    - Phase 1: Return 1 prediction: {'layer_1': pred}
+    - Phase 2: Return 3 predictions: {'layer_1': pred, 'layer_2': pred, 'layer_3': pred}
 ## 🧪 Testing Strategy
 
 ### UIModule Testing Approach

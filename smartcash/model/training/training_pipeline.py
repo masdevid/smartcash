@@ -247,6 +247,7 @@ class TrainingPipeline(UnifiedTrainingPipeline):
             'batch_size': 8,
             'num_workers': 0 if config['force_cpu'] else 4,
             'pin_memory': False,
+            'training_mode': config['training_mode'],  # Add training mode to training config
             'early_stopping': {
                 'enabled': True,
                 'patience': 10,
@@ -263,6 +264,10 @@ class TrainingPipeline(UnifiedTrainingPipeline):
         }
         
         # Always use YOLOv5 architecture
+        
+        # Apply training overrides from kwargs (including early stopping parameters)
+        from smartcash.model.training.utils.setup_utils import apply_training_overrides
+        config = apply_training_overrides(config, **kwargs)
         
         logger.info(f"🔧 Training configuration setup: {config['backbone']} | yolov5")
         return config

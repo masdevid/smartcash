@@ -23,6 +23,8 @@ if project_root not in sys.path:
 
 from smartcash.model.api.core import run_full_training_pipeline
 from training_args_helper import create_training_arg_parser, get_training_kwargs
+from smartcash.model.training.utils.metric_color_utils import ColorScheme
+from smartcash.model.training.utils.ui_metrics_callback import create_ui_metrics_callback
 
 
 def create_log_callback(verbose: bool = True):
@@ -51,26 +53,12 @@ def create_log_callback(verbose: bool = True):
 
 
 def create_metrics_callback(verbose: bool = True):
-    """Create a metrics callback that prints training metrics."""
-    def metrics_callback(phase: str, epoch: int, metrics: dict, **kwargs):
-        """Handle metrics updates from training."""
-        print(f"📊 METRICS [{phase.upper()}] Epoch {epoch}:")
-        
-        if metrics:
-            # Print loss metrics
-            for metric_name, value in metrics.items():
-                if isinstance(value, (int, float)):
-                    print(f"    {metric_name}: {value:.4f}")
-                else:
-                    print(f"    {metric_name}: {value}")
-        
-        # Print additional info from kwargs
-        if verbose and kwargs:
-            for key, value in kwargs.items():
-                if key not in ['phase', 'epoch', 'metrics']:
-                    print(f"    {key}: {value}")
-    
-    return metrics_callback
+    """Create an enhanced metrics callback with UI color support."""
+    return create_ui_metrics_callback(
+        verbose=verbose,
+        console_scheme=ColorScheme.EMOJI,
+        ui_callback=None  # Can be set later for UI integration
+    )
 
 
 def create_progress_callback(use_tqdm: bool = True, verbose: bool = True):
@@ -138,16 +126,39 @@ def create_progress_callback(use_tqdm: bool = True, verbose: bool = True):
         if phase in phase_progress_map:
             start, end = phase_progress_map[phase]
             overall_progress = start + (percentage / 100) * (end - start)
+            
+            # Handle finalize phase completion/failure properly
+            if phase == 'finalize':
+                if percentage >= 99:  # Account for both success (100%) and failure (99%)
+                    if "failed" in message.lower() or "❌" in message:
+                        # Failed finalize - stop at 95% to indicate incomplete
+                        overall_progress = 95
+                        overall_bar.set_description("🚀 Training Failed - See logs for details")
+                    else:
+                        # Successful finalize - reach 100%
+                        overall_progress = 100
+                        overall_bar.set_description("🚀 Training Complete!")
+                else:
+                    overall_bar.set_description(f"🚀 Overall Training - {phase_display}")
+            else:
+                overall_bar.set_description(f"🚀 Overall Training - {phase_display}")
+            
             overall_bar.n = int(overall_progress)
-            overall_bar.set_description(f"🚀 Overall Training - {phase_display}")
             overall_bar.refresh()
         
         # Handle phase completion
-        if percentage >= 100:
+        if percentage >= 99:  # Handle both 100% (success) and 99% (failure)
             if phase == 'finalize':  # Updated from 'summary_visualization'
-                # Training is complete
-                overall_bar.n = 100
-                overall_bar.set_description("🚀 Training Complete!")
+                # Training phase is done - handle success or failure
+                if "failed" in message.lower() or "❌" in message:
+                    # Failed training - stop at 95%
+                    overall_bar.n = 95
+                    overall_bar.set_description("🚀 Training Failed - See logs for details")
+                else:
+                    # Successful training - reach 100%
+                    overall_bar.n = 100
+                    overall_bar.set_description("🚀 Training Complete!")
+                
                 overall_bar.refresh()
                 overall_bar.close()
                 del progress_bars[overall_bar_key]
@@ -188,7 +199,12 @@ def create_progress_callback(use_tqdm: bool = True, verbose: bool = True):
         
         bar = progress_bars[bar_key]
         bar.n = current
-        bar.set_description(f"🚀 Overall Training - {message}")
+        
+        # Update description - use completion message if at 100%
+        if current >= total:
+            bar.set_description("🚀 Training Complete!")
+        else:
+            bar.set_description(f"🚀 Overall Training - {message}")
         bar.refresh()
         
         # Close when complete
@@ -270,6 +286,12 @@ def main():
         log_callback = create_log_callback(args.verbose)
         metrics_callback = create_metrics_callback(args.verbose)
         progress_callback = create_progress_callback(args.verbose)
+        
+        # Show early stopping behavior info
+        if args.training_mode == 'two_phase':
+            print("🎯 TWO-PHASE MODE: Early stopping disabled for Phase 1, enabled for Phase 2")
+        else:
+            print("🎯 SINGLE-PHASE MODE: Early stopping uses your configuration")
         
         # Get training arguments
         training_kwargs = get_training_kwargs(args)

@@ -607,28 +607,31 @@ class TrainingStartOperationHandler(BaseTrainingOperation):
             
             # Create enhanced metrics callback for live chart updates
             def metrics_callback(metrics_data: Dict[str, Any]) -> None:
-                """Forward training metrics to UI charts with minimal logging."""
+                """Forward training metrics to UI charts with intelligent layer filtering."""
                 try:
                     # Extract metrics from backend data
                     epoch = metrics_data.get('epoch', 0)
                     phase = metrics_data.get('phase', 'training')
                     metrics = metrics_data.get('metrics', {})
                     
-                    # Extract loss values
-                    train_loss = metrics.get('train_loss', 0.0)
-                    val_loss = metrics.get('val_loss', 0.0)
+                    # Apply intelligent layer filtering to metrics
+                    filtered_metrics = self._filter_metrics_by_active_layers(phase, metrics)
                     
-                    # Prepare comprehensive chart data
+                    # Extract loss values
+                    train_loss = filtered_metrics.get('train_loss', 0.0)
+                    val_loss = filtered_metrics.get('val_loss', 0.0)
+                    
+                    # Prepare comprehensive chart data with filtered metrics
                     chart_data = {
                         'epoch': epoch,
                         'train_loss': train_loss,
                         'val_loss': val_loss,
-                        'mAP@0.5': metrics.get('mAP_50', metrics.get('mAP@0.5', 0.0)),
-                        'mAP@0.75': metrics.get('mAP_75', metrics.get('mAP@0.75', 0.0)),
-                        'precision': metrics.get('precision', 0.0),
-                        'recall': metrics.get('recall', 0.0),
-                        'f1_score': metrics.get('f1', 0.0),
-                        **metrics
+                        'mAP@0.5': filtered_metrics.get('val_map50', filtered_metrics.get('mAP@0.5', 0.0)),
+                        'mAP@0.75': filtered_metrics.get('mAP_75', filtered_metrics.get('mAP@0.75', 0.0)),
+                        'precision': filtered_metrics.get('val_precision', 0.0),
+                        'recall': filtered_metrics.get('val_recall', 0.0),
+                        'f1_score': filtered_metrics.get('val_f1', 0.0),
+                        **filtered_metrics
                     }
                     
                     # Update charts through callback
@@ -794,6 +797,77 @@ class TrainingStartOperationHandler(BaseTrainingOperation):
         # Simple estimation: ~30 seconds per epoch (placeholder)
         estimated_minutes = (epochs * 30) // 60
         return f"~{estimated_minutes} minutes"
+
+    def _filter_metrics_by_active_layers(self, phase: str, metrics: Dict[str, Any]) -> Dict[str, Any]:
+        """Filter metrics to show only active layers using intelligent detection."""
+        # Determine which layers to show based on phase and actual metrics presence
+        show_layers = []
+        filter_zeros = False
+        
+        if phase.lower() == 'training_phase_1':
+            # Two-phase mode, phase 1: Only show layer_1
+            show_layers = ['layer_1']
+            filter_zeros = True  # Filter zeros to reduce clutter
+        elif phase.lower() == 'training_phase_2':
+            # Two-phase mode, phase 2: Show all layers
+            show_layers = ['layer_1', 'layer_2', 'layer_3']
+            filter_zeros = False
+        elif phase.lower() == 'training_phase_single':
+            # Single-phase mode: Determine active layers from actual metrics
+            layer_activity = {}
+            for layer in ['layer_1', 'layer_2', 'layer_3']:
+                # Check if this layer has any meaningful metrics
+                has_activity = any(
+                    metrics.get(f'{layer}_{metric}', 0) > 0.0001 or 
+                    metrics.get(f'val_{layer}_{metric}', 0) > 0.0001
+                    for metric in ['accuracy', 'precision', 'recall', 'f1']
+                )
+                layer_activity[layer] = has_activity
+            
+            # Determine active layers
+            active_layers = [layer for layer, active in layer_activity.items() if active]
+            if len(active_layers) == 1:
+                # Single-phase, single-layer mode: only show the active layer
+                show_layers = active_layers
+                filter_zeros = True
+            else:
+                # Single-phase, multi-layer mode: show all layers
+                show_layers = ['layer_1', 'layer_2', 'layer_3']
+                filter_zeros = False
+        else:
+            # Default: show all layers
+            show_layers = ['layer_1', 'layer_2', 'layer_3']
+            filter_zeros = False
+        
+        # Filter metrics based on active layers
+        filtered_metrics = {}
+        
+        # Always include core metrics
+        core_metrics = ['train_loss', 'val_loss', 'val_map50', 'val_map50_95', 
+                       'val_precision', 'val_recall', 'val_f1', 'val_accuracy']
+        for metric in core_metrics:
+            if metric in metrics:
+                filtered_metrics[metric] = metrics[metric]
+        
+        # Include layer-specific metrics for active layers only
+        for metric_name, value in metrics.items():
+            # Check if this is a layer metric and if we should show it
+            for layer in show_layers:
+                if (metric_name.startswith(f'{layer}_') or metric_name.startswith(f'val_{layer}_')):
+                    # Apply zero filtering if specified
+                    if filter_zeros:
+                        if isinstance(value, (int, float)) and value > 0.0001:
+                            filtered_metrics[metric_name] = value
+                    else:
+                        filtered_metrics[metric_name] = value
+                    break
+        
+        # Include class-specific AP metrics if they have meaningful values
+        for metric_name, value in metrics.items():
+            if metric_name.startswith('val_ap_') and isinstance(value, (int, float)) and value > 0.0001:
+                filtered_metrics[metric_name] = value
+        
+        return filtered_metrics
 
 
 # Import time for training ID generation

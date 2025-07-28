@@ -251,18 +251,44 @@ class EvaluationService:
         return self.results_aggregator.export_results(formats)
     
     def _load_checkpoint(self, checkpoint_path: str) -> Optional[Dict[str, Any]]:
-        """📥 Load checkpoint dengan validation"""
+        """📥 Load checkpoint dengan validation for latest model architecture"""
         try:
             checkpoint_info = self.checkpoint_selector.select_checkpoint(checkpoint_path)
             
             if self.model_api:
-                # Load model dengan checkpoint
+                # Load model dengan checkpoint using latest API
                 load_result = self.model_api.load_checkpoint(checkpoint_path)
                 if load_result.get('success', False):
                     checkpoint_info['model_loaded'] = True
-                    self.logger.info(f"✅ Model loaded: {checkpoint_info['display_name']}")
+                    checkpoint_info['architecture_type'] = load_result.get('architecture_type', 'yolov5')
+                    checkpoint_info['model_info'] = load_result.get('model_info', {})
+                    self.logger.info(f"✅ Model loaded: {checkpoint_info['display_name']} ({checkpoint_info['architecture_type']})")
                 else:
                     self.logger.warning(f"⚠️ Model load failed: {checkpoint_path}")
+                    checkpoint_info['model_loaded'] = False
+            else:
+                # If no model_api, try to create one using latest architecture
+                self.logger.info("🔧 Creating model API for evaluation")
+                try:
+                    from smartcash.model.api.core import create_api
+                    self.model_api = create_api(
+                        config=checkpoint_info.get('config', {}),
+                        use_yolov5_integration=True
+                    )
+                    
+                    # Try loading again with new API
+                    load_result = self.model_api.load_checkpoint(checkpoint_path)
+                    if load_result.get('success', False):
+                        checkpoint_info['model_loaded'] = True
+                        checkpoint_info['architecture_type'] = load_result.get('architecture_type', 'yolov5')
+                        checkpoint_info['model_info'] = load_result.get('model_info', {})
+                        self.logger.info(f"✅ Model API created and loaded: {checkpoint_info['display_name']}")
+                    else:
+                        checkpoint_info['model_loaded'] = False
+                        self.logger.warning(f"⚠️ Failed to load model with new API: {checkpoint_path}")
+                        
+                except Exception as api_error:
+                    self.logger.warning(f"⚠️ Failed to create model API: {api_error}")
                     checkpoint_info['model_loaded'] = False
             
             return checkpoint_info
@@ -393,21 +419,36 @@ class EvaluationService:
                 # Real inference dengan model
                 with self.inference_timer.time_inference(batch_size=1, operation='evaluation'):
                     try:
-                        # Convert PIL to tensor
+                        # Convert PIL to tensor using model API preprocessing
                         img_tensor = self._preprocess_image(img_data['image'])
                         
-                        # Run prediction
+                        # Run prediction with latest model API
                         pred_result = self.model_api.predict(img_tensor)
                         
                         detections = []
                         if pred_result.get('success', False):
-                            # Convert predictions to standard format
-                            for detection in pred_result.get('detections', []):
-                                detections.append({
-                                    'class_id': detection.get('class_id', 0),
-                                    'confidence': detection.get('confidence', 0),
-                                    'bbox': detection.get('bbox', [0, 0, 0, 0])
-                                })
+                            # Handle different prediction formats from latest architecture
+                            pred_detections = pred_result.get('detections', [])
+                            if isinstance(pred_detections, dict):
+                                # Handle multi-layer predictions (layer_1, layer_2, layer_3)
+                                for layer_name, layer_detections in pred_detections.items():
+                                    if isinstance(layer_detections, list):
+                                        for detection in layer_detections:
+                                            detections.append({
+                                                'class_id': detection.get('class_id', 0),
+                                                'confidence': detection.get('confidence', 0),
+                                                'bbox': detection.get('bbox', [0, 0, 0, 0]),
+                                                'layer': layer_name
+                                            })
+                            elif isinstance(pred_detections, list):
+                                # Handle single-layer predictions
+                                for detection in pred_detections:
+                                    detections.append({
+                                        'class_id': detection.get('class_id', 0),
+                                        'confidence': detection.get('confidence', 0),
+                                        'bbox': detection.get('bbox', [0, 0, 0, 0]),
+                                        'layer': 'unified'
+                                    })
                         
                         predictions.append({
                             'filename': img_data['filename'],

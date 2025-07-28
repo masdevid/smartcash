@@ -7,21 +7,22 @@ from typing import Dict, Any
 
 
 def generate_metrics_table_html(metrics: Dict[str, float]) -> str:
-    """Generate HTML table for training metrics results.
+    """Generate HTML table for training metrics results with intelligent layer support.
     
     Args:
-        metrics: Dictionary containing metric names and their values
+        metrics: Dictionary containing metric names and their values (pre-filtered by intelligent layer detection)
         
     Returns:
         HTML string containing the formatted metrics table
     """
     # Extract key metrics with fallbacks and calculate accuracy if not present
-    accuracy = metrics.get('accuracy', metrics.get('val_accuracy', 0.0))
-    precision = metrics.get('precision', 0.0)
-    recall = metrics.get('recall', 0.0)
-    f1_score = metrics.get('f1_score', 0.0)
-    map_50 = metrics.get('mAP@0.5', metrics.get('val_map50', 0.0))
-    map_75 = metrics.get('mAP@0.75', metrics.get('val_map75', 0.0))
+    # Note: metrics have already been filtered by intelligent layer detection
+    accuracy = metrics.get('val_accuracy', metrics.get('accuracy', 0.0))
+    precision = metrics.get('val_precision', metrics.get('precision', 0.0))
+    recall = metrics.get('val_recall', metrics.get('recall', 0.0))
+    f1_score = metrics.get('val_f1', metrics.get('f1_score', metrics.get('f1', 0.0)))
+    map_50 = metrics.get('val_map50', metrics.get('mAP@0.5', 0.0))
+    map_75 = metrics.get('val_map75', metrics.get('mAP@0.75', 0.0))
     train_loss = metrics.get('train_loss', 0.0)
     val_loss = metrics.get('val_loss', 0.0)
     

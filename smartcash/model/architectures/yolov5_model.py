@@ -71,6 +71,21 @@ class SmartCashYOLOv5(DetectionModel):
         # Initialize parent DetectionModel with anchors=None to prevent rounding issue
         super().__init__(cfg, ch, nc, anchors=None)
         
+        # Initialize phase tracking for layer mode control
+        self.current_phase = 1  # Default to phase 1 (single layer)
+        self.force_single_layer = False  # Flag for explicit single layer mode
+        
+        # Ensure current_phase is available at all model levels for phase management
+        if hasattr(self, 'model') and hasattr(self.model, '__iter__'):
+            try:
+                # Set current_phase on the detection head (last layer)
+                if len(self.model) > 0:
+                    last_layer = self.model[-1]
+                    if hasattr(last_layer, '__dict__'):
+                        last_layer.current_phase = 1
+            except:
+                pass  # Ignore any errors during initialization
+        
         # Apply custom anchors after initialization
         if self.custom_anchors is not None:
             self._apply_custom_anchors()
@@ -281,9 +296,43 @@ class SmartCashMultiDetect(nn.Module):
             
             results[layer_name] = z
         
-        # For training compatibility, return first layer results
+        # For training compatibility, check if we should return single layer or multi-layer
         if self.training:
-            return results['layer_1']
+            # Check if we have a config attribute that determines layer mode
+            if hasattr(self, 'force_single_layer') and self.force_single_layer:
+                return results['layer_1']
+            
+            # Check current phase from various possible locations
+            current_phase = getattr(self, 'current_phase', None)
+            
+            # If not found locally, try to get from parent model context
+            if current_phase is None:
+                # Look for current_phase in the model hierarchy
+                try:
+                    # Check if we can access the parent model through the call stack
+                    import inspect
+                    frame = inspect.currentframe()
+                    while frame:
+                        frame_locals = frame.f_locals
+                        if 'self' in frame_locals:
+                            parent_obj = frame_locals['self']
+                            if hasattr(parent_obj, 'current_phase') and parent_obj != self:
+                                current_phase = parent_obj.current_phase
+                                break
+                        frame = frame.f_back
+                except:
+                    pass
+            
+            # Default to phase 1 if still not found
+            if current_phase is None:
+                current_phase = 1
+            
+            if current_phase == 1:
+                # Phase 1: return only layer_1 for single-layer training
+                return results['layer_1']
+            else:
+                # Phase 2 or multi-layer training: return all layers
+                return results
         
         # For inference, return all layers
         return results

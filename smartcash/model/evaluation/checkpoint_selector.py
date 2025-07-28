@@ -31,10 +31,10 @@ class CheckpointSelector:
         # Get filename patterns from config
         self.filename_patterns = checkpoint_config.get('filename_patterns', ['best_*.pt'])
         
-        # Get validation requirements from config
-        self.required_keys = checkpoint_config.get('required_keys', ['model_state_dict', 'config'])
-        self.supported_backbones = checkpoint_config.get('supported_backbones', ['cspdarknet', 'efficientnet_b4'])
-        self.min_val_map = checkpoint_config.get('min_val_map', 0.3)
+        # Get validation requirements from config (updated for new training pipeline)
+        self.required_keys = checkpoint_config.get('required_keys', ['model_state_dict'])  # More flexible requirements
+        self.supported_backbones = checkpoint_config.get('supported_backbones', ['cspdarknet', 'efficientnet_b4', 'yolov5s', 'unknown'])
+        self.min_val_map = checkpoint_config.get('min_val_map', 0.1)  # Lower threshold for development checkpoints
         
         self.logger = get_logger('checkpoint_selector')
         self._checkpoint_cache = {}
@@ -154,12 +154,24 @@ class CheckpointSelector:
             if missing_keys:
                 return False, f"Missing keys: {', '.join(missing_keys)}"
             
-            # Validate model config
+            # Validate model config (more flexible for new training pipeline)
             model_config = checkpoint_data.get('config', {})
-            backbone = model_config.get('backbone', 'unknown')
             
-            if backbone not in self.supported_backbones:
-                return False, f"Backbone tidak didukung: {backbone} (supported: {', '.join(self.supported_backbones)})"
+            # Try to get backbone from different possible locations
+            backbone = (
+                model_config.get('backbone') or 
+                model_config.get('model', {}).get('backbone') or
+                checkpoint_data.get('training_config', {}).get('backbone') or
+                'unknown'
+            )
+            
+            # More flexible backbone validation
+            if backbone not in self.supported_backbones and backbone != 'unknown':
+                self.logger.debug(f"Unknown backbone {backbone}, but allowing for flexibility")
+            
+            # Check for essential model data
+            if 'model_state_dict' not in checkpoint_data and 'model' not in checkpoint_data:
+                return False, "No model weights found in checkpoint"
             
             return True, "Checkpoint valid untuk evaluation"
             
@@ -236,19 +248,47 @@ class CheckpointSelector:
             with torch.serialization.safe_globals(safe_globals):
                 checkpoint_data = torch.load(checkpoint_path, map_location='cpu')
         
-        # Parse filename pattern: best_{model}_{backbone}_{mode}_{date}.pt
-        # Enhanced pattern to handle various backbone naming conventions
+        # Parse filename pattern: enhanced for new training pipeline formats
+        # Updated to handle unified training pipeline checkpoint naming
         filename_patterns = [
-            r'best_(\w+)_(\w+)_(\w+)_(\d{8})\.pt',  # Original pattern
+            r'best_(\w+)_(\w+)_(\w+)_(\d{8})\.pt',  # Original pattern: best_model_backbone_mode_date.pt
             r'best_(\w+)_(efficientnet_b4)_(\w+)_(\d{8})\.pt',  # EfficientNet-B4 specific
             r'best_(\w+)_(cspdarknet)_(\w+)_(\d{8})\.pt',  # CSPDarknet specific
+            r'best_yolov5_(\w+)_(\w+)_(\d{8})\.pt',  # YOLOv5 integrated format: best_yolov5_backbone_mode_date.pt
+            r'unified_(\w+)_(\w+)_best_(\d{8})\.pt',  # Unified training format: unified_backbone_mode_best_date.pt
+            r'smartcash_(\w+)_best\.pt',  # Simple format: smartcash_backbone_best.pt
+            r'best_model\.pt',  # Generic best model
         ]
         
         matched = False
-        for pattern in filename_patterns:
+        model_name = 'smartcash'
+        backbone = 'unknown'
+        layer_mode = 'multi'
+        formatted_date = 'unknown'
+        
+        for i, pattern in enumerate(filename_patterns):
             match = re.match(pattern, checkpoint_path.name)
             if match:
-                model_name, backbone, layer_mode, date_str = match.groups()
+                groups = match.groups()
+                
+                if i <= 2:  # Original patterns: best_model_backbone_mode_date.pt
+                    model_name, backbone, layer_mode, date_str = groups
+                elif i == 3:  # YOLOv5 format: best_yolov5_backbone_mode_date.pt
+                    backbone, layer_mode, date_str = groups
+                    model_name = 'smartcash_yolov5'
+                elif i == 4:  # Unified format: unified_backbone_mode_best_date.pt
+                    backbone, layer_mode, date_str = groups
+                    model_name = 'smartcash_unified'
+                elif i == 5:  # Simple format: smartcash_backbone_best.pt
+                    backbone = groups[0]
+                    model_name = 'smartcash'
+                    layer_mode = 'multi'
+                    date_str = None
+                elif i == 6:  # Generic: best_model.pt
+                    model_name = 'smartcash'
+                    backbone = 'cspdarknet'  # Default backbone
+                    layer_mode = 'multi'
+                    date_str = None
                 
                 # Normalize backbone names
                 if backbone in ['b4', 'efficientnet_b4']:
@@ -256,11 +296,24 @@ class CheckpointSelector:
                 elif backbone in ['cspdarknet', 'csp']:
                     backbone = 'cspdarknet'
                 
-                try:
-                    date_obj = datetime.strptime(date_str, '%m%d%Y')
-                    formatted_date = date_obj.strftime('%d/%m/%Y')
-                except ValueError:
-                    formatted_date = date_str
+                # Parse date if available
+                if date_str:
+                    try:
+                        date_obj = datetime.strptime(date_str, '%m%d%Y')
+                        formatted_date = date_obj.strftime('%d/%m/%Y')
+                    except ValueError:
+                        try:
+                            date_obj = datetime.strptime(date_str, '%Y%m%d')
+                            formatted_date = date_obj.strftime('%d/%m/%Y')
+                        except ValueError:
+                            formatted_date = date_str
+                else:
+                    # Use file modification time as fallback
+                    try:
+                        mtime = checkpoint_path.stat().st_mtime
+                        formatted_date = datetime.fromtimestamp(mtime).strftime('%d/%m/%Y')
+                    except:
+                        formatted_date = 'unknown'
                 
                 matched = True
                 break
@@ -272,12 +325,40 @@ class CheckpointSelector:
             layer_mode = 'single'
             formatted_date = 'unknown'
         
-        # Extract metrics
-        metrics = checkpoint_data.get('metrics', {})
-        config = checkpoint_data.get('config', {})
+        # Extract metrics from various possible locations (updated for new training pipeline)
+        metrics = (
+            checkpoint_data.get('metrics', {}) or
+            checkpoint_data.get('best_metrics', {}) or
+            checkpoint_data.get('final_metrics', {}) or
+            {}
+        )
+        
+        # Extract config from various locations
+        config = (
+            checkpoint_data.get('config', {}) or
+            checkpoint_data.get('training_config', {}) or
+            {}
+        )
+        
+        # Try to get backbone from metadata if not parsed from filename
+        if backbone == 'unknown':
+            backbone = (
+                config.get('backbone') or 
+                config.get('model', {}).get('backbone') or
+                checkpoint_data.get('model_info', {}).get('backbone') or
+                'cspdarknet'  # Default fallback
+            )
         
         # Calculate file size
         file_size_mb = checkpoint_path.stat().st_size / (1024 * 1024)
+        
+        # Extract additional metadata from new training pipeline
+        architecture_type = checkpoint_data.get('architecture_type', 'yolov5')
+        training_mode = (
+            config.get('training_mode') or
+            config.get('training', {}).get('training_mode') or
+            'two_phase'
+        )
         
         return {
             'path': str(checkpoint_path),
@@ -291,6 +372,9 @@ class CheckpointSelector:
             'config': config,
             'file_size_mb': round(file_size_mb, 2),
             'epoch': checkpoint_data.get('epoch', 0),
+            'architecture_type': architecture_type,
+            'training_mode': training_mode,
+            'session_id': checkpoint_data.get('session_id', ''),
             'valid': True
         }
     

@@ -74,6 +74,22 @@ class UnifiedTrainingOperation:
     
     def _map_config_to_pipeline_params(self, config: Dict[str, Any], progress_callback: Callable) -> Dict[str, Any]:
         """Map UI configuration to unified training pipeline parameters."""
+        training_mode = config.get('training_mode', 'two_phase')
+        
+        # For two-phase mode: disable early stopping in Phase 1, enable in Phase 2
+        # For single-phase mode: use the user's early stopping setting
+        early_stopping_enabled = config.get('early_stopping_enabled', True)
+        if training_mode == 'two_phase':
+            # Pass special flags to indicate phase-specific early stopping behavior
+            early_stopping_phase_1_enabled = False
+            early_stopping_phase_2_enabled = early_stopping_enabled
+            self.logger.info("🎯 Two-phase mode: Early stopping disabled for Phase 1, " + 
+                           ("enabled" if early_stopping_enabled else "disabled") + " for Phase 2")
+        else:
+            # For single-phase mode, use the same setting for both (though only one phase exists)
+            early_stopping_phase_1_enabled = early_stopping_enabled
+            early_stopping_phase_2_enabled = early_stopping_enabled
+        
         return {
             # Core parameters
             'backbone': config.get('backbone', 'cspdarknet'),
@@ -83,7 +99,7 @@ class UnifiedTrainingOperation:
             'progress_callback': progress_callback,
             'verbose': config.get('verbose', True),
             'force_cpu': config.get('force_cpu', False),
-            'training_mode': config.get('training_mode', 'two_phase'),
+            'training_mode': training_mode,
             
             # Single-phase specific parameters
             'single_phase_layer_mode': config.get('single_phase_layer_mode', 'multi'),
@@ -96,8 +112,10 @@ class UnifiedTrainingOperation:
             'backbone_lr': config.get('backbone_lr', 1e-5),
             'batch_size': config.get('batch_size'),  # None for auto-detection
             
-            # Early stopping configuration parameters
-            'early_stopping_enabled': config.get('early_stopping_enabled', True),
+            # Phase-specific early stopping configuration
+            'early_stopping_enabled': early_stopping_enabled,  # Overall setting (for single-phase)
+            'early_stopping_phase_1_enabled': early_stopping_phase_1_enabled,  # Phase 1 specific
+            'early_stopping_phase_2_enabled': early_stopping_phase_2_enabled,  # Phase 2 specific
             'early_stopping_patience': config.get('early_stopping_patience', 15),
             'early_stopping_metric': config.get('early_stopping_metric', 'val_map50'),
             'early_stopping_mode': config.get('early_stopping_mode', 'max'),
@@ -112,6 +130,11 @@ class UnifiedTrainingOperation:
                 # Calculate percentage
                 percentage = (current / total) * 100 if total > 0 else 0
                 
+                # Ensure finalization phase reaches 100% completion
+                if phase == 'finalize' and percentage >= 100:
+                    percentage = 100
+                    message = "Training Complete!"
+                
                 # Format phase name for display
                 phase_display = phase.replace('_', ' ').title()
                 
@@ -123,7 +146,9 @@ class UnifiedTrainingOperation:
                 
                 # Call UI callbacks if available
                 if 'on_progress' in self.callbacks:
-                    self.callbacks['on_progress'](int(percentage), f"{phase_display}: {message}")
+                    # For finalization, use completion message
+                    display_message = "🚀 Training Complete!" if phase == 'finalize' and percentage >= 100 else f"{phase_display}: {message}"
+                    self.callbacks['on_progress'](int(percentage), display_message)
                     
             except Exception as e:
                 self.logger.warning(f"Progress callback error: {e}")
@@ -275,7 +300,7 @@ class UnifiedTrainingOperation:
         
         # Execute additional callbacks
         self._execute_metrics_callback(phase_num, epoch, metrics)
-        self._execute_chart_callback(metrics)
+        self._execute_chart_callback(phase_num, metrics)
     
     def _handle_training_success(self, result: Dict[str, Any]):
         """Handle successful training completion."""
@@ -370,24 +395,100 @@ class UnifiedTrainingOperation:
     # Enhanced callback system methods
     
     def _execute_metrics_callback(self, phase_num: str, epoch: int, metrics: Dict[str, Any]) -> None:
-        """Execute metrics callback for epoch completion."""
+        """Execute metrics callback for epoch completion with intelligent layer filtering."""
         try:
             if 'on_metrics_update' in self.callbacks:
+                # Apply intelligent layer filtering to metrics before display
+                filtered_metrics = self._filter_metrics_by_active_layers(phase_num, metrics)
+                
                 callback_data = {
                     'phase': phase_num,
                     'epoch': epoch,
-                    'metrics': metrics,
+                    'metrics': filtered_metrics,
                     'timestamp': time.time()
                 }
                 self.callbacks['on_metrics_update'](callback_data)
         except Exception as e:
             self.logger.debug(f"Metrics callback error: {e}")
     
-    def _execute_chart_callback(self, metrics: Dict[str, Any]) -> None:
-        """Execute chart update callback."""
+    def _filter_metrics_by_active_layers(self, phase: str, metrics: Dict[str, Any]) -> Dict[str, Any]:
+        """Filter metrics to show only active layers using intelligent detection."""
+        # Determine which layers to show based on phase and actual metrics presence
+        show_layers = []
+        filter_zeros = False
+        
+        if phase.lower() == 'training_phase_1':
+            # Two-phase mode, phase 1: Only show layer_1
+            show_layers = ['layer_1']
+            filter_zeros = True  # Filter zeros to reduce clutter
+        elif phase.lower() == 'training_phase_2':
+            # Two-phase mode, phase 2: Show all layers
+            show_layers = ['layer_1', 'layer_2', 'layer_3']
+            filter_zeros = False
+        elif phase.lower() == 'training_phase_single':
+            # Single-phase mode: Determine active layers from actual metrics
+            layer_activity = {}
+            for layer in ['layer_1', 'layer_2', 'layer_3']:
+                # Check if this layer has any meaningful metrics
+                has_activity = any(
+                    metrics.get(f'{layer}_{metric}', 0) > 0.0001 or 
+                    metrics.get(f'val_{layer}_{metric}', 0) > 0.0001
+                    for metric in ['accuracy', 'precision', 'recall', 'f1']
+                )
+                layer_activity[layer] = has_activity
+            
+            # Determine active layers
+            active_layers = [layer for layer, active in layer_activity.items() if active]
+            if len(active_layers) == 1:
+                # Single-phase, single-layer mode: only show the active layer
+                show_layers = active_layers
+                filter_zeros = True
+            else:
+                # Single-phase, multi-layer mode: show all layers
+                show_layers = ['layer_1', 'layer_2', 'layer_3']
+                filter_zeros = False
+        else:
+            # Default: show all layers
+            show_layers = ['layer_1', 'layer_2', 'layer_3']
+            filter_zeros = False
+        
+        # Filter metrics based on active layers
+        filtered_metrics = {}
+        
+        # Always include core metrics
+        core_metrics = ['train_loss', 'val_loss', 'val_map50', 'val_map50_95', 
+                       'val_precision', 'val_recall', 'val_f1', 'val_accuracy']
+        for metric in core_metrics:
+            if metric in metrics:
+                filtered_metrics[metric] = metrics[metric]
+        
+        # Include layer-specific metrics for active layers only
+        for metric_name, value in metrics.items():
+            # Check if this is a layer metric and if we should show it
+            for layer in show_layers:
+                if (metric_name.startswith(f'{layer}_') or metric_name.startswith(f'val_{layer}_')):
+                    # Apply zero filtering if specified
+                    if filter_zeros:
+                        if isinstance(value, (int, float)) and value > 0.0001:
+                            filtered_metrics[metric_name] = value
+                    else:
+                        filtered_metrics[metric_name] = value
+                    break
+        
+        # Include class-specific AP metrics if they have meaningful values
+        for metric_name, value in metrics.items():
+            if metric_name.startswith('val_ap_') and isinstance(value, (int, float)) and value > 0.0001:
+                filtered_metrics[metric_name] = value
+        
+        return filtered_metrics
+    
+    def _execute_chart_callback(self, phase_num: str, metrics: Dict[str, Any]) -> None:
+        """Execute chart update callback with intelligent layer filtering."""
         try:
             if 'on_chart_update' in self.callbacks:
-                self.callbacks['on_chart_update'](metrics)
+                # Use the same filtering logic for charts as for metrics display
+                filtered_metrics = self._filter_metrics_by_active_layers(phase_num, metrics)
+                self.callbacks['on_chart_update'](filtered_metrics)
         except Exception as e:
             self.logger.debug(f"Chart callback error: {e}")
     
@@ -418,12 +519,57 @@ class UnifiedTrainingOperation:
             self.logger.debug(f"Log callback error: {e}")
     
     def _execute_live_chart_callback(self, chart_data: Dict[str, Any]) -> None:
-        """Execute live chart callback for real-time chart updates."""
+        """Execute live chart callback for real-time chart updates with intelligent filtering."""
         try:
             if 'on_live_chart_update' in self.callbacks:
+                # Apply intelligent filtering to live chart data if it contains metrics
+                if 'layers' in chart_data and 'phase' in chart_data:
+                    phase_num = chart_data.get('phase', 1)
+                    phase_name = f'training_phase_{phase_num}' if isinstance(phase_num, int) else str(phase_num)
+                    
+                    # Filter layer data in chart_data
+                    layers_data = chart_data['layers']
+                    show_layers = self._determine_active_layers_for_charts(phase_name, layers_data)
+                    
+                    # Only include active layers in chart data
+                    filtered_layers_data = {layer: data for layer, data in layers_data.items() if layer in show_layers}
+                    chart_data['layers'] = filtered_layers_data
+                
                 self.callbacks['on_live_chart_update'](chart_data)
         except Exception as e:
             self.logger.debug(f"Live chart callback error: {e}")
+    
+    def _determine_active_layers_for_charts(self, phase_name: str, layers_data: Dict[str, Any]) -> list:
+        """Determine which layers should be included in charts using the same logic as metrics callback."""
+        if 'training_phase_1' in phase_name.lower():
+            # Phase 1: Only show layer_1
+            return ['layer_1']
+        elif 'training_phase_2' in phase_name.lower():
+            # Phase 2: Show all layers
+            return ['layer_1', 'layer_2', 'layer_3']
+        elif 'training_phase_single' in phase_name.lower():
+            # Single-phase mode: Determine active layers from actual data
+            layer_activity = {}
+            for layer in ['layer_1', 'layer_2', 'layer_3']:
+                # Check if this layer has any meaningful metrics
+                layer_data = layers_data.get(layer, {})
+                has_activity = any(
+                    layer_data.get(metric, 0) > 0.0001
+                    for metric in ['accuracy', 'precision', 'recall', 'f1']
+                )
+                layer_activity[layer] = has_activity
+            
+            # Determine active layers
+            active_layers = [layer for layer, active in layer_activity.items() if active]
+            if len(active_layers) == 1:
+                # Single-phase, single-layer mode: only show the active layer
+                return active_layers
+            else:
+                # Single-phase, multi-layer mode: show all layers
+                return ['layer_1', 'layer_2', 'layer_3']
+        else:
+            # Default: show all layers
+            return ['layer_1', 'layer_2', 'layer_3']
     
     def register_additional_callbacks(self, additional_callbacks: Dict[str, Callable]) -> None:
         """Register additional callbacks for extended functionality.

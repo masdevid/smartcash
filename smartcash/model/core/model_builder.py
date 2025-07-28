@@ -64,7 +64,9 @@ class ModelBuilder:
         # Set environment variables to prevent MPS usage
         import os
         os.environ['PYTORCH_ENABLE_MPS_FALLBACK'] = '1'
-        os.environ['PYTORCH_MPS_HIGH_WATERMARK_RATIO'] = '0.0'  # Disable high watermark check
+        # Set valid MPS ratios even when disabling to prevent errors
+        os.environ['PYTORCH_MPS_HIGH_WATERMARK_RATIO'] = '0.8'
+        os.environ['PYTORCH_MPS_LOW_WATERMARK_RATIO'] = '0.3'
         
         # Disable MPS if available to prevent any attempts to use it
         if hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
@@ -214,6 +216,12 @@ class ModelBuilder:
             
             if self.progress_bridge:
                 self.progress_bridge.update_substep(4, 4, "✅ Model build complete!")
+            
+            # Store backbone information for later retrieval
+            if hasattr(model, '__dict__'):
+                model._smartcash_backbone = backbone
+                model._smartcash_layer_mode = layer_mode
+                model._smartcash_detection_layers = detection_layers
                 
             self.logger.info(f"✅ Successfully built YOLOv5 model with {backbone} backbone")
             return model
@@ -229,10 +237,11 @@ class ModelBuilder:
     
     def get_available_architectures(self) -> List[str]:
         """Get list of available architecture types"""
-        architectures = ['legacy']
         if YOLOV5_INTEGRATION_AVAILABLE:
-            architectures.append('yolov5')
-        return architectures
+            return ['yolov5']
+        else:
+            # Fallback to legacy only if YOLOv5 is not available
+            return ['legacy']
     
     def get_available_backbones(self, architecture_type: str = 'yolov5') -> List[str]:
         """Get list of available backbones for YOLOv5 architecture"""
@@ -247,8 +256,17 @@ class ModelBuilder:
             'total_parameters': total_params,
             'trainable_parameters': trainable_params,
             'model_size_mb': total_params * 4 / (1024 * 1024),
-            'architecture_type': 'unknown'
+            'architecture_type': 'unknown',
+            'backbone': 'unknown'
         }
+        
+        # Extract stored SmartCash configuration
+        if hasattr(model, '_smartcash_backbone'):
+            info['backbone'] = model._smartcash_backbone
+        if hasattr(model, '_smartcash_layer_mode'):
+            info['layer_mode'] = model._smartcash_layer_mode
+        if hasattr(model, '_smartcash_detection_layers'):
+            info['detection_layers'] = model._smartcash_detection_layers
         
         # Determine architecture type
         if hasattr(model, 'yolov5_model'):

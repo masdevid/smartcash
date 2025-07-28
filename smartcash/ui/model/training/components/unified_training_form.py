@@ -58,7 +58,7 @@ def create_unified_training_form(config: Dict[str, Any]) -> widgets.Widget:
             value=training_config.get('phase_1_epochs', 1),
             min=1, max=200, step=1,
             style={'description_width': '120px'},
-            layout=widgets.Layout(width='150px')
+            layout=widgets.Layout(width='auto')
         )
         
         phase2_epochs = widgets.BoundedIntText(
@@ -66,7 +66,7 @@ def create_unified_training_form(config: Dict[str, Any]) -> widgets.Widget:
             value=training_config.get('phase_2_epochs', 1),
             min=1, max=200, step=1,
             style={'description_width': '120px'},
-            layout=widgets.Layout(width='150px')
+            layout=widgets.Layout(width='auto')
         )
         
         # Loss type
@@ -187,6 +187,101 @@ def create_unified_training_form(config: Dict[str, Any]) -> widgets.Widget:
             layout=widgets.Layout(width='auto')
         )
         
+        # Resume Training Section
+        resume_checkpoint_path = widgets.Text(
+            description="Checkpoint Path:",
+            value=training_config.get('resume_checkpoint_path', ''),
+            placeholder='data/checkpoints/best_model.pt',
+            style={'description_width': '120px'},
+            layout=widgets.Layout(width='auto')
+        )
+        
+        # Best model selector (will be populated dynamically)
+        best_model_selector = widgets.Dropdown(
+            description="Best Model:",
+            options=[('Select checkpoint path manually', '')],
+            value='',
+            style={'description_width': '120px'},
+            layout=widgets.Layout(width='auto')
+        )
+        
+        # Auto-detect best models button
+        detect_models_button = widgets.Button(
+            description="🔍 Find Best Models",
+            tooltip="Automatically detect available best model checkpoints",
+            button_style='info',
+            layout=widgets.Layout(width='auto')
+        )
+        
+        # Function to detect and populate best models
+        def detect_best_models():
+            """Detect available best model checkpoints."""
+            try:
+                import os
+                from pathlib import Path
+                
+                # Common checkpoint directories
+                checkpoint_dirs = [
+                    'data/checkpoints',
+                    'data/models',
+                    'checkpoints',
+                    'models'
+                ]
+                
+                best_models = []
+                for checkpoint_dir_path in checkpoint_dirs:
+                    if os.path.exists(checkpoint_dir_path):
+                        checkpoint_path = Path(checkpoint_dir_path)
+                        # Look for files with 'best' in the name
+                        for file_path in checkpoint_path.glob('**/*best*.pt'):
+                            if file_path.is_file():
+                                relative_path = str(file_path)
+                                # Create display name with file info
+                                file_size = file_path.stat().st_size / (1024 * 1024)  # MB
+                                display_name = f"{file_path.name} ({file_size:.1f}MB)"
+                                best_models.append((display_name, relative_path))
+                
+                # Update dropdown options
+                if best_models:
+                    options = [('Select checkpoint manually', '')] + best_models
+                    best_model_selector.options = options
+                    logger.info(f"Found {len(best_models)} best model checkpoints")
+                else:
+                    best_model_selector.options = [('No best models found', '')]
+                    logger.warning("No best model checkpoints found")
+                    
+            except Exception as e:
+                logger.error(f"Failed to detect best models: {e}")
+                best_model_selector.options = [('Error detecting models', '')]
+        
+        # Function to update checkpoint path when model is selected
+        def on_best_model_selected(change):
+            """Update checkpoint path when best model is selected."""
+            if change['new']:  # If a valid path is selected
+                resume_checkpoint_path.value = change['new']
+        
+        # Wire up the callbacks
+        detect_models_button.on_click(lambda b: detect_best_models())
+        best_model_selector.observe(on_best_model_selected, names='value')
+        
+        # Function to update dropdown when checkpoint path is manually entered
+        def on_checkpoint_path_changed(change):
+            """Update dropdown selection when path is manually entered."""
+            manual_path = change['new']
+            if manual_path:
+                # Check if the path is already in the dropdown
+                current_options = [option[1] for option in best_model_selector.options]
+                if manual_path not in current_options:
+                    # Add manual entry to options
+                    new_options = list(best_model_selector.options) + [(f"Manual: {Path(manual_path).name}", manual_path)]
+                    best_model_selector.options = new_options
+                    best_model_selector.value = manual_path
+        
+        resume_checkpoint_path.observe(on_checkpoint_path_changed, names='value')
+        
+        # Try to auto-detect models on form creation
+        detect_best_models()
+        
         # System options - with environment detection
         force_cpu_value = training_config.get('force_cpu', False) or force_cpu_recommended
         force_cpu_description = "Force CPU Training"
@@ -275,6 +370,10 @@ def create_unified_training_form(config: Dict[str, Any]) -> widgets.Widget:
             single_phase_options,
             single_layer_mode,
             single_freeze_backbone,
+            widgets.HTML("<h4 style='color: #28a745; margin: 15px 0 10px 0;'>🔄 Resume Training</h4>"),
+            best_model_selector,
+            detect_models_button,
+            resume_checkpoint_path,
             widgets.HTML("<h4 style='color: #17a2b8; margin: 15px 0 10px 0;'>⚙️ System Options</h4>"),
             force_cpu,
             verbose,
@@ -337,6 +436,9 @@ def create_unified_training_form(config: Dict[str, Any]) -> widgets.Widget:
             'single_phase_layer_mode': single_layer_mode,
             'single_phase_freeze_backbone': single_freeze_backbone,
             'single_phase_options': single_phase_options,
+            'resume_checkpoint_path': resume_checkpoint_path,
+            'best_model_selector': best_model_selector,
+            'detect_models_button': detect_models_button,
             'force_cpu': force_cpu,
             'verbose': verbose,
             'pretrained': pretrained,
@@ -371,6 +473,7 @@ def create_unified_training_form(config: Dict[str, Any]) -> widgets.Widget:
                     'early_stopping_min_delta': form_widgets['early_stopping_min_delta'].value,
                     'single_phase_layer_mode': form_widgets['single_phase_layer_mode'].value,
                     'single_phase_freeze_backbone': form_widgets['single_phase_freeze_backbone'].value,
+                    'resume_checkpoint_path': form_widgets['resume_checkpoint_path'].value,
                     'force_cpu': form_widgets['force_cpu'].value,
                     'verbose': form_widgets['verbose'].value,
                     'pretrained': form_widgets['pretrained'].value,
@@ -409,6 +512,7 @@ def create_unified_training_form(config: Dict[str, Any]) -> widgets.Widget:
                 form_widgets['early_stopping_min_delta'].value = training_config.get('early_stopping_min_delta', 0.001)
                 form_widgets['single_phase_layer_mode'].value = training_config.get('single_phase_layer_mode', 'multi')
                 form_widgets['single_phase_freeze_backbone'].value = training_config.get('single_phase_freeze_backbone', False)
+                form_widgets['resume_checkpoint_path'].value = training_config.get('resume_checkpoint_path', '')
                 form_widgets['force_cpu'].value = training_config.get('force_cpu', False)
                 form_widgets['verbose'].value = training_config.get('verbose', True)
                 form_widgets['pretrained'].value = training_config.get('pretrained', False)
@@ -424,10 +528,17 @@ def create_unified_training_form(config: Dict[str, Any]) -> widgets.Widget:
         def on_training_mode_change(change):
             """Update single-phase options visibility based on training mode."""
             is_single_phase = change['new'] == 'single_phase'
+            is_two_phase = change['new'] == 'two_phase'
             
             # Show/hide single-phase specific options
             single_layer_mode.layout.display = 'block' if is_single_phase else 'none'
             single_freeze_backbone.layout.display = 'block' if is_single_phase else 'none'
+            
+            # Update early stopping description for two-phase mode
+            if is_two_phase:
+                early_stopping_checkbox.description = "Enable Early Stopping (Phase 2 Only)"
+            else:
+                early_stopping_checkbox.description = "Enable Early Stopping"
         
         training_mode_dropdown.observe(on_training_mode_change, names='value')
         
@@ -445,9 +556,17 @@ def create_unified_training_form(config: Dict[str, Any]) -> widgets.Widget:
         
         # Initial visibility setup
         is_single_phase = training_mode_dropdown.value == 'single_phase'
+        is_two_phase = training_mode_dropdown.value == 'two_phase'
+        
         single_phase_options.layout.display = 'block' if is_single_phase else 'none'
         single_layer_mode.layout.display = 'block' if is_single_phase else 'none'
         single_freeze_backbone.layout.display = 'block' if is_single_phase else 'none'
+        
+        # Set initial early stopping description based on training mode
+        if is_two_phase:
+            early_stopping_checkbox.description = "Enable Early Stopping (Phase 2 Only)"
+        else:
+            early_stopping_checkbox.description = "Enable Early Stopping"
         
         is_early_stopping = early_stopping_checkbox.value
         patience.layout.display = 'block' if is_early_stopping else 'none'

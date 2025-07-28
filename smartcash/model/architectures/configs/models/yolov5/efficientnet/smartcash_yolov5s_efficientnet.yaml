@@ -1,4 +1,4 @@
-# SmartCash YOLOv5s with CSPDarknet backbone
+# SmartCash YOLOv5s with EfficientNet-B4 backbone
 # Multi-layer detection for banknote recognition
 
 # Parameters
@@ -10,17 +10,17 @@ anchors:
   - [30, 61, 62, 45, 59, 119]  # P4/16
   - [116, 90, 156, 198, 373, 326]  # P5/32
 
-# SmartCash CSPDarknet backbone  
+# SmartCash EfficientNet-B4 backbone
 backbone:
   # [from, number, module, args]
   [
-    [-1, 1, SmartCashCSPDarknetBackbone, []], # 0: Custom CSPDarknet backbone
-    # Backbone will output features at indices [4, 6, 9] for P3, P4, P5
+    [-1, 1, SmartCashEfficientNetBackbone, []], # 0: Custom EfficientNet-B4 backbone
+    # Backbone will output features at indices for P3, P4, P5
   ]
 
 # SmartCash YOLOv5 head with multi-layer detection
 head: [
-    # FPN-PAN neck
+    # FPN-PAN neck (adapted for EfficientNet-B4 output channels)
     [-1, 1, Conv, [512, 1, 1]],                    # 1: reduce P5 channels
     [-1, 1, nn.Upsample, [None, 2, "nearest"]],    # 2: upsample
     [[-1, 6], 1, Concat, [1]],                     # 3: cat backbone P4
@@ -68,7 +68,14 @@ training:
   optimizer:
     backbone_lr: 1e-5
     head_lr: 1e-3
-  loss_weights:
-    layer_1: 1.0
-    layer_2: 0.8
-    layer_3: 0.6
+  loss_function: "total_loss = λ1 * loss_layer1 + λ2 * loss_layer2 + λ3 * loss_layer3"
+  loss_weighting: "uncertainty-based dynamic weighting"
+  # Uncertainty-based loss implementation from Kendall et al. (Google DeepMind)
+  # Learnable log-variance parameters σᵢ² for each layer automatically balance losses
+  # Formula: Lᵢ_weighted = (1 / (2 * σᵢ²)) * Lᵢ + log(σᵢ)
+
+# EfficientNet-B4 specific settings
+backbone_config:
+  model_name: "efficientnet-b4"
+  pretrained: true
+  feature_extraction_layers: [6, 14, 22]  # Approximate P3, P4, P5 equivalent layers

@@ -401,10 +401,22 @@ def create_early_stopping(config: Dict[str, Any]) -> EarlyStopping:
     if not es_config.get('enabled', True):
         # Return dummy early stopping yang never stops
         class NoEarlyStopping:
-            def __call__(self, *args, **kwargs): return False
-            def reset(self): pass
-            def get_best_info(self): return {'best_score': None, 'should_stop': False}
-            should_stop = False
+            def __init__(self):
+                self.patience = 0
+                self.best_score = 0.0
+                self.best_epoch = 0
+                self.metric = 'disabled'
+                self.should_stop = False
+                
+            def __call__(self, score, model=None, epoch=0):
+                # Silent operation - no prints, no stopping
+                return False
+                
+            def reset(self): 
+                pass
+                
+            def get_best_info(self): 
+                return {'best_score': None, 'should_stop': False}
         
         return NoEarlyStopping()
     

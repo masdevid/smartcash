@@ -39,6 +39,9 @@ class YOLOLoss(nn.Module):
             ]).float()
         else:
             self.anchors = torch.tensor(anchors).float()
+            
+        # Store original anchor count for validation
+        self.original_anchor_count = len(self.anchors)
         
         # Loss functions
         self.bce_cls = nn.BCEWithLogitsLoss(reduction='none')
@@ -66,6 +69,42 @@ class YOLOLoss(nn.Module):
         
         return logger
     
+    def _expand_anchors_for_scales(self, num_scales: int) -> None:
+        """
+        Expand anchors to handle more prediction scales than originally defined
+        
+        Args:
+            num_scales: Total number of scales needed
+        """
+        current_scales = len(self.anchors)
+        if num_scales <= current_scales:
+            return
+            
+        # Generate additional anchor scales by interpolating/extrapolating
+        device = self.anchors.device
+        anchors_list = self.anchors.tolist()
+        
+        for scale_idx in range(current_scales, num_scales):
+            if scale_idx < 3:
+                # Use predefined patterns for common scales
+                if scale_idx == 0:
+                    new_anchors = [[10, 13], [16, 30], [33, 23]]  # P3
+                elif scale_idx == 1:
+                    new_anchors = [[30, 61], [62, 45], [59, 119]]  # P4
+                else:
+                    new_anchors = [[116, 90], [156, 198], [373, 326]]  # P5
+            else:
+                # Extrapolate for additional scales by scaling up the last set
+                scale_factor = 1.5 ** (scale_idx - 2)  # Exponential scaling
+                base_anchors = anchors_list[-1]  # Use last anchor set as base
+                new_anchors = [[int(w * scale_factor), int(h * scale_factor)] 
+                              for w, h in base_anchors]
+            
+            anchors_list.append(new_anchors)
+        
+        # Update the anchor tensor
+        self.anchors = torch.tensor(anchors_list, device=device, dtype=torch.float32)
+    
     def forward(self, predictions: List[torch.Tensor], targets: torch.Tensor, 
                 img_size: int = 640) -> Tuple[torch.Tensor, Dict[str, torch.Tensor]]:
         """
@@ -86,8 +125,16 @@ class YOLOLoss(nn.Module):
         # Build targets untuk setiap scale
         tcls, tbox, indices, anchors = self._build_targets(predictions, targets, img_size)
         
-        # Calculate loss for each scale
-        for i, pred in enumerate(predictions):
+        # Calculate loss for each scale - auto-expand anchors if needed
+        max_scales = len(self.anchors) if hasattr(self, 'anchors') and self.anchors is not None else 3
+        
+        # Auto-expand anchors if we have more prediction scales
+        if len(predictions) > max_scales:
+            self._expand_anchors_for_scales(len(predictions))
+            max_scales = len(self.anchors)
+            self.logger.info(f"Expanded anchors to handle {len(predictions)} prediction scales")
+        
+        for i, pred in enumerate(predictions[:max_scales]):  # Only process scales with anchors
             # Safe indexing with bounds checking
             if i >= len(indices) or i >= len(anchors) or i >= len(tcls) or i >= len(tbox):
                 continue
@@ -216,7 +263,13 @@ class YOLOLoss(nn.Module):
                         # Add bounds checking for anchors access
                         if i >= len(anchors):
                             self.logger.warning(f"Index {i} out of bounds for anchors with size {len(anchors)}. Using last available anchors.")
-                            anchor_tensor = anchors[-1].to(device=ps.device)
+                            if len(anchors) > 0:
+                                anchor_tensor = anchors[-1].to(device=ps.device)
+                            else:
+                                # Fallback to default anchors if none available
+                                self.logger.warning("No anchors available, using default anchors")
+                                default_anchor = torch.tensor([[10.0, 13.0]], device=ps.device)
+                                anchor_tensor = default_anchor
                         else:
                             anchor_tensor = anchors[i].to(device=ps.device)
                         pwh = (ps[:, 2:4].sigmoid() * 2) ** 2 * anchor_tensor
@@ -228,7 +281,7 @@ class YOLOLoss(nn.Module):
                     
                     # Objectness target with shape matching the prediction
                     score_iou = iou.detach().clamp(0).type(tobj.dtype)
-                    if len(score_iou) == 0:
+                    if score_iou.numel() == 0:
                         return torch.zeros_like(pred[..., 0]), {}
                     
                     # Ensure we have the same number of scores as targets
@@ -267,7 +320,9 @@ class YOLOLoss(nn.Module):
                 if self.num_classes > 1 and len(tcls) > i and len(tcls[i]) > 0:
                     with torch.no_grad():
                         t = torch.full_like(ps[:, 5:], self.cn, device=ps.device)  # targets
-                        t[range(len(t)), tcls[i].to(device=ps.device)] = self.cp
+                        if t.numel() > 0 and tcls[i].numel() > 0:
+                            valid_indices = tcls[i].to(device=ps.device).clamp(0, t.shape[1] - 1)
+                            t[range(t.shape[0]), valid_indices] = self.cp
                     lcls += self._classification_loss(ps[:, 5:], t)  # BCE
             
             # Calculate objectness loss for this scale
@@ -386,7 +441,7 @@ class YOLOLoss(nn.Module):
         na = self.na  # Local variable for use in this method
         
         # Number of positive targets
-        nt = len(targets) if hasattr(targets, 'shape') and len(targets.shape) > 1 else 0
+        nt = targets.shape[0] if hasattr(targets, 'shape') and len(targets.shape) > 1 else 0
         
         # Define the grid offset
         g = 0.5  # grid cell offset
@@ -404,7 +459,9 @@ class YOLOLoss(nn.Module):
                   else torch.device('cpu')
         ).float() * g  # offset
         
-        for i, pred in enumerate(predictions):
+        # Limit processing to available anchor scales
+        max_scales = len(self.anchors) if hasattr(self, 'anchors') and self.anchors is not None else 3
+        for i, pred in enumerate(predictions[:max_scales]):
             # Ensure pred is a tensor
             if not torch.is_tensor(pred):
                 pred = torch.tensor(pred, device=off.device)
@@ -438,8 +495,14 @@ class YOLOLoss(nn.Module):
                 self.logger.warning(f"No anchors defined. Using default anchors for scale {i}.")
             elif i >= len(self.anchors):
                 # If index is out of bounds, use the last available anchors
-                anchors_i = self.anchors[-1].clone().to(targets.device)
-                self.logger.warning(f"Index {i} out of bounds for anchors with size {len(self.anchors)}. Using last available anchors.")
+                if len(self.anchors) > 0:
+                    anchors_i = self.anchors[-1].clone().to(targets.device)
+                    self.logger.warning(f"Index {i} out of bounds for anchors with size {len(self.anchors)}. Using last available anchors.")
+                else:
+                    # Fallback to default anchors if none available
+                    default_anchors = torch.tensor([[10, 13], [16, 30], [33, 23]], device=targets.device).float()
+                    anchors_i = default_anchors
+                    self.logger.warning(f"No anchors available for index {i}. Using default anchors.")
             else:
                 # Use the anchors for the current scale
                 anchors_i = self.anchors[i].clone().to(targets.device)
@@ -510,7 +573,7 @@ class YOLOLoss(nn.Module):
                 target_indices, anchor_indices = torch.where(j)
                 
                 # Filter targets and get corresponding anchors
-                if len(target_indices) > 0:
+                if target_indices.numel() > 0:
                     t = t[target_indices]  # [num_matches, 6]
                     a = anchor_indices  # [num_matches]
                 else:
@@ -524,7 +587,7 @@ class YOLOLoss(nn.Module):
                 gi, gj = torch.zeros(0, dtype=torch.long, device=targets.device), \
                          torch.zeros(0, dtype=torch.long, device=targets.device)
                 
-                if len(t) > 0:
+                if t.numel() > 0:
                     # Get grid xy coordinates
                     gxy = t[:, 2:4]  # grid xy [num_matches, 2]
                     
@@ -760,7 +823,7 @@ class LossManager:
             total_loss: Combined loss
             loss_breakdown: Detailed loss components
         """
-        device = targets.device if len(targets) > 0 else torch.device('cpu')
+        device = targets.device if hasattr(targets, 'shape') and targets.numel() > 0 else torch.device('cpu')
         
         # Use MODEL_ARC.md compliant uncertainty-based multi-task loss if available
         if hasattr(self, 'use_multi_task_loss') and self.use_multi_task_loss:
@@ -780,15 +843,17 @@ class LossManager:
                     layer_targets[layer_name] = filtered_targets
         
         # Initialize metrics dictionary
+        # Note: validation metrics (mAP, precision, recall) should be computed separately
+        # during validation phase using dedicated metrics computation functions
         metrics = {
             'val_loss': 0.0,
-            'val_map50': 0.0,
-            'val_map50_95': 0.0,
-            'val_precision': 0.0,
-            'val_recall': 0.0,
-            'val_f1': 0.0,
-            'val_accuracy': 0.0,
-            'num_targets': len(targets)
+            'val_map50': 0.0,  # To be computed during validation
+            'val_map50_95': 0.0,  # To be computed during validation
+            'val_precision': 0.0,  # To be computed during validation
+            'val_recall': 0.0,  # To be computed during validation
+            'val_f1': 0.0,  # To be computed during validation
+            'val_accuracy': 0.0,  # To be computed during validation
+            'num_targets': targets.shape[0] if hasattr(targets, 'shape') and len(targets.shape) > 0 else 0
         }
         
         try:
@@ -827,7 +892,7 @@ class LossManager:
     def _compute_individual_losses(self, predictions: Dict[str, List[torch.Tensor]], 
                                   targets: torch.Tensor, img_size: int = 640) -> Tuple[torch.Tensor, Dict[str, Any]]:
         """Compute loss using individual YOLO losses (backward compatibility)"""
-        device = targets.device if len(targets) > 0 else torch.device('cpu')
+        device = targets.device if hasattr(targets, 'shape') and targets.numel() > 0 else torch.device('cpu')
         total_loss = torch.tensor(0.0, device=device, requires_grad=True)
         loss_breakdown = {}
         
@@ -843,6 +908,9 @@ class LossManager:
         
         # Handle multilayer mode
         else:
+            layer_losses = []
+            active_layers = 0
+            
             for layer_name, layer_preds in predictions.items():
                 if layer_name in self.loss_functions:
                     # Filter targets untuk layer ini
@@ -856,17 +924,28 @@ class LossManager:
                         prefixed_components = {f"{layer_name}_{k}": v for k, v in layer_components.items()}
                         loss_breakdown.update(prefixed_components)
                         
-                        total_loss = total_loss + layer_loss
+                        layer_losses.append(layer_loss)
+                        active_layers += 1
+            
+            # Average the losses instead of summing to prevent high values in multi-layer mode
+            if layer_losses:
+                if active_layers > 1:
+                    # Multi-layer: average the losses
+                    total_loss = torch.stack(layer_losses).mean()
+                    self.logger.debug(f"Multi-layer loss computed: {active_layers} layers, avg loss: {total_loss.item():.4f}")
+                else:
+                    # Single layer: use the loss directly
+                    total_loss = layer_losses[0]
         
         # Add overall metrics
         loss_breakdown['total_loss'] = total_loss
-        loss_breakdown['num_targets'] = len(targets)
+        loss_breakdown['num_targets'] = targets.shape[0] if hasattr(targets, 'shape') and len(targets.shape) > 0 else 0
         
         return total_loss, loss_breakdown
     
     def _filter_targets_for_layer(self, targets: torch.Tensor, layer_name: str) -> torch.Tensor:
         """Filter targets berdasarkan layer detection classes"""
-        if len(targets) == 0:
+        if not hasattr(targets, 'shape') or targets.numel() == 0:
             return targets
         
         # Class mapping untuk different layers (MODEL_ARC.md compliant)
@@ -883,7 +962,7 @@ class LossManager:
         valid_classes = layer_class_ranges.get(layer_name, list(range(0, 7)))
         
         # Filter targets dengan class yang sesuai
-        mask = torch.zeros(len(targets), dtype=torch.bool, device=targets.device)
+        mask = torch.zeros(targets.shape[0], dtype=torch.bool, device=targets.device)
         for i, target in enumerate(targets):
             try:
                 # Ensure target[1] is properly converted to int
@@ -897,7 +976,7 @@ class LossManager:
         filtered_targets = targets[mask].clone()
         
         # Remap class IDs untuk layer ini (0-based indexing)
-        if len(filtered_targets) > 0:
+        if filtered_targets.numel() > 0:
             class_offset = min(valid_classes)
             filtered_targets[:, 1] -= class_offset
         

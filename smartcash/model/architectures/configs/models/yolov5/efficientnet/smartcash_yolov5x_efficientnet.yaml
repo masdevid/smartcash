@@ -1,0 +1,81 @@
+# SmartCash YOLOv5x with EfficientNet-B7 backbone (Extra Large)
+# Multi-layer detection for banknote recognition
+
+# Parameters
+nc: 7  # number of classes (layer_1 - full banknotes)
+depth_multiple: 1.33  # model depth multiple (extra large)
+width_multiple: 1.25  # layer channel multiple (extra large)
+anchors:
+  - [10, 13, 16, 30, 33, 23]  # P3/8
+  - [30, 61, 62, 45, 59, 119]  # P4/16
+  - [116, 90, 156, 198, 373, 326]  # P5/32
+
+# SmartCash EfficientNet-B7 backbone
+backbone:
+  # [from, number, module, args]
+  [
+    [-1, 1, SmartCashEfficientNetBackbone, []], # 0: Custom EfficientNet-B7 backbone
+    # Backbone will output features at indices for P3, P4, P5
+  ]
+
+# SmartCash YOLOv5 head with multi-layer detection
+head: [
+    # FPN-PAN neck (adapted for EfficientNet-B7 output channels)
+    [-1, 1, Conv, [1280, 1, 1]],                   # 1: reduce P5 channels (extra large)
+    [-1, 1, nn.Upsample, [None, 2, "nearest"]],    # 2: upsample
+    [[-1, 6], 1, Concat, [1]],                     # 3: cat backbone P4
+    [-1, 3, C3, [1280, False]],                    # 4: C3 (extra large)
+    
+    [-1, 1, Conv, [640, 1, 1]],                    # 5: reduce P4 channels (extra large)
+    [-1, 1, nn.Upsample, [None, 2, "nearest"]],    # 6: upsample
+    [[-1, 4], 1, Concat, [1]],                     # 7: cat backbone P3
+    [-1, 3, C3, [640, False]],                     # 8: P3/8-small (extra large)
+    
+    [-1, 1, Conv, [640, 3, 2]],                    # 9: downsample (extra large)
+    [[-1, 14], 1, Concat, [1]],                    # 10: cat head P4
+    [-1, 3, C3, [1280, False]],                    # 11: P4/16-medium (extra large)
+    
+    [-1, 1, Conv, [1280, 3, 2]],                   # 12: downsample (extra large)
+    [[-1, 10], 1, Concat, [1]],                    # 13: cat head P5
+    [-1, 3, C3, [2560, False]],                    # 14: P5/32-large (extra large)
+    
+    # Multi-layer detection head
+    [[8, 11, 14], 1, SmartCashMultiDetect, [nc, anchors]], # 15: Multi-layer detect (P3, P4, P5)
+  ]
+
+# Layer specifications for multi-layer detection
+layer_specs:
+  layer_1:
+    nc: 7
+    classes: ["001", "002", "005", "010", "020", "050", "100"]
+    description: "Full banknote detection (main object)"
+  layer_2:
+    nc: 7
+    classes: ["l2_001", "l2_002", "l2_005", "l2_010", "l2_020", "l2_050", "l2_100"]
+    description: "Nominal-defining features (unique visual cues)"
+  layer_3:
+    nc: 3
+    classes: ["l3_sign", "l3_text", "l3_thread"]
+    description: "Common features (shared among notes)"
+
+# Training configuration (optimized for extra large model)
+training:
+  img_size: 640
+  batch_size: 4   # Smallest batch size for extra large model
+  epochs: 60      # Fewer epochs for extra large model
+  phase_1_epochs: 30  # Freeze backbone
+  phase_2_epochs: 30  # Fine-tune entire model
+  optimizer:
+    backbone_lr: 3e-6  # Very low learning rate for extra large model
+    head_lr: 3e-4
+  loss_function: "total_loss = λ1 * loss_layer1 + λ2 * loss_layer2 + λ3 * loss_layer3"
+  loss_weighting: "uncertainty-based dynamic weighting"
+  # Uncertainty-based loss implementation from Kendall et al. (Google DeepMind)
+  # Learnable log-variance parameters σᵢ² for each layer automatically balance losses
+  # Formula: Lᵢ_weighted = (1 / (2 * σᵢ²)) * Lᵢ + log(σᵢ)
+
+# EfficientNet-B7 specific settings
+backbone_config:
+  model_name: "efficientnet-b7"
+  pretrained: true
+  feature_extraction_layers: [10, 22, 37]  # Approximate P3, P4, P5 equivalent layers for B7

@@ -92,7 +92,7 @@ def create_dual_charts_layout(chart_config: Dict[str, Any], ui_config: Dict[str,
         
         # Add update methods to charts
         def update_loss_data(data: Dict[str, Any]):
-            """Update loss chart with new training data."""
+            """Update loss chart with new training data (supports intelligent layer filtering)."""
             try:
                 epoch = data.get('epoch', 0)
                 train_loss = data.get('train_loss', 0.0)

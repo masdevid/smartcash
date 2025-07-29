@@ -3,7 +3,7 @@ File: smartcash/model/training/__init__.py
 Deskripsi: Training package exports untuk Fase 2 implementation
 """
 
-# Old training service removed - use unified_training_pipeline instead
+# Old training service removed - use merged training_pipeline instead
 from .data_loader_factory import DataLoaderFactory, create_data_loaders, get_dataset_stats
 from .metrics_tracker import MetricsTracker, create_metrics_tracker
 from .optimizer_factory import (
@@ -22,14 +22,14 @@ from .utils.early_stopping import (
 )
 from .visualization_manager import ComprehensiveMetricsTracker, create_visualization_manager
 from .platform_presets import PlatformPresets, get_platform_presets, get_platform_config
-from .training_pipeline import TrainingPipeline, UnifiedTrainingPipeline
+from .training_pipeline import TrainingPipeline
 # run_full_training_pipeline moved to smartcash.model.api.core
 
-# Main training API - now uses unified training pipeline
+# Main training API - now uses merged training pipeline
 def start_training(backbone='cspdarknet', phase_1_epochs=1, phase_2_epochs=1, 
                   progress_callback=None, **kwargs):
     """
-    Quick start training using unified training pipeline
+    Quick start training using merged training pipeline
     
     Args:
         backbone: Model backbone ('cspdarknet' or 'efficientnet_b4')
@@ -96,5 +96,5 @@ __all__ = [
     
     # Platform-aware training
     'PlatformPresets', 'get_platform_presets', 'get_platform_config',
-    'TrainingPipeline', 'UnifiedTrainingPipeline'
+    'TrainingPipeline'
 ]

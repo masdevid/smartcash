@@ -9,12 +9,29 @@ from log_callback, metrics_callback, and progress_callback.
 Usage:
     python examples/callback_only_training_example.py --backbone cspdarknet --phase1-epochs 1 --verbose
     python examples/callback_only_training_example.py --training-mode single_phase --phase1-epochs 2 --force-cpu
+    python examples/callback_only_training_example.py --optimizer adamw --scheduler cosine --weight-decay 1e-2 --phase1-epochs 1
+    python examples/callback_only_training_example.py --resume data/checkpoints/best_model.pt --resume-optimizer --resume-scheduler
+    
+Features:
+    - Automatic memory cleanup on interruption (Ctrl+C)
+    - Real-time memory monitoring in verbose mode
+    - Graceful signal handling for clean exits
+    - GPU/MPS cache clearing and garbage collection
 """
 
+# Fix OpenMP duplicate library issue before any imports
+import os
+os.environ['KMP_DUPLICATE_LIB_OK'] = 'TRUE'
+
 import sys
+import gc
+import torch
+import psutil
+import signal
 from pathlib import Path
 from dotenv import load_dotenv
 from tqdm import tqdm
+from typing import Dict, Any, Optional
 
 # Add project root to path
 project_root = str(Path(__file__).parent.parent)
@@ -27,8 +44,105 @@ from smartcash.model.training.utils.metric_color_utils import ColorScheme
 from smartcash.model.training.utils.ui_metrics_callback import create_ui_metrics_callback
 
 
+def load_legacy_checkpoint_for_resume(checkpoint_path: str) -> Optional[Dict[str, Any]]:
+    """
+    Load checkpoint for resume training.
+    
+    This uses the core checkpoint utilities for consistent behavior across the system.
+    
+    Args:
+        checkpoint_path: Path to checkpoint file
+        
+    Returns:
+        Resume information dictionary or None if failed
+    """
+    # Import core checkpoint utilities
+    from smartcash.model.training.utils.checkpoint_utils import load_checkpoint_for_resume
+    
+    # Use the core function with verbose output for user feedback
+    return load_checkpoint_for_resume(checkpoint_path, verbose=True)
+
+
+def get_memory_usage():
+    """Get current memory usage in MB."""
+    process = psutil.Process(os.getpid())
+    return process.memory_info().rss / 1024 / 1024
+
+
+def cleanup_memory(verbose: bool = False):
+    """
+    Comprehensive memory cleanup function.
+    
+    Args:
+        verbose: Whether to print memory cleanup details
+    """
+    if verbose:
+        memory_before = get_memory_usage()
+        print(f"🧹 MEMORY CLEANUP: Starting cleanup (Memory: {memory_before:.1f} MB)")
+    
+    # Clear PyTorch caches
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+        torch.cuda.synchronize()
+        if verbose:
+            print("   ✅ Cleared CUDA cache")
+    
+    # Clear MPS cache if available (Apple Silicon)
+    if hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
+        try:
+            torch.mps.empty_cache()
+            if verbose:
+                print("   ✅ Cleared MPS cache")
+        except Exception:
+            pass  # Ignore if MPS cache clearing fails
+    
+    # Force garbage collection
+    collected = gc.collect()
+    if verbose:
+        print(f"   ✅ Garbage collection: {collected} objects collected")
+    
+    # Additional aggressive cleanup for large models
+    for _ in range(3):
+        gc.collect()
+    
+    if verbose:
+        memory_after = get_memory_usage()
+        memory_freed = memory_before - memory_after
+        print(f"   ✅ Memory cleanup complete (Memory: {memory_after:.1f} MB, Freed: {memory_freed:.1f} MB)")
+
+
+def setup_signal_handlers(verbose: bool = False):
+    """
+    Setup signal handlers for graceful interruption handling.
+    
+    Args:
+        verbose: Whether to print signal handler setup details
+    """
+    def signal_handler(signum, _):
+        """Handle interruption signals with memory cleanup."""
+        signal_name = signal.Signals(signum).name
+        print(f"\n🛑 TRAINING INTERRUPTED by {signal_name}")
+        print("🧹 Performing emergency memory cleanup...")
+        
+        try:
+            cleanup_memory(verbose=verbose)
+            print("✅ Memory cleanup completed successfully")
+        except Exception as e:
+            print(f"⚠️ Memory cleanup error: {str(e)}")
+        
+        print("👋 Exiting gracefully...")
+        sys.exit(1)
+    
+    # Register signal handlers for common interruption signals
+    signal.signal(signal.SIGINT, signal_handler)   # Ctrl+C
+    signal.signal(signal.SIGTERM, signal_handler)  # Termination request
+    
+    if verbose:
+        print("🛡️ Signal handlers registered for graceful interruption handling")
+
+
 def create_log_callback(verbose: bool = True):
-    """Create a log callback that prints all log messages."""
+    """Create a log callback that prints all log messages with enhanced phase and epoch information."""
     def log_callback(level: str, message: str, data: dict = None):
         """Handle log messages from the training pipeline."""
         # Format level with appropriate emoji
@@ -41,12 +155,32 @@ def create_log_callback(verbose: bool = True):
         }
         
         icon = level_icons.get(level.lower(), '📝')
-        print(f"{icon} [{level.upper()}] {message}")
+        
+        # Enhance message with phase and epoch context if available
+        enhanced_message = message
+        if data:
+            # Add phase information if available
+            if 'phase' in data:
+                phase_display = f"Phase {data['phase']}"
+                enhanced_message = f"[{phase_display}] {message}"
+            
+            # Add epoch information if available
+            if 'epoch' in data:
+                epoch_info = f"Epoch {data['epoch']}"
+                # If message doesn't already contain epoch info
+                if 'epoch' not in message.lower() and 'e' not in message[:10].lower():
+                    enhanced_message = f"[{epoch_info}] {enhanced_message}"
+            
+            # Add resume context if this is a resumed training log
+            if 'resumed_from' in data:
+                enhanced_message = f"[RESUMED from E{data['resumed_from']}] {enhanced_message}"
+        
+        print(f"{icon} [{level.upper()}] {enhanced_message}")
         
         # Print additional data if available and verbose mode is on
         if verbose and data:
             for key, value in data.items():
-                if key != 'message':  # Avoid duplicate message
+                if key not in ['message', 'phase', 'epoch', 'resumed_from']:  # Skip already processed keys
                     print(f"    {key}: {value}")
     
     return log_callback
@@ -62,10 +196,11 @@ def create_metrics_callback(verbose: bool = True):
 
 
 def create_progress_callback(use_tqdm: bool = True, verbose: bool = True):
-    """Create a triple tqdm progress callback for the new 3-level progress system."""
+    """Create a triple tqdm progress callback for the new 3-level progress system with memory monitoring."""
     
     # Storage for progress bars
     progress_bars = {}
+    last_memory_check = [0]  # Use list to make it mutable in nested functions
     
     def _format_phase_display(phase: str) -> str:
         """Format phase name for display."""
@@ -78,16 +213,6 @@ def create_progress_callback(use_tqdm: bool = True, verbose: bool = True):
         else:
             return phase.replace('_', ' ').title()
     
-    def _get_phase_number(phase: str) -> str:
-        """Get phase number from phase name."""
-        if phase == 'training_phase_1':
-            return "1"
-        elif phase == 'training_phase_2':
-            return "2"
-        elif phase == 'training_phase_single':
-            return "Single"
-        else:
-            return "?"
     
     # Old training phase progress handling removed - now using 3-level system
     
@@ -188,7 +313,7 @@ def create_progress_callback(use_tqdm: bool = True, verbose: bool = True):
             # Legacy support for old phase-based progress
             _handle_phase_progress(progress_type, current, total, message)
     
-    def _handle_overall_progress(current: int, total: int, message: str, **kwargs):
+    def _handle_overall_progress(current: int, total: int, message: str, **_kwargs):
         """Handle overall pipeline progress (Level 1)."""
         bar_key = "overall"
         if bar_key not in progress_bars:
@@ -223,12 +348,17 @@ def create_progress_callback(use_tqdm: bool = True, verbose: bool = True):
         
         bar = progress_bars[bar_key]
         bar.n = current
-        bar.set_description(f"📚 Epoch Progress - {message}")
+        
+        # Use actual epoch number from kwargs if available (for resumed training)
+        actual_epoch = kwargs.get('epoch', current)
+        bar.set_description(f"📚 Epoch Progress - Epoch {actual_epoch}")
         
         # Add postfix with additional info
         postfix = {}
         if 'phase' in kwargs:
             postfix['Phase'] = kwargs['phase']
+        if actual_epoch != current:
+            postfix['Resumed'] = f"From E{actual_epoch}"
         bar.set_postfix(postfix)
         bar.refresh()
         
@@ -238,7 +368,7 @@ def create_progress_callback(use_tqdm: bool = True, verbose: bool = True):
             del progress_bars[bar_key]
     
     def _handle_batch_progress(current: int, total: int, message: str, **kwargs):
-        """Handle batch progress (Level 3)."""
+        """Handle batch progress (Level 3) with memory monitoring."""
         bar_key = "batch"
         if bar_key not in progress_bars:
             progress_bars[bar_key] = tqdm(
@@ -256,6 +386,27 @@ def create_progress_callback(use_tqdm: bool = True, verbose: bool = True):
             postfix['Loss'] = f"{kwargs['loss']:.4f}"
         if 'epoch' in kwargs:
             postfix['Epoch'] = kwargs['epoch']
+        
+        # Add memory monitoring every 10 batches
+        if verbose and current % 10 == 0:
+            try:
+                current_memory = get_memory_usage()
+                postfix['Mem'] = f"{current_memory:.0f}MB"
+                
+                # Check for significant memory increase (> 500MB from last check)
+                if last_memory_check[0] > 0 and current_memory - last_memory_check[0] > 500:
+                    # Perform light cleanup
+                    torch.cuda.empty_cache() if torch.cuda.is_available() else None
+                    if hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
+                        try:
+                            torch.mps.empty_cache()
+                        except Exception:
+                            pass
+                
+                last_memory_check[0] = current_memory
+            except Exception:
+                pass  # Ignore memory monitoring errors
+        
         bar.set_postfix(postfix)
         bar.refresh()
         
@@ -278,6 +429,13 @@ def main():
     
     print("🚀 STARTING SmartCash Callback-Only Training")
     print("=" * 60)
+    
+    # Setup memory management and signal handlers
+    setup_signal_handlers(verbose=args.verbose)
+    if args.verbose:
+        initial_memory = get_memory_usage()
+        print(f"💾 Initial memory usage: {initial_memory:.1f} MB")
+    
     print("Only callback outputs will be shown below:")
     print("=" * 60)
     
@@ -287,17 +445,52 @@ def main():
         metrics_callback = create_metrics_callback(args.verbose)
         progress_callback = create_progress_callback(args.verbose)
         
-        # Show early stopping behavior info
+        # Show training configuration info
         if args.training_mode == 'two_phase':
             print("🎯 TWO-PHASE MODE: Early stopping disabled for Phase 1, enabled for Phase 2")
         else:
             print("🎯 SINGLE-PHASE MODE: Early stopping uses your configuration")
+        
+        # Show optimizer and scheduler info
+        print(f"⚙️ OPTIMIZER: {args.optimizer.upper()} with {args.scheduler} scheduler (weight_decay={args.weight_decay})")
+        if args.scheduler == 'cosine':
+            print(f"   └─ Cosine annealing: eta_min={args.cosine_eta_min}")
+        
+        # Show resume info
+        if args.resume:
+            print(f"🔄 RESUME TRAINING: Loading from {args.resume}")
+            resume_components = []
+            if args.resume_optimizer:
+                resume_components.append("optimizer state")
+            if args.resume_scheduler:
+                resume_components.append("scheduler state")
+            if resume_components:
+                print(f"   └─ Resuming: {', '.join(resume_components)}")
+            if args.resume_epoch:
+                print(f"   └─ Epoch override: {args.resume_epoch}")
+        else:
+            print("🔄 TRAINING FROM SCRATCH: No checkpoint resume")
         
         # Get training arguments
         training_kwargs = get_training_kwargs(args)
         
         # Set checkpoint directory to be relative to project root
         training_kwargs['checkpoint_dir'] = str(Path(project_root) / 'data' / 'checkpoints')
+        
+        # Handle resume from existing checkpoint format
+        if args.resume:
+            resume_info = load_legacy_checkpoint_for_resume(args.resume)
+            if resume_info:
+                training_kwargs.update({
+                    'resume_from_checkpoint': True,
+                    'resume_info': resume_info
+                })
+                print(f"✅ Successfully loaded checkpoint: epoch {resume_info['epoch']} (phase {resume_info.get('phase', 'N/A')})")
+            else:
+                print(f"❌ FAILED to load checkpoint {args.resume}")
+                print("❌ TRAINING TERMINATED - Invalid checkpoint file")
+                print("💡 Please check the checkpoint path and try again")
+                return 1  # Exit with error code instead of continuing
         
         # Set model configuration using arguments from args
         # Use enhanced model builder with YOLOv5 integration
@@ -327,16 +520,25 @@ def main():
         print("=" * 60)
         if result.get('success'):
             print("✅ TRAINING COMPLETED SUCCESSFULLY")
+            exit_code = 0
         else:
             print("❌ TRAINING FAILED")
             error = result.get('error', 'Unknown error')
             print(f"Error: {error}")
+            exit_code = 1
         print("=" * 60)
         
-        return 0 if result.get('success') else 1
+        # Perform final memory cleanup
+        if args.verbose:
+            print("🧹 Performing final memory cleanup...")
+        cleanup_memory(verbose=args.verbose)
+        
+        return exit_code
             
     except KeyboardInterrupt:
         print("\n⚠️ TRAINING INTERRUPTED BY USER")
+        print("🧹 Performing cleanup after interruption...")
+        cleanup_memory(verbose=args.verbose)
         return 1
         
     except Exception as e:
@@ -344,6 +546,9 @@ def main():
         if args.verbose:
             import traceback
             traceback.print_exc()
+        
+        print("🧹 Performing cleanup after error...")
+        cleanup_memory(verbose=args.verbose)
         return 1
 
 

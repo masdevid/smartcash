@@ -29,7 +29,10 @@ def calculate_multilayer_metrics(predictions: Dict[str, torch.Tensor],
     """
     metrics = {}
     
+    logger.debug(f"Calculating metrics for {len(predictions) if predictions else 0} prediction layers, {len(targets) if targets else 0} target layers")
+    
     if not predictions or not targets:
+        logger.debug("No predictions or targets provided")
         return metrics
     
     for layer_name in predictions.keys():
@@ -76,10 +79,16 @@ def calculate_multilayer_metrics(predictions: Dict[str, torch.Tensor],
             # Ensure same shape
             min_len = min(len(pred_classes), len(target_classes))
             if min_len == 0:
+                logger.debug(f"Layer {layer_name}: No valid predictions or targets after processing")
                 continue
                 
             pred_classes = pred_classes[:min_len]
             target_classes = target_classes[:min_len]
+            
+            # Debug info
+            unique_preds = np.unique(pred_classes)
+            unique_targets = np.unique(target_classes)
+            logger.debug(f"Layer {layer_name}: {min_len} samples, pred_classes={unique_preds}, target_classes={unique_targets}")
             
             # Calculate metrics using sklearn (handles edge cases well)
             metrics[f'{layer_name}_accuracy'] = float(accuracy_score(target_classes, pred_classes))
@@ -88,7 +97,9 @@ def calculate_multilayer_metrics(predictions: Dict[str, torch.Tensor],
             metrics[f'{layer_name}_f1'] = float(f1_score(target_classes, pred_classes, average='weighted', zero_division=0))
             
         except Exception as e:
-            logger.debug(f"Error calculating metrics for {layer_name}: {e}")
+            logger.warning(f"Error calculating metrics for {layer_name}: {e}")
+            import traceback
+            logger.debug(f"Traceback: {traceback.format_exc()}")
             # Set default values for failed calculation
             metrics[f'{layer_name}_accuracy'] = 0.0
             metrics[f'{layer_name}_precision'] = 0.0
@@ -96,6 +107,54 @@ def calculate_multilayer_metrics(predictions: Dict[str, torch.Tensor],
             metrics[f'{layer_name}_f1'] = 0.0
     
     return metrics
+
+
+def filter_phase_relevant_metrics(metrics: Dict[str, float], phase_num: int) -> Dict[str, float]:
+    """
+    Filter metrics to show only relevant ones for the current training phase.
+    
+    Phase 1: Focus on train_loss, val_loss, and layer_1_* metrics (only Layer 1 is training)
+    Phase 2: Show all metrics (full model fine-tuning)
+    
+    Args:
+        metrics: Complete metrics dictionary
+        phase_num: Current training phase (1 or 2)
+        
+    Returns:
+        Filtered metrics dictionary containing only relevant metrics
+    """
+    if not metrics:
+        return metrics
+    
+    if phase_num == 1:
+        # Phase 1: Only show metrics relevant to Layer 1 training
+        relevant_metrics = {}
+        
+        # Always include core training metrics
+        core_metrics = ['train_loss', 'val_loss', 'learning_rate', 'epoch']
+        for metric in core_metrics:
+            if metric in metrics:
+                relevant_metrics[metric] = metrics[metric]
+        
+        # Include all layer_1_* metrics (these should be improving)
+        for key, value in metrics.items():
+            if key.startswith('layer_1_'):
+                relevant_metrics[key] = value
+        
+        # Optionally include uncertainty/loss components for debugging
+        debug_metrics = ['total_loss', 'layer_1_total_loss', 'layer_1_weighted_loss', 
+                        'layer_1_regularization', 'layer_1_uncertainty']
+        for metric in debug_metrics:
+            if metric in metrics:
+                relevant_metrics[metric] = metrics[metric]
+        
+        logger.debug(f"Phase {phase_num}: Filtered {len(metrics)} metrics to {len(relevant_metrics)} relevant ones")
+        return relevant_metrics
+    
+    else:
+        # Phase 2: Show all metrics (full model is being fine-tuned)
+        logger.debug(f"Phase {phase_num}: Showing all {len(metrics)} metrics")
+        return metrics
 
 
 def format_metrics_for_display(metrics: Dict[str, float]) -> str:

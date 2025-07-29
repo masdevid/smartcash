@@ -37,6 +37,16 @@ Examples:
   %(prog)s --training-mode single_phase --single-layer-mode multi --phase1-epochs 5  # Multi-layer unfrozen
   %(prog)s --training-mode single_phase --pretrained --phase1-epochs 3  # Single phase with pretrained weights
   
+  # Optimizer and scheduler options
+  %(prog)s --optimizer adamw --scheduler cosine --weight-decay 1e-2 --cosine-eta-min 1e-6
+  %(prog)s --optimizer sgd --scheduler step --weight-decay 5e-4
+  %(prog)s --optimizer adam --scheduler plateau --weight-decay 1e-3
+  
+  # Resume training options
+  %(prog)s --resume data/checkpoints/best_model.pt  # Resume from checkpoint
+  %(prog)s --resume data/checkpoints/best_model.pt --resume-optimizer --resume-scheduler  # Resume with optimizer/scheduler state
+  %(prog)s --resume data/checkpoints/epoch_10.pt --resume-epoch 5  # Resume from specific epoch
+  
   # Other options
   %(prog)s --backbone cspdarknet --checkpoint-dir custom/checkpoints
   %(prog)s --loss-type focal --head-lr-p1 0.002 --head-lr-p2 0.0005 --backbone-lr 1e-6
@@ -75,6 +85,28 @@ Examples:
                        help='Learning rate for backbone in phase 2 (default: 1e-5)')
     parser.add_argument('--batch-size', type=int, default=None,
                        help='Batch size for training (default: auto-detected based on platform)')
+    
+    # Optimizer configuration
+    parser.add_argument('--optimizer', type=str, default='adamw',
+                       choices=['adamw', 'adam', 'sgd', 'rmsprop'],
+                       help='Optimizer type (default: adamw)')
+    parser.add_argument('--scheduler', type=str, default='cosine',
+                       choices=['cosine', 'step', 'plateau', 'exponential', 'linear'],
+                       help='Learning rate scheduler type (default: cosine)')
+    parser.add_argument('--weight-decay', type=float, default=1e-2,
+                       help='Weight decay for optimizer (default: 1e-2)')
+    parser.add_argument('--cosine-eta-min', type=float, default=1e-6,
+                       help='Minimum learning rate for cosine scheduler (default: 1e-6)')
+    
+    # Resume training configuration
+    parser.add_argument('--resume', type=str, default=None,
+                       help='Path to checkpoint file to resume training from')
+    parser.add_argument('--resume-optimizer', action='store_true',
+                       help='Resume optimizer state when resuming training (default: False)')
+    parser.add_argument('--resume-scheduler', action='store_true',
+                       help='Resume scheduler state when resuming training (default: False)')
+    parser.add_argument('--resume-epoch', type=int, default=None,
+                       help='Specific epoch to resume from (overrides checkpoint epoch)')
     
     # Early stopping configuration
     parser.add_argument('--early-stopping', action='store_true',
@@ -165,6 +197,33 @@ def print_training_configuration(args: Any) -> None:
     for param_name, param_value in training_params:
         print(f"   • {param_name}: {param_value}")
     
+    # Optimizer and scheduler parameters
+    print(f"\n⚙️ Optimizer & Scheduler Configuration:")
+    optimizer_params = [
+        ("Optimizer", args.optimizer),
+        ("Scheduler", args.scheduler),
+        ("Weight decay", args.weight_decay),
+        ("Cosine eta min", args.cosine_eta_min if args.scheduler == 'cosine' else 'N/A (not using cosine scheduler)')
+    ]
+    
+    for param_name, param_value in optimizer_params:
+        print(f"   • {param_name}: {param_value}")
+    
+    # Resume training parameters
+    print(f"\n🔄 Resume Training Configuration:")
+    if args.resume:
+        resume_params = [
+            ("Resume checkpoint", args.resume),
+            ("Resume optimizer state", 'Yes' if args.resume_optimizer else 'No'),
+            ("Resume scheduler state", 'Yes' if args.resume_scheduler else 'No'),
+            ("Resume epoch override", args.resume_epoch if args.resume_epoch is not None else 'Use checkpoint epoch')
+        ]
+        
+        for param_name, param_value in resume_params:
+            print(f"   • {param_name}: {param_value}")
+    else:
+        print("   • Resume training: Disabled (training from scratch)")
+    
     # Early stopping configuration
     print(f"\n🛑 Early Stopping Configuration:")
     if args.no_early_stopping:
@@ -212,6 +271,16 @@ def get_training_kwargs(args: Any) -> dict:
         'head_lr_p2': args.head_lr_p2,
         'backbone_lr': args.backbone_lr,
         'batch_size': args.batch_size,
+        # Optimizer and scheduler configuration parameters
+        'optimizer': args.optimizer,
+        'scheduler': args.scheduler,
+        'weight_decay': args.weight_decay,
+        'cosine_eta_min': args.cosine_eta_min,
+        # Resume training configuration parameters
+        'resume_checkpoint': args.resume,
+        'resume_optimizer_state': args.resume_optimizer,
+        'resume_scheduler_state': args.resume_scheduler,
+        'resume_epoch': args.resume_epoch,
         # Early stopping configuration parameters
         'early_stopping_enabled': not args.no_early_stopping,
         'early_stopping_patience': args.patience,

@@ -1,0 +1,36 @@
+{
+  "phase_1": {
+    "description": "Backbone dibekukan, hanya melatih kepala Layer 1 (deteksi kasar/global)",
+    "backbone": "frozen",
+    "active_layers": ["layer_1"],
+    "loss_calculation": {
+      "layer_1": 1.0,
+      "layer_2": 0.0,
+      "layer_3": 0.0
+    },
+    "notes": [
+      "Hanya layer_1 yang digunakan dalam perhitungan loss.",
+      "Digunakan untuk menstabilkan pembelajaran awal.",
+      "Opsional: bisa tambahkan weight kecil untuk layer_2 dan layer_3 (misal 0.1) jika ingin warmup."
+    ]
+  },
+  "phase_2": {
+    "description": "Backbone tidak dibekukan, fine-tuning bersama semua layer menggunakan uncertainty-based weighting",
+    "backbone": "unfrozen",
+    "active_layers": ["layer_1", "layer_2", "layer_3"],
+    "loss_calculation": {
+      "method": "uncertainty_weighted_loss",
+      "formulation": "L_total = Σ (1 / (2 * σ_i^2)) * L_i + log(σ_i)",
+      "layers": {
+        "layer_1": "L1_weight = 1 / (2 * σ1^2), learnable σ1",
+        "layer_2": "L2_weight = 1 / (2 * σ2^2), learnable σ2",
+        "layer_3": "L3_weight = 1 / (2 * σ3^2), learnable σ3"
+      }
+    },
+    "notes": [
+      "Menggunakan uncertainty untuk menyesuaikan bobot setiap head berdasarkan kesulitannya.",
+      "σ (sigma) adalah parameter trainable yang mengatur kontribusi relatif dari tiap layer.",
+      "Pendekatan ini mencegah satu layer mendominasi loss dan memperbaiki multitask learning."
+    ]
+  }
+}

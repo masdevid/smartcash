@@ -10,7 +10,7 @@ import time
 from typing import Dict, Any, Optional, Callable
 
 from smartcash.common.logger import get_logger
-from smartcash.model.training.utils.metrics_utils import calculate_multilayer_metrics
+from smartcash.model.training.utils.metrics_utils import calculate_multilayer_metrics, filter_phase_relevant_metrics
 
 # Import core components
 from .core import (
@@ -83,26 +83,50 @@ class TrainingPhaseManager:
             # Start epoch tracking
             self.progress_manager.start_epoch_tracking(epochs)
             
-            # Training loop
+            # Training loop - handle resume case where start_epoch might be >= epochs
+            if start_epoch >= epochs:
+                logger.info(f"🔄 Phase {phase_num} already completed - resume epoch {start_epoch + 1} >= total epochs {epochs}")
+                # Return successful completion with empty metrics
+                return {
+                    'success': True,
+                    'epochs_completed': epochs,
+                    'best_metrics': {},
+                    'best_checkpoint': None,
+                    'final_metrics': {},
+                    'training_completed_successfully': True,
+                    'phase_already_complete': True
+                }
+            
             for epoch in range(start_epoch, epochs):
                 epoch_start_time = time.time()
                 
-                # Update epoch progress
+                # Calculate display epoch (1-based, adjusted for resume)
+                # epoch is the 0-based loop variable, display_epoch is what we show to user
+                display_epoch = epoch + 1
+                
+                # Update epoch progress (show actual epoch numbers, not relative progress)
+                current_progress = epoch - start_epoch  # 0-based progress from start (for percentage)
+                total_progress = epochs - start_epoch   # total epochs to complete from start
+                # Pass actual epoch number for display, but keep relative progress for percentage calculation
                 self.progress_manager.update_epoch_progress(
-                    epoch, epochs, f"Training epoch {epoch + 1}/{epochs}"
+                    display_epoch, epochs, f"Training epoch {display_epoch}/{epochs}",
+                    progress_percentage=(current_progress / total_progress * 100) if total_progress > 0 else 0
                 )
                 
                 # Training
                 train_metrics = self.training_executor.train_epoch(
                     components['train_loader'], components['optimizer'], 
                     components['loss_manager'], components['scaler'], 
-                    epoch, epochs, phase_num
+                    epoch, epochs, phase_num, display_epoch=display_epoch
                 )
+                
+                # Optimize train→validation transition
+                self._optimize_train_to_validation_transition()
                 
                 # Validation
                 val_metrics = self.validation_executor.validate_epoch(
                     components['val_loader'], components['loss_manager'], 
-                    epoch, epochs, phase_num
+                    epoch, epochs, phase_num, display_epoch=display_epoch
                 )
                 
                 # Combine and process metrics
@@ -117,16 +141,66 @@ class TrainingPhaseManager:
                 # Ensure all required metrics are present
                 self._ensure_required_metrics(final_metrics)
                 
-                # Emit callbacks and updates
-                self._emit_epoch_updates(epoch, phase_num, final_metrics, layer_metrics)
+                # Filter metrics based on phase before emitting
+                filtered_metrics = filter_phase_relevant_metrics(final_metrics, phase_num)
                 
-                # Check for best model and save checkpoint
-                is_best = components['metrics_tracker'].is_best_model()
+                # Emit callbacks and updates with filtered metrics
+                self._emit_epoch_updates(epoch, phase_num, filtered_metrics, layer_metrics)
+                
+                # Save checkpoint every epoch (last.pt for resume)
+                # This saves the current training state for proper resume functionality
+                # Note: Use complete final_metrics for checkpoint saving, not filtered ones
+                self.checkpoint_manager.save_checkpoint(
+                    epoch, final_metrics, phase_num, is_best=False
+                )
+                
+                # Check for best model and save best checkpoint
+                # Phase 1: Focus on val_loss (minimal) - only layer 1 training
+                # Phase 2: Focus on val_map50 (maximal) - full model fine-tuning
+                # Note: Use complete final_metrics for best model evaluation
+                if phase_num == 1:
+                    metric_name = 'val_loss'
+                    current_val = final_metrics.get('val_loss', float('inf'))
+                    logger.debug(f"🔍 Phase 1 best check: val_loss = {current_val}")
+                    is_best = components['metrics_tracker'].is_best_model(
+                        metric_name='val_loss', mode='min'
+                    )
+                else:  # phase_num == 2
+                    metric_name = 'val_map50'
+                    current_val = final_metrics.get('val_map50', 0.0)
+                    logger.debug(f"🔍 Phase 2 best check: val_map50 = {current_val}")
+                    is_best = components['metrics_tracker'].is_best_model(
+                        metric_name='val_map50', mode='max'
+                    )
+                
+                logger.debug(f"🔍 Best model check result: is_best = {is_best} for {metric_name} = {current_val}")
+                
+                # FALLBACK: Also check manually for improvement to ensure best checkpoints are saved
+                manual_is_best = self._manual_best_check(epoch, phase_num, final_metrics)
+                if manual_is_best and not is_best:
+                    logger.info(f"🔄 Manual best check overriding tracker decision")
+                    is_best = True
+                
                 if is_best:
+                    # Log which metric triggered the best model save
+                    if phase_num == 1:
+                        metric_value = final_metrics.get('val_loss', 'N/A')
+                        logger.info(f"🏆 New best model (Phase {phase_num}): val_loss = {metric_value}")
+                    else:
+                        metric_value = final_metrics.get('val_map50', 'N/A')
+                        logger.info(f"🏆 New best model (Phase {phase_num}): val_map50 = {metric_value}")
+                    
+                    # Save complete metrics in checkpoint, not filtered ones
                     best_checkpoint_path = self.checkpoint_manager.save_checkpoint(
                         epoch, final_metrics, phase_num, is_best=True
                     )
                     best_metrics = final_metrics.copy()
+                else:
+                    # DEBUG: For troubleshooting, log why it wasn't considered best
+                    if phase_num == 1:
+                        logger.debug(f"🔍 Not best model - Phase 1 val_loss {final_metrics.get('val_loss', 'N/A')} not better than previous")
+                    else:
+                        logger.debug(f"🔍 Not best model - Phase 2 val_map50 {final_metrics.get('val_map50', 'N/A')} not better than previous")
                 
                 # Handle scheduler and early stopping
                 self.progress_manager.handle_scheduler_step(components['scheduler'], final_metrics)
@@ -143,7 +217,7 @@ class TrainingPhaseManager:
                     break
                 
                 # Update epoch progress - normal completion
-                self._update_epoch_completion_progress(epoch, epochs, final_metrics, epoch_start_time)
+                self._update_epoch_completion_progress(epoch, epochs, final_metrics, epoch_start_time, start_epoch)
             
             # Final cleanup and result preparation
             return self._prepare_phase_results(
@@ -192,14 +266,17 @@ class TrainingPhaseManager:
                     final_metrics[f'val_{layer}_{metric}'] = 0.0
     
     def _emit_epoch_updates(self, epoch: int, phase_num: int, final_metrics: dict, layer_metrics: dict):
-        """Emit all epoch updates including callbacks and visualizations."""
-        # Emit metrics callback for UI
+        """Emit all epoch updates including callbacks and visualizations.
+        
+        Note: final_metrics received here should be phase-filtered to show only relevant metrics.
+        """
+        # Emit metrics callback for UI (using phase-filtered metrics)
         self.progress_manager.emit_epoch_metrics(phase_num, epoch + 1, final_metrics)
         
-        # Emit live chart data
+        # Emit live chart data (using phase-filtered metrics)
         self.progress_manager.emit_training_charts(epoch, phase_num, final_metrics, layer_metrics)
         
-        # Update visualization manager
+        # Update visualization manager (using phase-filtered metrics)
         self.progress_manager.update_visualization_manager(epoch, phase_num, final_metrics, layer_metrics)
     
     def _handle_early_stop_cleanup(self, epoch: int, final_metrics: dict, phase_num: int,
@@ -222,12 +299,15 @@ class TrainingPhaseManager:
         return best_checkpoint_path, best_metrics
     
     def _update_epoch_completion_progress(self, epoch: int, epochs: int, 
-                                        final_metrics: dict, epoch_start_time: float):
+                                        final_metrics: dict, epoch_start_time: float, start_epoch: int):
         """Update progress tracking for normal epoch completion."""
         epoch_duration = time.time() - epoch_start_time
+        display_epoch = epoch + 1
+        current_progress = epoch - start_epoch + 1  # +1 because we just completed this epoch
+        total_progress = epochs - start_epoch
         self.progress_manager.update_epoch_progress(
-            epoch + 1, epochs,
-            f"Epoch {epoch + 1}/{epochs} completed in {epoch_duration:.1f}s - Loss: {final_metrics.get('train_loss', 0):.4f}"
+            current_progress, total_progress,
+            f"Epoch {display_epoch}/{epochs} completed in {epoch_duration:.1f}s - Loss: {final_metrics.get('train_loss', 0):.4f}"
         )
     
     def _prepare_phase_results(self, epoch: int, best_metrics: dict, 
@@ -255,3 +335,84 @@ class TrainingPhaseManager:
         """Set single phase mode flag for proper logging."""
         self.orchestrator.set_single_phase_mode(is_single_phase)
         self.progress_manager.set_single_phase_mode(is_single_phase)
+    
+    def _optimize_train_to_validation_transition(self):
+        """
+        Optimize the transition from training to validation to reduce delay.
+        
+        This method implements several optimizations to minimize the time between
+        training and validation phases.
+        """
+        import torch
+        
+        try:
+            # 1. Force CUDA synchronization now rather than during model.eval()
+            if torch.cuda.is_available():
+                torch.cuda.synchronize()
+            
+            # 2. Clear GPU cache to prevent memory fragmentation
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+            
+            # 3. Pre-warm the validation data loader by getting the first batch
+            # This avoids the cold-start delay when validation begins
+            val_loader = getattr(self, '_val_loader_cache', None)
+            if val_loader is not None:
+                try:
+                    # Pre-fetch first batch (non-blocking)
+                    val_iter = iter(val_loader)
+                    next(val_iter)  # This warms up the data loader
+                except (StopIteration, AttributeError):
+                    pass  # Ignore if loader is empty or has issues
+            
+            logger.debug("🔄 Train→validation transition optimized")
+            
+        except Exception as e:
+            # Don't let optimization errors break training
+            logger.debug(f"⚠️ Train→validation optimization failed: {e}")
+            pass
+    
+    def _manual_best_check(self, epoch: int, phase_num: int, final_metrics: Dict[str, float]) -> bool:
+        """
+        Manual fallback check for best model to ensure best checkpoints are saved.
+        
+        This provides a backup when the metrics tracker may not detect improvements properly.
+        """
+        if not hasattr(self, '_manual_best_values'):
+            self._manual_best_values = {}
+        
+        try:
+            if phase_num == 1:
+                metric_name = 'val_loss'
+                current_value = final_metrics.get('val_loss', float('inf'))
+                mode = 'min'
+            else:
+                metric_name = 'val_map50'
+                current_value = final_metrics.get('val_map50', 0.0)
+                mode = 'max'
+            
+            # First epoch for this metric
+            if metric_name not in self._manual_best_values:
+                self._manual_best_values[metric_name] = current_value
+                logger.debug(f"🔄 Manual check: First {metric_name} = {current_value}, marking as best")
+                return True
+            
+            # Check for improvement
+            previous_best = self._manual_best_values[metric_name]
+            
+            if mode == 'min':
+                is_better = current_value < previous_best
+            else:  # mode == 'max'
+                is_better = current_value > previous_best
+            
+            if is_better:
+                self._manual_best_values[metric_name] = current_value
+                logger.debug(f"🔄 Manual check: {metric_name} improved from {previous_best} to {current_value}")
+                return True
+            else:
+                logger.debug(f"🔄 Manual check: {metric_name} {current_value} not better than {previous_best}")
+                return False
+                
+        except Exception as e:
+            logger.debug(f"⚠️ Manual best check failed: {e}")
+            return False

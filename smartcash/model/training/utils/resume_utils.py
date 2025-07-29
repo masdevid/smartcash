@@ -8,7 +8,7 @@ This module handles training resumption logic and checkpoint-based training cont
 import uuid
 from typing import Dict, Any, Tuple
 from smartcash.common.logger import get_logger
-from smartcash.model.training.utils.checkpoint_utils import check_for_resumable_checkpoint
+from smartcash.model.training.utils.checkpoint_utils import check_for_resumable_checkpoint, load_checkpoint_for_resume
 
 logger = get_logger(__name__)
 
@@ -84,16 +84,16 @@ def handle_resume_training_pipeline(
             # Two-phase training resume logic
             if resume_phase == 1:
                 # Resume from Phase 1
-                logger.info(f"🔄 Resuming Phase 1 from epoch {resume_epoch + 1}")
-                phase1_result = pipeline_instance._phase_training_1(start_epoch=resume_epoch + 1)
+                logger.info(f"🔄 Resuming Phase 1 from epoch {resume_epoch}")
+                phase1_result = pipeline_instance._phase_training_1(start_epoch=resume_epoch - 1)  # Convert to 0-based
                 if phase1_result.get('success'):
                     phase2_result = pipeline_instance._phase_training_2()
                     
             elif resume_phase == 2:
                 # Skip Phase 1, resume from Phase 2
-                logger.info(f"🔄 Skipping Phase 1, resuming Phase 2 from epoch {resume_epoch + 1}")
+                logger.info(f"🔄 Skipping Phase 1, resuming Phase 2 from epoch {resume_epoch}")
                 phase1_result = {'success': True, 'message': 'Completed (loaded from checkpoint)'}
-                phase2_result = pipeline_instance._phase_training_2(start_epoch=resume_epoch + 1)
+                phase2_result = pipeline_instance._phase_training_2(start_epoch=resume_epoch - 1)  # Convert to 0-based
             
             else:
                 # Invalid phase, start fresh
@@ -105,11 +105,11 @@ def handle_resume_training_pipeline(
         else:
             # Single-phase training resume logic
             total_epochs = phase_1_epochs  # Only use phase_1_epochs for single phase
-            logger.info(f"🔄 Resuming single phase training from epoch {resume_epoch + 1}")
+            logger.info(f"🔄 Resuming single phase training from epoch {resume_epoch}")
             phase1_result = {'success': True, 'message': 'Skipped in single phase mode'}
             phase2_result = pipeline_instance._phase_single_training(
                 total_epochs, 
-                start_epoch=resume_epoch + 1,
+                start_epoch=resume_epoch - 1,  # Convert to 0-based
                 layer_mode=single_phase_layer_mode,
                 freeze_backbone=single_phase_freeze_backbone
             )

@@ -1,0 +1,3 @@
+"""
+SmartCash test suite.
+"""

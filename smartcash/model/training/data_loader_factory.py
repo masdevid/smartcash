@@ -125,16 +125,32 @@ class DataLoaderFactory:
         """Clean up all resources used by dataloaders and their workers to prevent semaphore leaks"""
         for dl in self._dataloaders:
             try:
-                # Explicitly shutdown worker processes if possible
+                # For PyTorch 2.7+, use proper iterator cleanup
+                if hasattr(dl, '_iterator') and dl._iterator is not None:
+                    # Safely shutdown the iterator which handles worker processes
+                    if hasattr(dl._iterator, '_shutdown_workers'):
+                        dl._iterator._shutdown_workers()
+                    elif hasattr(dl._iterator, 'shutdown'):
+                        dl._iterator.shutdown()
+                    # Remove iterator reference to help GC
+                    dl._iterator = None
+                    
+                # Fallback for older PyTorch versions
                 if hasattr(dl, '_shutdown_workers'):
                     dl._shutdown_workers()
-                if hasattr(dl, '_iterator'):
-                    # Remove iterator to help GC
-                    delattr(dl, '_iterator')
+                    
+                # Clean up dataset resources
                 if hasattr(dl, 'dataset') and hasattr(dl.dataset, 'close'):
                     dl.dataset.close()
-            except Exception:
+                    
+            except (AttributeError, RuntimeError) as e:
+                # Ignore AttributeError for missing attributes in different PyTorch versions
+                # Ignore RuntimeError for workers already shutdown
                 pass
+            except Exception:
+                # Catch any other unexpected exceptions during cleanup
+                pass
+                
         self._dataloaders.clear()
         if self in DataLoaderFactory._instances:
             DataLoaderFactory._instances.remove(self)
@@ -158,15 +174,28 @@ class DataLoaderFactory:
     
     def _get_fallback_config(self) -> Dict[str, Any]:
         """Fallback config jika file tidak ada"""
+        # Detect PyTorch version and adjust multiprocessing settings
+        import torch
+        pytorch_version = tuple(map(int, torch.__version__.split('.')[:2]))
+        
+        # For PyTorch 2.7+, reduce multiprocessing complexity to avoid worker issues
+        if pytorch_version >= (2, 7):
+            num_workers = 2  # Reduced workers for PyTorch 2.7+ compatibility
+            persistent_workers = False  # Disable persistent workers to avoid _workers_status issues
+        else:
+            num_workers = 4
+            persistent_workers = True
+            
         return {
             'training': {
                 'batch_size': 16,
                 'data': {
-                    'num_workers': 4,  # Use optimal workers for mixed I/O and CPU tasks
+                    'num_workers': num_workers,
                     'pin_memory': True,
-                    'persistent_workers': True,
+                    'persistent_workers': persistent_workers,
                     'prefetch_factor': 2,
-                    'drop_last': True
+                    'drop_last': True,
+                    'timeout': 30  # Add timeout to prevent hanging workers
                 }
             }
         }
@@ -196,17 +225,35 @@ class DataLoaderFactory:
         )
         
         data_config = self.config.get('training', {}).get('data', {})
-        loader = DataLoader(
-            dataset,
-            batch_size=self.config.get('training', {}).get('batch_size', 16),
-            shuffle=True,
-            num_workers=4,
-            pin_memory=data_config.get('pin_memory', True),
-            persistent_workers=data_config.get('persistent_workers', True),
-            prefetch_factor=data_config.get('prefetch_factor', 2),
-            drop_last=data_config.get('drop_last', True),
-            collate_fn=collate_fn
-        )
+        
+        # Determine multiprocessing settings with PyTorch version compatibility
+        num_workers = data_config.get('num_workers', 4)
+        persistent_workers = data_config.get('persistent_workers', True)
+        
+        # If persistent_workers is enabled but num_workers is 0, disable persistent_workers
+        if num_workers == 0:
+            persistent_workers = False
+            
+        loader_args = {
+            'dataset': dataset,
+            'batch_size': self.config.get('training', {}).get('batch_size', 16),
+            'shuffle': True,
+            'num_workers': num_workers,
+            'pin_memory': data_config.get('pin_memory', True),
+            'prefetch_factor': data_config.get('prefetch_factor', 2),
+            'drop_last': data_config.get('drop_last', True),
+            'collate_fn': collate_fn
+        }
+        
+        # Add persistent_workers only if num_workers > 0
+        if num_workers > 0:
+            loader_args['persistent_workers'] = persistent_workers
+            
+        # Add timeout if specified
+        if data_config.get('timeout'):
+            loader_args['timeout'] = data_config.get('timeout')
+            
+        loader = DataLoader(**loader_args)
         self._dataloaders.append(loader)
         return loader
     
@@ -223,15 +270,33 @@ class DataLoaderFactory:
         )
         
         data_config = self.config.get('training', {}).get('data', {})
-        loader = DataLoader(
-            dataset,
-            batch_size=self.config.get('training', {}).get('batch_size', 16),
-            shuffle=False,
-            num_workers=4,
-            pin_memory=data_config.get('pin_memory', True),
-            persistent_workers=data_config.get('persistent_workers', True),
-            collate_fn=collate_fn
-        )
+        
+        # Determine multiprocessing settings with PyTorch version compatibility
+        num_workers = data_config.get('num_workers', 4)
+        persistent_workers = data_config.get('persistent_workers', True)
+        
+        # If persistent_workers is enabled but num_workers is 0, disable persistent_workers
+        if num_workers == 0:
+            persistent_workers = False
+            
+        loader_args = {
+            'dataset': dataset,
+            'batch_size': self.config.get('training', {}).get('batch_size', 16),
+            'shuffle': False,
+            'num_workers': num_workers,
+            'pin_memory': data_config.get('pin_memory', True),
+            'collate_fn': collate_fn
+        }
+        
+        # Add persistent_workers only if num_workers > 0
+        if num_workers > 0:
+            loader_args['persistent_workers'] = persistent_workers
+            
+        # Add timeout if specified
+        if data_config.get('timeout'):
+            loader_args['timeout'] = data_config.get('timeout')
+            
+        loader = DataLoader(**loader_args)
         self._dataloaders.append(loader)
         return loader
     
@@ -251,14 +316,33 @@ class DataLoaderFactory:
         )
         
         data_config = self.config.get('training', {}).get('data', {})
-        loader = DataLoader(
-            dataset,
-            batch_size=self.config.get('training', {}).get('batch_size', 16),
-            shuffle=False,
-            num_workers=4,
-            pin_memory=data_config.get('pin_memory', True),
-            collate_fn=collate_fn
-        )
+        
+        # Determine multiprocessing settings with PyTorch version compatibility
+        num_workers = data_config.get('num_workers', 4)
+        persistent_workers = data_config.get('persistent_workers', True)
+        
+        # If persistent_workers is enabled but num_workers is 0, disable persistent_workers
+        if num_workers == 0:
+            persistent_workers = False
+            
+        loader_args = {
+            'dataset': dataset,
+            'batch_size': self.config.get('training', {}).get('batch_size', 16),
+            'shuffle': False,
+            'num_workers': num_workers,
+            'pin_memory': data_config.get('pin_memory', True),
+            'collate_fn': collate_fn
+        }
+        
+        # Add persistent_workers only if num_workers > 0
+        if num_workers > 0:
+            loader_args['persistent_workers'] = persistent_workers
+            
+        # Add timeout if specified
+        if data_config.get('timeout'):
+            loader_args['timeout'] = data_config.get('timeout')
+            
+        loader = DataLoader(**loader_args)
         self._dataloaders.append(loader)
         return loader
     

@@ -248,7 +248,7 @@ class EvaluationUIModule(ModelDiscoveryMixin, ModelConfigSyncMixin, BackendServi
             self.log_info("🔄 Refreshing available models...")
             discovered_models = self.discover_checkpoints(
                 discovery_paths=['data/checkpoints', 'runs/train/*/weights', 'experiments/*/checkpoints'],
-                filename_patterns=['best_*.pt', 'last.pt', 'epoch_*.pt']
+                filename_patterns=['best_*.pt', 'last_*.pt', 'last.pt', 'epoch_*.pt']
             )
             
             scan_results = {

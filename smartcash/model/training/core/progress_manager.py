@@ -194,9 +194,15 @@ class ProgressManager:
         """Start epoch progress tracking."""
         self.progress_tracker.start_epoch_tracking(total_epochs)
     
-    def update_epoch_progress(self, epoch: int, total_epochs: int, message: str):
-        """Update epoch progress with message."""
-        self.progress_tracker.update_epoch_progress(epoch, total_epochs, message)
+    def update_epoch_progress(self, epoch: int, total_epochs: int, message: str, progress_percentage: float = None):
+        """Update epoch progress with message and optional custom percentage."""
+        if progress_percentage is not None:
+            # Use custom percentage calculation for resumed training
+            # Convert percentage back to relative position for progress bar
+            relative_current = int((progress_percentage / 100) * (total_epochs - 1))  
+            self.progress_tracker.update_epoch_progress(epoch, total_epochs, message, relative_current)
+        else:
+            self.progress_tracker.update_epoch_progress(epoch, total_epochs, message)
     
     def complete_epoch_early_stopping(self, epoch: int, message: str):
         """Complete epoch tracking due to early stopping."""
@@ -220,24 +226,31 @@ class ProgressManager:
     
     def handle_early_stopping(self, early_stopping, final_metrics: dict, epoch: int, phase_num: int) -> bool:
         """
-        Handle early stopping logic.
+        Handle early stopping logic with phase-aware behavior.
         
         Args:
             early_stopping: Early stopping instance
             final_metrics: Final metrics dictionary
             epoch: Current epoch number
-            phase_num: Current phase number (unused but kept for interface consistency)
+            phase_num: Current phase number - used to determine if early stopping should run
             
         Returns:
             True if training should stop, False otherwise
         """
-        # phase_num is unused but kept for interface consistency
+        # Early stopping should only be active in Phase 2
+        # Phase 1 focuses on detection layer training where val_map50 is not meaningful
+        if phase_num == 1:
+            logger.debug(f"Phase 1: Early stopping skipped (detection layer training only)")
+            return False
+        
+        # Phase 2: Use val_map50 for early stopping as originally intended
         monitor_metric = final_metrics.get('val_map50', 0)
         should_stop = early_stopping(monitor_metric, None, epoch)  # Don't pass model for saving
         
         if should_stop:
             logger.info(f"🛑 Early stopping triggered at epoch {epoch + 1}")
-            logger.info(f"   Best {early_stopping.metric}: {early_stopping.best_score:.6f} at epoch {early_stopping.best_epoch + 1}")
+            logger.info(f"   Monitoring val_map50: no improvement for {early_stopping.patience} epochs")
+            logger.info(f"   Best val_map50: {early_stopping.best_score:.6f} at epoch {early_stopping.best_epoch + 1}")
             
             # Add early stopping info to final metrics
             final_metrics['early_stopped'] = True

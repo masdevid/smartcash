@@ -11,6 +11,10 @@ from collections import defaultdict
 import json
 from pathlib import Path
 
+from smartcash.common.logger import get_logger
+
+logger = get_logger(__name__)
+
 class APCalculator:
     """Calculator untuk Average Precision dengan COCO-style evaluation"""
     
@@ -307,23 +311,33 @@ class MetricsTracker:
     
     def is_best_model(self, metric_name: str = 'val_map50', mode: str = 'max') -> bool:
         """Check apakah current model adalah yang terbaik"""
+        logger.debug(f"🔍 is_best_model check: metric={metric_name}, mode={mode}")
+        logger.debug(f"🔍 Available current_metrics: {list(self.current_metrics.keys())}")
+        
         if metric_name not in self.current_metrics:
+            logger.debug(f"🔍 Metric {metric_name} not found in current_metrics")
             return False
         
         current_value = self.current_metrics[metric_name]
+        logger.debug(f"🔍 Current {metric_name} value: {current_value}")
         
         if metric_name not in self.best_metrics:
+            logger.debug(f"🔍 First time seeing {metric_name}, setting as best")
             self.best_metrics[metric_name] = current_value
             return True
         
         best_value = self.best_metrics[metric_name]
+        logger.debug(f"🔍 Previous best {metric_name} value: {best_value}")
         
         if mode == 'max':
             is_better = current_value > best_value
         else:  # mode == 'min'
             is_better = current_value < best_value
         
+        logger.debug(f"🔍 Is {current_value} better than {best_value} (mode={mode})? {is_better}")
+        
         if is_better:
+            logger.debug(f"🔍 New best {metric_name}: {current_value} (was {best_value})")
             self.best_metrics[metric_name] = current_value
             return True
         

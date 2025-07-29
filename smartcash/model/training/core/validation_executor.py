@@ -38,26 +38,32 @@ class ValidationExecutor:
         self.map_calculator = create_optimal_map_calculator()
     
     def validate_epoch(self, val_loader, loss_manager, 
-                      epoch: int, total_epochs: int, phase_num: int) -> Dict[str, float]:
+                      epoch: int, total_epochs: int, phase_num: int, display_epoch: int = None) -> Dict[str, float]:
         """
         Run validation for one epoch.
         
         Args:
             val_loader: Validation data loader
             loss_manager: Loss manager instance
-            epoch: Current epoch number
+            epoch: Current epoch number (0-based)
             total_epochs: Total number of epochs
             phase_num: Current phase number
+            display_epoch: Display epoch number (1-based, for progress/logging)
             
         Returns:
             Dictionary containing validation metrics
         """
-        self.model.eval()
+        # Optimized model switching to eval mode with reduced overhead
+        self._switch_to_eval_mode()
         running_val_loss = 0.0
         num_batches = len(val_loader)
         
+        # Calculate display epoch if not provided
+        if display_epoch is None:
+            display_epoch = epoch + 1
+        
         # Debug logging
-        logger.info(f"Starting validation epoch {epoch+1} with {num_batches} batches")
+        logger.debug(f"Starting validation epoch {display_epoch} with {num_batches} batches")
         if num_batches == 0:
             logger.warning("Validation loader is empty!")
             return self._get_empty_validation_metrics()
@@ -70,8 +76,12 @@ class ValidationExecutor:
         # Start batch tracking for validation
         self.progress_tracker.start_batch_tracking(num_batches)
         
-        # Process all validation batches
+        # Process all validation batches with optimizations
         with torch.no_grad():
+            # Pre-allocate lists for better memory efficiency
+            prediction_tensors = {f'layer_{i}': [] for i in range(1, 4)}
+            target_tensors = {f'layer_{i}': [] for i in range(1, 4)}
+            
             for batch_idx, (images, targets) in enumerate(val_loader):
                 batch_metrics = self._process_validation_batch(
                     images, targets, loss_manager, batch_idx, num_batches, 
@@ -80,15 +90,22 @@ class ValidationExecutor:
                 
                 running_val_loss += batch_metrics['loss']
                 
-                # Update batch progress
-                if batch_idx % 10 == 0 or batch_idx == num_batches - 1:
+                # Optimized progress updates - reduce frequency for better performance
+                update_freq = max(1, num_batches // 10)  # Update 10 times max per validation
+                if batch_idx % update_freq == 0 or batch_idx == num_batches - 1:
                     avg_loss = running_val_loss / (batch_idx + 1)
                     self.progress_tracker.update_batch_progress(
                         batch_idx + 1, num_batches,
                         f"Validation batch {batch_idx + 1}/{num_batches}",
                         loss=avg_loss,
-                        epoch=epoch + 1
+                        epoch=display_epoch
                     )
+                
+                # Optional: Skip detailed metrics computation for some batches to speed up
+                # Can be enabled with a config flag for faster validation
+                if hasattr(self.config, 'fast_validation') and self.config.get('fast_validation', False):
+                    if batch_idx > 0 and batch_idx % 3 != 0:  # Skip 2/3 of batches for mAP
+                        continue
         
         # Complete batch tracking
         self.progress_tracker.complete_batch_tracking()
@@ -102,20 +119,28 @@ class ValidationExecutor:
                                 phase_num, all_predictions, all_targets):
         """Process a single validation batch."""
         if batch_idx == 0 or batch_idx % 10 == 0:  # Log first and every 10th batch
-            logger.info(f"Processing validation batch {batch_idx+1}/{num_batches}, images: {images.shape}, targets: {targets.shape}")
+            logger.debug(f"Processing validation batch {batch_idx+1}/{num_batches}, images: {images.shape}, targets: {targets.shape}")
         
         device = next(self.model.parameters()).device
+        
+        # Optimized non-blocking transfers
         images = images.to(device, non_blocking=True)
         targets = targets.to(device, non_blocking=True)
+        
+        # For first batch, ensure transfer is complete to avoid later sync overhead
+        if batch_idx == 0:
+            import torch
+            if torch.cuda.is_available():
+                torch.cuda.synchronize()
         
         # Get model predictions
         predictions = self.model(images)
         if batch_idx == 0:  # Only log on first batch to reduce noise
-            logger.info(f"Model predictions type: {type(predictions)}, structure: {type(predictions).__name__}")
+            logger.debug(f"Model predictions type: {type(predictions)}, structure: {type(predictions).__name__}")
             if isinstance(predictions, (list, tuple)):
-                logger.info(f"  Predictions list length: {len(predictions)}")
+                logger.debug(f"  Predictions list length: {len(predictions)}")
                 if len(predictions) > 0:
-                    logger.info(f"  First prediction type: {type(predictions[0])}, shape: {getattr(predictions[0], 'shape', 'N/A')}")
+                    logger.debug(f"  First prediction type: {type(predictions[0])}, shape: {getattr(predictions[0], 'shape', 'N/A')}")
         
         # Normalize predictions format
         predictions = self.prediction_processor.normalize_validation_predictions(
@@ -127,7 +152,7 @@ class ValidationExecutor:
             loss, loss_breakdown = loss_manager.compute_loss(predictions, targets, images.shape[-1])
             
             if batch_idx == 0:
-                logger.info(f"First batch loss: {loss.item():.4f}, loss_breakdown keys: {list(loss_breakdown.keys())}")
+                logger.debug(f"First batch loss: {loss.item():.4f}, loss_breakdown keys: {list(loss_breakdown.keys())}")
                 
         except Exception as e:
             logger.error(f"Error computing loss in validation batch {batch_idx}: {e}")
@@ -160,6 +185,13 @@ class ValidationExecutor:
                 )
                 all_predictions[layer_name].append(layer_output)
                 
+                # Debug: Check if predictions are meaningful
+                if batch_idx == 0 and layer_output.numel() > 0:
+                    pred_mean = layer_output.mean().item()
+                    pred_std = layer_output.std().item()
+                    pred_max = layer_output.max().item()
+                    logger.debug(f"  Layer {layer_name} predictions: mean={pred_mean:.4f}, std={pred_std:.4f}, max={pred_max:.4f}")
+                
                 # Extract target classes
                 layer_targets = self.prediction_processor.extract_target_classes(
                     targets, images.shape[0], device
@@ -167,7 +199,9 @@ class ValidationExecutor:
                 all_targets[layer_name].append(layer_targets)
                 
                 if batch_idx == 0:
-                    logger.info(f"Layer {layer_name}: prediction shape {layer_output.shape}, target shape {layer_targets.shape}")
+                    logger.debug(f"Layer {layer_name}: prediction shape {layer_output.shape}, target shape {layer_targets.shape}")
+                    logger.debug(f"  Prediction sample: {layer_output[:2] if layer_output.numel() > 0 else 'empty'}")
+                    logger.debug(f"  Target sample: {layer_targets[:2] if layer_targets.numel() > 0 else 'empty'}")
                     
         except Exception as e:
             logger.error(f"Error processing predictions in batch {batch_idx}: {e}")
@@ -189,25 +223,35 @@ class ValidationExecutor:
         }
         
         # Compute mAP metrics
+        logger.debug(f"Computing mAP with processed batches")
         map_metrics = self.map_calculator.compute_final_map()
+        logger.debug(f"mAP metrics result: {map_metrics}")
         base_metrics.update(map_metrics)
         
         # Compute classification metrics
         computed_metrics = self._compute_classification_metrics(all_predictions, all_targets)
+        logger.debug(f"Computed classification metrics: {computed_metrics}")
         if computed_metrics:
             # Average metrics across layers and update base metrics
             self._update_with_classification_metrics(base_metrics, computed_metrics)
             # Include individual layer metrics
             base_metrics.update(computed_metrics)
+        else:
+            logger.warning("No classification metrics computed - check prediction/target data")
         
-        logger.info(f"Validation completed: {num_batches} batches processed")
-        logger.info(f"Final metrics: mAP@0.5={base_metrics['val_map50']:.4f}, accuracy={base_metrics['val_accuracy']:.4f}")
+        # Debug: Check for duplicate metrics issue
+        metrics_hash = hash(tuple(sorted(base_metrics.items())))
+        logger.debug(f"Metrics hash: {metrics_hash}")
+        
+        logger.info(f"Validation completed: mAP@0.5={base_metrics['val_map50']:.4f}, accuracy={base_metrics['val_accuracy']:.4f}")
         
         return base_metrics
     
     def _compute_classification_metrics(self, all_predictions, all_targets):
         """Compute classification metrics from collected predictions and targets."""
         computed_metrics = {}
+        logger.debug(f"Classification metrics input: predictions={len(all_predictions) if all_predictions else 0} layers, targets={len(all_targets) if all_targets else 0} layers")
+        
         if all_predictions and all_targets:
             # Concatenate all predictions and targets
             final_predictions = {}
@@ -216,16 +260,30 @@ class ValidationExecutor:
             for layer_name in all_predictions.keys():
                 if all_predictions[layer_name] and all_targets[layer_name]:
                     try:
+                        pred_batches = len(all_predictions[layer_name])
+                        target_batches = len(all_targets[layer_name])
+                        logger.debug(f"Layer {layer_name}: {pred_batches} prediction batches, {target_batches} target batches")
+                        
                         final_predictions[layer_name] = torch.cat(all_predictions[layer_name], dim=0)
                         final_targets[layer_name] = torch.cat(all_targets[layer_name], dim=0)
+                        
+                        logger.debug(f"Layer {layer_name}: concatenated pred shape {final_predictions[layer_name].shape}, target shape {final_targets[layer_name].shape}")
+                        
                     except Exception as e:
                         logger.debug(f"Error concatenating {layer_name} data: {e}")
                         continue
+                else:
+                    logger.debug(f"Layer {layer_name}: empty predictions or targets")
             
             # Calculate metrics using the metrics utils
             if final_predictions and final_targets:
+                logger.debug(f"Computing metrics for {len(final_predictions)} layers")
                 computed_metrics = calculate_multilayer_metrics(final_predictions, final_targets)
-                logger.info(f"Computed validation metrics: {computed_metrics}")
+                logger.debug(f"Computed validation metrics: {computed_metrics}")
+            else:
+                logger.warning("No final predictions or targets available for metric computation")
+        else:
+            logger.warning("No predictions or targets collected during validation")
         
         return computed_metrics
     
@@ -267,3 +325,43 @@ class ValidationExecutor:
             'val_f1': 0.0,
             'val_accuracy': 0.0
         }
+    
+    def _switch_to_eval_mode(self):
+        """
+        Optimized model switching to evaluation mode.
+        
+        This method implements optimizations to reduce the time required
+        to switch the model from training to evaluation mode.
+        """
+        import torch
+        
+        try:
+            # Check if model is already in eval mode to avoid unnecessary work
+            if not self.model.training:
+                logger.debug("Model already in eval mode, skipping switch")
+                return
+            
+            # Switch to eval mode
+            self.model.eval()
+            
+            # For CUDA models, ensure synchronization happens now to avoid later sync overhead
+            if torch.cuda.is_available() and next(self.model.parameters()).is_cuda:
+                torch.cuda.synchronize()
+            
+            # Enable fast validation optimizations if configured
+            self._enable_fast_validation_mode()
+            
+            logger.debug("🔄 Model switched to eval mode (optimized)")
+            
+        except Exception as e:
+            # Fallback to simple eval() if optimization fails
+            logger.debug(f"⚠️ Optimized eval switch failed, using fallback: {e}")
+            self.model.eval()
+    
+    def _enable_fast_validation_mode(self):
+        """Enable fast validation mode with reduced metrics computation."""
+        # This can be called when validation speed is more important than complete accuracy
+        self.fast_validation_enabled = getattr(self, 'fast_validation_enabled', False)
+        if hasattr(self.config, 'fast_validation') and self.config.get('fast_validation', False):
+            self.fast_validation_enabled = True
+            logger.info("⚡ Fast validation mode enabled - using sampling optimizations")

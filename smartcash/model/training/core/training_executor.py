@@ -38,7 +38,7 @@ class TrainingExecutor:
         self._last_targets = None
     
     def train_epoch(self, train_loader, optimizer, loss_manager, scaler, 
-                   epoch: int, total_epochs: int, phase_num: int) -> Dict[str, float]:
+                   epoch: int, total_epochs: int, phase_num: int, display_epoch: int = None) -> Dict[str, float]:
         """
         Train for one epoch with optimized progress tracking.
         
@@ -47,9 +47,10 @@ class TrainingExecutor:
             optimizer: Optimizer instance
             loss_manager: Loss manager instance
             scaler: Mixed precision scaler
-            epoch: Current epoch number
+            epoch: Current epoch number (0-based)
             total_epochs: Total number of epochs
             phase_num: Current phase number
+            display_epoch: Display epoch number (1-based, for progress/logging)
             
         Returns:
             Dictionary containing training metrics
@@ -64,15 +65,16 @@ class TrainingExecutor:
         
         # Progress update frequency for performance
         update_freq = max(1, num_batches // 20)  # Update 20 times per epoch max
-        logger.info(f"🔍 Training setup: {num_batches} batches, update_freq={update_freq}")
+        
+        # Calculate display epoch if not provided
+        if display_epoch is None:
+            display_epoch = epoch + 1
         
         # Start batch tracking
         self.progress_tracker.start_batch_tracking(num_batches)
-        logger.info(f"🚀 Starting training loop with {num_batches} batches")
+        logger.info(f"🚀 Starting training epoch {display_epoch}/{total_epochs} with {num_batches} batches")
         
         for batch_idx, (images, targets) in enumerate(train_loader):
-            if batch_idx < 3:  # Debug first 3 batches
-                logger.info(f"🔍 Processing training batch {batch_idx + 1}/{num_batches}")
             
             # Process batch
             loss, predictions, processed_predictions, processed_targets = self._process_training_batch(
@@ -93,15 +95,12 @@ class TrainingExecutor:
             if batch_idx % update_freq == 0 or batch_idx == num_batches - 1:
                 avg_loss = running_loss / (batch_idx + 1)
                 
-                if batch_idx < 5 or batch_idx % 10 == 0:  # Debug first few and every 10th batch
-                    logger.info(f"🔍 Training batch {batch_idx + 1}/{num_batches}, avg_loss={avg_loss:.4f}")
-                
                 # Update batch progress
                 self.progress_tracker.update_batch_progress(
                     batch_idx + 1, num_batches,
                     f"Training batch {batch_idx + 1}/{num_batches}",
                     loss=avg_loss,
-                    epoch=epoch + 1
+                    epoch=display_epoch
                 )
         
         # Store for final metrics calculation

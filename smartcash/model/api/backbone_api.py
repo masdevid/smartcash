@@ -290,7 +290,7 @@ def check_built_models() -> Dict[str, Any]:
             },
             {
                 'paths': ['runs/train/*/weights'],
-                'patterns': ['best.pt', 'last.pt'],
+                'patterns': ['best.pt', 'best_*.pt', 'last_*.pt', 'last.pt'],
                 'priority': 3
             },
             {

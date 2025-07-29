@@ -136,10 +136,10 @@ class PlatformPresets:
         
         elif self.platform_info['is_m1_mac']:
             # M1 Mac: unified memory, be conservative
-            base_batch = 6 if backbone == 'cspdarknet' else 4  # EfficientNet needs less
+            base_batch = 8 if backbone == 'cspdarknet' else 8  # EfficientNet needs less
             config.update({
                 'batch_size': base_batch,
-                'num_workers': min(6, config['num_workers']),  # Good CPU, limit for memory
+                'num_workers': min(8, config['num_workers']),  # Good CPU, limit for memory
                 'pin_memory': False,  # Not beneficial for MPS
                 'persistent_workers': config['num_workers'] > 0,
                 'prefetch_factor': 1  # Conservative memory usage
@@ -174,13 +174,19 @@ class PlatformPresets:
         device_config = self.get_device_config()
         data_config = self.get_data_config(backbone)
         
-        # Base training configuration
+        # Base training configuration with AdamW defaults (lr=5e-4)
         config = {
             'mixed_precision': device_config['mixed_precision'],
             'gradient_clip': 10.0,
-            'weight_decay': 0.0005,
-            'optimizer': 'adamw',  # Generally better than adam
-            'scheduler': 'cosine',  # String value expected by OptimizerFactory
+            'learning_rate': 5e-4,  # Default AdamW learning rate
+            'weight_decay': 1e-2,   # Standard AdamW weight decay
+            'optimizer': 'adamw',   # Default to AdamW
+            'scheduler': 'cosine',  # CosineAnnealingLR as default
+            # AdamW specific parameters
+            'adamw_betas': (0.9, 0.999),
+            'adamw_eps': 1e-8,
+            # CosineAnnealingLR specific parameters
+            'cosine_eta_min': 1e-6,
             'scheduler_config': {  # Separate config for scheduler details
                 'type': 'cosine',
                 'eta_min': 1e-6,
@@ -277,8 +283,8 @@ class PlatformPresets:
                 'epochs': phase_2_epochs,
                 'freeze_backbone': False,
                 'learning_rates': {
-                    'backbone': 5e-6,  # Very conservative for backbone
-                    'head': 1e-4       # Moderate for heads
+                    'backbone': 5e-5,  # Conservative for backbone (10x lower than base)
+                    'head': 5e-4       # Default AdamW rate for heads
                 },
                 'warmup_epochs': 0  # No warmup for short training
             }

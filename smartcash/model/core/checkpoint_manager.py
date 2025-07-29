@@ -62,6 +62,8 @@ class CheckpointManager:
                 checkpoint_data['scheduler_state_dict'] = kwargs['scheduler'].state_dict()
             if 'epoch' in kwargs:
                 checkpoint_data['epoch'] = kwargs['epoch']
+            if 'phase' in kwargs:
+                checkpoint_data['phase'] = kwargs['phase']
             
             # Save checkpoint
             self.progress_bridge.update(3, f"💾 Saving to {checkpoint_name}...")
@@ -74,9 +76,9 @@ class CheckpointManager:
             
             self.progress_bridge.complete(4, f"✅ Checkpoint saved: {checkpoint_name}")
             
-            # Log save info
-            file_size = checkpoint_path.stat().st_size / (1024 * 1024)  # MB
-            self.logger.info(f"💾 Checkpoint saved: {checkpoint_name} ({file_size:.1f}MB)")
+            # Log save info (reduced verbosity)
+            # file_size = checkpoint_path.stat().st_size / (1024 * 1024)  # MB
+            # self.logger.info(f"💾 Checkpoint saved: {checkpoint_name} ({file_size:.1f}MB)")
             
             return str(checkpoint_path)
             
@@ -197,13 +199,17 @@ class CheckpointManager:
             return []
     
     def _generate_checkpoint_name(self, metrics: Optional[Dict] = None, **kwargs) -> str:
-        """📝 Generate checkpoint filename using new naming convention
+        """📝 Generate checkpoint filename using naming convention
         
-        Format: best_{backbone}_{two_phase|single_phase}_{single|multi}_{frozen|unfrozen}_{pretrained:if true}_{yyyymmdd}.pt
+        - For best checkpoints: best_{backbone}_{two_phase|single_phase}_{single|multi}_{frozen|unfrozen}_{pretrained:if true}_{yyyymmdd}.pt
+        - For regular checkpoints: last_{backbone}_{two_phase|single_phase}_{single|multi}_{frozen|unfrozen}_{pretrained:if true}.pt
         """
         
         try:
-            # Get model configuration
+            # Check if this is a best checkpoint
+            is_best = kwargs.get('is_best', False)
+            
+            # Get model configuration for naming (both best and regular checkpoints)
             model_config = self.config.get('model', {})
             training_config = self.config.get('training', {})
             
@@ -231,11 +237,30 @@ class CheckpointManager:
             pretrained = model_config.get('pretrained', False)
             pretrained_suffix = 'pretrained' if pretrained else ''
             
+            # For regular checkpoints, build name with backbone info (no date)
+            if not is_best:
+                name_parts = [
+                    'last',
+                    backbone,
+                    training_mode,
+                    layer_mode,
+                    freeze_status
+                ]
+                
+                # Add pretrained suffix only if True
+                if pretrained_suffix:
+                    name_parts.append(pretrained_suffix)
+                
+                filename = '_'.join(name_parts) + '.pt'
+                self.logger.debug(f"📝 Generated regular checkpoint name: {filename}")
+                return filename
+            
+            # For best checkpoints, add date
             # Get current date
             current_date = datetime.now()
             date_str = current_date.strftime('%Y%m%d')
             
-            # Build checkpoint name parts
+            # Build checkpoint name parts for best checkpoints
             name_parts = [
                 'best',
                 backbone,
@@ -289,8 +314,9 @@ class CheckpointManager:
         
         checkpoints = list(self.save_dir.glob("*.pt"))
         
-        # Keep best_*.pt files
-        regular_checkpoints = [cp for cp in checkpoints if not cp.name.startswith('best_')]
+        # Keep best_*.pt files and last_*.pt files (updated pattern)
+        regular_checkpoints = [cp for cp in checkpoints 
+                              if not cp.name.startswith('best_') and not cp.name.startswith('last_')]
         
         if len(regular_checkpoints) > self.max_checkpoints:
             # Sort by modification time

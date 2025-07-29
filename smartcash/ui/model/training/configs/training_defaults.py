@@ -29,13 +29,18 @@ def get_default_training_config() -> Dict[str, Any]:
         'training': {
             'epochs': 100,
             'batch_size': 16,
-            'learning_rate': 0.001,
-            'optimizer': 'adam',
-            'scheduler': 'cosine',
-            'weight_decay': 0.0005,
+            'learning_rate': 5e-4,  # AdamW default learning rate
+            'optimizer': 'adamw',   # Default to AdamW
+            'scheduler': 'cosine',  # CosineAnnealingLR as default
+            'weight_decay': 1e-2,   # AdamW standard weight decay
             'warmup_epochs': 3,
             'save_period': 10,
             'val_period': 5,
+            # AdamW specific parameters
+            'adamw_betas': [0.9, 0.999],
+            'adamw_eps': 1e-8,
+            # CosineAnnealingLR specific parameters  
+            'cosine_eta_min': 1e-6,
             'early_stopping': {
                 'enabled': True,
                 'patience': 15,
@@ -121,7 +126,7 @@ def get_training_metrics_config() -> Dict[str, Any]:
             'mAP@0.75': 0.0,
             'precision': 0.0,
             'recall': 0.0,
-            'learning_rate': 0.001,
+            'learning_rate': 5e-4,
             'gradient_norm': 0.0,
             'gpu_memory': 0.0,
             'training_speed': 0.0,

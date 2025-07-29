@@ -158,55 +158,86 @@ class PhaseOrchestrator:
         return early_stopping
     
     def _set_model_phase(self, phase_num: int):
-        """Set current phase on model for layer mode control, handling nested YOLOv5 structure."""
+        """Set current phase on model for layer mode control, handling nested YOLOv5 structure.
+        
+        Args:
+            phase_num: The phase number to set (1 or 2)
+            
+        Logs:
+            Only shows success message when all phase settings are successful.
+            Individual phase settings are logged at debug level.
+        """
         phase_set = False
         
         # Force create and set current_phase on the main model
         self.model.current_phase = phase_num
         phase_set = True
-        logger.info(f"🎯 Set model.current_phase to {phase_num}")
+        logger.debug(f"Set model.current_phase to {phase_num}")
         
         # Try to set phase on YOLOv5 model if it exists
         if hasattr(self.model, 'yolov5_model'):
-            yolo_model = self.model.yolov5_model
-            yolo_model.current_phase = phase_num
-            phase_set = True
-            logger.info(f"🎯 Set yolov5_model.current_phase to {phase_num}")
+            try:
+                yolo_model = self.model.yolov5_model
+                yolo_model.current_phase = phase_num
+                phase_set = True
+                logger.debug(f"Set yolov5_model.current_phase to {phase_num}")
+            except Exception as e:
+                logger.debug(f"Could not set phase on yolov5_model: {e}")
+                phase_set = False
         
         # Try to set phase on nested model if it exists  
         if hasattr(self.model, 'model'):
-            nested_model = self.model.model
-            nested_model.current_phase = phase_num
-            phase_set = True
-            logger.info(f"🎯 Set model.model.current_phase to {phase_num}")
-            
-            # Check for detection head in nested model
-            if hasattr(nested_model, 'model') and hasattr(nested_model.model, '__iter__'):
-                try:
-                    # Look for detection head (usually the last layer)
-                    if len(nested_model.model) > 0:
-                        last_layer = nested_model.model[-1]
-                        last_layer.current_phase = phase_num
-                        logger.info(f"🎯 Set detection_head.current_phase to {phase_num}")
-                except Exception as e:
-                    logger.debug(f"Could not set phase on detection head: {e}")
+            try:
+                nested_model = self.model.model
+                nested_model.current_phase = phase_num
+                phase_set = phase_set and True
+                logger.debug(f"Set model.model.current_phase to {phase_num}")
+                
+                # Check for detection head in nested model
+                if hasattr(nested_model, 'model') and hasattr(nested_model.model, '__iter__'):
+                    try:
+                        # Look for detection head (usually the last layer)
+                        if len(nested_model.model) > 0:
+                            last_layer = nested_model.model[-1]
+                            last_layer.current_phase = phase_num
+                            logger.debug(f"Set detection_head.current_phase to {phase_num}")
+                    except Exception as e:
+                        logger.debug(f"Could not set phase on detection head: {e}")
+                        phase_set = False
+            except Exception as e:
+                logger.debug(f"Could not set phase on model.model: {e}")
+                phase_set = False
         
         # Try to set phase on deeply nested YOLOv5 model
         if hasattr(self.model, 'yolov5_model') and hasattr(self.model.yolov5_model, 'model'):
-            deep_model = self.model.yolov5_model.model
-            deep_model.current_phase = phase_num
-            logger.info(f"🎯 Set yolov5_model.model.current_phase to {phase_num}")
+            try:
+                deep_model = self.model.yolov5_model.model
+                deep_model.current_phase = phase_num
+                logger.debug(f"Set yolov5_model.model.current_phase to {phase_num}")
+            except Exception as e:
+                logger.debug(f"Could not set phase on yolov5_model.model: {e}")
+                phase_set = False
         
         # Also check for detection head specifically (where the phase might be needed)
         if hasattr(self.model, 'head'):
-            self.model.head.current_phase = phase_num
-            logger.info(f"🎯 Set model.head.current_phase to {phase_num}")
+            try:
+                head = self.model.head
+                head.current_phase = phase_num
+                phase_set = phase_set and True
+                logger.debug(f"Set model.head.current_phase to {phase_num}")
+            except Exception as e:
+                logger.debug(f"Could not set phase on model.head: {e}")
+                phase_set = False
         
         # Check nested head in YOLOv5 model
         if hasattr(self.model, 'yolov5_model') and hasattr(self.model.yolov5_model, 'head'):
-            yolo_head = self.model.yolov5_model.head
-            yolo_head.current_phase = phase_num
-            logger.info(f"🎯 Set yolov5_model.head.current_phase to {phase_num}")
+            try:
+                yolo_head = self.model.yolov5_model.head
+                yolo_head.current_phase = phase_num
+                logger.debug(f"Set yolov5_model.head.current_phase to {phase_num}")
+            except Exception as e:
+                logger.debug(f"Could not set phase on yolov5_model.head: {e}")
+                phase_set = False
         
         if phase_set:
             logger.info(f"✅ Model phase successfully set to {phase_num} for layer mode control")

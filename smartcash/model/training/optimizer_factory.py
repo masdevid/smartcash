@@ -22,15 +22,33 @@ class OptimizerFactory:
         self.training_config = config.get('training', {})
         
         # Optimizer parameters
-        self.learning_rate = self.training_config.get('learning_rate', 0.001)
-        self.weight_decay = self.training_config.get('weight_decay', 0.0005)
-        self.optimizer_type = self.training_config.get('optimizer', 'adam').lower()
+        self.phase = self.training_config.get('phase', 1)  # 1 or 2 for phase-based training
+        
+        # Phase-based defaults - AdamW with CosineAnnealingLR as standard
+        if self.phase == 1:
+            # Phase 1: Frozen backbone, small learning rate
+            self.learning_rate = self.training_config.get('learning_rate', 1e-4)
+            self.weight_decay = self.training_config.get('weight_decay', 1e-2)
+        else:
+            # Phase 2: Unfrozen, train all layers - default AdamW 5e-4
+            self.learning_rate = self.training_config.get('learning_rate', 5e-4)
+            self.weight_decay = self.training_config.get('weight_decay', 1e-2)
+            
+        self.optimizer_type = self.training_config.get('optimizer', 'adamw').lower()
         self.scheduler_type = self.training_config.get('scheduler', 'cosine').lower()
         self.mixed_precision = self.training_config.get('mixed_precision', True)
         self.gradient_clip = self.training_config.get('gradient_clip', 10.0)
+        self.total_epochs = self.training_config.get('total_epochs', 100)  # For scheduler
+        
+        # Configurable AdamW optimizer parameters
+        self.adamw_betas = self.training_config.get('adamw_betas', (0.9, 0.999))
+        self.adamw_eps = self.training_config.get('adamw_eps', 1e-8)
+        
+        # Configurable CosineAnnealingLR scheduler parameters
+        self.cosine_eta_min = self.training_config.get('cosine_eta_min', 1e-6)
         
         # Scaler untuk mixed precision
-        self.scaler = GradScaler() if self.mixed_precision else None
+        self.scaler = GradScaler('cuda') if self.mixed_precision else None
     
     def create_optimizer(self, model: nn.Module, custom_lr: Optional[float] = None) -> torch.optim.Optimizer:
         """
@@ -48,40 +66,14 @@ class OptimizerFactory:
         # Create parameter groups dengan learning rate yang berbeda
         param_groups = self._create_parameter_groups(model, lr)
         
-        # Create optimizer berdasarkan type
-        if self.optimizer_type == 'adam':
-            optimizer = optim.Adam(
-                param_groups,
-                lr=lr,
-                weight_decay=self.weight_decay,
-                betas=(0.9, 0.999),
-                eps=1e-8
-            )
-        elif self.optimizer_type == 'adamw':
-            optimizer = optim.AdamW(
-                param_groups,
-                lr=lr,
-                weight_decay=self.weight_decay,
-                betas=(0.9, 0.999),
-                eps=1e-8
-            )
-        elif self.optimizer_type == 'sgd':
-            optimizer = optim.SGD(
-                param_groups,
-                lr=lr,
-                momentum=0.9,
-                weight_decay=self.weight_decay,
-                nesterov=True
-            )
-        elif self.optimizer_type == 'rmsprop':
-            optimizer = optim.RMSprop(
-                param_groups,
-                lr=lr,
-                weight_decay=self.weight_decay,
-                momentum=0.9
-            )
-        else:
-            raise ValueError(f"❌ Optimizer type tidak didukung: {self.optimizer_type}")
+        # Default to AdamW with the specified configuration (lr=5e-4 for phase 2)
+        optimizer = optim.AdamW(
+            param_groups,
+            lr=lr,
+            weight_decay=self.weight_decay,
+            betas=self.adamw_betas,
+            eps=self.adamw_eps
+        )
         
         return optimizer
     
@@ -140,35 +132,22 @@ class OptimizerFactory:
         
         return param_groups
     
-    def create_scheduler(self, optimizer: torch.optim.Optimizer, 
-                        total_epochs: int) -> Optional[torch.optim.lr_scheduler._LRScheduler]:
-        """
-        Create learning rate scheduler
+    def create_scheduler(self, optimizer: torch.optim.Optimizer, total_epochs: Optional[int] = None) -> Optional[torch.optim.lr_scheduler._LRScheduler]:
+        """Create learning rate scheduler"""
+        total_epochs = total_epochs or self.total_epochs
         
-        Args:
-            optimizer: Optimizer yang akan di-schedule
-            total_epochs: Total training epochs
-            
-        Returns:
-            Configured scheduler atau None
-        """
-        if self.scheduler_type == 'none':
+        # Only use scheduler in phase 2
+        if self.phase != 2:
             return None
-        
-        elif self.scheduler_type == 'cosine':
-            return CosineAnnealingLR(
-                optimizer,
+            
+        if self.scheduler_type == 'cosine':
+            return torch.optim.lr_scheduler.CosineAnnealingLR(
+                optimizer, 
                 T_max=total_epochs,
-                eta_min=self.learning_rate * 0.01  # Minimum LR = 1% dari initial
+                eta_min=self.cosine_eta_min  # Configurable minimum learning rate
             )
-        
         elif self.scheduler_type == 'step':
-            step_size = max(total_epochs // 3, 10)  # Step setiap 1/3 total epochs
-            return StepLR(
-                optimizer,
-                step_size=step_size,
-                gamma=0.1  # Reduce LR by 10x
-            )
+            return StepLR(optimizer, step_size=30, gamma=0.1)
         
         elif self.scheduler_type == 'plateau':
             return ReduceLROnPlateau(

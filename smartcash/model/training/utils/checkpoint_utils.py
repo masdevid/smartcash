@@ -270,39 +270,156 @@ def cleanup_old_checkpoints(
         return 0
 
 
-def load_checkpoint_for_resume(checkpoint_path: str) -> Optional[Dict[str, Any]]:
+def load_checkpoint_for_resume(checkpoint_path: str, verbose: bool = True) -> Optional[Dict[str, Any]]:
     """
     Load checkpoint data for resuming training.
     
+    This function provides intelligent checkpoint loading with:
+    - Automatic last_*.pt detection for more recent training state  
+    - Phase detection from checkpoint structure and naming
+    - Proper epoch calculation for resume
+    - Comprehensive validation and user feedback
+    
     Args:
         checkpoint_path: Path to checkpoint file
+        verbose: Whether to print detailed analysis information
         
     Returns:
-        Checkpoint data dictionary or None if failed
+        Resume information dictionary or None if failed
     """
     try:
-        # Use safe globals for PyTorch 2.6+ compatibility
-        import torch.serialization
-        try:
-            from models.yolo import Model as YOLOModel
-            from models.common import Conv, C3, SPPF, Bottleneck
-            safe_globals = [YOLOModel, Conv, C3, SPPF, Bottleneck]
-        except ImportError:
-            safe_globals = []
+        # First, try to find a more recent 'last_*.pt' checkpoint in the same directory
+        checkpoint_dir = Path(checkpoint_path).parent
         
-        with torch.serialization.safe_globals(safe_globals):
-            checkpoint = torch.load(checkpoint_path, map_location='cpu')
+        # Find all last_*.pt files in the directory
+        last_checkpoints = list(checkpoint_dir.glob('last_*.pt'))
         
-        # Validate checkpoint structure
-        required_keys = ['model_state_dict', 'epoch', 'phase']
-        for key in required_keys:
-            if key not in checkpoint:
-                logger.warning(f"Checkpoint missing required key: {key}")
-                return None
+        # Also check for legacy last.pt
+        legacy_last = checkpoint_dir / 'last.pt'
+        if legacy_last.exists():
+            last_checkpoints.append(legacy_last)
         
-        logger.info(f"✅ Loaded checkpoint: {Path(checkpoint_path).name}")
-        return checkpoint
+        # If we have last checkpoints, find the most recent one
+        if last_checkpoints:
+            try:
+                # Sort by modification time to find the most recent
+                last_checkpoints.sort(key=lambda x: x.stat().st_mtime, reverse=True)
+                most_recent_last = last_checkpoints[0]
+                
+                last_ckpt = _load_checkpoint_raw(most_recent_last)
+                last_epoch = last_ckpt.get('epoch', 0)
+                current_ckpt = _load_checkpoint_raw(checkpoint_path)
+                current_epoch = current_ckpt.get('epoch', 0)
+                
+                if last_epoch > current_epoch:
+                    if verbose:
+                        logger.info(f"🔍 Found more recent last checkpoint (epoch {last_epoch} vs {current_epoch})")
+                        logger.info(f"   Using: {most_recent_last}")
+                    checkpoint = last_ckpt
+                    checkpoint_path = str(most_recent_last)
+                else:
+                    checkpoint = current_ckpt
+            except Exception as e:
+                if verbose:
+                    logger.warning(f"⚠️ Could not load last checkpoint, using specified checkpoint: {e}")
+                checkpoint = _load_checkpoint_raw(checkpoint_path)
+        else:
+            checkpoint = _load_checkpoint_raw(checkpoint_path)
+        
+        # Analyze checkpoint and create resume info
+        resume_info = _create_resume_info(checkpoint, checkpoint_path, verbose)
+        
+        return resume_info
         
     except Exception as e:
-        logger.error(f"Error loading checkpoint {checkpoint_path}: {e}")
+        logger.error(f"Error loading checkpoint for resume {checkpoint_path}: {e}")
         return None
+
+
+def _load_checkpoint_raw(checkpoint_path: str) -> Dict[str, Any]:
+    """Load raw checkpoint data with proper safety measures."""
+    # Use safe globals for PyTorch 2.6+ compatibility
+    import torch.serialization
+    try:
+        from models.yolo import Model as YOLOModel
+        from models.common import Conv, C3, SPPF, Bottleneck
+        safe_globals = [YOLOModel, Conv, C3, SPPF, Bottleneck]
+    except ImportError:
+        safe_globals = []
+    
+    with torch.serialization.safe_globals(safe_globals):
+        return torch.load(checkpoint_path, map_location='cpu', weights_only=False)
+
+
+def _create_resume_info(checkpoint: Dict[str, Any], checkpoint_path: str, verbose: bool = True) -> Dict[str, Any]:
+    """Create comprehensive resume information from checkpoint."""
+    import time
+    
+    # Extract epoch and calculate resume epoch
+    saved_epoch = checkpoint.get('epoch', 0)
+    resume_epoch = saved_epoch + 1  # Correct epoch calculation
+    
+    # Determine phase based on checkpoint analysis
+    checkpoint_name = Path(checkpoint_path).name.lower()
+    metrics = checkpoint.get('metrics', {})
+    
+    # Try to determine phase from checkpoint structure
+    if 'phase' in checkpoint:
+        # Direct phase information in checkpoint
+        resume_phase = checkpoint.get('phase', 1)
+    elif 'phase_1' in checkpoint_name:
+        resume_phase = 1
+    elif 'phase_2' in checkpoint_name:
+        resume_phase = 2
+    else:
+        # Analyze checkpoint to determine phase
+        # Phase 1: Early training, basic metrics
+        # Phase 2: Advanced training, full validation metrics
+        
+        # Check for phase 2 indicators
+        has_full_validation = any(key.startswith('val_ap_') for key in metrics.keys())
+        has_layer_metrics = any('layer_' in key for key in metrics.keys())
+        
+        if saved_epoch == 0 and not has_full_validation:
+            # Very early checkpoint, likely phase 1
+            resume_phase = 1
+        elif has_full_validation or has_layer_metrics:
+            # Advanced metrics suggest phase 2
+            resume_phase = 2
+        else:
+            # Default to phase 1 for ambiguous cases
+            resume_phase = 1
+    
+    # Create resume info dictionary
+    resume_info = {
+        'checkpoint_path': checkpoint_path,
+        'checkpoint_name': Path(checkpoint_path).name,
+        'epoch': resume_epoch,
+        'phase': resume_phase,
+        'model_state_dict': checkpoint.get('model_state_dict'),
+        'metrics': metrics,
+        'config': checkpoint.get('model_config', {}),
+        'session_id': f"resume_{int(time.time())}",
+        'timestamp': checkpoint.get('timestamp', time.time()),
+        'model_info': checkpoint.get('model_info', {}),
+        'saved_epoch': saved_epoch  # Keep original for debugging
+    }
+    
+    # Provide detailed analysis if verbose
+    if verbose:
+        _print_resume_analysis(resume_info, metrics, saved_epoch, resume_epoch, resume_phase)
+    
+    return resume_info
+
+
+def _print_resume_analysis(resume_info: Dict[str, Any], metrics: Dict, saved_epoch: int, 
+                          resume_epoch: int, resume_phase: int):
+    """Print essential resume information for user feedback."""
+    logger.info(f"📊 Loaded checkpoint from phase {resume_phase} and epoch {resume_epoch}")
+    logger.info(f"   Checkpoint file: {resume_info['checkpoint_name']}")
+    
+    # Show key metrics if available
+    if metrics:
+        key_metrics = {k: v for k, v in metrics.items() if k in ['val_map50', 'val_loss', 'train_loss']}
+        if key_metrics:
+            logger.info(f"   Key metrics: {key_metrics}")

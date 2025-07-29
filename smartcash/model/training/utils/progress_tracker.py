@@ -115,14 +115,16 @@ class UnifiedProgressTracker:
         if self.progress_callback:
             self.progress_callback('epoch', 0, total_epochs, f"Starting epoch training ({total_epochs} epochs)")
     
-    def update_epoch_progress(self, current_epoch: int, total_epochs: int = None, message: str = ""):
-        """Update epoch progress."""
+    def update_epoch_progress(self, current_epoch: int, total_epochs: int = None, message: str = "", relative_current: int = None):
+        """Update epoch progress with option for custom relative position."""
         self.current_epoch = current_epoch
         if total_epochs:
             self.total_epochs = total_epochs
             
         if self.progress_callback:
-            self.progress_callback('epoch', current_epoch, self.total_epochs, message)
+            # Use relative_current for progress bar position if provided, otherwise use current_epoch
+            progress_position = relative_current if relative_current is not None else current_epoch
+            self.progress_callback('epoch', progress_position, self.total_epochs, message, epoch=current_epoch)
     
     def complete_epoch_early_stopping(self, final_epoch: int, message: str = "Early stopping triggered"):
         """Complete epoch tracking due to early stopping."""

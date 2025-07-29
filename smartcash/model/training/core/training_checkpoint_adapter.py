@@ -123,18 +123,13 @@ class TrainingCheckpointAdapter:
     
     def _generate_best_checkpoint_name(self) -> str:
         """Generate a checkpoint name for best models."""
-        # Use the main checkpoint manager's naming logic
-        return self.checkpoint_manager._generate_checkpoint_name()
+        # Use the main checkpoint manager's naming logic with is_best=True
+        return self.checkpoint_manager._generate_checkpoint_name(is_best=True)
     
     def _log_checkpoint_info(self, saved_path: str, epoch: int, phase_num: int, is_best: bool):
         """Log checkpoint information."""
-        device = next(self.model.parameters()).device
-        device_type = 'cpu' if device.type == 'cpu' else ('mps' if device.type == 'mps' else 'gpu')
-        layer_mode = self.config['model'].get('layer_mode', 'multi')
-        
         checkpoint_type = "Best" if is_best else "Regular"
         logger.info(f"💾 {checkpoint_type} checkpoint saved: {Path(saved_path).name}")
-        logger.info(f"   Epoch: {epoch + 1}, Phase: {phase_num}, Device: {device_type}, Layer mode: {layer_mode}")
     
     def get_best_checkpoint_info(self) -> Dict[str, Any]:
         """

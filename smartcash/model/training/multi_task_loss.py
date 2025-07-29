@@ -11,6 +11,7 @@ import math
 
 from smartcash.common.logger import SmartCashLogger
 from smartcash.model.training.loss_manager import YOLOLoss
+from smartcash.model.training.utils.tensor_format_converter import convert_for_yolo_loss
 
 
 class UncertaintyMultiTaskLoss(nn.Module):
@@ -84,7 +85,15 @@ class UncertaintyMultiTaskLoss(nn.Module):
             total_loss: Weighted total loss
             loss_breakdown: Detailed loss components
         """
-        device = next(iter(predictions.values()))[0].device
+        # Determine device from predictions or fallback to CPU
+        device = torch.device('cpu')  # Default device
+        if predictions:
+            for pred_list in predictions.values():
+                if pred_list and isinstance(pred_list, list) and len(pred_list) > 0:
+                    if isinstance(pred_list[0], torch.Tensor):
+                        device = pred_list[0].device
+                        break
+        
         total_loss = torch.tensor(0.0, device=device, requires_grad=True)
         loss_breakdown = {}
         layer_losses = {}
@@ -141,7 +150,11 @@ class UncertaintyMultiTaskLoss(nn.Module):
                     # Compute YOLO loss for this layer
                     loss_fn = self.layer_losses[layer_name]
                     try:
-                        layer_loss, layer_components = loss_fn(layer_preds, layer_targets, img_size)
+                        # Convert predictions to format expected by YOLOLoss
+                        converted_preds = convert_for_yolo_loss(layer_preds, img_size)
+                        
+                        # Call YOLOLoss with converted predictions
+                        layer_loss, layer_components = loss_fn(converted_preds, layer_targets, img_size)
                         layer_losses[layer_name] = layer_loss
                         
                         # Store individual loss components with layer prefix

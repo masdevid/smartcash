@@ -21,7 +21,8 @@ evaluation:
     filename_patterns:
       - 'best_*.pt'                           # Standard best model format
       - 'best_{model}_{backbone}_{mode}_{date}.pt'  # Enhanced format
-      - 'last.pt'                             # Latest checkpoint fallback
+      - 'last_*.pt'                           # Latest checkpoint (backbone-specific)
+      - 'last.pt'                             # Legacy latest checkpoint fallback
       - 'epoch_*.pt'                          # Epoch-based checkpoints
     
     # Selection criteria

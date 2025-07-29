@@ -10,6 +10,7 @@ import torch
 from typing import Dict, Tuple
 
 from smartcash.common.logger import get_logger
+from smartcash.model.training.utils.tensor_format_converter import convert_for_yolo_loss, ensure_yolo_format
 
 logger = get_logger(__name__)
 
@@ -100,23 +101,42 @@ class PredictionProcessor:
             logger.info(f"Multi-layer {context.lower()}: Converting {type(predictions)} to multi-layer dict")
         
         if isinstance(predictions, (tuple, list)) and len(predictions) >= 1:
-            # YOLOv5 returns tuple of predictions for different scales
-            # For multi-layer training, we need to split this into layer predictions
-            # Use the first scale prediction and replicate for all layers
-            base_prediction = predictions[0]  # Use first scale
-            
+            # YOLOv5 returns tuple/list of predictions for different scales
+            # For multi-layer training, we use the predictions for all layers
             predictions_dict = {
-                'layer_1': base_prediction,
-                'layer_2': base_prediction,  # For now, use same prediction
-                'layer_3': base_prediction   # This should be improved later
+                'layer_1': predictions,  # Use all scales for layer_1
+                'layer_2': predictions,  # Use all scales for layer_2  
+                'layer_3': predictions   # Use all scales for layer_3
             }
             if batch_idx == 0:
                 logger.info(f"Created multi-layer predictions: {list(predictions_dict.keys())}")
             return predictions_dict
+        elif isinstance(predictions, torch.Tensor):
+            # Single tensor - might be flattened format
+            if predictions.dim() == 3:
+                # Likely flattened format [batch, total_predictions, features]
+                # Convert to proper YOLO format for each layer
+                converted_preds = convert_for_yolo_loss(predictions)
+                predictions_dict = {
+                    'layer_1': converted_preds,
+                    'layer_2': converted_preds,
+                    'layer_3': converted_preds
+                }
+                if batch_idx == 0:
+                    logger.info(f"Converted flattened tensor to multi-layer predictions: {list(predictions_dict.keys())}")
+                return predictions_dict
+            else:
+                # Other tensor format - use as is
+                predictions_dict = {
+                    'layer_1': predictions,
+                    'layer_2': predictions,
+                    'layer_3': predictions
+                }
+                return predictions_dict
         else:
             # Fallback to single layer
             if batch_idx == 0:
-                logger.warning(f"Fallback to single layer due to unexpected prediction format")
+                logger.warning(f"Fallback to single layer due to unexpected prediction format: {type(predictions)}")
             return {'layer_1': predictions}
     
     def process_for_metrics(self, predictions: Dict, targets: torch.Tensor, 
@@ -185,6 +205,10 @@ class PredictionProcessor:
         
         # Apply objectness weighting to class probabilities
         weighted_class_probs = torch.sigmoid(objectness) * torch.sigmoid(class_logits)
+        
+        # Debug: Check for valid predictions
+        max_obj = torch.sigmoid(objectness).max().item() if objectness.numel() > 0 else 0.0
+        max_class = torch.sigmoid(class_logits).max().item() if class_logits.numel() > 0 else 0.0
         
         # Take the detection with highest objectness score per image
         if weighted_class_probs.shape[1] > 0:  # Has detections

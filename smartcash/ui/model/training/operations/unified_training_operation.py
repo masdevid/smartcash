@@ -43,6 +43,15 @@ class UnifiedTrainingOperation:
             # Extract training configuration
             training_config = self.config.get('training', {})
             
+            # Validate resume functionality if enabled
+            resume_checkpoint_path = training_config.get('resume_checkpoint_path', '').strip()
+            if resume_checkpoint_path:
+                validation_result = self._validate_resume_checkpoint(resume_checkpoint_path)
+                if not validation_result['success']:
+                    self._log_error(validation_result['message'])
+                    return validation_result
+                self._log_info(f"✅ Resume checkpoint validated: {validation_result['message']}")
+            
             # Create progress callback that bridges to UI
             progress_callback = self._create_ui_progress_callback()
             
@@ -51,6 +60,9 @@ class UnifiedTrainingOperation:
             
             self._log_info(f"Training configuration: {pipeline_params['backbone']} ({pipeline_params['training_mode']})")
             self._log_info(f"Epochs: Phase 1={pipeline_params['phase_1_epochs']}, Phase 2={pipeline_params['phase_2_epochs']}")
+            
+            if pipeline_params['resume_from_checkpoint']:
+                self._log_info(f"🔄 Resume training from: {resume_checkpoint_path}")
             
             # Call the unified training pipeline directly
             result = run_full_training_pipeline(**pipeline_params)
@@ -72,6 +84,72 @@ class UnifiedTrainingOperation:
         finally:
             self._is_training = False
     
+    def _validate_resume_checkpoint(self, checkpoint_path: str) -> Dict[str, Any]:
+        """Validate resume checkpoint before training starts."""
+        try:
+            import os
+            from pathlib import Path
+            
+            # Check if file exists
+            if not os.path.exists(checkpoint_path):
+                return {
+                    'success': False,
+                    'message': f"❌ Checkpoint file not found: {checkpoint_path}"
+                }
+            
+            # Check file size (should not be empty)
+            file_size = os.path.getsize(checkpoint_path)
+            if file_size == 0:
+                return {
+                    'success': False,
+                    'message': f"❌ Checkpoint file is empty: {checkpoint_path}"
+                }
+            
+            # Check file extension
+            valid_extensions = ['.pt', '.pth', '.ckpt']
+            if not any(checkpoint_path.endswith(ext) for ext in valid_extensions):
+                return {
+                    'success': False,
+                    'message': f"❌ Invalid checkpoint format. Expected: {valid_extensions}"
+                }
+            
+            # Try to load checkpoint metadata (without loading full model)
+            try:
+                import torch
+                checkpoint_data = torch.load(checkpoint_path, map_location='cpu', weights_only=False)
+                
+                # Check for basic checkpoint structure
+                if isinstance(checkpoint_data, dict):
+                    epoch = checkpoint_data.get('epoch', 0)
+                    phase = checkpoint_data.get('phase', 1)
+                    metrics = checkpoint_data.get('metrics', {})
+                    
+                    return {
+                        'success': True,
+                        'message': f"Valid checkpoint (Epoch {epoch + 1}, Phase {phase})",
+                        'epoch': epoch,
+                        'phase': phase,
+                        'metrics': metrics,
+                        'file_size_mb': file_size / (1024 * 1024)
+                    }
+                else:
+                    return {
+                        'success': False,
+                        'message': f"❌ Invalid checkpoint structure in: {checkpoint_path}"
+                    }
+                    
+            except Exception as e:
+                return {
+                    'success': False,
+                    'message': f"❌ Failed to load checkpoint: {str(e)}"
+                }
+                
+        except Exception as e:
+            return {
+                'success': False,
+                'message': f"❌ Checkpoint validation error: {str(e)}"
+            }
+    
     def _map_config_to_pipeline_params(self, config: Dict[str, Any], progress_callback: Callable) -> Dict[str, Any]:
         """Map UI configuration to unified training pipeline parameters."""
         training_mode = config.get('training_mode', 'two_phase')
@@ -90,6 +168,18 @@ class UnifiedTrainingOperation:
             early_stopping_phase_1_enabled = early_stopping_enabled
             early_stopping_phase_2_enabled = early_stopping_enabled
         
+        # Handle resume functionality
+        resume_checkpoint_path = config.get('resume_checkpoint_path', '').strip()
+        resume_from_checkpoint = bool(resume_checkpoint_path)
+        
+        if resume_from_checkpoint:
+            self.logger.info(f"🔄 Resume training enabled from: {resume_checkpoint_path}")
+            # If a specific checkpoint path is provided, pass it as resume_info
+            # The training pipeline will use this specific checkpoint
+            resume_info = {'checkpoint_path': resume_checkpoint_path}
+        else:
+            resume_info = None
+        
         return {
             # Core parameters
             'backbone': config.get('backbone', 'cspdarknet'),
@@ -100,6 +190,10 @@ class UnifiedTrainingOperation:
             'verbose': config.get('verbose', True),
             'force_cpu': config.get('force_cpu', False),
             'training_mode': training_mode,
+            
+            # Resume functionality parameters
+            'resume_from_checkpoint': resume_from_checkpoint,
+            'resume_info': resume_info,  # Pass specific checkpoint path if provided
             
             # Single-phase specific parameters
             'single_phase_layer_mode': config.get('single_phase_layer_mode', 'multi'),
@@ -197,6 +291,18 @@ class UnifiedTrainingOperation:
             # Fail silently on progress update errors
             if hasattr(self, 'logger'):
                 self.logger.debug(f"Progress update failed: {e}")
+    
+    def _log_info(self, message: str):
+        """Log info message to both logger and UI callbacks."""
+        self.logger.info(message)
+        if 'log' in self.callbacks:
+            self.callbacks['log']('info', message)
+    
+    def _log_error(self, message: str):
+        """Log error message to both logger and UI callbacks."""
+        self.logger.error(message)
+        if 'log' in self.callbacks:
+            self.callbacks['log']('error', message)
     
     def _handle_training_phase_progress(self, phase: str, current: int, total: int, 
                                       message: str, percentage: float, **kwargs):

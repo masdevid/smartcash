@@ -30,7 +30,7 @@ class BackboneFactory:
         
         backbone_class = self.available_backbones[backbone_type]
         
-        self.logger.info(f"🏗️ Creating {backbone_type} backbone | Pretrained: {pretrained} | Optimization: {feature_optimization}")
+        self.logger.debug(f"🏗️ Creating {backbone_type} backbone | Pretrained: {pretrained} | Optimization: {feature_optimization}")
         
         backbone = backbone_class(
             pretrained=pretrained,
@@ -41,7 +41,7 @@ class BackboneFactory:
         # Log backbone info
         channels = backbone.get_output_channels()
         params = sum(p.numel() for p in backbone.parameters())
-        self.logger.info(f"✅ {backbone_type} ready | Channels: {channels} | Params: {params:,}")
+        self.logger.info(f"✅ {backbone_type} backbone ready ({params:,} params)")
         
         return backbone
     
@@ -70,13 +70,13 @@ class BackboneBase(nn.Module):
         """Freeze backbone parameters"""
         for param in self.parameters():
             param.requires_grad = False
-        self.logger.info("❄️ Backbone frozen")
+        self.logger.debug("❄️ Backbone frozen")
     
     def unfreeze(self) -> None:
         """Unfreeze backbone parameters"""
         for param in self.parameters():
             param.requires_grad = True
-        self.logger.info("🔥 Backbone unfrozen")
+        self.logger.debug("🔥 Backbone unfrozen")
 
 
 class CSPDarknetBackbone(BackboneBase):

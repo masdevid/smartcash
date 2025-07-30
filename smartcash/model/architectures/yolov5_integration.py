@@ -8,6 +8,7 @@ import torch.nn as nn
 from pathlib import Path
 import sys
 import yaml
+import gc
 from copy import deepcopy
 from typing import Dict, List, Any, Optional, Union
 
@@ -79,12 +80,48 @@ class SmartCashYOLOv5Integration:
         """
         self.logger = logger or SmartCashLogger(__name__)
         
+        # Perform memory cleanup before initialization
+        self._initial_memory_cleanup()
+        
         # Register custom components with YOLOv5
         if YOLOV5_AVAILABLE:
             register_yolov5_components()
             self._register_custom_components()
         
         self.logger.info("✅ SmartCash YOLOv5 integration initialized")
+    
+    def _initial_memory_cleanup(self):
+        """
+        Perform comprehensive memory cleanup before initialization.
+        
+        This ensures a clean memory state when starting the YOLOv5 integration,
+        which is especially important for repeated model creation or in memory-constrained environments.
+        """
+        try:
+            # Force garbage collection multiple times for thorough cleanup
+            for _ in range(3):
+                gc.collect()
+            
+            # Clear CUDA cache if available
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+                torch.cuda.synchronize()
+                self.logger.debug("🧹 Cleared CUDA cache during initialization")
+            
+            # Clear MPS cache if available (Apple Silicon)
+            if hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
+                try:
+                    torch.mps.empty_cache()
+                    self.logger.debug("🧹 Cleared MPS cache during initialization")
+                except Exception:
+                    # MPS cache clearing can sometimes fail, but it's not critical
+                    pass
+            
+            self.logger.debug("🧹 Initial memory cleanup completed")
+            
+        except Exception as e:
+            # Memory cleanup should never fail the initialization
+            self.logger.warning(f"⚠️ Initial memory cleanup encountered an issue: {e}")
     
     def _register_custom_components(self):
         """Register SmartCash components with YOLOv5 parsing system"""
@@ -227,7 +264,7 @@ class SmartCashYOLOv5Integration:
                                 # Check if this looks like a multi-layer class dict
                                 if all(k.startswith('layer_') for k in obj.keys()) and all(isinstance(v, int) for v in obj.values()):
                                     total_classes = sum(obj.values())
-                                    self.logger.info(f"Converting multi-layer dict {obj} -> {total_classes}")
+                                    self.logger.debug(f"Converting multi-layer dict {obj} -> {total_classes}")
                                     return total_classes  # Convert to total classes
                                 else:
                                     # Recursively process nested dicts

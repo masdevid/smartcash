@@ -42,25 +42,24 @@ def prepare_training_environment(
     """
     try:
         # Step 1: Load platform-optimized configuration
-        logger.info("⚙️ Loading platform-optimized configuration")
+        logger.debug("⚙️ Loading platform-optimized configuration")
         config = get_platform_config(backbone, phase_1_epochs, phase_2_epochs)
         
         # Step 2: Set pretrained flag and training mode in configuration
         if 'model' in config:
             config['model']['pretrained'] = pretrained
-            logger.info(f"🏗️ Model configuration: backbone={backbone}, pretrained={pretrained}")
         
         if 'training' not in config:
             config['training'] = {}
         config['training']['training_mode'] = training_mode
-        logger.info(f"🚀 Training mode set: {training_mode}")
+        logger.info(f"🏗️ Training setup: {backbone} (pretrained={pretrained}, mode={training_mode})")
         
         # Step 3: Apply force_cpu if specified
         if force_cpu:
             config = apply_force_cpu_configuration(config)
         
         # Step 4: Platform detection and optimization (with device awareness)
-        logger.info("🔧 Detecting platform and applying optimizations")
+        logger.debug("🔧 Detecting platform and applying optimizations")
         target_device = None
         if force_cpu:
             target_device = torch.device('cpu')
@@ -71,7 +70,7 @@ def prepare_training_environment(
             config = apply_configuration_overrides(config, **kwargs)
         
         # Step 5: Setup checkpoint directory
-        logger.info("📁 Setting up checkpoint management")
+        logger.debug("📁 Setting up checkpoint management")
         checkpoint_path = Path(checkpoint_dir)
         checkpoint_path.mkdir(parents=True, exist_ok=True)
         config['paths']['checkpoints'] = str(checkpoint_path)
@@ -98,7 +97,7 @@ def apply_force_cpu_configuration(config: Dict[str, Any]) -> Dict[str, Any]:
     Returns:
         Updated configuration with CPU settings
     """
-    logger.info("🖥️ Force CPU mode enabled - disabling GPU/MPS detection")
+    logger.debug("🖥️ Force CPU mode enabled - disabling GPU/MPS detection")
     config['device']['device'] = 'cpu'
     config['device']['auto_detect'] = False
     
@@ -127,7 +126,7 @@ def apply_force_cpu_configuration(config: Dict[str, Any]) -> Dict[str, Any]:
     if 'platform_info' in config:
         config['platform_info']['force_cpu'] = True
         
-    logger.info("🖥️ CPU mode configured: num_workers=0, pin_memory=False")
+    logger.debug("🖥️ CPU mode configured: num_workers=0, pin_memory=False")
     return config
 
 
@@ -256,7 +255,7 @@ def apply_training_overrides(config: Dict[str, Any], **kwargs) -> Dict[str, Any]
         if 'early_stopping' not in config['training']:
             config['training']['early_stopping'] = {}
         config['training']['early_stopping']['patience'] = kwargs['patience']
-        logger.info(f"🎯 Early stopping patience override applied: {kwargs['patience']}")
+        logger.debug(f"🎯 Early stopping patience override: {kwargs['patience']}")
     
     # Phase-specific epoch overrides
     if 'phase1_epochs' in kwargs and kwargs['phase1_epochs'] is not None:
@@ -265,7 +264,7 @@ def apply_training_overrides(config: Dict[str, Any], **kwargs) -> Dict[str, Any]
         if 'phase_1' not in config['training_phases']:
             config['training_phases']['phase_1'] = {}
         config['training_phases']['phase_1']['epochs'] = kwargs['phase1_epochs']
-        logger.info(f"🎯 Phase 1 epochs override applied: {kwargs['phase1_epochs']}")
+        logger.debug(f"🎯 Phase 1 epochs override: {kwargs['phase1_epochs']}")
     
     if 'phase2_epochs' in kwargs and kwargs['phase2_epochs'] is not None:
         if 'training_phases' not in config:
@@ -273,47 +272,47 @@ def apply_training_overrides(config: Dict[str, Any], **kwargs) -> Dict[str, Any]
         if 'phase_2' not in config['training_phases']:
             config['training_phases']['phase_2'] = {}
         config['training_phases']['phase_2']['epochs'] = kwargs['phase2_epochs']
-        logger.info(f"🎯 Phase 2 epochs override applied: {kwargs['phase2_epochs']}")
+        logger.debug(f"🎯 Phase 2 epochs override: {kwargs['phase2_epochs']}")
     
     # Training mode override
     if 'training_mode' in kwargs and kwargs['training_mode']:
         if 'training' not in config:
             config['training'] = {}
         config['training']['training_mode'] = kwargs['training_mode']
-        logger.info(f"🎯 Training mode override applied: {kwargs['training_mode']}")
+        logger.debug(f"🎯 Training mode override: {kwargs['training_mode']}")
     
     # Backbone override
     if 'backbone' in kwargs and kwargs['backbone']:
         if 'model' not in config:
             config['model'] = {}
         config['model']['backbone'] = kwargs['backbone']
-        logger.info(f"🎯 Backbone override applied: {kwargs['backbone']}")
+        logger.debug(f"🎯 Backbone override: {kwargs['backbone']}")
     
     # Pretrained override
     if 'pretrained' in kwargs and kwargs['pretrained'] is not None:
         if 'model' not in config:
             config['model'] = {}
         config['model']['pretrained'] = kwargs['pretrained']
-        logger.info(f"🎯 Pretrained override applied: {kwargs['pretrained']}")
+        logger.debug(f"🎯 Pretrained override: {kwargs['pretrained']}")
     
     # Verbose override
     if 'verbose' in kwargs and kwargs['verbose'] is not None:
         if 'training' not in config:
             config['training'] = {}
         config['training']['verbose'] = kwargs['verbose']
-        logger.info(f"🎯 Verbose override applied: {kwargs['verbose']}")
+        logger.debug(f"🎯 Verbose override: {kwargs['verbose']}")
     
     # Force CPU override
     if 'force_cpu' in kwargs and kwargs['force_cpu']:
         config = apply_force_cpu_configuration(config)
-        logger.info("🎯 Force CPU override applied")
+        logger.debug("🎯 Force CPU override applied")
     
     # Single layer mode override
     if 'single_layer_mode' in kwargs and kwargs['single_layer_mode']:
         if 'model' not in config:
             config['model'] = {}
         config['model']['layer_mode'] = kwargs['single_layer_mode']
-        logger.info(f"🎯 Single layer mode override applied: {kwargs['single_layer_mode']}")
+        logger.debug(f"🎯 Single layer mode override: {kwargs['single_layer_mode']}")
     
     return config
 
@@ -342,14 +341,14 @@ def configure_single_phase_settings(config: Dict[str, Any], layer_mode: str) -> 
         # Single layer detection - force standard YOLO loss
         original_loss_type = config['training']['loss']['type']
         config['training']['loss']['type'] = 'standard'
-        logger.info(f"🎯 Single layer mode: using standard YOLO loss (was {original_loss_type})")
+        logger.debug(f"🎯 Single layer mode: using standard YOLO loss (was {original_loss_type})")
     else:
         # Multi layer detection - use dynamic/uncertainty loss
         if config['training']['loss']['type'] not in ['uncertainty_multi_task', 'weighted_multi_task']:
             original_loss_type = config['training']['loss']['type']
             config['training']['loss']['type'] = 'uncertainty_multi_task'
-            logger.info(f"🎯 Multi layer mode: using uncertainty_multi_task loss (was {original_loss_type})")
+            logger.debug(f"🎯 Multi layer mode: using uncertainty_multi_task loss (was {original_loss_type})")
         else:
-            logger.info(f"🎯 Multi layer mode: using {config['training']['loss']['type']} loss")
+            logger.debug(f"🎯 Multi layer mode: using {config['training']['loss']['type']} loss")
     
     return config

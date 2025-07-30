@@ -5,39 +5,22 @@ Multi-Layer Banknote Detection System
 
 import torch
 import torch.nn as nn
-from typing import Dict, Any, Optional, List, Union
-from pathlib import Path
+from typing import Dict, Any, List
 
 from smartcash.common.logger import get_logger
 from smartcash.model.utils.progress_bridge import ModelProgressBridge
-from smartcash.model.utils.backbone_factory import BackboneFactory
-from smartcash.model.core.yolo_head import YOLOHead
 
 # Import YOLOv5 integration components
 try:
     from smartcash.model.architectures.yolov5_integration import (
         SmartCashYOLOv5Integration, 
-        create_smartcash_yolov5_model,
         create_training_model
     )
     YOLOV5_INTEGRATION_AVAILABLE = True
 except ImportError:
     YOLOV5_INTEGRATION_AVAILABLE = False
 
-# Import legacy components from backup file
-try:
-    from smartcash.model.core.model_builder_legacy import ModelBuilder as LegacyModelBuilder, SmartCashYOLO
-except ImportError:
-    # If legacy file doesn't exist, create stub classes for compatibility
-    class LegacyModelBuilder:
-        def __init__(self, *args, **kwargs):
-            pass
-        def build(self, *args, **kwargs):
-            raise NotImplementedError("Legacy model builder not available")
-    
-    class SmartCashYOLO:
-        def __init__(self, *args, **kwargs):
-            pass
+# Legacy components removed - using YOLOv5 integration only
 
 
 class ModelBuilder:
@@ -59,7 +42,7 @@ class ModelBuilder:
         
         # Force CPU mode to avoid MPS issues
         self.device = torch.device("cpu")
-        self.logger.info("🖥️  Using CPU (MPS disabled due to compatibility issues)")
+        self.logger.debug("🖥️  Using CPU (MPS disabled due to compatibility issues)")
         
         # Set environment variables to prevent MPS usage
         import os
@@ -73,13 +56,12 @@ class ModelBuilder:
             torch.backends.mps.enabled = False
             torch.backends.mps.is_available = lambda: False
         
-        # Initialize legacy builder for fallback
-        self.legacy_builder = LegacyModelBuilder(config, progress_bridge) if progress_bridge else None
+        # Legacy builder removed - using YOLOv5 integration only
         
         # Initialize YOLOv5 integration if available
         if YOLOV5_INTEGRATION_AVAILABLE:
             self.yolov5_integration = SmartCashYOLOv5Integration(logger=self.logger)
-            self.logger.info("✅ YOLOv5 integration available")
+            self.logger.debug("✅ YOLOv5 integration available")
         else:
             self.yolov5_integration = None
             self.logger.warning("⚠️ YOLOv5 integration not available, using legacy mode only")
@@ -106,7 +88,7 @@ class ModelBuilder:
         detection_layers = detection_layers or ['layer_1', 'layer_2', 'layer_3']
         feature_optimization = feature_optimization or {'enabled': True}
         
-        self.logger.info(f"🏗️ Building SmartCash YOLOv5 model: {backbone} | Mode: {layer_mode} | Architecture: yolov5")
+        self.logger.debug(f"🏗️ Building SmartCash YOLOv5 model: {backbone} | Mode: {layer_mode} | Architecture: yolov5")
         
         # Always use YOLOv5 architecture
         if self.yolov5_integration:
@@ -137,20 +119,19 @@ class ModelBuilder:
         if not optimization_config.get('enabled', True):
             return model
             
-        self.logger.info("🔧 Applying feature optimization...")
+        self.logger.debug("🔧 Applying feature optimization...")
         
         # Freeze backbone layers if specified
         if optimization_config.get('freeze_backbone', False):
             for name, param in model.named_parameters():
                 if 'model.0.' in name or 'model.1.' in name:  # First few layers are typically the backbone
                     param.requires_grad = False
-            self.logger.info("  - Frozen backbone layers")
+            self.logger.debug("  - Frozen backbone layers")
         
         # Apply other optimizations as needed
         if optimization_config.get('use_amp', False):
-            from torch.cuda.amp import autocast
             model.forward = lambda x: model.forward(x.to(next(model.parameters()).device))
-            self.logger.info("  - Applied mixed precision training (AMP)")
+            self.logger.debug("  - Applied mixed precision training (AMP)")
             
         return model
         
@@ -183,7 +164,7 @@ class ModelBuilder:
             # Filter out None values to avoid passing them to create_training_model
             model_config = {k: v for k, v in model_config.items() if v is not None}
             
-            self.logger.info(f"Creating YOLOv5 model with config: {model_config}")
+            self.logger.debug(f"Creating YOLOv5 model with config: {model_config}")
             
             # Create the model using the YOLOv5 integration
             if self.yolov5_integration is not None:
@@ -223,7 +204,7 @@ class ModelBuilder:
                 model._smartcash_layer_mode = layer_mode
                 model._smartcash_detection_layers = detection_layers
                 
-            self.logger.info(f"✅ Successfully built YOLOv5 model with {backbone} backbone")
+            self.logger.info(f"✅ YOLOv5 model built successfully ({backbone})")
             return model
             
         except Exception as e:
@@ -240,10 +221,9 @@ class ModelBuilder:
         if YOLOV5_INTEGRATION_AVAILABLE:
             return ['yolov5']
         else:
-            # Fallback to legacy only if YOLOv5 is not available
-            return ['legacy']
+            return []  # No architectures available without YOLOv5
     
-    def get_available_backbones(self, architecture_type: str = 'yolov5') -> List[str]:
+    def get_available_backbones(self) -> List[str]:
         """Get list of available backbones for YOLOv5 architecture"""
         return ['cspdarknet', 'efficientnet_b4']
     
@@ -301,12 +281,9 @@ class ModelBuilder:
                     info['model_stride'] = yolo_model.stride.tolist() if hasattr(yolo_model.stride, 'tolist') else str(yolo_model.stride)
                     
             except Exception as e:
-                self.logger.warning(f"Could not extract YOLOv5 model info: {e}")
+                self.logger.debug(f"Could not extract YOLOv5 model info: {e}")
                 
-        elif hasattr(model, 'config'):
-            info['architecture_type'] = 'legacy'
-            if hasattr(model, 'get_model_summary'):
-                info.update(model.get_model_summary())
+        # Legacy architecture support removed
         
         return info
 

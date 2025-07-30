@@ -254,7 +254,7 @@ class PipelineExecutor:
             if self.log_callback:
                 self.log_callback('info', f"Model built successfully", {
                     'architecture_type': 'yolov5',
-                    'backbone': self.config.get('backbone', 'unknown'),
+                    'backbone': build_result.get('model_info', {}).get('backbone', 'unknown'),
                     'parameters': build_result.get('model_info', {}).get('total_parameters', 0)
                 })
             

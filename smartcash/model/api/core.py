@@ -44,7 +44,7 @@ class SmartCashModelAPI:
         # Load configuration
         if config is not None:
             self.config = config
-            self.logger.info("📋 Using provided configuration dictionary")
+            self.logger.debug("📋 Using provided configuration dictionary")
         else:
             self.config = self._load_config(config_path)
         
@@ -66,12 +66,12 @@ class SmartCashModelAPI:
         # Store memory configuration
         self.memory_config = memory_config
         
-        self.logger.info("✅ SmartCash Model API initialized")
-        self.logger.info(f"🔧 YOLOv5 integration: {'enabled' if use_yolov5_integration else 'disabled'}")
+        self.logger.debug("✅ SmartCash Model API initialized")
+        self.logger.debug(f"🔧 YOLOv5 integration: {'enabled' if use_yolov5_integration else 'disabled'}")
         
         # Log available architectures
         available_archs = self.model_builder.get_available_architectures()
-        self.logger.info(f"🏗️ Available architectures: {available_archs}")
+        self.logger.debug(f"🏗️ Available architectures: {available_archs}")
     
     def _load_config(self, config_path: Optional[str]) -> Dict[str, Any]:
         """Load configuration from file or use defaults"""
@@ -122,7 +122,7 @@ class SmartCashModelAPI:
             # Set defaults
             backbone = model_config.get('backbone', 'cspdarknet')
             
-            self.logger.info(f"🔧 Building model: {backbone} | Architecture: yolov5")
+            self.logger.debug(f"🔧 Building model: {backbone} | Architecture: yolov5")
             
             # Build model
             self.model = self.model_builder.build(

@@ -119,7 +119,19 @@ class MAPCalculator:
             batch_idx: Current batch index for logging
         """
         try:
+            # Check if layer_preds is empty or invalid
+            if not layer_preds or len(layer_preds) == 0:
+                if batch_idx < 3:
+                    logger.warning(f"mAP - batch {batch_idx}: Empty layer_preds list")
+                return
+                
             # Process first scale for simplicity (can be extended to all scales)
+            # Additional safety check for first element
+            if len(layer_preds) < 1 or layer_preds[0] is None:
+                if batch_idx < 3:
+                    logger.warning(f"mAP - batch {batch_idx}: Invalid first element in layer_preds")
+                return
+                
             scale_pred = layer_preds[0]
             if batch_idx < 2:  # Log format for first few batches
                 logger.info(f"mAP Debug - batch {batch_idx}: layer_preds type {type(layer_preds)}, length {len(layer_preds) if hasattr(layer_preds, '__len__') else 'N/A'}")
@@ -151,6 +163,8 @@ class MAPCalculator:
                 self._process_batch_images(
                     filtered_data, targets, image_shape, device, batch_idx, ap_calculator
                 )
+            elif batch_idx < 3:
+                logger.warning(f"mAP - batch {batch_idx}: _filter_predictions returned None or empty data")
                     
         except Exception as e:
             if batch_idx < 3:  # Only log first few failures
@@ -160,6 +174,11 @@ class MAPCalculator:
     
     def _flatten_predictions(self, scale_pred, batch_idx):
         """Flatten prediction tensor to consistent format."""
+        if scale_pred is None:
+            if batch_idx < 2:
+                logger.warning(f"mAP Debug - batch {batch_idx}: scale_pred is None")
+            return None
+            
         if scale_pred.dim() == 4:
             # 4D format [batch, anchors, grid_y, grid_x, features]
             batch_size, _, _, _, num_features = scale_pred.shape
@@ -187,6 +206,11 @@ class MAPCalculator:
     
     def _process_coordinates(self, flat_pred, scale_pred, image_shape, device):
         """Process coordinate predictions based on tensor format."""
+        # Safety check for inputs
+        if flat_pred is None or scale_pred is None or image_shape is None:
+            logger.warning("Invalid inputs to _process_coordinates")
+            return None
+            
         img_h, img_w = image_shape[-2:]
         
         if scale_pred.dim() == 4:
@@ -240,6 +264,12 @@ class MAPCalculator:
     
     def _filter_predictions(self, bbox_coords, obj_conf, class_probs, batch_idx):
         """Filter predictions by confidence threshold."""
+        # Safety checks for input tensors
+        if bbox_coords is None or obj_conf is None or class_probs is None:
+            if batch_idx < 3:
+                logger.warning(f"mAP - batch {batch_idx}: Invalid input tensors to _filter_predictions")
+            return None
+            
         # Filter by confidence threshold (reasonable threshold to avoid performance issues)
         conf_thresh = 0.1  # Balanced threshold to avoid processing too many predictions
         max_preds_per_img = 1000  # Limit predictions per image for performance
@@ -266,14 +296,32 @@ class MAPCalculator:
     
     def _process_batch_images(self, filtered_data, targets, image_shape, device, batch_idx, ap_calculator):
         """Process each image in the batch for mAP calculation."""
+        # Safety check for filtered_data
+        if not filtered_data:
+            if batch_idx < 3:
+                logger.warning(f"mAP - batch {batch_idx}: Empty filtered_data")
+            return
+            
         bbox_coords = filtered_data['bbox_coords']
         final_scores = filtered_data['final_scores']
         class_probs = filtered_data['class_probs']
         conf_mask = filtered_data['conf_mask']
         max_preds_per_img = filtered_data['max_preds_per_img']
         
+        # Additional safety checks
+        if bbox_coords is None or final_scores is None or class_probs is None or conf_mask is None:
+            if batch_idx < 3:
+                logger.warning(f"mAP - batch {batch_idx}: Invalid filtered_data components")
+            return
+        
         img_h, img_w = image_shape[-2:]
-        batch_size = bbox_coords.shape[0]
+        batch_size = bbox_coords.shape[0] if hasattr(bbox_coords, 'shape') and len(bbox_coords.shape) > 0 else 0
+        
+        # Check if we have valid batch size
+        if batch_size <= 0:
+            if batch_idx < 3:
+                logger.warning(f"mAP - batch {batch_idx}: Invalid batch_size: {batch_size}")
+            return
         
         # Process each image in batch
         for img_idx in range(batch_size):

@@ -142,7 +142,19 @@ class ParallelMAPCalculator:
             batch_idx: Current batch index
         """
         try:
+            # Check if layer_preds is empty or invalid
+            if not layer_preds or len(layer_preds) == 0:
+                if batch_idx < 3:
+                    logger.warning(f"Parallel mAP - batch {batch_idx}: Empty layer_preds list")
+                return
+            
             # Process first scale for simplicity (can be extended to all scales)
+            # Additional safety check for first element
+            if len(layer_preds) < 1 or layer_preds[0] is None:
+                if batch_idx < 3:
+                    logger.warning(f"Parallel mAP - batch {batch_idx}: Invalid first element in layer_preds")
+                return
+                
             scale_pred = layer_preds[0]
             
             # Flatten predictions
@@ -250,11 +262,21 @@ class ParallelMAPCalculator:
         results = []
         
         try:
+            # Safety check for filtered_data
+            if not filtered_data:
+                logger.warning(f"Worker {worker_id}: Empty filtered_data for batch {batch_idx}")
+                return results
+                
             bbox_coords = filtered_data['bbox_coords']
             final_scores = filtered_data['final_scores']
             class_probs = filtered_data['class_probs']
             conf_mask = filtered_data['conf_mask']
             max_preds_per_img = filtered_data['max_preds_per_img']
+            
+            # Additional safety checks
+            if bbox_coords is None or final_scores is None or class_probs is None or conf_mask is None:
+                logger.warning(f"Worker {worker_id}: Invalid filtered_data components for batch {batch_idx}")
+                return results
             
             img_h, img_w = image_shape[-2:]
             
@@ -413,6 +435,11 @@ class ParallelMAPCalculator:
     # Delegate coordinate processing methods from original implementation
     def _flatten_predictions(self, scale_pred, batch_idx):
         """Flatten prediction tensor to consistent format."""
+        if scale_pred is None:
+            if batch_idx < 2:
+                logger.warning(f"mAP Debug - batch {batch_idx}: scale_pred is None")
+            return None
+            
         if scale_pred.dim() == 4:
             batch_size, _, _, _, num_features = scale_pred.shape
             if num_features < 7:
@@ -436,6 +463,11 @@ class ParallelMAPCalculator:
     
     def _process_coordinates(self, flat_pred, scale_pred, image_shape, device):
         """Process coordinate predictions based on tensor format."""
+        # Safety check for inputs
+        if flat_pred is None or scale_pred is None or image_shape is None:
+            logger.warning("Invalid inputs to _process_coordinates")
+            return None
+            
         img_h, img_w = image_shape[-2:]
         
         if scale_pred.dim() == 4:
@@ -482,6 +514,12 @@ class ParallelMAPCalculator:
     
     def _filter_predictions(self, bbox_coords, obj_conf, class_probs, batch_idx):
         """Filter predictions by confidence threshold."""
+        # Safety checks for input tensors
+        if bbox_coords is None or obj_conf is None or class_probs is None:
+            if batch_idx < 3:
+                logger.warning(f"Parallel mAP - batch {batch_idx}: Invalid input tensors to _filter_predictions")
+            return None
+            
         conf_thresh = 0.1
         max_preds_per_img = 1000
         final_scores = obj_conf * class_probs.max(dim=-1)[0]

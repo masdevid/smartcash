@@ -8,7 +8,7 @@ from .api.core import SmartCashModelAPI, create_model_api
 from .core.checkpoint_manager import CheckpointManager
 from .utils.backbone_factory import BackboneFactory
 from .utils.device_utils import setup_device, get_device_info
-from .utils.progress_bridge import ModelProgressBridge
+from .training.utils.progress_tracker import TrainingProgressTracker
 
 # Initialize backbone factory
 backbone_factory = BackboneFactory()
@@ -69,7 +69,7 @@ __all__ = [
     'SmartCashModelAPI', 'create_model_api',
     'CheckpointManager', 'create_backbone',
     'setup_device', 'get_device_info',
-    'ModelProgressBridge',
+    'TrainingProgressTracker',
     
     # Fase 2 - Training
     'TrainingService', 'start_training', 'resume_training',

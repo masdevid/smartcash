@@ -10,12 +10,12 @@ from typing import Dict, Any, Optional, List
 from datetime import datetime
 
 from smartcash.common.logger import get_logger
-from smartcash.model.utils.progress_bridge import ModelProgressBridge
+from smartcash.model.training.utils.progress_tracker import TrainingProgressTracker
 
 class CheckpointManager:
     """💾 Manager untuk checkpoint operations dengan automatic naming"""
     
-    def __init__(self, config: Dict[str, Any], progress_bridge: ModelProgressBridge):
+    def __init__(self, config: Dict[str, Any], progress_bridge: TrainingProgressTracker):
         self.config = config
         self.progress_bridge = progress_bridge
         self.logger = get_logger("model.checkpoint")
@@ -369,6 +369,6 @@ class CheckpointManager:
 
 
 # Factory function
-def create_checkpoint_manager(config: Dict[str, Any], progress_bridge: ModelProgressBridge) -> CheckpointManager:
+def create_checkpoint_manager(config: Dict[str, Any], progress_bridge: TrainingProgressTracker) -> CheckpointManager:
     """🏭 Factory untuk membuat CheckpointManager"""
     return CheckpointManager(config, progress_bridge)

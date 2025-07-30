@@ -11,7 +11,7 @@ project_root = str(Path(__file__).parent)
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
-from smartcash.model.training.utils.progress_tracker import UnifiedProgressTracker
+from smartcash.model.training.utils.progress_tracker import TrainingProgressTracker
 
 
 def test_successful_completion():
@@ -31,7 +31,7 @@ def test_successful_completion():
         })
         print(f"   📊 {phase}: {current}/{total} ({current/total*100:.1f}%) - {message}")
     
-    tracker = UnifiedProgressTracker(
+    tracker = TrainingProgressTracker(
         progress_callback=capture_progress,
         verbose=False,
         training_mode='two_phase'
@@ -71,7 +71,7 @@ def test_failed_completion():
         })
         print(f"   📊 {phase}: {current}/{total} ({current/total*100:.1f}%) - {message}")
     
-    tracker = UnifiedProgressTracker(
+    tracker = TrainingProgressTracker(
         progress_callback=capture_progress,
         verbose=False,
         training_mode='two_phase'

@@ -20,7 +20,7 @@ from typing import Dict, Any, Optional, Callable
 
 from smartcash.common.logger import get_logger
 # Removed unified_training_pipeline import - functionality merged here
-from smartcash.model.training.utils.progress_tracker import UnifiedProgressTracker
+from smartcash.model.training.utils.progress_tracker import TrainingProgressTracker
 from smartcash.model.utils.memory_optimizer import emergency_cleanup
 from smartcash.model.training.pipeline import SessionManager, ConfigurationBuilder, PipelineExecutor
 from smartcash.model.training.utils.resume_utils import setup_training_session, validate_training_mode_and_params
@@ -80,7 +80,7 @@ class TrainingPipeline:
         self._training_mode = None
         
         # Initialize progress tracker (will be updated based on training mode)
-        self.progress_tracker = UnifiedProgressTracker(
+        self.progress_tracker = TrainingProgressTracker(
             progress_callback=progress_callback,
             verbose=verbose
         )
@@ -162,7 +162,7 @@ class TrainingPipeline:
             if self._training_mode != training_mode:
                 self._training_mode = training_mode
                 current_callback = getattr(self.progress_tracker, 'progress_callback', None)
-                self.progress_tracker = UnifiedProgressTracker(
+                self.progress_tracker = TrainingProgressTracker(
                     progress_callback=current_callback,
                     verbose=self.verbose,
                     training_mode=training_mode

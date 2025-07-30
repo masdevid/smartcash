@@ -14,7 +14,7 @@ from smartcash.common.logger import get_logger
 from smartcash.model.core.model_builder import ModelBuilder
 from smartcash.model.core.checkpoint_manager import CheckpointManager
 from smartcash.model.utils.device_utils import setup_device, get_device_info
-from smartcash.model.utils.progress_bridge import ModelProgressBridge
+from smartcash.model.training.utils.progress_tracker import TrainingProgressTracker
 from smartcash.model.utils.memory_optimizer import get_memory_optimizer
 
 
@@ -38,7 +38,7 @@ class SmartCashModelAPI:
             use_yolov5_integration: Enable YOLOv5 integration
         """
         self.logger = get_logger("model.api")
-        self.progress_bridge = ModelProgressBridge(progress_callback)
+        self.progress_bridge = TrainingProgressTracker(progress_callback, True, 'single_phase')
         self.use_yolov5_integration = use_yolov5_integration
         
         # Load configuration

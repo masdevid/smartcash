@@ -8,7 +8,7 @@ import torch.nn as nn
 from typing import Dict, Any, List
 
 from smartcash.common.logger import get_logger
-from smartcash.model.utils.progress_bridge import ModelProgressBridge
+from smartcash.model.training.utils.progress_tracker import TrainingProgressTracker
 
 # Import YOLOv5 integration components
 try:
@@ -28,7 +28,7 @@ class ModelBuilder:
     SmartCash model builder with YOLOv5 integration for multi-layer banknote detection
     """
     
-    def __init__(self, config: Dict[str, Any], progress_bridge: ModelProgressBridge = None):
+    def __init__(self, config: Dict[str, Any], progress_bridge: TrainingProgressTracker = None):
         """
         Initialize SmartCash model builder with YOLOv5 integration
         

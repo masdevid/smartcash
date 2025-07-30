@@ -13,20 +13,8 @@ from pathlib import Path
 from smartcash.common.logger import get_logger
 from smartcash.model.core.checkpoint_manager import CheckpointManager
 
-# Try to import ModelProgressBridge, create mock if not available
-try:
-    from smartcash.model.utils.progress_bridge import ModelProgressBridge
-except ImportError:
-    # Create a simple mock for ModelProgressBridge
-    class ModelProgressBridge:
-        def start_operation(self, name, steps): 
-            pass
-        def update(self, step, message): 
-            pass
-        def complete(self, step, message): 
-            pass
-        def error(self, message): 
-            pass
+# Import TrainingProgressTracker
+from smartcash.model.training.utils.progress_tracker import TrainingProgressTracker
 
 logger = get_logger(__name__)
 
@@ -48,7 +36,7 @@ class TrainingCheckpointAdapter:
         self.config = config
         
         # Create progress bridge for the checkpoint manager
-        self.progress_bridge = ModelProgressBridge()
+        self.progress_bridge = TrainingProgressTracker()
         
         # Initialize the main checkpoint manager
         self.checkpoint_manager = CheckpointManager(config, self.progress_bridge)

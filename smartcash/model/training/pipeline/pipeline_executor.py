@@ -14,7 +14,7 @@ from smartcash.model.training.utils.resume_utils import handle_resume_training_p
 from smartcash.model.training.utils.setup_utils import prepare_training_environment
 from smartcash.model.training.utils.summary_utils import generate_markdown_summary
 from smartcash.model.training.training_phase_manager import TrainingPhaseManager
-from smartcash.model.api.core import create_api
+# Delayed import to avoid circular dependency - imported where used
 from smartcash.model.utils.memory_optimizer import get_memory_optimizer
 import torch
 
@@ -221,6 +221,8 @@ class PipelineExecutor:
             self.progress_tracker.update_phase(1, 4, "🔧 Initializing model API...")
             
             # Create SmartCash API with YOLOv5 integration
+            # Delayed import to avoid circular dependency
+            from smartcash.model.api.core import create_api
             self.model_api = create_api(
                 config=self.config,
                 use_yolov5_integration=self.use_yolov5_integration

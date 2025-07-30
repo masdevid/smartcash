@@ -12,8 +12,8 @@ from .optimizer_factory import (
     get_parameter_count
 )
 from .loss_manager import LossManager, create_loss_manager, compute_yolo_loss
-from .utils.training_progress_bridge import (
-    TrainingProgressBridge, create_training_progress_bridge,
+from .utils.progress_tracker import (
+    TrainingProgressTracker, create_training_progress_bridge,
     create_simple_progress_callback
 )
 from .utils.early_stopping import (
@@ -84,7 +84,7 @@ __all__ = [
     'LossManager', 'create_loss_manager', 'compute_yolo_loss',
     
     # Progress tracking
-    'TrainingProgressBridge', 'create_training_progress_bridge',
+    'TrainingProgressTracker', 'create_training_progress_bridge',
     'create_simple_progress_callback',
     
     # Early stopping

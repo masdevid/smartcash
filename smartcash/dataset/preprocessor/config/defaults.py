@@ -74,10 +74,13 @@ def get_default_config():
         'preprocessing': {
             'enabled': True,
             'validation': {
-                'enabled': False,  # Minimal validation only
+                'enabled': True,   # Enable sample validation by default
                 'filename_pattern': True,
                 'directory_structure': True,
-                'auto_fix': True
+                'auto_fix': True,
+                'min_bbox_size': 0.001,
+                'min_valid_boxes': 1,
+                'quarantine_invalid': True
             },
             'normalization': NORMALIZATION_PRESETS['default'].copy(),
             'output': {
@@ -92,6 +95,7 @@ def get_default_config():
             'dir': 'data',
             'preprocessed_dir': 'data/preprocessed',
             'samples_dir': 'data/samples',
+            'invalid_dir': 'data/invalid',
             'local': {}
         },
         'performance': {

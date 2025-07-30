@@ -5,7 +5,7 @@ Deskripsi: Main preprocessing service dengan simplified validation dan YOLO focu
 
 import time
 from pathlib import Path
-from typing import Dict, Any, Optional, Callable, Optional
+from typing import Dict, Any, Optional, Callable, List
 
 from smartcash.common.logger import get_logger
 from .config.validator import validate_preprocessing_config
@@ -13,6 +13,7 @@ from .config.defaults import get_default_config
 from .utils.progress_bridge import create_preprocessing_bridge
 from .validation.directory_validator import DirectoryValidator
 from .validation.filename_validator import FilenameValidator
+from .validation.sample_validator import create_invalid_sample_validator
 from .core.normalizer import YOLONormalizer
 from .core.file_processor import FileProcessor
 from .core.stats_collector import StatsCollector
@@ -47,6 +48,7 @@ class PreprocessingService:
         # Validation components (minimal setup)
         self.dir_validator = DirectoryValidator({'auto_fix': True})
         self.filename_validator = FilenameValidator()
+        self.sample_validator = create_invalid_sample_validator(self.config)
     
     def preprocess_dataset(self) -> Dict[str, Any]:
         """🎯 Main preprocessing method dengan phases"""
@@ -225,7 +227,7 @@ class PreprocessingService:
         }
     
     def _process_single_split(self, split: str) -> Dict[str, Any]:
-        """🎯 Process single split dengan split-specific progress"""
+        """🎯 Process single split dengan split-specific progress and sample validation"""
         try:
             # Get paths
             input_dir = Path(self.data_config['dir']) / split
@@ -235,11 +237,12 @@ class PreprocessingService:
             image_files = self.file_processor.scan_files(input_dir / 'images', 'rp_')
             
             if not image_files:
-                return {'processed': 0, 'errors': 0, 'message': f'No images in {split}'}
+                return {'processed': 0, 'errors': 0, 'quarantined': 0, 'message': f'No images in {split}'}
             
-            # Process files dengan split progress
+            # Process files dengan split progress and validation
             processed = 0
             errors = 0
+            quarantined = 0
             
             for i, img_file in enumerate(image_files):
                 try:
@@ -250,7 +253,29 @@ class PreprocessingService:
                             i + 1, len(image_files), f"Processing batch {i//batch_size + 1}/10..."
                         )
                     
-                    # Load image
+                    # First validate the sample before processing
+                    is_valid, validation_info = self.sample_validator.validate_sample(img_file)
+                    
+                    if not is_valid:
+                        # Quarantine invalid sample
+                        label_file = input_dir / 'labels' / f"{img_file.stem}.txt"
+                        quarantine_success = self.sample_validator.quarantine_invalid_sample(
+                            img_file, label_file if label_file.exists() else None, validation_info
+                        )
+                        
+                        if quarantine_success:
+                            quarantined += 1
+                        else:
+                            errors += 1
+                        continue
+                    
+                    # Log auto-fix if it occurred
+                    if validation_info.get('auto_fixed', False):
+                        removed_labels = validation_info.get('removed_labels', [])
+                        removed_info = ', '.join([f"{class_id}({reason})" for class_id, reason in removed_labels])
+                        self.logger.debug(f"🔧 Auto-fixed {img_file.name}: removed {removed_info}")
+                    
+                    # Load image for processing
                     image = self.file_processor.read_image(img_file)
                     if image is None:
                         errors += 1
@@ -267,11 +292,22 @@ class PreprocessingService:
                     success = self.file_processor.save_normalized_array(output_path, normalized, metadata)
                     
                     if success:
-                        # Copy corresponding label
+                        # Process corresponding label - use validated labels if available
                         label_file = input_dir / 'labels' / f"{img_file.stem}.txt"
                         if label_file.exists():
-                            label_output = output_dir / 'labels' / f"pre_{img_file.stem}.txt"
-                            self.file_processor.copy_file(label_file, label_output)
+                            # Use the validated bounding boxes from validation_info if available
+                            if 'valid_bboxes' in validation_info and 'valid_class_labels' in validation_info:
+                                # Save cleaned label with only valid boxes
+                                label_output = output_dir / 'labels' / f"pre_{img_file.stem}.txt"
+                                self._save_cleaned_label(
+                                    label_output, 
+                                    validation_info['valid_bboxes'], 
+                                    validation_info['valid_class_labels']
+                                )
+                            else:
+                                # Copy original label
+                                label_output = output_dir / 'labels' / f"pre_{img_file.stem}.txt"
+                                self.file_processor.copy_file(label_file, label_output)
                         
                         processed += 1
                     else:
@@ -281,11 +317,16 @@ class PreprocessingService:
                     self.logger.error(f"❌ Error processing {img_file.name}: {str(e)}")
                     errors += 1
             
+            # Log validation summary for this split
+            if quarantined > 0:
+                self.logger.info(f"🗂️ {split}: {quarantined} invalid samples quarantined to data/invalid/")
+            
             return {
                 'processed': processed,
                 'errors': errors,
+                'quarantined': quarantined,
                 'total': len(image_files),
-                'message': f"✅ {split}: {processed}/{len(image_files)} processed"
+                'message': f"✅ {split}: {processed}/{len(image_files)} processed, {quarantined} quarantined"
             }
             
         except Exception as e:
@@ -293,16 +334,32 @@ class PreprocessingService:
             return {
                 'processed': 0,
                 'errors': 1,
+                'quarantined': 0,
                 'message': f"❌ {split} processing failed: {str(e)}"
             }
     
+    def _save_cleaned_label(self, label_path: Path, bboxes: List[List[float]], class_labels: List[int]):
+        """Save cleaned label file with only valid bounding boxes."""
+        try:
+            label_path.parent.mkdir(parents=True, exist_ok=True)
+            with open(label_path, 'w') as f:
+                for bbox, class_label in zip(bboxes, class_labels):
+                    x, y, w, h = bbox
+                    f.write(f"{int(class_label)} {x:.6f} {y:.6f} {w:.6f} {h:.6f}\n")
+        except Exception as e:
+            self.logger.error(f"❌ Error saving cleaned label {label_path}: {str(e)}")
+    
     def _compile_final_stats(self, processing_result: Dict[str, Any], processing_time: float) -> Dict[str, Any]:
-        """📊 Compile comprehensive final statistics"""
+        """📊 Compile comprehensive final statistics including validation stats"""
         total_processed = processing_result['total_processed']
         total_errors = sum(split_data.get('errors', 0) for split_data in processing_result['by_split'].values())
+        total_quarantined = sum(split_data.get('quarantined', 0) for split_data in processing_result['by_split'].values())
         total_input = sum(split_data.get('total', 0) for split_data in processing_result['by_split'].values())
         
-        return {
+        # Get validation summary
+        validation_summary = self.sample_validator.get_validation_summary()
+        
+        stats = {
             'processing_time_seconds': round(processing_time, 2),
             'processing_time_minutes': round(processing_time / 60, 2),
             'input': {
@@ -312,7 +369,18 @@ class PreprocessingService:
             'output': {
                 'total_processed': total_processed,
                 'total_errors': total_errors,
-                'success_rate': f"{(total_processed / max(total_input, 1)) * 100:.1f}%"
+                'total_quarantined': total_quarantined,
+                'success_rate': f"{(total_processed / max(total_input, 1)) * 100:.1f}%",
+                'quarantine_rate': f"{(total_quarantined / max(total_input, 1)) * 100:.1f}%"
+            },
+            'validation': {
+                'enabled': True,
+                'samples_validated': validation_summary['total_processed'],
+                'valid_samples': validation_summary['valid_samples'],
+                'invalid_samples': validation_summary['invalid_samples'],
+                'quarantined_samples': validation_summary['quarantined_samples'],
+                'invalid_reasons': validation_summary['invalid_reasons'],
+                'quarantine_directory': validation_summary['quarantine_directory']
             },
             'performance': {
                 'avg_time_per_image_ms': round((processing_time / max(total_input, 1)) * 1000, 1),
@@ -322,10 +390,17 @@ class PreprocessingService:
                 'target_splits': self._get_target_splits(),
                 'normalization_config': self.preprocessing_config['normalization'],
                 'output_format': 'npy + txt',
-                'output_directory': self.data_config['preprocessed_dir']
+                'output_directory': self.data_config['preprocessed_dir'],
+                'validation_enabled': True
             },
             'by_split': processing_result['by_split']
         }
+        
+        # Log validation summary at the end
+        if validation_summary['invalid_samples'] > 0:
+            self.sample_validator.log_validation_summary(validation_summary)
+        
+        return stats
     
     def _get_target_splits(self) -> list:
         """🎯 Get target splits dari config"""

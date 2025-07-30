@@ -116,6 +116,20 @@ class ConfigValidator:
                 if norm_config['method'] not in valid_methods:
                     warnings.append(f"Invalid normalization method: {norm_config['method']}")
         
+        # Validate validation config
+        if 'validation' in config:
+            val_config = config['validation']
+            
+            if 'min_bbox_size' in val_config:
+                min_bbox_size = val_config['min_bbox_size']
+                if not (0.0 <= min_bbox_size <= 1.0):
+                    warnings.append("min_bbox_size should be between 0.0 and 1.0")
+            
+            if 'min_valid_boxes' in val_config:
+                min_valid_boxes = val_config['min_valid_boxes']
+                if min_valid_boxes < 0:
+                    warnings.append("min_valid_boxes should be >= 0")
+        
         return warnings
     
     def _normalize_values(self, config: Dict[str, Any]) -> Dict[str, Any]:
@@ -141,6 +155,14 @@ class ConfigValidator:
                     norm_config['target_size'] = [int(target_size[0]), int(target_size[1])]
                 else:
                     norm_config['target_size'] = [640, 640]  # Default
+        
+        # Normalize validation config values
+        if 'validation' in config:
+            val_config = config['validation']
+            if 'min_bbox_size' in val_config:
+                val_config['min_bbox_size'] = max(0.0, min(1.0, float(val_config['min_bbox_size'])))
+            if 'min_valid_boxes' in val_config:
+                val_config['min_valid_boxes'] = max(0, int(val_config['min_valid_boxes']))
         
         return config
     
@@ -184,6 +206,11 @@ class ConfigValidator:
                     'denormalize': False,
                     'target_size': [640, 640]
                 }
+            },
+            'validation': {
+                'enabled': True,
+                'min_bbox_size': 0.001,
+                'min_valid_boxes': 1
             },
             'balancing': {
                 'enabled': True,

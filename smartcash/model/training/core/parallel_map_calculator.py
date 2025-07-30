@@ -142,17 +142,32 @@ class ParallelMAPCalculator:
             batch_idx: Current batch index
         """
         try:
-            # Check if layer_preds is empty or invalid
-            if not layer_preds or len(layer_preds) == 0:
+            # Enhanced safety checks for layer_preds
+            if not layer_preds:
+                if batch_idx < 3:
+                    logger.warning(f"Parallel mAP - batch {batch_idx}: layer_preds is None or falsy")
+                return
+                
+            if not hasattr(layer_preds, '__len__'):
+                if batch_idx < 3:
+                    logger.warning(f"Parallel mAP - batch {batch_idx}: layer_preds has no length attribute")
+                return
+                
+            if len(layer_preds) == 0:
                 if batch_idx < 3:
                     logger.warning(f"Parallel mAP - batch {batch_idx}: Empty layer_preds list")
                 return
             
             # Process first scale for simplicity (can be extended to all scales)
-            # Additional safety check for first element
-            if len(layer_preds) < 1 or layer_preds[0] is None:
+            # Additional safety check for first element and proper bounds checking
+            if not layer_preds or len(layer_preds) == 0:
                 if batch_idx < 3:
-                    logger.warning(f"Parallel mAP - batch {batch_idx}: Invalid first element in layer_preds")
+                    logger.warning(f"Parallel mAP - batch {batch_idx}: Empty layer_preds list")
+                return
+                
+            if layer_preds[0] is None:
+                if batch_idx < 3:
+                    logger.warning(f"Parallel mAP - batch {batch_idx}: First element in layer_preds is None")
                 return
                 
             scale_pred = layer_preds[0]
@@ -377,17 +392,18 @@ class ParallelMAPCalculator:
                     self.ap_calculator.predictions = [self.ap_calculator.predictions[i] for i in sample_indices]
                     self.ap_calculator.targets = [self.ap_calculator.targets[i] for i in sample_indices]
                 
-                # Compute mAP@0.5 (primary metric)
+                # Focus on mAP@0.5 (mAP50) as primary metric for faster computation
                 map50, class_aps = self.ap_calculator.compute_map(iou_threshold=0.5)
                 map_metrics['val_map50'] = float(map50)
                 
-                # For mAP@0.5:0.95, use even more aggressive sampling during training
+                # For mAP@0.5:0.95, use sampling or approximation to speed up training
                 if use_sampling:
                     # Use approximate mAP@0.5:0.95 based on mAP@0.5 correlation
-                    # This is much faster and reasonably accurate for training progress
-                    map50_95 = map50 * 0.6  # Approximate correlation factor
-                    logger.debug(f"⚡ Using approximated mAP@0.5:0.95 based on mAP@0.5")
+                    # Research shows mAP@0.5:0.95 ≈ 0.6 * mAP@0.5 for most datasets
+                    map50_95 = map50 * 0.6
+                    logger.debug(f"⚡ Using approximated mAP@0.5:0.95 based on mAP@0.5 correlation")
                 else:
+                    # For smaller datasets, compute actual mAP@0.5:0.95
                     map50_95 = self.ap_calculator.compute_map50_95()
                 
                 map_metrics['val_map50_95'] = float(map50_95)

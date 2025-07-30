@@ -210,8 +210,24 @@ def main() -> int:
     print(f"⚡ Workers: {args.workers}")
     print(f"📦 Batch size: {args.batch_size}")
     print(f"🧹 Cleanup mode: {'Enabled' if args.cleanup else 'Disabled'}")
+    print(f"🔍 Sample validation: {'Enabled' if config.get('preprocessing', {}).get('validation', {}).get('enabled', True) else 'Disabled'}")
+    print(f"🗂️ Invalid sample quarantine: Enabled (data/invalid/)")
     print(f"📝 Verbose logging: {'Enabled' if args.verbose else 'Disabled'}")
     print("-" * 60)
+    
+    # Show validation info if enabled
+    if config.get('preprocessing', {}).get('validation', {}).get('enabled', True):
+        print("🔍 Sample Validation Info:")
+        print("   • Validates bounding box format and size")
+        print("   • Enforces hierarchical class relationships:")
+        print("     - Multi-label samples: ignore Layer 3 (l3_*) classes")
+        print("     - If Layer 2 (l2_*) exists: must match with Layer 1")
+        print("     - Single labels valid: either 001 OR l2_001")
+        print("   • Auto-fix capability for invalid label combinations:")
+        print("     - Example: 001, l2_001, l2_100 → auto-fix to 001, l2_001")
+        print("   • Invalid samples moved to data/invalid/ directory")
+        print("   • Only valid samples proceed to preprocessing")
+        print("-" * 60)
     
     try:
         # Set up optimized progress callback
@@ -240,6 +256,7 @@ def main() -> int:
                 print(f"   • {split.upper()} Split:")
                 print(f"     - Processed: {split_stats.get('processed', 0)}")
                 print(f"     - Errors: {split_stats.get('errors', 0)}")
+                print(f"     - Quarantined: {split_stats.get('quarantined', 0)}")
                 print(f"     - Total: {split_stats.get('total', 0)}")
         
         # Show overall statistics
@@ -247,12 +264,49 @@ def main() -> int:
         input_stats = stats.get('input', {})
         output_stats = stats.get('output', {})
         performance_stats = stats.get('performance', {})
+        validation_stats = stats.get('validation', {})
         
         print(f"   • Total input images: {input_stats.get('total_images', 0)}")
         print(f"   • Total processed: {output_stats.get('total_processed', 0)}")
         print(f"   • Total errors: {output_stats.get('total_errors', 0)}")
+        print(f"   • Total quarantined: {output_stats.get('total_quarantined', 0)}")
         print(f"   • Success rate: {output_stats.get('success_rate', 'N/A')}")
+        print(f"   • Quarantine rate: {output_stats.get('quarantine_rate', 'N/A')}")
         print(f"   • Processing speed: {performance_stats.get('images_per_second', 0)} images/sec")
+        
+        # Show validation statistics if available
+        if validation_stats and validation_stats.get('enabled'):
+            print(f"\n🔍 Sample Validation Statistics:")
+            print(f"   • Samples validated: {validation_stats.get('samples_validated', 0)}")
+            print(f"   • Valid samples: {validation_stats.get('valid_samples', 0)}")
+            print(f"   • Invalid samples: {validation_stats.get('invalid_samples', 0)}")
+            print(f"   • Auto-fixed samples: {validation_stats.get('auto_fixed_samples', 0)}")
+            print(f"   • Quarantined samples: {validation_stats.get('quarantined_samples', 0)}")
+            
+            # Show auto-fix statistics if any
+            auto_fix_stats = validation_stats.get('auto_fix_stats', {})
+            if validation_stats.get('auto_fixed_samples', 0) > 0:
+                print(f"   • Auto-fix breakdown:")
+                if auto_fix_stats.get('layer_3_removed', 0) > 0:
+                    print(f"     - Layer_3 labels removed: {auto_fix_stats['layer_3_removed']}")
+                if auto_fix_stats.get('mismatched_layer_2_removed', 0) > 0:
+                    print(f"     - Mismatched Layer_2 removed: {auto_fix_stats['mismatched_layer_2_removed']}")
+                if auto_fix_stats.get('orphaned_layer_1_removed', 0) > 0:
+                    print(f"     - Orphaned Layer_1 removed: {auto_fix_stats['orphaned_layer_1_removed']}")
+                print(f"     - Total labels removed: {auto_fix_stats.get('total_labels_removed', 0)}")
+            
+            # Show breakdown of invalid reasons if any
+            invalid_reasons = validation_stats.get('invalid_reasons', {})
+            if invalid_reasons and any(count > 0 for count in invalid_reasons.values()):
+                print(f"   • Invalid reasons breakdown:")
+                for reason, count in invalid_reasons.items():
+                    if count > 0:
+                        reason_display = reason.replace('_', ' ').title()
+                        print(f"     - {reason_display}: {count}")
+            
+            quarantine_dir = validation_stats.get('quarantine_directory')
+            if quarantine_dir:
+                print(f"   • Quarantine directory: {quarantine_dir}")
         
         print(f"\n💾 Output saved to: {config['output_dir']}")
         

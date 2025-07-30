@@ -13,6 +13,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from smartcash.dataset.augmentor.core.pipeline_factory import PipelineFactory
 from smartcash.dataset.augmentor.utils.file_processor import FileProcessor
 from smartcash.dataset.augmentor.utils.balance_calculator import BalanceCalculator
+from smartcash.dataset.augmentor.utils.sample_validator import create_sample_validator
 from smartcash.common.utils.file_naming_manager import FileNamingManager, create_file_naming_manager
 from smartcash.common.logger import get_logger
 from smartcash.dataset.augmentor.utils.config_validator import validate_augmentation_config, get_default_augmentation_config
@@ -40,6 +41,8 @@ class AugmentationEngine:
         self.file_processor = FileProcessor(config)
         self.balance_calculator = BalanceCalculator(config)
         self.naming_manager = create_file_naming_manager(config)  # NEW: FileNamingManager
+        self.sample_validator = create_sample_validator(config)  # NEW: Sample validator
+        self.validation_results = []  # Track validation results for reporting
     
     def create_live_preview(self, target_split: str = 'train') -> Dict[str, Any]:
         """🎥 NEW: Create live preview augmentation tanpa normalization"""
@@ -136,6 +139,9 @@ class AugmentationEngine:
     def augment_split(self, target_split: str, progress_callback: Optional[Callable] = None) -> Dict[str, Any]:
         """🎯 Enhanced augmentation dengan FileNamingManager dan variance support"""
         try:
+            # Reset validation results for this run
+            self.validation_results = []
+            
             self._report_progress("overall", 0, 4, "Memulai setup directory dan analisis", progress_callback)
             
             # Phase 0: Auto-create directories
@@ -319,8 +325,23 @@ class AugmentationEngine:
     
     def _save_augmented_pair(self, image: np.ndarray, bboxes: List, class_labels: List, 
                            filename: str, output_dir: Path) -> bool:
-        """Save augmented pair dengan error handling"""
+        """Save augmented pair dengan validation filtering"""
         try:
+            # Validate the augmented sample first
+            is_valid, valid_bboxes, valid_class_labels, validation_info = self.sample_validator.validate_augmented_sample(
+                bboxes, class_labels
+            )
+            
+            # Track validation results for reporting
+            self.validation_results.append(validation_info)
+            
+            # If the sample is not valid, don't save anything
+            if not is_valid:
+                if validation_info.get('reason') != 'valid':
+                    self.logger.debug(f"🔍 Filtered {filename}: {validation_info.get('reason', 'unknown')} "
+                                    f"({validation_info.get('valid_count', 0)}/{validation_info.get('original_count', 0)} valid boxes)")
+                return False
+            
             # Save image as regular JPEG
             img_path = output_dir / 'images' / f"{filename}.jpg"
             save_params = [cv2.IMWRITE_JPEG_QUALITY, 95, cv2.IMWRITE_JPEG_OPTIMIZE, 1]
@@ -328,15 +349,13 @@ class AugmentationEngine:
             if not cv2.imwrite(str(img_path), image, save_params):
                 return False
             
-            # Save labels as .txt
+            # Save only valid labels as .txt
             label_path = output_dir / 'labels' / f"{filename}.txt"
             
             with open(label_path, 'w') as f:
-                for bbox, class_label in zip(bboxes, class_labels):
-                    x, y, w, h = [max(0.0, min(1.0, float(coord))) for coord in bbox]
-                    
-                    if w > 0.001 and h > 0.001:
-                        f.write(f"{int(class_label)} {x:.6f} {y:.6f} {w:.6f} {h:.6f}\n")
+                for bbox, class_label in zip(valid_bboxes, valid_class_labels):
+                    x, y, w, h = bbox  # Already validated and normalized
+                    f.write(f"{int(class_label)} {x:.6f} {y:.6f} {w:.6f} {h:.6f}\n")
             
             return True
             
@@ -353,7 +372,10 @@ class AugmentationEngine:
         success_rate = (total_generated / (processed_files * self.num_variations)) * 100 if processed_files > 0 else 0
         processing_rate = (processed_files / len(source_files)) * 100 if source_files else 0
         
-        # Enhanced summary dengan variance info
+        # Generate validation summary
+        validation_summary = self.sample_validator.get_validation_summary(self.validation_results)
+        
+        # Enhanced summary dengan variance info dan validation statistics
         summary = {
             'summary': {
                 'input': {
@@ -367,6 +389,14 @@ class AugmentationEngine:
                     'target_variations': self.num_variations,
                     'intensity_applied': self.intensity,
                     'variance_pattern': f"aug_*_{{uuid}}_{{variance:03d}}.jpg"  # NEW: Variance pattern info
+                },
+                'validation': {
+                    'total_samples_processed': validation_summary.get('total_samples', 0),
+                    'valid_samples': validation_summary.get('valid_samples', 0),
+                    'invalid_samples': validation_summary.get('invalid_samples', 0),
+                    'sample_retention_rate': f"{validation_summary.get('valid_rate', 0):.1f}%",
+                    'bounding_boxes': validation_summary.get('box_statistics', {}),
+                    'filtering_enabled': True
                 },
                 'configuration': {
                     'types': ', '.join(self.types),
@@ -387,9 +417,10 @@ class AugmentationEngine:
         return summary
     
     def _log_detailed_summary(self, summary: Dict[str, Any]):
-        """📋 Log detailed summary dengan variance info"""
+        """📋 Log detailed summary dengan variance info dan validation statistics"""
         input_info = summary['input']
         output_info = summary['output']
+        validation_info = summary.get('validation', {})
         config_info = summary['configuration']
         
         # Consolidate summary into fewer log entries (reduce verbosity)
@@ -399,6 +430,13 @@ class AugmentationEngine:
             f"{output_info['total_generated']} generated ({output_info['success_rate']} success), "
             f"{output_info['target_variations']} variations @ {output_info['intensity_applied']} intensity"
         )
+        
+        # Log validation statistics if available
+        if validation_info and validation_info.get('filtering_enabled'):
+            self.sample_validator.log_validation_summary(
+                self.sample_validator.get_validation_summary(self.validation_results),
+                summary.get('configuration', {}).get('target_split', '')
+            )
     
     def _setup_augmented_output_directory(self, target_split: str) -> Path:
         """Setup directory untuk augmented output"""

@@ -290,29 +290,30 @@ class ValidationExecutor:
     def _update_with_classification_metrics(self, base_metrics, computed_metrics):
         """Update base metrics with computed classification metrics."""
         # For multi-layer models, average the metrics across layers
-        layer_count = 0
-        total_accuracy = 0.0
-        total_precision = 0.0
-        total_recall = 0.0
-        total_f1 = 0.0
+        accuracy_metrics = []
+        precision_metrics = []
+        recall_metrics = []
+        f1_metrics = []
         
+        # Collect metrics by type
         for key, value in computed_metrics.items():
             if 'accuracy' in key:
-                total_accuracy += value
-                layer_count += 1
+                accuracy_metrics.append(value)
             elif 'precision' in key:
-                total_precision += value
+                precision_metrics.append(value)
             elif 'recall' in key:
-                total_recall += value
+                recall_metrics.append(value)
             elif 'f1' in key:
-                total_f1 += value
+                f1_metrics.append(value)
         
-        # Update validation metrics with averages
-        if layer_count > 0:
-            base_metrics['val_accuracy'] = total_accuracy / layer_count
-            base_metrics['val_precision'] = total_precision / layer_count
-            base_metrics['val_recall'] = total_recall / layer_count
-            base_metrics['val_f1'] = total_f1 / layer_count
+        # Update validation metrics with averages (ensuring we have values)
+        base_metrics['val_accuracy'] = sum(accuracy_metrics) / len(accuracy_metrics) if accuracy_metrics else 0.0
+        base_metrics['val_precision'] = sum(precision_metrics) / len(precision_metrics) if precision_metrics else 0.0
+        base_metrics['val_recall'] = sum(recall_metrics) / len(recall_metrics) if recall_metrics else 0.0
+        base_metrics['val_f1'] = sum(f1_metrics) / len(f1_metrics) if f1_metrics else 0.0
+        
+        logger.debug(f"Aggregated validation metrics: accuracy={base_metrics['val_accuracy']:.4f}, precision={base_metrics['val_precision']:.4f}, recall={base_metrics['val_recall']:.4f}, f1={base_metrics['val_f1']:.4f}")
+        logger.debug(f"Per-layer metrics count: accuracy={len(accuracy_metrics)}, precision={len(precision_metrics)}, recall={len(recall_metrics)}, f1={len(f1_metrics)}")
     
     def _get_empty_validation_metrics(self):
         """Get empty validation metrics when no data is available."""

@@ -43,8 +43,9 @@ Examples:
   %(prog)s --optimizer adam --scheduler plateau --weight-decay 1e-3
   
   # Resume training options
-  %(prog)s --resume data/checkpoints/best_model.pt  # Resume from checkpoint
-  %(prog)s --resume data/checkpoints/best_model.pt --resume-optimizer --resume-scheduler  # Resume with optimizer/scheduler state
+  %(prog)s --resume  # Auto-detect latest last_*.pt checkpoint
+  %(prog)s --resume data/checkpoints/best_model.pt  # Resume from specific checkpoint
+  %(prog)s --resume --resume-optimizer --resume-scheduler  # Auto-detect with optimizer/scheduler state
   %(prog)s --resume data/checkpoints/epoch_10.pt --resume-epoch 5  # Resume from specific epoch
   
   # Other options
@@ -99,8 +100,8 @@ Examples:
                        help='Minimum learning rate for cosine scheduler (default: 1e-6)')
     
     # Resume training configuration
-    parser.add_argument('--resume', type=str, default=None,
-                       help='Path to checkpoint file to resume training from')
+    parser.add_argument('--resume', nargs='?', const='auto', default=None,
+                       help='Resume training from checkpoint. Use --resume to auto-detect latest last_*.pt, or --resume PATH to specify checkpoint file')
     parser.add_argument('--resume-optimizer', action='store_true',
                        help='Resume optimizer state when resuming training (default: False)')
     parser.add_argument('--resume-scheduler', action='store_true',

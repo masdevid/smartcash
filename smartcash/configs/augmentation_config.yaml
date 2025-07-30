@@ -47,6 +47,12 @@ preprocessing:
     denormalize: false       # denormalize checkbox
     target_size: [640, 640]
 
+# Validation settings for filtering invalid augmented samples
+validation:
+  enabled: true              # Enable sample validation
+  min_bbox_size: 0.001      # Minimum bbox width/height (0.001 = 0.1% of image)
+  min_valid_boxes: 1        # Minimum number of valid boxes required per sample
+
 # Backend structure yang diharapkan service
 backend:
   service_enabled: true

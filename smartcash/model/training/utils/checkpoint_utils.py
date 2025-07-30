@@ -270,6 +270,84 @@ def cleanup_old_checkpoints(
         return 0
 
 
+def find_latest_checkpoint(checkpoint_dir: str, backbone: str = None) -> Optional[str]:
+    """
+    Auto-detect the latest 'last_*.pt' checkpoint for resuming training.
+    
+    This function follows the sequence described in debug.md:
+    - 🔁 Resume Phase (last.pt) -> Keeps optimizer, LR schedule, and epoch in sync
+    
+    Args:
+        checkpoint_dir: Directory to search for checkpoints
+        backbone: Optional backbone name to filter checkpoints
+        
+    Returns:
+        Path to the latest checkpoint file or None if not found
+    """
+    try:
+        checkpoint_path = Path(checkpoint_dir)
+        if not checkpoint_path.exists():
+            logger.warning(f"📁 Checkpoint directory does not exist: {checkpoint_dir}")
+            return None
+        
+        # Search patterns in order of preference (following debug.md)
+        search_patterns = []
+        
+        if backbone:
+            # Look for backbone-specific last checkpoints first
+            search_patterns.extend([
+                f"last_{backbone}_*.pt",
+                f"last_{backbone}.pt"
+            ])
+        
+        # General last checkpoint patterns
+        search_patterns.extend([
+            "last_*.pt",
+            "last.pt"
+        ])
+        
+        all_candidates = []
+        
+        # Collect all matching checkpoints
+        for pattern in search_patterns:
+            candidates = list(checkpoint_path.glob(pattern))
+            all_candidates.extend(candidates)
+        
+        if not all_candidates:
+            logger.info(f"📋 No 'last_*.pt' checkpoints found in {checkpoint_dir}")
+            return None
+        
+        # Remove duplicates and sort by modification time (most recent first)
+        unique_candidates = list(set(all_candidates))
+        unique_candidates.sort(key=lambda x: x.stat().st_mtime, reverse=True)
+        
+        latest_checkpoint = unique_candidates[0]
+        
+        # Verify the checkpoint is loadable
+        try:
+            _load_checkpoint_raw(str(latest_checkpoint))
+            logger.info(f"✅ Auto-detected latest checkpoint: {latest_checkpoint.name}")
+            return str(latest_checkpoint)
+        except Exception as e:
+            logger.warning(f"⚠️ Latest checkpoint {latest_checkpoint.name} is corrupted: {e}")
+            
+            # Try the next candidates
+            for candidate in unique_candidates[1:]:
+                try:
+                    _load_checkpoint_raw(str(candidate))
+                    logger.info(f"✅ Using fallback checkpoint: {candidate.name}")
+                    return str(candidate)
+                except Exception:
+                    continue
+            
+            logger.error("❌ No valid checkpoints found")
+            return None
+        
+    except Exception as e:
+        logger.error(f"Error auto-detecting checkpoint: {e}")
+        return None
+
+
 def load_checkpoint_for_resume(checkpoint_path: str, verbose: bool = True) -> Optional[Dict[str, Any]]:
     """
     Load checkpoint data for resuming training.

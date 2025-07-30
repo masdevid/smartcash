@@ -22,6 +22,10 @@ from smartcash.dataset.augmentor.utils.filename_manager import FilenameManager
 from smartcash.dataset.augmentor.utils.path_resolver import PathResolver
 from smartcash.dataset.augmentor.utils.balance_calculator import BalanceCalculator
 from smartcash.dataset.augmentor.utils.cleanup_manager import CleanupManager
+from smartcash.dataset.augmentor.utils.sample_validator import (
+    AugmentedSampleValidator,
+    create_sample_validator
+)
 
 # One-liner utilities
 validate_config = lambda config: validate_augmentation_config(config)
@@ -32,6 +36,7 @@ create_filename_manager = lambda: FilenameManager()
 create_path_resolver = lambda config: PathResolver(config)
 create_balance_calculator = lambda config: BalanceCalculator(config)
 create_cleanup_manager = lambda config, progress=None: CleanupManager(config, progress)
+create_sample_validator = lambda config=None: create_sample_validator(config)
 create_symlink_manager = lambda config: SymlinkManager(config)
 
 __all__ = [
@@ -53,6 +58,8 @@ __all__ = [
     'PathResolver',
     'BalanceCalculator',
     'CleanupManager',
+    'AugmentedSampleValidator',
+    'create_sample_validator',
     'SymlinkManager',
     
     # One-liner factories

@@ -458,7 +458,10 @@ def main():
         
         # Show resume info
         if args.resume:
-            print(f"🔄 RESUME TRAINING: Loading from {args.resume}")
+            if args.resume == 'auto':
+                print("🔄 RESUME TRAINING: Auto-detecting latest checkpoint")
+            else:
+                print(f"🔄 RESUME TRAINING: Loading from {args.resume}")
             resume_components = []
             if args.resume_optimizer:
                 resume_components.append("optimizer state")
@@ -479,7 +482,23 @@ def main():
         
         # Handle resume from existing checkpoint format
         if args.resume:
-            resume_info = load_legacy_checkpoint_for_resume(args.resume)
+            checkpoint_path = args.resume
+            
+            # Auto-detect latest checkpoint if --resume was used without path
+            if args.resume == 'auto':
+                from smartcash.model.training.utils.checkpoint_utils import find_latest_checkpoint
+                checkpoint_path = find_latest_checkpoint(args.checkpoint_dir, args.backbone)
+                
+                if not checkpoint_path:
+                    print("❌ No 'last_*.pt' checkpoints found for auto-resume")
+                    print(f"💡 Searched in: {args.checkpoint_dir}")
+                    print("💡 Run training without --resume to start fresh, or specify a checkpoint path")
+                    return 1
+                
+                print(f"🔍 Auto-detected checkpoint: {Path(checkpoint_path).name}")
+            
+            # Load the checkpoint
+            resume_info = load_legacy_checkpoint_for_resume(checkpoint_path)
             if resume_info:
                 training_kwargs.update({
                     'resume_from_checkpoint': True,
@@ -487,7 +506,7 @@ def main():
                 })
                 print(f"✅ Successfully loaded checkpoint: epoch {resume_info['epoch']} (phase {resume_info.get('phase', 'N/A')})")
             else:
-                print(f"❌ FAILED to load checkpoint {args.resume}")
+                print(f"❌ FAILED to load checkpoint {checkpoint_path}")
                 print("❌ TRAINING TERMINATED - Invalid checkpoint file")
                 print("💡 Please check the checkpoint path and try again")
                 return 1  # Exit with error code instead of continuing

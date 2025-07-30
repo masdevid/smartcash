@@ -85,11 +85,11 @@ class MAPCalculator:
                 map_metrics['val_map50'] = 0.0
                 map_metrics['val_map50_95'] = 0.0
             else:
-                # Compute mAP@0.5
+                # Focus on mAP@0.5 (mAP50) as primary metric
                 map50, class_aps = self.ap_calculator.compute_map(iou_threshold=0.5)
                 map_metrics['val_map50'] = float(map50)
                 
-                # Compute mAP@0.5:0.95
+                # Compute mAP@0.5:0.95 (can be slower, used for final evaluation)
                 map50_95 = self.ap_calculator.compute_map50_95()
                 map_metrics['val_map50_95'] = float(map50_95)
                 
@@ -119,17 +119,32 @@ class MAPCalculator:
             batch_idx: Current batch index for logging
         """
         try:
-            # Check if layer_preds is empty or invalid
-            if not layer_preds or len(layer_preds) == 0:
+            # Enhanced safety checks for layer_preds
+            if not layer_preds:
+                if batch_idx < 3:
+                    logger.warning(f"mAP - batch {batch_idx}: layer_preds is None or falsy")
+                return
+                
+            if not hasattr(layer_preds, '__len__'):
+                if batch_idx < 3:
+                    logger.warning(f"mAP - batch {batch_idx}: layer_preds has no length attribute")
+                return
+                
+            if len(layer_preds) == 0:
                 if batch_idx < 3:
                     logger.warning(f"mAP - batch {batch_idx}: Empty layer_preds list")
                 return
                 
             # Process first scale for simplicity (can be extended to all scales)
-            # Additional safety check for first element
-            if len(layer_preds) < 1 or layer_preds[0] is None:
+            # Enhanced safety checks with proper bounds checking
+            if not layer_preds or len(layer_preds) == 0:
                 if batch_idx < 3:
-                    logger.warning(f"mAP - batch {batch_idx}: Invalid first element in layer_preds")
+                    logger.warning(f"mAP - batch {batch_idx}: Empty layer_preds list")
+                return
+                
+            if layer_preds[0] is None:
+                if batch_idx < 3:
+                    logger.warning(f"mAP - batch {batch_idx}: First element in layer_preds is None")
                 return
                 
             scale_pred = layer_preds[0]

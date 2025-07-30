@@ -38,14 +38,14 @@ class CheckpointManager:
             self.progress_bridge.start_operation("Saving Checkpoint", 4)
             
             # Generate checkpoint filename
-            self.progress_bridge.update(1, "📝 Generating checkpoint name...")
+            self.progress_bridge.update_operation(1, "📝 Generating checkpoint name...")
             if checkpoint_name is None:
                 checkpoint_name = self._generate_checkpoint_name(metrics, **kwargs)
             
             checkpoint_path = self.save_dir / checkpoint_name
             
             # Prepare checkpoint data
-            self.progress_bridge.update(2, "📦 Preparing checkpoint data...")
+            self.progress_bridge.update_operation(2, "📦 Preparing checkpoint data...")
             checkpoint_data = {
                 'model_state_dict': model.state_dict(),
                 'model_config': getattr(model, 'config', {}),
@@ -66,15 +66,15 @@ class CheckpointManager:
                 checkpoint_data['phase'] = kwargs['phase']
             
             # Save checkpoint
-            self.progress_bridge.update(3, f"💾 Saving to {checkpoint_name}...")
+            self.progress_bridge.update_operation(3, f"💾 Saving to {checkpoint_name}...")
             torch.save(checkpoint_data, checkpoint_path)
             
             # Cleanup old checkpoints
             if self.auto_cleanup:
-                self.progress_bridge.update(4, "🧹 Cleaning up old checkpoints...")
+                self.progress_bridge.update_operation(4, "🧹 Cleaning up old checkpoints...")
                 self._cleanup_old_checkpoints()
             
-            self.progress_bridge.complete(4, f"✅ Checkpoint saved: {checkpoint_name}")
+            self.progress_bridge.complete_operation(4, f"✅ Checkpoint saved: {checkpoint_name}")
             
             # Log save info (reduced verbosity)
             # file_size = checkpoint_path.stat().st_size / (1024 * 1024)  # MB
@@ -97,7 +97,7 @@ class CheckpointManager:
             
             # Find checkpoint jika tidak specified
             if checkpoint_path is None:
-                self.progress_bridge.update(1, "🔍 Finding best checkpoint...")
+                self.progress_bridge.update_operation(1, "🔍 Finding best checkpoint...")
                 checkpoint_path = self._find_best_checkpoint()
                 if checkpoint_path is None:
                     raise FileNotFoundError("❌ No checkpoint found")
@@ -107,7 +107,7 @@ class CheckpointManager:
                 raise FileNotFoundError(f"❌ Checkpoint not found: {checkpoint_path}")
             
             # Load checkpoint data
-            self.progress_bridge.update(2, f"📂 Loading {checkpoint_path.name}...")
+            self.progress_bridge.update_operation(2, f"📂 Loading {checkpoint_path.name}...")
             checkpoint_data = torch.load(checkpoint_path, map_location='cpu', weights_only=False)
             
             # Load model state
@@ -124,7 +124,7 @@ class CheckpointManager:
             if 'scheduler' in kwargs and 'scheduler_state_dict' in checkpoint_data:
                 kwargs['scheduler'].load_state_dict(checkpoint_data['scheduler_state_dict'])
             
-            self.progress_bridge.complete(3, f"✅ Checkpoint loaded: {checkpoint_path.name}")
+            self.progress_bridge.complete_operation(3, f"✅ Checkpoint loaded: {checkpoint_path.name}")
             
             # Return checkpoint info
             return {

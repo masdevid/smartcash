@@ -1,8 +1,8 @@
 ### 🔄 Project Awareness & Context
-- **Always read `PLANNING.md` and `MODEL_ARC.md`** at the start of a new conversation to understand the project's architecture, goals, style, and constraints.
+- **Always read `PLANNING.md` and `docs/MODEL_ARC.md`** at the start of a new conversation to understand the project's architecture, goals, style, and constraints.
 - **Check `TASK.md`** before starting a new task. If the task isn’t listed, add it with a brief description and today's date.
 - **Use consistent naming conventions, file structure, and architecture patterns** as described in `PLANNING.md`.
-- **Use venv_linux** (the virtual environment named 'venv-test') whenever executing Python commands, including for unit tests.
+- **Use venv-test** (the virtual environment named 'venv-test') whenever executing Python commands, including for unit tests.
 
 ### 🧱 Code Structure & Modularity
 - **Never create a file longer than 500 lines of code.** If a file approaches this limit, refactor by splitting it into modules or helper files.
@@ -13,7 +13,7 @@
 ### 🧪 Testing & Reliability
 - **Always create Pytest unit tests for new features** (functions, classes, routes, etc).
 - **After updating any logic**, check whether existing unit tests need to be updated. If so, do it.
-- **Tests should live in a `/tests` folder** mirroring the main app structure.
+- **Tests should live in a `tests` folder** mirroring the main app structure.
   - Include at least:
     - 1 test for expected use
     - 1 edge case
@@ -75,7 +75,7 @@
 - **DO** group related functionality into logical modules and classes
 
 ### ❌ DON'T - Common Pitfalls
-
+- **DON'T** pollute project root with tests files and debug logs
 #### Logger Anti-Patterns
 - **DON'T** use module-level logger declarations like `logger = get_module_logger(__name__)`
 - **DON'T** call logger objects directly in event handlers (causes "Logger object is not callable" errors)

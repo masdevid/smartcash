@@ -55,6 +55,9 @@ class PhaseOrchestrator:
         try:
             phase_config = self.config['training_phases'][f'phase_{phase_num}']
             
+            # Log memory optimization recommendations if available
+            self._log_memory_optimization_info()
+            
             # Set up data loaders
             data_factory = DataLoaderFactory(self.config)
             train_loader = data_factory.create_train_loader()
@@ -241,6 +244,15 @@ class PhaseOrchestrator:
         
         if phase_set:
             logger.info(f"✅ Model phase successfully set to {phase_num} for layer mode control")
+            
+            # Verify phase was actually set by checking the model
+            actual_phase = getattr(self.model, 'current_phase', None)
+            logger.info(f"🔍 Phase verification: model.current_phase = {actual_phase}")
+            
+            # Also check nested models
+            if hasattr(self.model, 'yolov5_model'):
+                nested_phase = getattr(self.model.yolov5_model, 'current_phase', None)
+                logger.info(f"🔍 Nested model phase: yolov5_model.current_phase = {nested_phase}")
         else:
             logger.warning(f"⚠️ Could not find current_phase attribute to set phase {phase_num}")
     
@@ -252,3 +264,33 @@ class PhaseOrchestrator:
     def is_single_phase(self) -> bool:
         """Get single phase mode flag."""
         return self._is_single_phase
+    
+    def _log_memory_optimization_info(self):
+        """Log memory optimization and batch size information."""
+        try:
+            from smartcash.model.utils.memory_optimizer import MemoryOptimizer
+            
+            # Create memory optimizer to get recommendations
+            memory_optimizer = MemoryOptimizer()
+            optimal_config = memory_optimizer.get_optimal_training_config()
+            
+            # Get current config batch size
+            current_batch_size = self.config.get('training', {}).get('batch_size', 16)
+            
+            logger.info(f"🧠 Memory Optimization Analysis:")
+            logger.info(f"   • Current Batch Size: {current_batch_size}")
+            logger.info(f"   • Recommended Batch Size: {optimal_config.get('batch_size', 'N/A')}")
+            logger.info(f"   • Effective Batch Size: {optimal_config.get('effective_batch_size', 'N/A')}")
+            logger.info(f"   • Gradient Accumulation Steps: {optimal_config.get('gradient_accumulation_steps', 'N/A')}")
+            logger.info(f"   • Device: {memory_optimizer.device}")
+            logger.info(f"   • Platform: {'Apple Silicon' if memory_optimizer.platform_info.get('is_apple_silicon') else 'CUDA' if memory_optimizer.platform_info.get('is_cuda_workstation') else 'CPU'}")
+            
+            # Warning if batch sizes don't match
+            if current_batch_size != optimal_config.get('batch_size'):
+                logger.warning(f"⚠️ Current batch size ({current_batch_size}) differs from memory optimizer recommendation ({optimal_config.get('batch_size')})")
+                logger.info(f"💡 Consider using the recommended batch size for optimal performance")
+                
+        except ImportError:
+            logger.debug("Memory optimizer not available for batch size recommendations")
+        except Exception as e:
+            logger.debug(f"Could not get memory optimization info: {e}")

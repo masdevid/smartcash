@@ -151,25 +151,67 @@ class SmartCashTrainingCompatibilityWrapper(nn.Module):
                 nested_model = self.yolov5_model.model
                 nested_model.current_phase = self.current_phase
                 
-                # Set phase on detection head if it exists
+                # Set phase on detection head if it exists (comprehensive search)
                 if hasattr(nested_model, 'model') and hasattr(nested_model.model, '__iter__'):
                     try:
-                        if len(nested_model.model) > 0:
-                            last_layer = nested_model.model[-1]
-                            last_layer.current_phase = self.current_phase
-                    except:
-                        pass
+                        # Search through all layers for detection heads
+                        for layer in nested_model.model:
+                            # Set phase on any layer that might be a detection head
+                            layer.current_phase = self.current_phase
+                            
+                            # Also check for multi-layer heads specifically
+                            if hasattr(layer, 'heads') or 'MultiLayer' in str(type(layer)):
+                                layer.current_phase = self.current_phase
+                                self.logger.debug(f"Set phase {self.current_phase} on detection head: {type(layer)}")
+                    except Exception as layer_e:
+                        self.logger.debug(f"Could not set phase on model layers: {layer_e}")
             
             # Set phase on extracted components
             if hasattr(self, 'head') and self.head:
                 self.head.current_phase = self.current_phase
+                self.logger.debug(f"Set phase {self.current_phase} on extracted head: {type(self.head)}")
             if hasattr(self, 'backbone') and self.backbone:
                 self.backbone.current_phase = self.current_phase
             if hasattr(self, 'neck') and self.neck:
                 self.neck.current_phase = self.current_phase
+            
+            # Additional comprehensive search for any detection heads in the model hierarchy
+            self._deep_phase_propagation(self.yolov5_model)
                 
         except Exception as e:
             self.logger.debug(f"Phase propagation encountered an issue: {e}")
+    
+    def _deep_phase_propagation(self, module, visited=None):
+        """Deep search and propagation of current_phase to all nested modules"""
+        if visited is None:
+            visited = set()
+            
+        # Avoid infinite recursion
+        if id(module) in visited:
+            return
+        visited.add(id(module))
+        
+        try:
+            # Set phase on current module
+            if hasattr(module, '__dict__'):
+                module.current_phase = self.current_phase
+            
+            # Recursively search child modules
+            if hasattr(module, '_modules') and module._modules:
+                for child in module._modules.values():
+                    if child is not None:
+                        self._deep_phase_propagation(child, visited)
+            
+            # Also search other attributes that might contain modules
+            if hasattr(module, '__dict__'):
+                for attr_name, attr_value in module.__dict__.items():
+                    if (hasattr(attr_value, '_modules') or 
+                        hasattr(attr_value, 'forward') or
+                        'Module' in str(type(attr_value))):
+                        self._deep_phase_propagation(attr_value, visited)
+                        
+        except Exception as e:
+            self.logger.debug(f"Deep phase propagation failed on {type(module)}: {e}")
     
     def get_model_summary(self):
         """Get model summary compatible with existing interface"""

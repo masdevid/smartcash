@@ -16,6 +16,15 @@ from smartcash.common.logger import get_logger
 logger = get_logger(__name__)
 
 
+# Import shared safe loading function
+from smartcash.common.checkpoint_utils import safe_load_checkpoint
+
+
+def _load_checkpoint_raw(checkpoint_path: str) -> Dict[str, Any]:
+    """Load raw checkpoint data with proper safety measures and version compatibility."""
+    return safe_load_checkpoint(checkpoint_path)
+
+
 def check_for_resumable_checkpoint(checkpoint_dir: str, backbone: str) -> Optional[Dict[str, Any]]:
     """
     Check for the latest resumable checkpoint for the given backbone.
@@ -45,17 +54,8 @@ def check_for_resumable_checkpoint(checkpoint_dir: str, backbone: str) -> Option
         # Try to load the most recent checkpoint
         for checkpoint_file in checkpoint_files:
             try:
-                # Use safe globals for PyTorch 2.6+ compatibility
-                import torch.serialization
-                try:
-                    from models.yolo import Model as YOLOModel
-                    from models.common import Conv, C3, SPPF, Bottleneck
-                    safe_globals = [YOLOModel, Conv, C3, SPPF, Bottleneck]
-                except ImportError:
-                    safe_globals = []
-                
-                with torch.serialization.safe_globals(safe_globals):
-                    checkpoint = torch.load(checkpoint_file, map_location='cpu')
+                # Use version-compatible checkpoint loading
+                checkpoint = _load_checkpoint_raw(str(checkpoint_file))
                 
                 # Extract information from checkpoint
                 resume_info = {
@@ -412,21 +412,6 @@ def load_checkpoint_for_resume(checkpoint_path: str, verbose: bool = True) -> Op
     except Exception as e:
         logger.error(f"Error loading checkpoint for resume {checkpoint_path}: {e}")
         return None
-
-
-def _load_checkpoint_raw(checkpoint_path: str) -> Dict[str, Any]:
-    """Load raw checkpoint data with proper safety measures."""
-    # Use safe globals for PyTorch 2.6+ compatibility
-    import torch.serialization
-    try:
-        from models.yolo import Model as YOLOModel
-        from models.common import Conv, C3, SPPF, Bottleneck
-        safe_globals = [YOLOModel, Conv, C3, SPPF, Bottleneck]
-    except ImportError:
-        safe_globals = []
-    
-    with torch.serialization.safe_globals(safe_globals):
-        return torch.load(checkpoint_path, map_location='cpu', weights_only=False)
 
 
 def _create_resume_info(checkpoint: Dict[str, Any], checkpoint_path: str, verbose: bool = True) -> Dict[str, Any]:

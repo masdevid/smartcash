@@ -158,7 +158,7 @@ def main():
                       help='Output directory for augmented data (default: data/augmented/)')
     parser.add_argument('--splits', type=str, default='train',
                       help='Comma-separated list of splits to augment (default: train)')
-    parser.add_argument('--num-variations', type=int, default=int(os.getenv('AUG_NUM_VARIATIONS', 8)),
+    parser.add_argument('--num-variations', type=int, default=int(os.getenv('AUG_NUM_VARIATIONS', 4)),
                       help='Number of augmented variations per image (default: 2)')
     parser.add_argument('--target-count', type=int, default=int(os.getenv('AUG_TARGET_COUNT', 4)),
                       help='Target number of images per class (default: 1000)')

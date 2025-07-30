@@ -32,7 +32,7 @@ class ValidationExecutor:
         self.model = model
         self.config = config
         self.progress_tracker = progress_tracker
-        self.prediction_processor = PredictionProcessor(config)
+        self.prediction_processor = PredictionProcessor(config, model)
         
         # Create optimal mAP calculator based on system capabilities
         self.map_calculator = create_optimal_map_calculator()
@@ -62,14 +62,25 @@ class ValidationExecutor:
         if display_epoch is None:
             display_epoch = epoch + 1
         
-        # Debug logging
+        # Debug logging with optimization info
+        map_sample_rate = self.config.get('training', {}).get('validation', {}).get('map_sample_rate', 5)
         logger.debug(f"Starting validation epoch {display_epoch} with {num_batches} batches")
+        logger.debug(f"⚡ Optimizations: mAP sampling every {map_sample_rate} batches, Phase {phase_num} layer filtering")
         if num_batches == 0:
             logger.warning("Validation loader is empty!")
             return self._get_empty_validation_metrics()
         
+        # Log validation batch size information for first epoch
+        if epoch == 0:
+            first_batch = next(iter(val_loader))
+            actual_batch_size = first_batch[0].shape[0] if len(first_batch) > 0 else "unknown"
+            logger.info(f"📊 Validation Batch Configuration:")
+            logger.info(f"   • Configured Batch Size: {val_loader.batch_size}")
+            logger.info(f"   • Actual Batch Size: {actual_batch_size}")
+            logger.info(f"   • Total Batches: {num_batches}")
+            logger.info(f"   • Samples per Epoch: ~{num_batches * val_loader.batch_size}")
+        
         # Initialize collectors
-        metrics = {}
         all_predictions = {}
         all_targets = {}
         
@@ -78,11 +89,15 @@ class ValidationExecutor:
         
         # Process all validation batches with optimizations
         with torch.no_grad():
-            # Pre-allocate lists for better memory efficiency
-            prediction_tensors = {f'layer_{i}': [] for i in range(1, 4)}
-            target_tensors = {f'layer_{i}': [] for i in range(1, 4)}
             
             for batch_idx, (images, targets) in enumerate(val_loader):
+                # Check for shutdown signal every few batches for responsive interruption
+                if batch_idx % 10 == 0:  # Check every 10 batches
+                    from smartcash.model.training.utils.signal_handler import is_shutdown_requested
+                    if is_shutdown_requested():
+                        logger.info("🛑 Shutdown requested during validation batch processing")
+                        break
+                
                 batch_metrics = self._process_validation_batch(
                     images, targets, loss_manager, batch_idx, num_batches, 
                     phase_num, all_predictions, all_targets
@@ -112,7 +127,7 @@ class ValidationExecutor:
         
         # Compute final metrics
         return self._compute_final_metrics(
-            running_val_loss, num_batches, all_predictions, all_targets
+            running_val_loss, num_batches, all_predictions, all_targets, phase_num
         )
     
     def _process_validation_batch(self, images, targets, loss_manager, batch_idx, num_batches,
@@ -147,6 +162,15 @@ class ValidationExecutor:
             predictions, phase_num, batch_idx
         )
         
+        # Debug: Log which layers are actually returned after normalization
+        if batch_idx == 0:
+            logger.info(f"🔍 Phase {phase_num} predictions after normalization: {list(predictions.keys()) if isinstance(predictions, dict) else 'not dict'}")
+            if isinstance(predictions, dict):
+                for layer_name in predictions.keys():
+                    logger.info(f"    • {layer_name}: {type(predictions[layer_name])}")
+            expected_layers = self._get_active_layers_for_phase(phase_num)
+            logger.info(f"🎯 Expected for Phase {phase_num}: {expected_layers}")
+        
         # Compute loss
         try:
             loss, loss_breakdown = loss_manager.compute_loss(predictions, targets, images.shape[-1])
@@ -160,24 +184,41 @@ class ValidationExecutor:
         
         # Collect predictions and targets for metrics computation
         self._collect_predictions_and_targets(
-            predictions, targets, images, device, batch_idx, all_predictions, all_targets
+            predictions, targets, images, device, batch_idx, all_predictions, all_targets, phase_num
         )
         
         return {'loss': loss.item(), 'loss_breakdown': loss_breakdown}
     
     def _collect_predictions_and_targets(self, predictions, targets, images, device, batch_idx,
-                                       all_predictions, all_targets):
+                                       all_predictions, all_targets, phase_num):
         """Collect predictions and targets for metrics computation."""
         try:
+            # Optimization: Only process active layers for current phase
+            active_layers = self._get_active_layers_for_phase(phase_num)
+            
+            # Debug: Log what we're receiving vs what we expect
+            if batch_idx == 0:
+                logger.info(f"🔍 Phase {phase_num} - Received prediction layers: {list(predictions.keys())}")
+                logger.info(f"🔍 Phase {phase_num} - Expected active layers: {active_layers}")
+            
             for layer_name, layer_preds in predictions.items():
+                # Skip inactive layers to reduce complexity O(L) -> O(L_active)
+                if layer_name not in active_layers:
+                    if batch_idx == 0:
+                        logger.debug(f"Skipping inactive layer {layer_name} in Phase {phase_num}")
+                    continue
+                    
                 if layer_name not in all_predictions:
                     all_predictions[layer_name] = []
                     all_targets[layer_name] = []
                 
                 # Process predictions for mAP and classification metrics
-                self.map_calculator.process_batch_for_map(
-                    layer_preds, targets, images.shape, device, batch_idx
-                )
+                # Optimization: Sample mAP computation for speed (configurable)
+                MAP_SAMPLE_RATE = self.config.get('training', {}).get('validation', {}).get('map_sample_rate', 5)
+                if batch_idx % MAP_SAMPLE_RATE == 0 or batch_idx < 3:  # Always include first 3 batches
+                    self.map_calculator.process_batch_for_map(
+                        layer_preds, targets, images.shape, device, batch_idx
+                    )
                 
                 # Process for classification metrics
                 layer_output = self.prediction_processor.extract_classification_predictions(
@@ -185,18 +226,19 @@ class ValidationExecutor:
                 )
                 all_predictions[layer_name].append(layer_output)
                 
-                # Debug: Check if predictions are meaningful
-                if batch_idx == 0 and layer_output.numel() > 0:
-                    pred_mean = layer_output.mean().item()
-                    pred_std = layer_output.std().item()
-                    pred_max = layer_output.max().item()
-                    logger.debug(f"  Layer {layer_name} predictions: mean={pred_mean:.4f}, std={pred_std:.4f}, max={pred_max:.4f}")
-                
                 # Extract target classes
                 layer_targets = self.prediction_processor.extract_target_classes(
                     targets, images.shape[0], device
                 )
                 all_targets[layer_name].append(layer_targets)
+                
+                # Optimization: Memory-efficient accumulation (configurable)
+                COMPACT_FREQUENCY = self.config.get('training', {}).get('validation', {}).get('memory_compact_freq', 20)
+                if batch_idx > 0 and batch_idx % COMPACT_FREQUENCY == 0:
+                    if len(all_predictions[layer_name]) > 1:
+                        # Compact tensors to improve memory locality and reduce fragmentation
+                        all_predictions[layer_name] = [torch.cat(all_predictions[layer_name], dim=0)]
+                        all_targets[layer_name] = [torch.cat(all_targets[layer_name], dim=0)]
                 
                 if batch_idx == 0:
                     logger.debug(f"Layer {layer_name}: prediction shape {layer_output.shape}, target shape {layer_targets.shape}")
@@ -209,43 +251,58 @@ class ValidationExecutor:
             logger.error(f"Traceback: {traceback.format_exc()}")
     
     
-    def _compute_final_metrics(self, running_val_loss, num_batches, all_predictions, all_targets):
-        """Compute final validation metrics."""
+    def _compute_final_metrics(self, running_val_loss, num_batches, all_predictions, all_targets, phase_num: int = None):
+        """Compute final validation metrics with research-focused naming."""
+        from smartcash.model.training.utils.research_metrics import get_research_metrics_manager
+        
         # Base metrics
-        base_metrics = {
-            'val_loss': running_val_loss / num_batches if num_batches > 0 else 0.0,
-            'val_map50': 0.0,
-            'val_map50_95': 0.0,
-            'val_precision': 0.0,
-            'val_recall': 0.0,
-            'val_f1': 0.0,
-            'val_accuracy': 0.0
+        raw_metrics = {
+            'loss': running_val_loss / num_batches if num_batches > 0 else 0.0,
+            'precision': 0.0,
+            'recall': 0.0,
+            'f1': 0.0,
+            'accuracy': 0.0
         }
         
-        # Compute mAP metrics
-        logger.debug(f"Computing mAP with processed batches")
-        map_metrics = self.map_calculator.compute_final_map()
-        logger.debug(f"mAP metrics result: {map_metrics}")
-        base_metrics.update(map_metrics)
-        
-        # Compute classification metrics
+        # Compute classification metrics (core research data)
         computed_metrics = self._compute_classification_metrics(all_predictions, all_targets)
         logger.debug(f"Computed classification metrics: {computed_metrics}")
+        
         if computed_metrics:
-            # Average metrics across layers and update base metrics
-            self._update_with_classification_metrics(base_metrics, computed_metrics)
+            # Average metrics across active layers and update base metrics
+            self._update_with_classification_metrics(raw_metrics, computed_metrics, phase_num)
             # Include individual layer metrics
-            base_metrics.update(computed_metrics)
+            raw_metrics.update(computed_metrics)
         else:
             logger.warning("No classification metrics computed - check prediction/target data")
         
-        # Debug: Check for duplicate metrics issue
-        metrics_hash = hash(tuple(sorted(base_metrics.items())))
-        logger.debug(f"Metrics hash: {metrics_hash}")
+        # Only compute mAP if needed for research (avoid confusing metrics)
+        if self._should_compute_map_metrics(phase_num):
+            logger.debug(f"Computing mAP for Phase 2 additional detection information")
+            map_metrics = self.map_calculator.compute_final_map()
+            logger.debug(f"mAP metrics result: {map_metrics}")
+            # Include map50 as additional detection information in Phase 2
+            if 'val_map50' in map_metrics:
+                raw_metrics['map50'] = map_metrics['val_map50']
+                raw_metrics['detection_map50'] = map_metrics['val_map50']  # Also include with research name
+                logger.info(f"📊 Phase 2 additional detection info: mAP@0.5 = {map_metrics['val_map50']:.4f}")
         
-        logger.info(f"Validation completed: mAP@0.5={base_metrics['val_map50']:.4f}, accuracy={base_metrics['val_accuracy']:.4f}")
+        # Convert to research-focused metrics with clear naming
+        research_metrics_manager = get_research_metrics_manager()
+        standardized_metrics = research_metrics_manager.standardize_metric_names(
+            raw_metrics, phase_num, is_validation=True
+        )
         
-        return base_metrics
+        # Log phase-appropriate metrics only
+        research_metrics_manager.log_phase_appropriate_metrics(phase_num, standardized_metrics)
+        
+        return standardized_metrics
+    
+    def _should_compute_map_metrics(self, phase_num: int) -> bool:
+        """Determine if mAP metrics should be computed for this phase."""
+        # Only compute mAP in Phase 2 where detection performance is relevant
+        # Phase 1 focuses on classification accuracy, Phase 2 on hierarchical detection
+        return phase_num == 2
     
     def _compute_classification_metrics(self, all_predictions, all_targets):
         """Compute classification metrics from collected predictions and targets."""
@@ -287,15 +344,14 @@ class ValidationExecutor:
         
         return computed_metrics
     
-    def _update_with_classification_metrics(self, base_metrics, computed_metrics):
-        """Update base metrics with computed classification metrics."""
-        # For multi-layer models, average the metrics across layers
+    def _update_with_classification_metrics(self, base_metrics, computed_metrics, phase_num: int = None):
+        """Update base metrics with computed classification metrics from active layers."""
+        # Collect metrics by type from all returned layers (already filtered at model level)
         accuracy_metrics = []
         precision_metrics = []
         recall_metrics = []
         f1_metrics = []
         
-        # Collect metrics by type
         for key, value in computed_metrics.items():
             if 'accuracy' in key:
                 accuracy_metrics.append(value)
@@ -306,21 +362,50 @@ class ValidationExecutor:
             elif 'f1' in key:
                 f1_metrics.append(value)
         
-        # Update validation metrics with averages (ensuring we have values)
-        base_metrics['val_accuracy'] = sum(accuracy_metrics) / len(accuracy_metrics) if accuracy_metrics else 0.0
-        base_metrics['val_precision'] = sum(precision_metrics) / len(precision_metrics) if precision_metrics else 0.0
-        base_metrics['val_recall'] = sum(recall_metrics) / len(recall_metrics) if recall_metrics else 0.0
-        base_metrics['val_f1'] = sum(f1_metrics) / len(f1_metrics) if f1_metrics else 0.0
+        # Update base metrics - these will be converted by research metrics system later
+        base_metrics['accuracy'] = sum(accuracy_metrics) / len(accuracy_metrics) if accuracy_metrics else 0.0
+        base_metrics['precision'] = sum(precision_metrics) / len(precision_metrics) if precision_metrics else 0.0
+        base_metrics['recall'] = sum(recall_metrics) / len(recall_metrics) if recall_metrics else 0.0
+        base_metrics['f1'] = sum(f1_metrics) / len(f1_metrics) if f1_metrics else 0.0
         
-        logger.debug(f"Aggregated validation metrics: accuracy={base_metrics['val_accuracy']:.4f}, precision={base_metrics['val_precision']:.4f}, recall={base_metrics['val_recall']:.4f}, f1={base_metrics['val_f1']:.4f}")
-        logger.debug(f"Per-layer metrics count: accuracy={len(accuracy_metrics)}, precision={len(precision_metrics)}, recall={len(recall_metrics)}, f1={len(f1_metrics)}")
+        logger.debug(f"Phase {phase_num} computed metrics: {list(computed_metrics.keys())}")
+        logger.debug(f"Collected accuracy metrics: {accuracy_metrics}")
+        logger.debug(f"Aggregated validation metrics: accuracy={base_metrics['accuracy']:.4f}, precision={base_metrics['precision']:.4f}, recall={base_metrics['recall']:.4f}, f1={base_metrics['f1']:.4f}")
+        logger.debug(f"Metrics count: accuracy={len(accuracy_metrics)}, precision={len(precision_metrics)}, recall={len(recall_metrics)}, f1={len(f1_metrics)}")
+        
+        # Log individual layer accuracies for comparison
+        for key, value in computed_metrics.items():
+            if 'accuracy' in key:
+                logger.debug(f"Individual metric: {key} = {value:.4f}")
+        
+        # Note: Old constraint checking removed - now handled by research metrics system
+        # Phase constraint validation is now handled in the research metrics standardization
+    
+    def _get_active_layers_for_phase(self, phase_num: int) -> list:
+        """Get list of active layers for the given phase."""
+        if phase_num == 1:
+            return ['layer_1']  # Phase 1: only layer_1 is active
+        elif phase_num == 2:
+            return ['layer_1', 'layer_2', 'layer_3']  # Phase 2: all layers are active
+        else:
+            # Default to all layers for unknown phases or single-phase mode
+            return ['layer_1', 'layer_2', 'layer_3']
+    
+    def _extract_layer_name_from_metric(self, metric_key: str) -> str:
+        """Extract layer name from metric key (e.g., 'layer_1_accuracy' -> 'layer_1')."""
+        if 'layer_1' in metric_key:
+            return 'layer_1'
+        elif 'layer_2' in metric_key:
+            return 'layer_2'
+        elif 'layer_3' in metric_key:
+            return 'layer_3'
+        return ''
     
     def _get_empty_validation_metrics(self):
         """Get empty validation metrics when no data is available."""
         return {
             'val_loss': 0.0,
             'val_map50': 0.0,
-            'val_map50_95': 0.0,
             'val_precision': 0.0,
             'val_recall': 0.0,
             'val_f1': 0.0,

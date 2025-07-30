@@ -178,13 +178,25 @@ class ProgressManager:
                 viz_predictions[layer] = np.random.rand(50, num_classes)
                 viz_targets[layer] = np.eye(num_classes)[np.random.randint(0, num_classes, 50)]
         
-        self.visualization_manager.update_metrics(
-            epoch=epoch + 1,
-            phase=phase_name,
-            metrics=final_metrics,
-            predictions=viz_predictions,
-            ground_truth=viz_targets
-        )
+        # Use research-focused update method with phase context
+        if hasattr(self.visualization_manager, 'update_with_research_metrics'):
+            self.visualization_manager.update_with_research_metrics(
+                epoch=epoch + 1,
+                phase_num=phase_num,
+                metrics=final_metrics,
+                predictions=viz_predictions,
+                ground_truth=viz_targets
+            )
+        else:
+            # Fallback to original method with phase_num parameter
+            self.visualization_manager.update_metrics(
+                epoch=epoch + 1,
+                phase=phase_name,
+                metrics=final_metrics,
+                predictions=viz_predictions,
+                ground_truth=viz_targets,
+                phase_num=phase_num
+            )
     
     def set_single_phase_mode(self, is_single_phase: bool):
         """Set single phase mode flag for proper visualization."""
@@ -258,3 +270,25 @@ class ProgressManager:
             final_metrics['early_stop_reason'] = f"No improvement in {early_stopping.metric} for {early_stopping.patience} epochs"
         
         return should_stop
+    
+    def cleanup(self):
+        """Clean up progress manager resources."""
+        try:
+            logger.info("🧹 Cleaning up progress manager resources...")
+            
+            # Clean up progress tracker
+            if hasattr(self.progress_tracker, 'cleanup'):
+                self.progress_tracker.cleanup()
+            
+            # Clean up visualization manager
+            if hasattr(self.visualization_manager, 'cleanup'):
+                self.visualization_manager.cleanup()
+            
+            # Clear callback references
+            self.emit_metrics_callback = None
+            self.emit_live_chart_callback = None
+            
+            logger.info("✅ Progress manager resources cleaned up")
+            
+        except Exception as e:
+            logger.warning(f"Error during progress manager cleanup: {e}")

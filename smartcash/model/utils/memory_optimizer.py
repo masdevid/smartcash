@@ -123,11 +123,11 @@ class MemoryOptimizer:
         backbone_configs = {
             'efficientnet_b4': {
                 'mps_batch': 1, 'cuda_batch': 4, 'cpu_batch': 1,
-                'target_effective_batch': 8
+                'target_effective_batch': 16
             },
             'cspdarknet': {
                 'mps_batch': 2, 'cuda_batch': 6, 'cpu_batch': 1,
-                'target_effective_batch': 8
+                'target_effective_batch': 16
             }
         }
         

@@ -314,6 +314,15 @@ class PipelineExecutor:
         """Run training phases with architecture-specific handling."""
         
         try:
+            # Create visualization manager for comprehensive training charts
+            from smartcash.model.training.visualization_manager import create_visualization_manager
+            num_classes_per_layer = {'layer_1': 7, 'layer_2': 7, 'layer_3': 3}
+            visualization_manager = create_visualization_manager(
+                num_classes_per_layer=num_classes_per_layer,
+                save_dir="data/visualization",
+                verbose=True
+            )
+            
             # Create training phase manager
             phase_manager = TrainingPhaseManager(
                 model=self.model,
@@ -321,8 +330,11 @@ class PipelineExecutor:
                 config=config,
                 progress_tracker=self.progress_tracker,
                 emit_metrics_callback=self.metrics_callback,
-                emit_live_chart_callback=self.log_callback
+                emit_live_chart_callback=self.log_callback,
+                visualization_manager=visualization_manager
             )
+            # Store reference for finalization phase
+            self.training_phase_manager = phase_manager
             
             # Run training phases based on mode
             if config['training_mode'] == 'two_phase':
@@ -366,6 +378,15 @@ class PipelineExecutor:
         """Run training phases with resume logic and correct epoch offsets."""
         
         try:
+            # Create visualization manager for comprehensive training charts
+            from smartcash.model.training.visualization_manager import create_visualization_manager
+            num_classes_per_layer = {'layer_1': 7, 'layer_2': 7, 'layer_3': 3}
+            visualization_manager = create_visualization_manager(
+                num_classes_per_layer=num_classes_per_layer,
+                save_dir="data/visualization",
+                verbose=True
+            )
+            
             # Create training phase manager
             phase_manager = TrainingPhaseManager(
                 model=self.model,
@@ -373,8 +394,11 @@ class PipelineExecutor:
                 config=config,
                 progress_tracker=self.progress_tracker,
                 emit_metrics_callback=self.metrics_callback,
-                emit_live_chart_callback=self.log_callback
+                emit_live_chart_callback=self.log_callback,
+                visualization_manager=visualization_manager
             )
+            # Store reference for finalization phase
+            self.training_phase_manager = phase_manager
             
             # Run training phases based on mode and resume info
             if config['training_mode'] == 'two_phase':
@@ -390,6 +414,8 @@ class PipelineExecutor:
                     )
                     
                     if not phase1_result.get('success', False):
+                        phase1_result['completed_phase'] = 1
+                        phase1_result['training_mode'] = 'two_phase'
                         return phase1_result
                     
                     # Phase 2: Fine-tuning training (start from beginning)
@@ -400,17 +426,25 @@ class PipelineExecutor:
                         start_epoch=0
                     )
                     
+                    # Add phase information for finalization
+                    phase2_result['completed_phase'] = 2
+                    phase2_result['training_mode'] = 'two_phase'
                     return phase2_result
                     
                 elif resume_phase == 2:
                     # Skip Phase 1, resume from Phase 2
                     logger.info(f"🔄 Skipping Phase 1, resuming Phase 2 from epoch {resume_epoch}")
                     self.progress_tracker.start_phase('training_phase_2', 6)
-                    return phase_manager.run_training_phase(
+                    phase2_result = phase_manager.run_training_phase(
                         phase_num=2, 
                         epochs=config['phase_2_epochs'], 
                         start_epoch=resume_epoch - 1  # Convert to 0-based
                     )
+                    
+                    # Add phase information for finalization
+                    phase2_result['completed_phase'] = 2
+                    phase2_result['training_mode'] = 'two_phase'
+                    return phase2_result
                 else:
                     # Invalid phase, start fresh
                     logger.warning(f"⚠️ Invalid resume phase {resume_phase}, starting fresh training")
@@ -419,11 +453,16 @@ class PipelineExecutor:
                 # Single phase training resume
                 logger.info(f"🔄 Resuming single phase training from epoch {resume_epoch}")
                 self.progress_tracker.start_phase('training_phase_single', 6)
-                return phase_manager.run_training_phase(
+                single_result = phase_manager.run_training_phase(
                     phase_num=1, 
                     epochs=config.get('phase_1_epochs', 10), 
                     start_epoch=resume_epoch - 1  # Convert to 0-based
                 )
+                
+                # Add phase information for finalization
+                single_result['completed_phase'] = 1
+                single_result['training_mode'] = 'single_phase'
+                return single_result
                 
         except ImportError:
             logger.error("Training phase manager not available")
@@ -445,6 +484,27 @@ class PipelineExecutor:
             
             self.progress_tracker.update_phase(2, 3, "📈 Creating visualizations...")
             
+            # Generate visualization charts
+            generated_charts = {}
+            if hasattr(self, 'training_phase_manager') and self.training_phase_manager:
+                progress_manager = getattr(self.training_phase_manager, 'progress_manager', None)
+                if progress_manager and hasattr(progress_manager, 'visualization_manager'):
+                    visualization_manager = progress_manager.visualization_manager
+                    if visualization_manager:
+                        try:
+                            logger.info("📊 Generating comprehensive training visualization charts...")
+                            generated_charts = visualization_manager.generate_comprehensive_charts(session_id)
+                            logger.info(f"✅ Generated {len(generated_charts)} visualization charts")
+                        except Exception as viz_error:
+                            logger.warning(f"⚠️ Error generating visualization charts: {viz_error}")
+                            # Continue with finalization even if visualization fails
+                    else:
+                        logger.debug("No visualization manager available for chart generation")
+                else:
+                    logger.debug("No progress manager or visualization manager available")
+            else:
+                logger.debug("No training phase manager available for visualization")
+            
             # Generate markdown summary
             markdown_summary = generate_markdown_summary(
                 config=self.config,
@@ -465,6 +525,8 @@ class PipelineExecutor:
                 'architecture_type': 'yolov5',
                 'model_summary': model_summary,
                 'markdown_summary': markdown_summary,
+                'generated_charts': generated_charts,
+                'charts_count': len(generated_charts),
                 'summary_path': None  # Could be enhanced to save summary to file
             }
             

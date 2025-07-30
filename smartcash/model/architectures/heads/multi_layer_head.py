@@ -171,8 +171,22 @@ class MultiLayerHead(nn.Module):
         
         results = {}
         
-        # Process each detection layer
+        # Determine active layers based on current_phase
+        active_layers = self._get_active_layers()
+        
+        # Log which layers are being computed (only for debugging)
+        if len(features) > 0:  # Check if we have features to avoid logging on every call
+            current_phase = getattr(self, 'current_phase', 'unknown')
+            self.logger.debug(f"🎯 MultiLayerHead Phase {current_phase}: Computing layers {active_layers}")
+        
+        # Process only active detection layers for performance
         for layer_name in self.layer_names:
+            # Skip inactive layers to save computation
+            if layer_name not in active_layers:
+                if len(features) > 0:  # Only log during actual computation
+                    self.logger.debug(f"    ⏭️ Skipping {layer_name} (inactive in phase {getattr(self, 'current_phase', 'unknown')})")
+                continue
+                
             layer_predictions = []
             layer_heads = self.heads[layer_name]
             num_classes = self.layer_specs[layer_name]['num_classes']
@@ -192,6 +206,61 @@ class MultiLayerHead(nn.Module):
             results[layer_name] = layer_predictions
         
         return results
+    
+    def _get_active_layers(self) -> List[str]:
+        """
+        Get list of active layers based on current_phase.
+        
+        Returns:
+            List of active layer names
+        """
+        # Check for current_phase attribute on this head
+        current_phase = getattr(self, 'current_phase', None)
+        
+        # If phase not set on head, search through the PyTorch module hierarchy
+        if current_phase is None:
+            # Try to find current_phase in parent modules by walking up the hierarchy
+            current_module = self
+            
+            # Look for _parent_module or similar attributes that might exist
+            parent_attrs = ['_parent_module', '_parent', 'parent', '_owner', 'owner']
+            for attr in parent_attrs:
+                if hasattr(current_module, attr):
+                    parent = getattr(current_module, attr)
+                    if hasattr(parent, 'current_phase'):
+                        current_phase = getattr(parent, 'current_phase')
+                        break
+        
+        # If still not found, look through global modules for current_phase
+        if current_phase is None:
+            import gc
+            import torch.nn as nn
+            
+            # Search through all PyTorch modules in memory for current_phase
+            for obj in gc.get_objects():
+                if (isinstance(obj, nn.Module) and 
+                    hasattr(obj, 'current_phase') and 
+                    obj.current_phase is not None):
+                    current_phase = obj.current_phase
+                    break
+        
+        # Default behavior if no phase info found
+        if current_phase is None:
+            # Log warning for debugging
+            self.logger.debug(f"No current_phase found, defaulting to all layers: {self.layer_names}")
+            return self.layer_names  # Use all layers
+        
+        # Phase-based layer activation
+        if current_phase == 1:
+            self.logger.debug(f"Phase {current_phase}: activating only layer_1")
+            return ['layer_1']  # Phase 1: only layer_1 is active
+        elif current_phase == 2:
+            self.logger.debug(f"Phase {current_phase}: activating all layers")
+            return ['layer_1', 'layer_2', 'layer_3']  # Phase 2: all layers are active
+        else:
+            # Unknown phase or single-phase mode: use all layers
+            self.logger.debug(f"Unknown phase {current_phase}: activating all layers")
+            return self.layer_names
     
     def get_layer_info(self) -> Dict[str, Any]:
         """Get information about all detection layers"""

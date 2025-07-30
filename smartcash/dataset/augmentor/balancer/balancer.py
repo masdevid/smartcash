@@ -10,8 +10,10 @@ from smartcash.common.logger import get_logger
 # One-liner constants
 get_layer1_classes = lambda: {'0', '1', '2', '3', '4', '5', '6'}
 get_layer2_classes = lambda: {'7', '8', '9', '10', '11', '12', '13'}
+get_layer3_classes = lambda: {'14', '15', '16'}
 get_all_target_classes = lambda: get_layer1_classes().union(get_layer2_classes())
 is_target_class = lambda cls: cls in get_all_target_classes()
+is_layer3_class = lambda cls: cls in get_layer3_classes()
 calc_need = lambda current, target: max(0, target - current)
 calc_priority_multiplier = lambda cls: 1.5 if cls in get_layer1_classes() else 1.2 if cls in get_layer2_classes() else 1.0
 

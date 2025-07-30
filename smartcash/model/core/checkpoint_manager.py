@@ -108,7 +108,8 @@ class CheckpointManager:
             
             # Load checkpoint data
             self.progress_bridge.update_operation(2, f"📂 Loading {checkpoint_path.name}...")
-            checkpoint_data = torch.load(checkpoint_path, map_location='cpu', weights_only=False)
+            from smartcash.common.checkpoint_utils import safe_load_checkpoint
+            checkpoint_data = safe_load_checkpoint(str(checkpoint_path))
             
             # Load model state
             if 'model_state_dict' in checkpoint_data:
@@ -155,18 +156,9 @@ class CheckpointManager:
             
             for checkpoint_file in self.save_dir.glob("*.pt"):
                 try:
-                    # Load metadata dari checkpoint
-                    # Use safe globals for PyTorch 2.6+ compatibility
-                    import torch.serialization
-                    try:
-                        from models.yolo import Model as YOLOModel
-                        from models.common import Conv, C3, SPPF, Bottleneck
-                        safe_globals = [YOLOModel, Conv, C3, SPPF, Bottleneck]
-                    except ImportError:
-                        safe_globals = []
-                    
-                    with torch.serialization.safe_globals(safe_globals):
-                        checkpoint_data = torch.load(checkpoint_file, map_location='cpu')
+                    # Load metadata dari checkpoint with safe loading
+                    from smartcash.common.checkpoint_utils import safe_load_checkpoint
+                    checkpoint_data = safe_load_checkpoint(str(checkpoint_file))
                     
                     # Extract info
                     file_stat = checkpoint_file.stat()

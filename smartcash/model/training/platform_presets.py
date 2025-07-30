@@ -25,7 +25,7 @@ import platform
 import torch
 from typing import Dict, Any
 
-from smartcash.common.worker_utils import get_optimal_worker_count, optimal_mixed_workers
+from smartcash.common.worker_utils import get_optimal_worker_count, optimal_mixed_workers, optimal_io_workers
 from smartcash.common.logger import get_logger
 from smartcash.model.utils.memory_optimizer import get_memory_optimizer
 
@@ -116,13 +116,15 @@ class PlatformPresets:
         """Get optimized data loading configuration with deferred memory optimization."""
         device_config = self.get_device_config()
         
-        # Use platform-optimized configuration (memory optimizer will be applied later during training)
+        # MAXIMUM SPEED: Use platform-optimized configuration with performance focus
         config = {
-            'num_workers': optimal_mixed_workers(),  # Mixed I/O and CPU operations
-            'pin_memory': device_config['device'] == 'cuda',  # Only beneficial for CUDA
-            'persistent_workers': True,
-            'prefetch_factor': 2,
-            'drop_last': True
+            'num_workers': min(8, optimal_io_workers()),  # MAXIMUM: I/O optimized for data loading speed
+            'pin_memory': device_config['device'] in ['cuda', 'mps'],  # Beneficial for GPU training
+            'persistent_workers': True,  # Always enable for speed
+            'prefetch_factor': 4,  # MAXIMUM: 4x prefetch for fastest loading
+            'drop_last': True,
+            'non_blocking': True,  # Enable async tensor operations
+            'timeout': 60  # Longer timeout for stability with high worker count
         }
         
         # Platform-specific optimizations
@@ -135,14 +137,15 @@ class PlatformPresets:
             })
         
         elif self.platform_info['is_m1_mac']:
-            # M1 Mac: unified memory, be conservative
-            base_batch = 8 if backbone == 'cspdarknet' else 8  # EfficientNet needs less
+            # M1 Mac: MAXIMUM SPEED - unified memory allows aggressive optimization
+            base_batch = 12 if backbone == 'cspdarknet' else 10  # INCREASED: Take advantage of unified memory
             config.update({
                 'batch_size': base_batch,
-                'num_workers': min(8, config['num_workers']),  # Good CPU, limit for memory
+                'num_workers': 8,  # MAXIMUM: Use all 8 workers for speed
                 'pin_memory': False,  # Not beneficial for MPS
-                'persistent_workers': config['num_workers'] > 0,
-                'prefetch_factor': 1  # Conservative memory usage
+                'persistent_workers': True,  # Always enable for speed
+                'prefetch_factor': 4,  # MAXIMUM: 4x prefetch despite unified memory
+                'timeout': 90  # Longer timeout for stability with high worker count
             })
             
             # Set MPS memory environment with valid ratios

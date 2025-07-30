@@ -62,7 +62,7 @@ class MAPCalculatorFactory:
                 max_workers = max(2, min(4, cpu_count // 2))
             else:
                 # If CPU-only, use more workers but leave some cores free
-                max_workers = max(2, min(8, cpu_count - 1)) 
+                max_workers = max(2, min(6, cpu_count - 1)) 
         
         # Create appropriate calculator
         if should_use_parallel:

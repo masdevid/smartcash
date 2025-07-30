@@ -160,17 +160,21 @@ class ParallelMAPCalculator:
             
             # Process first scale for simplicity (can be extended to all scales)
             # Additional safety check for first element and proper bounds checking
-            if not layer_preds or len(layer_preds) == 0:
+            try:
+                # Safely access first element with bounds checking
+                scale_pred = layer_preds[0] if len(layer_preds) > 0 else None
+                if scale_pred is None:
+                    if batch_idx < 3:
+                        logger.warning(f"Parallel mAP - batch {batch_idx}: First element in layer_preds is None or list is empty")
+                    return
+            except IndexError:
                 if batch_idx < 3:
-                    logger.warning(f"Parallel mAP - batch {batch_idx}: Empty layer_preds list")
+                    logger.warning(f"Parallel mAP - batch {batch_idx}: IndexError accessing layer_preds[0], length: {len(layer_preds) if hasattr(layer_preds, '__len__') else 'unknown'}")
                 return
-                
-            if layer_preds[0] is None:
+            except Exception as e:
                 if batch_idx < 3:
-                    logger.warning(f"Parallel mAP - batch {batch_idx}: First element in layer_preds is None")
+                    logger.warning(f"Parallel mAP - batch {batch_idx}: Unexpected error accessing layer_preds[0]: {e}")
                 return
-                
-            scale_pred = layer_preds[0]
             
             # Flatten predictions
             flat_pred = self._flatten_predictions(scale_pred, batch_idx)

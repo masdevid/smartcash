@@ -225,18 +225,46 @@ class DataLoaderFactory:
         )
         
         data_config = self.config.get('training', {}).get('data', {})
+        batch_size = self.config.get('training', {}).get('batch_size', 16)
+        
+        # Handle auto batch size detection
+        if batch_size is None:
+            # Import platform presets for auto-detection
+            from smartcash.model.training.platform_presets import PlatformPresets
+            presets = PlatformPresets()
+            
+            # Get recommended batch size for current platform
+            data_config = presets.get_data_config()
+            batch_size = data_config.get('batch_size', 16)
+            batch_size_source = "auto-detected"
+            print(f"🤖 Auto-detected batch size: {batch_size} for platform: {presets.platform_info.get('platform_name', 'unknown')}")
+        else:
+            batch_size_source = "config" if 'batch_size' in self.config.get('training', {}) else "default"
+        
+        print(f"📊 Training DataLoader Configuration:")
+        print(f"   • Batch Size: {batch_size} (source: {batch_size_source})")
+        print(f"   • Dataset Size: {len(dataset)} samples")
+        print(f"   • Batches per Epoch: {len(dataset) // batch_size}")
         
         # Determine multiprocessing settings with PyTorch version compatibility
-        num_workers = data_config.get('num_workers', 4)
+        num_workers = data_config.get('num_workers', 8)
         persistent_workers = data_config.get('persistent_workers', True)
         
         # If persistent_workers is enabled but num_workers is 0, disable persistent_workers
         if num_workers == 0:
             persistent_workers = False
             
+        print(f"   • Workers: {num_workers}, Pin Memory: {data_config.get('pin_memory', True)}")
+        print(f"   • Prefetch Factor: {data_config.get('prefetch_factor', 2)}, Drop Last: {data_config.get('drop_last', True)}")
+        print(f"   • Persistent Workers: {persistent_workers}, Non-blocking: {data_config.get('non_blocking', False)}")
+        
+        # Log performance mode if maximum speed settings detected
+        if num_workers >= 8 and data_config.get('prefetch_factor', 2) >= 4:
+            print("⚡ MAXIMUM SPEED MODE: High-performance dataloader configuration detected")
+            
         loader_args = {
             'dataset': dataset,
-            'batch_size': self.config.get('training', {}).get('batch_size', 16),
+            'batch_size': batch_size,
             'shuffle': True,
             'num_workers': num_workers,
             'pin_memory': data_config.get('pin_memory', True),
@@ -254,6 +282,11 @@ class DataLoaderFactory:
             loader_args['timeout'] = data_config.get('timeout')
             
         loader = DataLoader(**loader_args)
+        
+        # Add non_blocking support for faster tensor operations (used in training loop)
+        # Note: non_blocking is not a DataLoader parameter, so we attach it after creation
+        if data_config.get('non_blocking', False):
+            loader._non_blocking = True  # Store for training loop access
         self._dataloaders.append(loader)
         return loader
     
@@ -270,6 +303,26 @@ class DataLoaderFactory:
         )
         
         data_config = self.config.get('training', {}).get('data', {})
+        batch_size = self.config.get('training', {}).get('batch_size', 16)
+        
+        # Handle auto batch size detection
+        if batch_size is None:
+            # Import platform presets for auto-detection
+            from smartcash.model.training.platform_presets import PlatformPresets
+            presets = PlatformPresets()
+            
+            # Get recommended batch size for current platform
+            data_config = presets.get_data_config()
+            batch_size = data_config.get('batch_size', 16)
+            batch_size_source = "auto-detected"
+            print(f"🤖 Auto-detected validation batch size: {batch_size} for platform: {presets.platform_info.get('platform_name', 'unknown')}")
+        else:
+            batch_size_source = "config" if 'batch_size' in self.config.get('training', {}) else "default"
+        
+        print(f"📊 Validation DataLoader Configuration:")
+        print(f"   • Batch Size: {batch_size} (source: {batch_size_source})")
+        print(f"   • Dataset Size: {len(dataset)} samples")
+        print(f"   • Batches per Epoch: {len(dataset) // batch_size}")
         
         # Determine multiprocessing settings with PyTorch version compatibility
         num_workers = data_config.get('num_workers', 4)
@@ -281,7 +334,7 @@ class DataLoaderFactory:
             
         loader_args = {
             'dataset': dataset,
-            'batch_size': self.config.get('training', {}).get('batch_size', 16),
+            'batch_size': batch_size,
             'shuffle': False,
             'num_workers': num_workers,
             'pin_memory': data_config.get('pin_memory', True),
@@ -316,6 +369,18 @@ class DataLoaderFactory:
         )
         
         data_config = self.config.get('training', {}).get('data', {})
+        batch_size = self.config.get('training', {}).get('batch_size', 16)
+        
+        # Handle auto batch size detection
+        if batch_size is None:
+            # Import platform presets for auto-detection
+            from smartcash.model.training.platform_presets import PlatformPresets
+            presets = PlatformPresets()
+            
+            # Get recommended batch size for current platform
+            data_config = presets.get_data_config()
+            batch_size = data_config.get('batch_size', 16)
+            print(f"🤖 Auto-detected test batch size: {batch_size} for platform: {presets.platform_info.get('platform_name', 'unknown')}")
         
         # Determine multiprocessing settings with PyTorch version compatibility
         num_workers = data_config.get('num_workers', 4)
@@ -327,7 +392,7 @@ class DataLoaderFactory:
             
         loader_args = {
             'dataset': dataset,
-            'batch_size': self.config.get('training', {}).get('batch_size', 16),
+            'batch_size': batch_size,
             'shuffle': False,
             'num_workers': num_workers,
             'pin_memory': data_config.get('pin_memory', True),

@@ -18,14 +18,16 @@ logger = get_logger(__name__)
 class PredictionProcessor:
     """Handles prediction format normalization and processing."""
     
-    def __init__(self, config):
+    def __init__(self, config, model=None):
         """
         Initialize prediction processor.
         
         Args:
             config: Training configuration
+            model: Model reference for phase information
         """
         self.config = config
+        self.model = model
     
     def normalize_training_predictions(self, predictions, phase_num: int, batch_idx: int = 0):
         """
@@ -77,6 +79,14 @@ class PredictionProcessor:
         
         if batch_idx == 0:  # Only log on first batch
             logger.info(f"{context} - Model current_phase: {current_phase}, training_mode: {training_mode}, layer_mode: {layer_mode}, prediction type: {type(predictions)}")
+            logger.info(f"{context} - phase_num parameter: {phase_num}, model.current_phase: {getattr(self.model if hasattr(self, 'model') else None, 'current_phase', 'NOT_SET')}")
+        
+        # Check if predictions are already in dict format from phase-aware model
+        if isinstance(predictions, dict):
+            # Model has already returned phase-appropriate predictions
+            if batch_idx == 0:
+                logger.info(f"{context} - Model returned dict with layers: {list(predictions.keys())}")
+            return predictions
         
         # Determine if we should use multi-layer format
         use_multi_layer = self._should_use_multi_layer(training_mode, layer_mode, current_phase)

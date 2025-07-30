@@ -18,6 +18,7 @@ class FileSelectionStrategy:
         self.communicator = communicator
         self.processed_files: Set[str] = set()
         self.selection_metrics = defaultdict(int)
+        self.layer3_penalty_stats = {'files_penalized': 0, 'total_penalty': 0.0, 'layer3_instances': 0}
     
     def select_prioritized_files_split_aware(self, data_dir: str, target_split: str, 
                                            class_needs: Dict[str, int], 
@@ -46,6 +47,7 @@ class FileSelectionStrategy:
         self.logger.info(f"🎯 Memulai seleksi file prioritas untuk {len(class_needs)} kelas")
         
         self.selection_metrics.clear()
+        self.layer3_penalty_stats = {'files_penalized': 0, 'total_penalty': 0.0, 'layer3_instances': 0}
         files_by_class = self._group_files_by_primary_class(files_metadata)
         
         selected_files = []
@@ -62,6 +64,12 @@ class FileSelectionStrategy:
             self.selection_metrics[f'class_{cls}'] = len(class_files)
         
         selected_files = self._optimize_final_selection(selected_files, files_metadata)
+        
+        # Log layer_3 penalty statistics
+        if self.layer3_penalty_stats['files_penalized'] > 0:
+            avg_penalty = self.layer3_penalty_stats['total_penalty'] / self.layer3_penalty_stats['files_penalized']
+            self.logger.info(f"📉 Layer_3 penalties applied: {self.layer3_penalty_stats['files_penalized']} files, "
+                           f"avg penalty={avg_penalty:.1f}, total layer_3 instances={self.layer3_penalty_stats['layer3_instances']}")
         
         self.logger.info(f"✅ Seleksi selesai: {len(selected_files)} file terpilih dari {len(files_metadata)} total")
         return selected_files
@@ -158,7 +166,7 @@ class FileSelectionStrategy:
         return selected
     
     def _calculate_file_score(self, file_path: str, target_class: str, metadata: Dict[str, Any]) -> float:
-        """Calculate score dengan preserved logic"""
+        """Calculate score dengan preserved logic and layer_3 penalty"""
         score = 0.0
         
         class_counts = metadata.get('class_counts', {})
@@ -174,6 +182,33 @@ class FileSelectionStrategy:
         file_name = Path(file_path).stem
         similar_processed = sum(1 for p in self.processed_files if Path(p).stem.startswith(file_name[:5]))
         score -= similar_processed * 5.0
+        
+        # Layer_3 penalty: decrease scoring if more layer_3 classes detected
+        layer3_classes = {'14', '15', '16'}  # l3_sign, l3_text, l3_thread
+        layer3_count = sum(class_counts.get(cls, 0) for cls in layer3_classes)
+        if layer3_count > 0:
+            # Progressive penalty: more layer_3 instances = higher penalty
+            layer3_penalty = layer3_count * 3.0  # 3.0 penalty per layer_3 instance
+            score -= layer3_penalty
+            
+            if target_class not in layer3_classes:
+                # Extra penalty if target class is not layer_3 but file has layer_3
+                extra_penalty = layer3_count * 2.0
+                score -= extra_penalty
+                total_layer3_penalty = layer3_penalty + extra_penalty
+            else:
+                total_layer3_penalty = layer3_penalty
+            
+            # Track penalty statistics
+            self.layer3_penalty_stats['files_penalized'] += 1
+            self.layer3_penalty_stats['total_penalty'] += total_layer3_penalty
+            self.layer3_penalty_stats['layer3_instances'] += layer3_count
+            
+            # Log penalty application for debugging (only occasionally to avoid spam)
+            if score < 5.0:  # Only log when penalty significantly impacts score
+                self.logger.debug(f"Layer_3 penalty applied to {Path(file_path).name}: "
+                                f"{layer3_count} layer_3 instances, penalty={total_layer3_penalty:.1f}, "
+                                f"target_class={target_class}, final_score={score:.1f}")
         
         return max(score, 0.1)
     

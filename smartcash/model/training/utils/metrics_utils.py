@@ -131,7 +131,7 @@ def filter_phase_relevant_metrics(metrics: Dict[str, float], phase_num: int) -> 
         relevant_metrics = {}
         
         # Always include core training metrics
-        core_metrics = ['train_loss', 'val_loss', 'learning_rate', 'epoch']
+        core_metrics = ['train_loss', 'val_loss', 'val_accuracy','val_precision', 'val_recall', 'val_f1', 'learning_rate', 'epoch']
         for metric in core_metrics:
             if metric in metrics:
                 relevant_metrics[metric] = metrics[metric]

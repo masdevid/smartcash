@@ -153,7 +153,7 @@ class TrainingCheckpointAdapter:
         return self.best_checkpoint_path
     
     def update_best_if_better(self, epoch: int, metrics: Dict[str, float], 
-                             phase_num: int, monitor_metric: str = 'val_map50') -> bool:
+                             phase_num: int, monitor_metric: str = None) -> bool:
         """
         Update best checkpoint if current metrics are better.
         
@@ -161,11 +161,18 @@ class TrainingCheckpointAdapter:
             epoch: Current epoch number
             metrics: Current metrics
             phase_num: Current phase number
-            monitor_metric: Metric to monitor for best model
+            monitor_metric: Metric to monitor for best model (auto-selected if None)
             
         Returns:
             True if this is a new best model, False otherwise
         """
+        # Auto-select monitor metric based on phase if not provided
+        if monitor_metric is None:
+            if phase_num == 1:
+                monitor_metric = 'val_accuracy'
+            else:
+                monitor_metric = 'val_map50'
+        
         current_value = metrics.get(monitor_metric, 0.0)
         
         if not self.best_metrics or current_value > self.best_metrics.get(monitor_metric, 0.0):

@@ -31,7 +31,7 @@ class TrainingExecutor:
         self.model = model
         self.config = config
         self.progress_tracker = progress_tracker
-        self.prediction_processor = PredictionProcessor(config)
+        self.prediction_processor = PredictionProcessor(config, model)
         
         # State for metrics calculation
         self._last_predictions = None
@@ -72,9 +72,26 @@ class TrainingExecutor:
         
         # Start batch tracking
         self.progress_tracker.start_batch_tracking(num_batches)
+        
+        # Log batch size information for first epoch
+        if epoch == 0:
+            first_batch = next(iter(train_loader))
+            actual_batch_size = first_batch[0].shape[0] if len(first_batch) > 0 else "unknown"
+            logger.info(f"📊 Training Batch Configuration:")
+            logger.info(f"   • Configured Batch Size: {train_loader.batch_size}")
+            logger.info(f"   • Actual Batch Size: {actual_batch_size}")
+            logger.info(f"   • Total Batches: {num_batches}")
+            logger.info(f"   • Samples per Epoch: ~{num_batches * train_loader.batch_size}")
+        
         logger.info(f"🚀 Starting training epoch {display_epoch}/{total_epochs} with {num_batches} batches")
         
         for batch_idx, (images, targets) in enumerate(train_loader):
+            # Check for shutdown signal every few batches for responsive interruption
+            if batch_idx % 10 == 0:  # Check every 10 batches
+                from smartcash.model.training.utils.signal_handler import is_shutdown_requested
+                if is_shutdown_requested():
+                    logger.info("🛑 Shutdown requested during training batch processing")
+                    break
             
             # Process batch
             loss, predictions, processed_predictions, processed_targets = self._process_training_batch(
@@ -85,6 +102,13 @@ class TrainingExecutor:
             if batch_idx == num_batches - 1:
                 last_predictions = processed_predictions
                 last_targets = processed_targets
+                
+                # Debug: Log what predictions are being stored for layer metrics
+                if processed_predictions:
+                    logger.info(f"🔍 Training executor storing predictions for layer metrics: {list(processed_predictions.keys()) if isinstance(processed_predictions, dict) else type(processed_predictions)}")
+                    if isinstance(processed_predictions, dict):
+                        for layer_name in processed_predictions.keys():
+                            logger.info(f"    • {layer_name}: {type(processed_predictions[layer_name])}")
             
             # Backward pass
             self._backward_pass(loss, optimizer, scaler)

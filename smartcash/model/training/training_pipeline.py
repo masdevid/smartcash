@@ -14,6 +14,7 @@ Features:
 - Real-time visualization and metrics reporting
 """
 
+import os
 import time
 from pathlib import Path
 from typing import Dict, Any, Optional, Callable
@@ -292,18 +293,32 @@ class TrainingPipeline:
             }
         }
         
-        # Auto-detect num_workers if not specified
+        # Auto-detect num_workers if not specified - MAXIMUM SPEED configuration
         if kwargs.get('num_workers') is None:
-            auto_workers = 0 if config['force_cpu'] else 4
+            if config['force_cpu']:
+                auto_workers = 0  # CPU training: no workers to avoid competition
+            else:
+                # GPU training: MAXIMUM SPEED - use 8 workers for high-performance systems
+                from smartcash.common.worker_utils import optimal_io_workers
+                max_workers = min(8, optimal_io_workers())  # Cap at 8 for stability
+                auto_workers = max_workers
+                logger.info(f"🚀 MAXIMUM SPEED: Using {auto_workers} dataloader workers (system has {os.cpu_count()} CPU cores)")
+                logger.info("⚡ Performance mode: Optimized for fastest batch loading")
         else:
             auto_workers = kwargs.get('num_workers')
+            logger.info(f"🔧 Using specified dataloader workers: {auto_workers}")
         
-        # Training configuration
+        # Training configuration - MAXIMUM SPEED OPTIMIZATIONS
         config['training'] = {
             'mixed_precision': False,  # Disable for CPU
             'batch_size': kwargs.get('batch_size', 8),
             'num_workers': auto_workers,
-            'pin_memory': False,
+            'pin_memory': not config['force_cpu'],  # Enable for GPU training
+            'persistent_workers': auto_workers > 0,  # Enable for faster epoch transitions
+            'prefetch_factor': 4 if auto_workers > 0 else None,  # MAXIMUM: 4x prefetch for speed
+            'drop_last': True,  # Consistent batch sizes for better performance
+            'non_blocking': True,  # Non-blocking tensor transfers
+            'timeout': 60,  # Longer timeout for large batches
             'training_mode': config['training_mode'],  # Add training mode to training config
             'early_stopping': {
                 'enabled': kwargs.get('early_stopping_enabled', not kwargs.get('no_early_stopping', False)),
@@ -312,6 +327,17 @@ class TrainingPipeline:
                 'monitor': kwargs.get('monitor', kwargs.get('early_stopping_metric', 'val_loss'))
             }
         }
+        
+        # MAXIMUM SPEED: Log performance configuration
+        if auto_workers > 0:
+            logger.info("⚡ MAXIMUM SPEED CONFIGURATION ENABLED:")
+            logger.info(f"   • Workers: {auto_workers} (multi-threaded data loading)")
+            logger.info(f"   • Persistent Workers: {config['training']['persistent_workers']} (faster epoch transitions)")
+            logger.info(f"   • Prefetch Factor: {config['training']['prefetch_factor']} (4x batch prefetching)")
+            logger.info(f"   • Pin Memory: {config['training']['pin_memory']} (faster GPU transfers)")
+            logger.info(f"   • Non-blocking: {config['training']['non_blocking']} (async tensor ops)")
+            estimated_speedup = min(4.0, auto_workers / 2.0)  # Estimate based on workers
+            logger.info(f"   • Expected Speedup: {estimated_speedup:.1f}x faster batch loading")
         
         # Paths configuration
         config['paths'] = {

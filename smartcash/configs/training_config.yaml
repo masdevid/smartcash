@@ -69,6 +69,13 @@ training:
     prefetch_factor: 2
     drop_last: true
   
+  # Validation optimization settings
+  validation:
+    fast_mode: false           # Enable fast validation optimizations
+    map_sample_rate: 5         # Compute mAP every Nth batch (1=all batches, 5=every 5th)
+    memory_compact_freq: 20    # Compact tensors every N batches for memory efficiency
+    skip_detailed_metrics: false  # Skip some detailed metrics for speed
+  
   # Enhanced multi-task loss configuration
   loss:
     type: uncertainty_multi_task  # Supported: uncertainty_multi_task, weighted_multi_task, focal, standard

@@ -85,7 +85,7 @@ class TrainingPipeline:
             verbose=verbose
         )
         
-        logger.info(f"🚀 Merged training pipeline initialized")
+        logger.info(f"🚀 Training pipeline initialized")
         logger.info(f"🔧 YOLOv5 integration: {'enabled' if use_yolov5_integration else 'disabled'}")
     
     def run_full_training_pipeline(self,

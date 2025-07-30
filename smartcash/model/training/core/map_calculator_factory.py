@@ -66,20 +66,15 @@ class MAPCalculatorFactory:
         
         # Create appropriate calculator
         if should_use_parallel:
-            logger.info(f"🚀 Creating ParallelMAPCalculator:")
-            logger.info(f"  Workers: {max_workers}")
-            logger.info(f"  CPU cores: {cpu_count}")
-            logger.info(f"  Available memory: {available_memory:.1f}GB")
-            logger.info(f"  CUDA available: {has_cuda}")
+            logger.info(f"🚀 Creating ParallelMAPCalculator: Workers={max_workers}, CPU cores={cpu_count}, Available memory={available_memory:.1f}GB, CUDA={has_cuda}")
             
             return ParallelMAPCalculator(
                 max_workers=max_workers,
                 batch_queue_size=batch_queue_size
             )
         else:
-            logger.info(f"📊 Creating Sequential MAPCalculator:")
-            logger.info(f"  Reason: {'Force sequential' if force_parallel is False else 'Limited system resources'}")
-            logger.info(f"  CPU cores: {cpu_count}, Available memory: {available_memory:.1f}GB")
+            reason = 'Force sequential' if force_parallel is False else 'Limited system resources'
+            logger.info(f"📊 Creating Sequential MAPCalculator: {reason} (CPU cores={cpu_count}, Available memory={available_memory:.1f}GB)")
             
             return MAPCalculator()
     

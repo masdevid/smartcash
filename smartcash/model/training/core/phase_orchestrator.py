@@ -41,6 +41,22 @@ class PhaseOrchestrator:
         # Training state
         self._is_single_phase = False
     
+    def _propagate_phase_to_children(self, module, phase_num: int):
+        """
+        Propagate current_phase to all child modules that can use it.
+        
+        Args:
+            module: PyTorch module to propagate phase to
+            phase_num: Phase number to set
+        """
+        for name, child in module.named_children():
+            # Set current_phase on child modules
+            child.current_phase = phase_num
+            logger.debug(f"Set current_phase={phase_num} on {name} ({type(child).__name__})")
+            
+            # Recursively propagate to grandchildren
+            self._propagate_phase_to_children(child, phase_num)
+    
     def setup_phase(self, phase_num: int, epochs: int) -> Dict[str, Any]:
         """
         Set up training phase with all required components.
@@ -176,6 +192,9 @@ class PhaseOrchestrator:
         self.model.current_phase = phase_num
         phase_set = True
         logger.debug(f"Set model.current_phase to {phase_num}")
+        
+        # Propagate current_phase to all child modules (especially the head)
+        self._propagate_phase_to_children(self.model, phase_num)
         
         # Try to set phase on YOLOv5 model if it exists
         if hasattr(self.model, 'yolov5_model'):

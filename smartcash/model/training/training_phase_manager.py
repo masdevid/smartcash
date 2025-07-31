@@ -190,18 +190,8 @@ class TrainingPhaseManager:
                     else:
                         logger.debug(f"✅ Research metrics consistent: difference = {research_diff:.6f}")
                 
-                # In Phase 1, don't overwrite validation-computed layer metrics with training metrics
-                # because validation metrics are phase-aware and training metrics might not be
-                if phase_num == 1:
-                    # Only add layer metrics that don't already exist from validation
-                    for key, value in layer_metrics.items():
-                        if key not in final_metrics:
-                            final_metrics[key] = value
-                        else:
-                            logger.debug(f"Keeping validation metric {key}={final_metrics[key]:.6f} instead of training {value:.6f}")
-                else:
-                    # Phase 2: Use training metrics normally
-                    final_metrics.update(layer_metrics)
+                # Layer metrics merging is now handled in _apply_research_metrics_format method
+                # This ensures proper Phase 1 protection against training metrics overwriting validation metrics
                 
                 # Ensure all required metrics are present
                 self._ensure_required_metrics(final_metrics)
@@ -362,8 +352,20 @@ class TrainingPhaseManager:
         combined_metrics = {**final_metrics}
         
         # Add training layer metrics (remove val_ prefix for training processing)
-        for key, value in layer_metrics.items():
-            combined_metrics[key] = value
+        # CRITICAL FIX: In Phase 1, don't overwrite validation layer metrics with training metrics
+        if phase_num == 1:
+            # Only add layer metrics that don't already exist from validation
+            for key, value in layer_metrics.items():
+                if key not in combined_metrics:
+                    combined_metrics[key] = value
+                else:
+                    from smartcash.common.logger import get_logger
+                    logger = get_logger(__name__)
+                    logger.debug(f"Phase 1: Keeping validation metric {key}={combined_metrics[key]:.6f} instead of training {value:.6f}")
+        else:
+            # Phase 2: Use training metrics normally
+            for key, value in layer_metrics.items():
+                combined_metrics[key] = value
         
         # Create training metrics version (without val_ prefix)
         training_raw_metrics = {}

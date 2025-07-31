@@ -229,6 +229,7 @@ class MultiLayerHead(nn.Module):
                     parent = getattr(current_module, attr)
                     if hasattr(parent, 'current_phase'):
                         current_phase = getattr(parent, 'current_phase')
+                        self.logger.debug(f"Found current_phase={current_phase} from parent {type(parent).__name__}")
                         break
         
         # If still not found, look through global modules for current_phase

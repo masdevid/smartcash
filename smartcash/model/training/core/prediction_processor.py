@@ -28,6 +28,16 @@ class PredictionProcessor:
         """
         self.config = config
         self.model = model
+        
+        # Phase-aware class filtering (matching loss_manager.py logic)
+        self.layer_class_ranges = {
+            'layer_1': list(range(0, 7)),    # Layer 1: Classes 0-6 (denomination detection)
+            'layer_2': list(range(7, 14)),   # Layer 2: Classes 7-13 (l2_* features)
+            'layer_3': list(range(14, 17)),  # Layer 3: Classes 14-16 (l3_* features)
+        }
+        
+        # Initialize debug counter for logging
+        self._debug_counter = 0
     
     def normalize_training_predictions(self, predictions, phase_num: int, batch_idx: int = 0):
         """
@@ -95,7 +105,14 @@ class PredictionProcessor:
             return self._convert_to_multi_layer(predictions, batch_idx, context)
         else:
             # Single layer mode: normalize to layer_1 as expected
-            return {'layer_1': predictions}
+            # Handle different prediction formats based on context
+            if context == "Validation" and isinstance(predictions, (tuple, list)) and len(predictions) > 0:
+                # For validation: extract tensor from tuple for proper metrics computation
+                layer_1_pred = predictions[0]  # Use first prediction output
+                return {'layer_1': layer_1_pred}
+            else:
+                # For training: keep original format to preserve gradient graph
+                return {'layer_1': predictions}
     
     def _should_use_multi_layer(self, training_mode: str, layer_mode: str, current_phase: int) -> bool:
         """Determine if multi-layer format should be used."""
@@ -171,8 +188,8 @@ class PredictionProcessor:
             layer_output = self.extract_classification_predictions(layer_preds, images.shape[0], device)
             processed_predictions[layer_name] = layer_output.detach()
             
-            # Process targets
-            layer_targets = self.extract_target_classes(targets, images.shape[0], device)
+            # Process targets with phase-aware filtering
+            layer_targets = self.extract_target_classes(targets, images.shape[0], device, layer_name)
             processed_targets[layer_name] = layer_targets.detach()
         
         return processed_predictions, processed_targets
@@ -197,15 +214,15 @@ class PredictionProcessor:
                 if first_scale.dim() >= 2 and first_scale.shape[-1] > 5:
                     return self._extract_from_yolo_tensor(first_scale, batch_size, device)
                 else:
-                    return torch.zeros((batch_size, 7), device=device)
+                    return torch.zeros((batch_size, 7), device=device)   # FIXED: Use 7 classes for Phase 1
             else:
-                return torch.zeros((batch_size, 7), device=device)
+                return torch.zeros((batch_size, 7), device=device)   # FIXED: Use 7 classes for Phase 1
         else:
             # Direct tensor - assume it's already in the right format
             if isinstance(layer_preds, torch.Tensor):
                 return layer_preds
             else:
-                return torch.zeros((batch_size, 7), device=device)
+                return torch.zeros((batch_size, 7), device=device)   # FIXED: Use 7 classes for Phase 1
     
     def _extract_from_yolo_tensor(self, tensor: torch.Tensor, batch_size: int, device: torch.device) -> torch.Tensor:
         """Extract classification predictions from YOLO tensor format."""
@@ -219,6 +236,8 @@ class PredictionProcessor:
         # Debug: Check for valid predictions
         max_obj = torch.sigmoid(objectness).max().item() if objectness.numel() > 0 else 0.0
         max_class = torch.sigmoid(class_logits).max().item() if class_logits.numel() > 0 else 0.0
+        
+        # Extract YOLO predictions
         
         # Take the detection with highest objectness score per image
         if weighted_class_probs.shape[1] > 0:  # Has detections
@@ -238,28 +257,82 @@ class PredictionProcessor:
                 best_detection_idx = torch.argmax(reshaped_obj, dim=1)  # [batch]
                 batch_indices = torch.arange(batch_size, device=device)
                 layer_output = reshaped_probs[batch_indices, best_detection_idx]  # [batch, num_classes]
+                
+            # Debug: Log final predictions for poor validation accuracy investigation  
+            if self._debug_counter <= 3:
+                pred_classes = torch.argmax(layer_output, dim=1)
+                logger.warning(f"   • Final predictions shape: {layer_output.shape}")
+                logger.warning(f"   • Predicted classes: {pred_classes.tolist()}")
+                logger.warning(f"   • Max prediction confidence: {layer_output.max().item():.6f}")
+                logger.warning(f"   • Min prediction confidence: {layer_output.min().item():.6f}")
         else:
-            layer_output = torch.zeros((batch_size, 7), device=device)
+            layer_output = torch.zeros((batch_size, 7), device=device)   # FIXED: Use 7 classes for Phase 1
+            if self._debug_counter <= 3:
+                logger.warning(f"   • No detections found - returning zeros")
         
         return layer_output
     
-    def extract_target_classes(self, targets: torch.Tensor, batch_size: int, device: torch.device) -> torch.Tensor:
+    def _filter_targets_for_layer(self, targets: torch.Tensor, layer_name: str) -> torch.Tensor:
         """
-        Extract target classes for classification metrics.
+        Filter targets by layer detection classes (matching loss_manager.py logic).
+        
+        Args:
+            targets: Target tensor in YOLO format [image_idx, class_id, x, y, w, h]
+            layer_name: Layer name (e.g., 'layer_1')
+            
+        Returns:
+            Filtered targets tensor with remapped class IDs
+        """
+        if not hasattr(targets, 'shape') or targets.numel() == 0:
+            return targets
+        
+        valid_classes = self.layer_class_ranges.get(layer_name, list(range(0, 7)))  # Default to layer 1 classes
+        
+        # Filter targets with matching classes
+        mask = torch.zeros(targets.shape[0], dtype=torch.bool, device=targets.device)
+        for i, target in enumerate(targets):
+            try:
+                # Ensure target[1] is properly converted to int
+                class_id = int(target[1].float().item())  # Explicit float conversion first
+                if class_id in valid_classes:
+                    mask[i] = True
+            except (ValueError, RuntimeError) as e:
+                # Skip invalid targets
+                continue
+        
+        filtered_targets = targets[mask].clone()
+        
+        # Remap class IDs for this layer (0-based indexing for the layer)
+        if filtered_targets.numel() > 0:
+            class_offset = min(valid_classes)
+            filtered_targets[:, 1] -= class_offset
+            
+            # Targets filtered and remapped successfully
+        
+        return filtered_targets
+    
+    def extract_target_classes(self, targets: torch.Tensor, batch_size: int, device: torch.device, layer_name: str = 'layer_1') -> torch.Tensor:
+        """
+        Extract target classes for classification metrics with phase-aware filtering.
         
         Args:
             targets: Target tensor in YOLO format [image_idx, class_id, x, y, w, h]
             batch_size: Batch size
             device: Device for tensor operations
+            layer_name: Layer name for phase-aware filtering
             
         Returns:
-            Target classes tensor
+            Target classes tensor with filtered and remapped class IDs
         """
         if targets.numel() > 0 and targets.dim() >= 2 and targets.shape[-1] > 1:
+            # CRITICAL FIX: Apply phase-aware target filtering (matching loss_manager.py)
+            filtered_targets = self._filter_targets_for_layer(targets, layer_name)
+            
             layer_targets = torch.zeros(batch_size, dtype=torch.long, device=device)
             
+            # Extract classes from filtered targets
             for img_idx in range(batch_size):
-                img_targets = targets[targets[:, 0] == img_idx]  # Filter by image index
+                img_targets = filtered_targets[filtered_targets[:, 0] == img_idx]  # Filter by image index
                 if len(img_targets) > 0:
                     classes = img_targets[:, 1].long()  # Extract class column
                     if len(classes) > 0:

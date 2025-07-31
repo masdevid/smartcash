@@ -20,35 +20,23 @@ Updated 22 Juli 2025, 20:
   - Labels as .txt files
 
 # GENERAL
-- [NEW] `[module]_uimodule.py` sepertinya menginisialisasi config handler dua kali, kecuali colab_uimodule.py.
-- [NEW] `[module]_uimodule.py` kecuali colab_uimodule.py sepertinya menginisialisasi component dua kali membuat proses inisialisasi saat restart dan reload colab menjadi lambat.
-
+- N/A
 # COLAB MODULE
 - N/A
-
 # DEPENDENCY MODULE
-- [NEW] Refactor operation container menggunakan signature yang tepat
-- [NEW] Integrasikan dual progress tracker dengan methods yang benar pada semua operasi kecuali save dan reset, contoh penerapan progress tracker pada downloader module 
-
+- N/A
 # DOWNLOAD MODULE
-- [NEW] Format summary masih belum menggunakan markdown seperti summary pada preprocessing module
-
+- N/A
 # PREPROCESSING MODULE
-- [NEW] Integrasikan dual progress tracker dengan methods yang benar pada semua operasi kecuali save dan reset, contoh penerapan progress tracker pada downloader module 
-
+- N/A
 # AUGMENTATION MODULE
-- [NEW] Summary container belum muncul. Refaktro augmentation_ui tanpa mengubah form original. Pastikan semua kontainer menggunakan signature yang tepat. 
-- [NEW] Integrasikan dual progress tracker dengan methods yang benar pada semua operasi kecuali save dan reset, contoh penerapan progress tracker pada downloader module 
-
-# PRETRAINED MODULE
-- [NEW] Refaktor operation menjadi one-click download button. Satu button untuk chexk existing -> download jika pretrained module tidak ditemukan -> validasi -> hapus file (jika berbeda dengan yang baru) lama jika ada.
-
+- N/A
 # TRAINING MODULE
-- [NEW] Integrasikan triple progress tracker dengan methods yang benar pada semua operasi kecuali save dan reset.
-- [NEW] Integrasilam log_callback, live_chart callback, metrics callback.
-
+- Fixed validation metrics stagnation issue (val_precision, val_recall, val_f1, val_accuracy) - July 31, 2025
+  - Root cause: Model's current_phase was not being propagated to child modules (especially MultiLayerHead)
+  - Solution: Added _propagate_phase_to_children() method in PhaseOrchestrator to ensure all modules receive phase info
+  - Updated research metrics system to force zero values instead of static fallbacks when layer metrics missing
 # EVALUATION MODULE
-- [NEW] Integrasikan dual progress tracker dengan methods yang benar pada semua operasi kecuali save dan reset, contoh penerapan progress tracker pada downloader module 
-
+- N/A
 # VISUALIZATION MODULE
-- [NEW] Dashboard Cards masih tidak muncul. Periksa urutan dan timing inisialisasi. Jangan update statistik sebelum semua UI components rendered. 
+- N/A

@@ -17,7 +17,7 @@ class YOLOLoss(nn.Module):
     """YOLO loss implementation untuk currency detection"""
     
     def __init__(self, num_classes: int = 7, anchors: Optional[List] = None, 
-                 box_weight: float = 0.05, obj_weight: float = 1.0, cls_weight: float = 0.5,
+                 box_weight: float = 0.05, obj_weight: float = 4.0, cls_weight: float = 0.5,
                  focal_loss: bool = False, label_smoothing: float = 0.0, logger=None):
         super().__init__()
         self.num_classes = num_classes
@@ -30,12 +30,12 @@ class YOLOLoss(nn.Module):
         # Initialize logger
         self.logger = logger or self._create_default_logger()
         
-        # Default anchors untuk 3 scales (P3, P4, P5)
+        # Default anchors optimized for banknote detection (smaller objects)
         if anchors is None:
             self.anchors = torch.tensor([
-                [[10, 13], [16, 30], [33, 23]],      # P3/8
-                [[30, 61], [62, 45], [59, 119]],     # P4/16  
-                [[116, 90], [156, 198], [373, 326]]  # P5/32
+                [[8, 11], [12, 18], [18, 28]],       # P3/8 - Smaller for banknotes
+                [[24, 36], [36, 48], [48, 72]],      # P4/16 - Medium banknote sizes  
+                [[72, 96], [96, 128], [144, 192]]    # P5/32 - Large banknote sizes
             ]).float()
         else:
             self.anchors = torch.tensor(anchors).float()
@@ -366,14 +366,15 @@ class YOLOLoss(nn.Module):
                 balance_weight = self.balance[i] if i < len(self.balance) else 1.0
                 lobj = lobj + (obj_loss * balance_weight)  # Use = instead of +=
         
-        # Apply loss weights with gradient scaling
-        num_scales = max(1, len(predictions))  # Avoid division by zero
+        # Apply loss weights - FIXED: Don't scale down objectness loss
         lbox = lbox * self.box_weight
-        lobj = lobj * (self.obj_weight / num_scales)  # Scale by number of scales
+        lobj = lobj * self.obj_weight  # FIXED: Removed division by num_scales
         lcls = lcls * self.cls_weight
         
-        # Calculate total loss with gradient scaling
-        total_loss = (lbox + lobj + lcls) * 3.0  # Scale up to maintain magnitude
+        # Calculate total loss without arbitrary scaling
+        total_loss = lbox + lobj + lcls
+        
+        # Loss computation complete
         
         # Detach losses for logging
         with torch.no_grad():
@@ -566,8 +567,8 @@ class YOLOLoss(nn.Module):
                 target_wh = t[:, 4:6]  # [num_targets, 2]
                 r = target_wh.unsqueeze(1) / anchors_i.unsqueeze(0)  # [num_targets, num_anchors, 2]
                 
-                # Find anchors with aspect ratios close to target
-                j = torch.max(r, 1. / r).max(-1)[0] < 4  # [num_targets, num_anchors]
+                # Find anchors with aspect ratios close to target - FIXED: More lenient for banknotes
+                j = torch.max(r, 1. / r).max(-1)[0] < 6  # [num_targets, num_anchors] - Increased from 4 to 6
                 
                 # Get indices of matching target-anchor pairs
                 target_indices, anchor_indices = torch.where(j)
@@ -726,7 +727,7 @@ class LossManager:
         loss_config = config.get('training', {}).get('loss', {})
         
         self.box_weight = loss_config.get('box_weight', 0.05)
-        self.obj_weight = loss_config.get('obj_weight', 1.0)
+        self.obj_weight = loss_config.get('obj_weight', 4.0)  # FIXED: Increased for better detection
         self.cls_weight = loss_config.get('cls_weight', 0.5)
         self.focal_loss = loss_config.get('focal_loss', False)
         self.label_smoothing = loss_config.get('label_smoothing', 0.0)
@@ -773,9 +774,9 @@ class LossManager:
     
     def _setup_individual_losses(self) -> None:
         """Setup individual YOLO loss functions for each layer"""
-        # MODEL_ARC.md compliant layer names
+        # MODEL_ARC.md compliant layer names - FIXED: Phase-specific classes
         self.loss_functions['layer_1'] = YOLOLoss(
-            num_classes=7,  # Full banknote detection
+            num_classes=7,  # FIXED: Layer 1 classes only (0-6) for Phase 1
             box_weight=self.box_weight,
             obj_weight=self.obj_weight,
             cls_weight=self.cls_weight,
@@ -785,8 +786,8 @@ class LossManager:
         
         # Additional layers jika diperlukan
         if self._is_multilayer_mode():
-            self.loss_functions['layer_2'] = YOLOLoss(num_classes=7, **self._get_loss_params())  # Denomination features
-            self.loss_functions['layer_3'] = YOLOLoss(num_classes=3, **self._get_loss_params())  # Common features
+            self.loss_functions['layer_2'] = YOLOLoss(num_classes=7, **self._get_loss_params())   # Layer 2: 7 classes (7-13)
+            self.loss_functions['layer_3'] = YOLOLoss(num_classes=3, **self._get_loss_params())   # Layer 3: 3 classes (14-16)
         
         # Legacy support untuk backward compatibility
         self.loss_functions['banknote'] = self.loss_functions['layer_1']
@@ -839,8 +840,21 @@ class LossManager:
         for layer_name in ['layer_1', 'layer_2', 'layer_3']:
             if layer_name in predictions:
                 filtered_targets = self._filter_targets_for_layer(targets, layer_name)
-                if len(filtered_targets) > 0:  # Only add if there are targets for this layer
+                # Safe check for tensor size - avoid Boolean tensor comparison
+                if torch.is_tensor(filtered_targets) and filtered_targets.numel() > 0:
                     layer_targets[layer_name] = filtered_targets
+                elif isinstance(filtered_targets, (list, tuple)) and len(filtered_targets) > 0:
+                    layer_targets[layer_name] = filtered_targets
+                else:
+                    # Log when no targets found for a layer
+                    logger.debug(f"No targets found for {layer_name}: filtered_targets type={type(filtered_targets)}, numel={filtered_targets.numel() if torch.is_tensor(filtered_targets) else 'N/A'}")
+        
+        # Debug: Check if we have any layer targets at all
+        if len(layer_targets) == 0:
+            logger.warning(f"No layer targets found for any layer. Original targets shape: {targets.shape if hasattr(targets, 'shape') else 'no shape'}")
+            logger.warning(f"Available prediction layers: {list(predictions.keys())}")
+            # Return small loss instead of zero to avoid optimization issues
+            return torch.tensor(1e-6, device=targets.device, requires_grad=True), metrics
         
         # Initialize metrics dictionary
         # Note: validation metrics (mAP, precision, recall) should be computed separately
@@ -896,6 +910,11 @@ class LossManager:
         total_loss = torch.tensor(0.0, device=device, requires_grad=True)
         loss_breakdown = {}
         
+        # Debug: Check if we have targets
+        if not hasattr(targets, 'shape') or targets.numel() == 0:
+            logger.warning(f"Individual loss computation: No targets available. Targets type: {type(targets)}")
+            return torch.tensor(1e-6, device=device, requires_grad=True), loss_breakdown
+        
         # Handle single layer mode
         if not self._is_multilayer_mode():
             layer_name = list(predictions.keys())[0]  # Primary layer
@@ -916,7 +935,14 @@ class LossManager:
                     # Filter targets untuk layer ini
                     layer_targets = self._filter_targets_for_layer(targets, layer_name)
                     
-                    if len(layer_targets) > 0:
+                    # Safe check for tensor size - avoid Boolean tensor comparison
+                    has_targets = False
+                    if torch.is_tensor(layer_targets) and layer_targets.numel() > 0:
+                        has_targets = True
+                    elif isinstance(layer_targets, (list, tuple)) and len(layer_targets) > 0:
+                        has_targets = True
+                    
+                    if has_targets:
                         loss_fn = self.loss_functions[layer_name]
                         layer_loss, layer_components = loss_fn(layer_preds, layer_targets, img_size)
                         
@@ -948,34 +974,34 @@ class LossManager:
         if not hasattr(targets, 'shape') or targets.numel() == 0:
             return targets
         
-        # Class mapping untuk different layers (MODEL_ARC.md compliant)
+        # FIXED: Proper phase-aware class filtering
         layer_class_ranges = {
-            'layer_1': list(range(0, 7)),    # Full banknote detection: Classes 0-6
-            'layer_2': list(range(7, 14)),   # Denomination features: Classes 7-13  
-            'layer_3': list(range(14, 17)),  # Common features: Classes 14-16
+            'layer_1': list(range(0, 7)),    # Layer 1: Classes 0-6 (denomination detection)
+            'layer_2': list(range(7, 14)),   # Layer 2: Classes 7-13 (l2_* features)
+            'layer_3': list(range(14, 17)),  # Layer 3: Classes 14-16 (l3_* features) 
             # Legacy support
             'banknote': list(range(0, 7)),   # Classes 0-6
-            'nominal': list(range(7, 14)),   # Classes 7-13  
+            'nominal': list(range(7, 14)),   # Classes 7-13
             'security': list(range(14, 17))  # Classes 14-16
         }
         
-        valid_classes = layer_class_ranges.get(layer_name, list(range(0, 7)))
+        valid_classes = layer_class_ranges.get(layer_name, list(range(0, 7)))   # Default to layer 1 classes
         
-        # Filter targets dengan class yang sesuai
+        # Filter targets dengan class yang sesuai - safer tensor operations
+        if targets.shape[1] < 2:  # Need at least 2 columns for class_id
+            return targets
+        
+        # Extract class IDs safely
+        class_ids = targets[:, 1].long()  # Get all class IDs as long tensor
+        
+        # Create mask for valid classes
         mask = torch.zeros(targets.shape[0], dtype=torch.bool, device=targets.device)
-        for i, target in enumerate(targets):
-            try:
-                # Ensure target[1] is properly converted to int
-                class_id = int(target[1].float().item())  # Explicit float conversion first
-                if class_id in valid_classes:
-                    mask[i] = True
-            except (ValueError, RuntimeError) as e:
-                # Skip invalid targets
-                continue
+        for class_id in valid_classes:
+            mask |= (class_ids == class_id)
         
         filtered_targets = targets[mask].clone()
         
-        # Remap class IDs untuk layer ini (0-based indexing)
+        # Remap class IDs untuk layer ini (0-based indexing for the layer)
         if filtered_targets.numel() > 0:
             class_offset = min(valid_classes)
             filtered_targets[:, 1] -= class_offset

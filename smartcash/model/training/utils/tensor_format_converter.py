@@ -205,9 +205,31 @@ class TensorFormatConverter:
             scale_tensor = tensor[:, start_idx:end_idx, :]
             
             # Reshape to 5D format
-            reshaped = scale_tensor.view(batch_size, TensorFormatConverter.NUM_ANCHORS,
-                                       grid_size, grid_size, num_features)
-            result.append(reshaped)
+            try:
+                reshaped = scale_tensor.view(batch_size, TensorFormatConverter.NUM_ANCHORS,
+                                           grid_size, grid_size, num_features)
+                result.append(reshaped)
+                logger.debug(f"Scale {i+1} ({grid_size}x{grid_size}): reshaped {scale_tensor.shape} to {reshaped.shape}")
+            except RuntimeError as e:
+                logger.error(f"Failed to reshape scale {i+1} tensor {scale_tensor.shape} to "
+                           f"[{batch_size}, {TensorFormatConverter.NUM_ANCHORS}, {grid_size}, {grid_size}, {num_features}]: {e}")
+                
+                # Calculate what the tensor should be and provide detailed error info
+                expected_elements = batch_size * TensorFormatConverter.NUM_ANCHORS * grid_size * grid_size * num_features
+                actual_elements = scale_tensor.numel()
+                logger.error(f"Expected elements: {expected_elements}, Actual elements: {actual_elements}")
+                
+                # Try a fallback approach - use the largest possible grid size that fits
+                max_spatial_size = int((actual_elements // (batch_size * TensorFormatConverter.NUM_ANCHORS * num_features)) ** 0.5)
+                if max_spatial_size > 0:
+                    logger.warning(f"Using fallback grid size {max_spatial_size} instead of {grid_size}")
+                    reshaped = scale_tensor.view(batch_size, TensorFormatConverter.NUM_ANCHORS,
+                                               max_spatial_size, max_spatial_size, num_features)
+                    result.append(reshaped)
+                else:
+                    # If all else fails, skip this scale
+                    logger.error(f"Cannot reshape scale {i+1}, skipping...")
+                    continue
             start_idx = end_idx
         
         logger.debug(f"Split flattened tensor {tensor.shape} into {len(result)} scales")
@@ -277,6 +299,26 @@ class TensorFormatConverter:
                 elif predictions.dim() == 5:
                     # Already in YOLO format
                     return [predictions]
+                elif predictions.dim() == 2:
+                    # 2D tensor - missing batch dimension, add it
+                    logger.warning(f"🚨 Tensor format converter: Detected 2D tensor {predictions.shape}, adding batch dimension")
+                    # Add batch dimension and process as 3D
+                    predictions_3d = predictions.unsqueeze(0)  # [1, num_predictions, features]
+                    logger.info(f"✅ Tensor format converter: Fixed to 3D tensor: {predictions_3d.shape}")
+                    
+                    # Now process as 3D tensor
+                    batch_size, total_predictions, num_features = predictions_3d.shape
+                    yolo_grid_sizes = TensorFormatConverter.YOLO_GRID_SIZES  # [80, 40, 20]
+                    yolo_total_predictions = sum(gs * gs for gs in yolo_grid_sizes) * TensorFormatConverter.NUM_ANCHORS
+                    
+                    if total_predictions == yolo_total_predictions:
+                        # This is definitely a YOLOv5 multi-scale output, split it properly
+                        logger.debug(f"Converting YOLOv5 multi-scale predictions {predictions_3d.shape} to YOLO format")
+                        return TensorFormatConverter._split_flattened_tensor(predictions_3d, img_size)
+                    else:
+                        # Regular flattened format
+                        logger.debug(f"Converting flattened predictions {predictions_3d.shape} to YOLO format")
+                        return TensorFormatConverter.flatten_to_yolo_format(predictions_3d, img_size)
                 else:
                     logger.warning(f"Unexpected prediction tensor dimensions: {predictions.dim()}")
                     return [predictions]
@@ -284,12 +326,23 @@ class TensorFormatConverter:
             elif isinstance(predictions, (list, tuple)):
                 # List of tensors - ensure each is in correct format
                 result = []
-                for pred in predictions:
+                
+                # Flatten the list just in case it's nested
+                flat_predictions = []
+                for item in predictions:
+                    if isinstance(item, (list, tuple)):
+                        flat_predictions.extend(item)
+                    else:
+                        flat_predictions.append(item)
+
+                for pred in flat_predictions:
                     if isinstance(pred, torch.Tensor):
                         converted = TensorFormatConverter._ensure_yolo_format(pred, img_size)
                         result.append(converted)
                     else:
-                        logger.warning(f"Skipping non-tensor prediction: {type(pred)}")
+                        # Log if it's still not a tensor after flattening
+                        if pred is not None:
+                            logger.warning(f"Skipping non-tensor prediction after flattening: {type(pred)}")
                 
                 return result
             

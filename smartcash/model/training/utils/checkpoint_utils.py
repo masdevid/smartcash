@@ -440,13 +440,22 @@ def _create_resume_info(checkpoint: Dict[str, Any], checkpoint_path: str, verbos
         # Phase 2: Advanced training, full validation metrics
         
         # Check for phase 2 indicators
-        has_full_validation = any(key.startswith('val_ap_') for key in metrics.keys())
-        has_layer_metrics = any('layer_' in key for key in metrics.keys())
+        # Phase 2 is characterized by:
+        # - Detection metrics: val_map50, val_detection_map50
+        # - Multi-layer metrics: val_layer_2_*, val_layer_3_*
+        # - Research metrics: val_research_primary_metric, val_hierarchical_accuracy
+        has_detection_metrics = any(key in ['val_map50', 'val_detection_map50'] for key in metrics.keys())
+        has_multilayer_metrics = any(key.startswith('val_layer_2_') or key.startswith('val_layer_3_') for key in metrics.keys())
+        has_research_metrics = any(key in ['val_research_primary_metric', 'val_hierarchical_accuracy'] for key in metrics.keys())
+        has_layer_contribution = any('contribution' in key for key in metrics.keys())
         
-        if saved_epoch == 0 and not has_full_validation:
+        # More comprehensive phase 2 detection
+        phase_2_indicators = has_detection_metrics or has_multilayer_metrics or has_research_metrics or has_layer_contribution
+        
+        if saved_epoch == 0 and not phase_2_indicators:
             # Very early checkpoint, likely phase 1
             resume_phase = 1
-        elif has_full_validation or has_layer_metrics:
+        elif phase_2_indicators:
             # Advanced metrics suggest phase 2
             resume_phase = 2
         else:

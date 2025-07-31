@@ -79,8 +79,9 @@ class PhaseOrchestrator:
             train_loader = data_factory.create_train_loader()
             val_loader = data_factory.create_val_loader()
             
-            # Set up loss manager
+            # Set up loss manager with phase awareness
             loss_manager = LossManager(self.config)
+            loss_manager.set_current_phase(phase_num)
             
             # Configure model phase
             self._configure_model_phase(phase_num)

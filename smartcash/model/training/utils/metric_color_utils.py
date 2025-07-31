@@ -83,15 +83,16 @@ class MetricColorizer:
         self.colors = COLOR_MAPPINGS[color_scheme]
     
     def get_loss_status(self, loss_value: float, loss_type: str = "yolo", 
-                       epoch: int = 1, max_epochs: int = 100) -> MetricStatus:
+                       epoch: int = 1, max_epochs: int = 100, phase: int = 1) -> MetricStatus:
         """
-        Determine status for loss metrics.
+        Determine status for loss metrics with phase awareness.
         
         Args:
             loss_value: The loss value to evaluate
             loss_type: Type of loss ("yolo", "classification", "mse", "bce")
             epoch: Current training epoch
             max_epochs: Total training epochs
+            phase: Training phase (1=single layer, 2=multi-layer)
             
         Returns:
             MetricStatus indicating performance level
@@ -103,25 +104,48 @@ class MetricColorizer:
         late_training = progress_ratio >= 0.7
         
         if loss_type.lower() == "yolo":
-            # YOLO loss thresholds (box + objectness + classification)
-            if early_training:
-                if loss_value <= 1.5: return MetricStatus.EXCELLENT
-                elif loss_value <= 2.5: return MetricStatus.GOOD
-                elif loss_value <= 4.0: return MetricStatus.FAIR
-                elif loss_value <= 6.0: return MetricStatus.POOR
-                else: return MetricStatus.CRITICAL
-            elif mid_training:
-                if loss_value <= 1.0: return MetricStatus.EXCELLENT
-                elif loss_value <= 2.0: return MetricStatus.GOOD
-                elif loss_value <= 3.0: return MetricStatus.FAIR
-                elif loss_value <= 4.5: return MetricStatus.POOR
-                else: return MetricStatus.CRITICAL
-            else:  # late_training
-                if loss_value <= 0.5: return MetricStatus.EXCELLENT
-                elif loss_value <= 1.0: return MetricStatus.GOOD
-                elif loss_value <= 2.0: return MetricStatus.FAIR
-                elif loss_value <= 3.0: return MetricStatus.POOR
-                else: return MetricStatus.CRITICAL
+            # Phase-aware YOLO loss thresholds
+            if phase == 1:
+                # Phase 1: Single-layer training (7 classes, simpler loss)
+                if early_training:
+                    if loss_value <= 1.5: return MetricStatus.EXCELLENT
+                    elif loss_value <= 2.5: return MetricStatus.GOOD
+                    elif loss_value <= 4.0: return MetricStatus.FAIR
+                    elif loss_value <= 6.0: return MetricStatus.POOR
+                    else: return MetricStatus.CRITICAL
+                elif mid_training:
+                    if loss_value <= 1.0: return MetricStatus.EXCELLENT
+                    elif loss_value <= 2.0: return MetricStatus.GOOD
+                    elif loss_value <= 3.0: return MetricStatus.FAIR
+                    elif loss_value <= 4.5: return MetricStatus.POOR
+                    else: return MetricStatus.CRITICAL
+                else:  # late_training
+                    if loss_value <= 0.5: return MetricStatus.EXCELLENT
+                    elif loss_value <= 1.0: return MetricStatus.GOOD
+                    elif loss_value <= 2.0: return MetricStatus.FAIR
+                    elif loss_value <= 3.0: return MetricStatus.POOR
+                    else: return MetricStatus.CRITICAL
+            else:
+                # Phase 2: Multi-layer training (17 classes, more complex loss)
+                # Higher thresholds are normal due to multi-layer complexity
+                if early_training:
+                    if loss_value <= 3.0: return MetricStatus.EXCELLENT
+                    elif loss_value <= 6.0: return MetricStatus.GOOD
+                    elif loss_value <= 10.0: return MetricStatus.FAIR
+                    elif loss_value <= 15.0: return MetricStatus.POOR
+                    else: return MetricStatus.CRITICAL
+                elif mid_training:
+                    if loss_value <= 2.0: return MetricStatus.EXCELLENT
+                    elif loss_value <= 4.0: return MetricStatus.GOOD
+                    elif loss_value <= 7.0: return MetricStatus.FAIR
+                    elif loss_value <= 12.0: return MetricStatus.POOR
+                    else: return MetricStatus.CRITICAL
+                else:  # late_training
+                    if loss_value <= 1.0: return MetricStatus.EXCELLENT
+                    elif loss_value <= 2.5: return MetricStatus.GOOD
+                    elif loss_value <= 5.0: return MetricStatus.FAIR
+                    elif loss_value <= 8.0: return MetricStatus.POOR
+                    else: return MetricStatus.CRITICAL
                 
         elif loss_type.lower() == "classification":
             # Classification loss thresholds (cross-entropy)
@@ -167,21 +191,45 @@ class MetricColorizer:
         elif loss_value <= 4.0: return MetricStatus.POOR
         else: return MetricStatus.CRITICAL
     
-    def get_accuracy_status(self, accuracy: float) -> MetricStatus:
+    def get_accuracy_status(self, accuracy: float, phase: int = 1, epoch: int = 1, max_epochs: int = 100) -> MetricStatus:
         """
-        Determine status for accuracy metrics.
+        Determine status for accuracy metrics with phase awareness.
         
         Args:
             accuracy: Accuracy value (0.0 to 1.0)
+            phase: Training phase (1=single layer, 2=multi-layer)
+            epoch: Current training epoch
+            max_epochs: Total training epochs
             
         Returns:
             MetricStatus indicating performance level
         """
-        if accuracy >= 0.95: return MetricStatus.EXCELLENT
-        elif accuracy >= 0.85: return MetricStatus.GOOD
-        elif accuracy >= 0.70: return MetricStatus.FAIR
-        elif accuracy >= 0.50: return MetricStatus.POOR
-        else: return MetricStatus.CRITICAL
+        progress_ratio = epoch / max_epochs
+        early_training = progress_ratio < 0.3
+        
+        if phase == 1:
+            # Phase 1: Single-layer training - higher accuracy expected
+            if accuracy >= 0.95: return MetricStatus.EXCELLENT
+            elif accuracy >= 0.85: return MetricStatus.GOOD
+            elif accuracy >= 0.70: return MetricStatus.FAIR
+            elif accuracy >= 0.50: return MetricStatus.POOR
+            else: return MetricStatus.CRITICAL
+        else:
+            # Phase 2: Multi-layer training - lower initial accuracy is normal
+            if early_training:
+                # Early Phase 2: Very low accuracy is expected as layers sync up
+                if accuracy >= 0.60: return MetricStatus.EXCELLENT
+                elif accuracy >= 0.40: return MetricStatus.GOOD
+                elif accuracy >= 0.20: return MetricStatus.FAIR
+                elif accuracy >= 0.05: return MetricStatus.POOR
+                else: return MetricStatus.CRITICAL
+            else:
+                # Later Phase 2: Should improve towards Phase 1 levels
+                if accuracy >= 0.90: return MetricStatus.EXCELLENT
+                elif accuracy >= 0.75: return MetricStatus.GOOD
+                elif accuracy >= 0.60: return MetricStatus.FAIR
+                elif accuracy >= 0.40: return MetricStatus.POOR
+                else: return MetricStatus.CRITICAL
     
     def get_map_status(self, map_value: float) -> MetricStatus:
         """
@@ -216,7 +264,7 @@ class MetricColorizer:
         else: return MetricStatus.CRITICAL
     
     def colorize_metric(self, metric_name: str, metric_value: float, 
-                       epoch: int = 1, max_epochs: int = 100) -> str:
+                       epoch: int = 1, max_epochs: int = 100, phase: int = 1) -> str:
         """
         Apply color coding to a metric value based on its type and performance.
         
@@ -225,6 +273,7 @@ class MetricColorizer:
             metric_value: The metric value
             epoch: Current training epoch
             max_epochs: Total training epochs
+            phase: Training phase (1=single layer, 2=multi-layer)
             
         Returns:
             Colorized string representation of the metric
@@ -232,22 +281,22 @@ class MetricColorizer:
         # Determine metric type and get status
         if "loss" in metric_name.lower():
             if "yolo" in metric_name.lower() or any(x in metric_name.lower() for x in ["train_loss", "val_loss", "total_loss"]):
-                status = self.get_loss_status(metric_value, "yolo", epoch, max_epochs)
+                status = self.get_loss_status(metric_value, "yolo", epoch, max_epochs, phase)
             elif "mse" in metric_name.lower():
-                status = self.get_loss_status(metric_value, "mse", epoch, max_epochs)
+                status = self.get_loss_status(metric_value, "mse", epoch, max_epochs, phase)
             elif "bce" in metric_name.lower():
-                status = self.get_loss_status(metric_value, "bce", epoch, max_epochs)
+                status = self.get_loss_status(metric_value, "bce", epoch, max_epochs, phase)
             else:
-                status = self.get_loss_status(metric_value, "classification", epoch, max_epochs)
+                status = self.get_loss_status(metric_value, "classification", epoch, max_epochs, phase)
         elif "accuracy" in metric_name.lower():
-            status = self.get_accuracy_status(metric_value)
+            status = self.get_accuracy_status(metric_value, phase, epoch, max_epochs)
         elif "map" in metric_name.lower():
             status = self.get_map_status(metric_value)
         elif any(x in metric_name.lower() for x in ["precision", "recall", "f1"]):
             status = self.get_precision_recall_f1_status(metric_value)
         else:
             # Default to accuracy-like thresholds
-            status = self.get_accuracy_status(metric_value)
+            status = self.get_accuracy_status(metric_value, phase, epoch, max_epochs)
         
         # Apply colorization
         return self.apply_color(f"{metric_value:.4f}", status)
@@ -287,7 +336,7 @@ class MetricColorizer:
         return self.colors[status]
     
     def format_metric_summary(self, metrics: Dict[str, float], 
-                            epoch: int = 1, max_epochs: int = 100) -> str:
+                            epoch: int = 1, max_epochs: int = 100, phase: int = 1) -> str:
         """
         Format a complete metrics summary with color coding.
         
@@ -295,6 +344,7 @@ class MetricColorizer:
             metrics: Dictionary of metric names and values
             epoch: Current training epoch
             max_epochs: Total training epochs
+            phase: Training phase (1=single layer, 2=multi-layer)
             
         Returns:
             Formatted, colorized metrics summary
@@ -312,25 +362,25 @@ class MetricColorizer:
         if loss_metrics:
             lines.append("📉 Loss Metrics:")
             for name, value in loss_metrics.items():
-                colorized = self.colorize_metric(name, value, epoch, max_epochs)
+                colorized = self.colorize_metric(name, value, epoch, max_epochs, phase)
                 lines.append(f"   {name}: {colorized}")
         
         if accuracy_metrics:
             lines.append("🎯 Accuracy Metrics:")
             for name, value in accuracy_metrics.items():
-                colorized = self.colorize_metric(name, value, epoch, max_epochs)
+                colorized = self.colorize_metric(name, value, epoch, max_epochs, phase)
                 lines.append(f"   {name}: {colorized}")
         
         if map_metrics:
             lines.append("📊 mAP Metrics:")
             for name, value in map_metrics.items():
-                colorized = self.colorize_metric(name, value, epoch, max_epochs)
+                colorized = self.colorize_metric(name, value, epoch, max_epochs, phase)
                 lines.append(f"   {name}: {colorized}")
         
         if other_metrics:
             lines.append("📋 Other Metrics:")
             for name, value in other_metrics.items():
-                colorized = self.colorize_metric(name, value, epoch, max_epochs)
+                colorized = self.colorize_metric(name, value, epoch, max_epochs, phase)
                 lines.append(f"   {name}: {colorized}")
         
         return "\n".join(lines)
@@ -339,7 +389,7 @@ class MetricColorizer:
 # Convenience functions
 def get_metric_color(metric_name: str, metric_value: float, 
                     color_scheme: ColorScheme = ColorScheme.TERMINAL,
-                    epoch: int = 1, max_epochs: int = 100) -> str:
+                    epoch: int = 1, max_epochs: int = 100, phase: int = 1) -> str:
     """
     Quick function to get colorized metric value.
     
@@ -349,16 +399,17 @@ def get_metric_color(metric_name: str, metric_value: float,
         color_scheme: Color scheme to use
         epoch: Current training epoch
         max_epochs: Total training epochs
+        phase: Training phase (1=single layer, 2=multi-layer)
         
     Returns:
         Colorized metric string
     """
     colorizer = MetricColorizer(color_scheme)
-    return colorizer.colorize_metric(metric_name, metric_value, epoch, max_epochs)
+    return colorizer.colorize_metric(metric_name, metric_value, epoch, max_epochs, phase)
 
 
 def get_metric_status(metric_name: str, metric_value: float,
-                     epoch: int = 1, max_epochs: int = 100) -> MetricStatus:
+                     epoch: int = 1, max_epochs: int = 100, phase: int = 1) -> MetricStatus:
     """
     Quick function to get metric performance status.
     
@@ -367,6 +418,7 @@ def get_metric_status(metric_name: str, metric_value: float,
         metric_value: The metric value
         epoch: Current training epoch
         max_epochs: Total training epochs
+        phase: Training phase (1=single layer, 2=multi-layer)
         
     Returns:
         MetricStatus indicating performance level
@@ -375,21 +427,21 @@ def get_metric_status(metric_name: str, metric_value: float,
     
     if "loss" in metric_name.lower():
         if "yolo" in metric_name.lower() or any(x in metric_name.lower() for x in ["train_loss", "val_loss", "total_loss"]):
-            return colorizer.get_loss_status(metric_value, "yolo", epoch, max_epochs)
+            return colorizer.get_loss_status(metric_value, "yolo", epoch, max_epochs, phase)
         else:
-            return colorizer.get_loss_status(metric_value, "classification", epoch, max_epochs)
+            return colorizer.get_loss_status(metric_value, "classification", epoch, max_epochs, phase)
     elif "accuracy" in metric_name.lower():
-        return colorizer.get_accuracy_status(metric_value)
+        return colorizer.get_accuracy_status(metric_value, phase, epoch, max_epochs)
     elif "map" in metric_name.lower():
         return colorizer.get_map_status(metric_value)
     elif any(x in metric_name.lower() for x in ["precision", "recall", "f1"]):
         return colorizer.get_precision_recall_f1_status(metric_value)
     else:
-        return colorizer.get_accuracy_status(metric_value)
+        return colorizer.get_accuracy_status(metric_value, phase, epoch, max_epochs)
 
 
 def get_metrics_with_colors(metrics: Dict[str, float], 
-                          epoch: int = 1, max_epochs: int = 100) -> Dict[str, Dict]:
+                          epoch: int = 1, max_epochs: int = 100, phase: int = 1) -> Dict[str, Dict]:
     """
     Get metrics with comprehensive color information for UI usage.
     
@@ -397,6 +449,7 @@ def get_metrics_with_colors(metrics: Dict[str, float],
         metrics: Dictionary of metric names and values
         epoch: Current training epoch
         max_epochs: Total training epochs
+        phase: Training phase (1=single layer, 2=multi-layer)
         
     Returns:
         Dictionary with metric data including colors for all schemes
@@ -422,7 +475,7 @@ def get_metrics_with_colors(metrics: Dict[str, float],
     
     for metric_name, value in metrics.items():
         if isinstance(value, (int, float)):
-            status = get_metric_status(metric_name, value, epoch, max_epochs)
+            status = get_metric_status(metric_name, value, epoch, max_epochs, phase)
             
             # Get colors for all schemes
             colors = {}
@@ -431,7 +484,7 @@ def get_metrics_with_colors(metrics: Dict[str, float],
             for scheme in ColorScheme:
                 colorizer = MetricColorizer(scheme)
                 colors[scheme.value] = colorizer.get_status_indicator(status)
-                formatted[scheme.value] = colorizer.colorize_metric(metric_name, value, epoch, max_epochs)
+                formatted[scheme.value] = colorizer.colorize_metric(metric_name, value, epoch, max_epochs, phase)
             
             result[metric_name] = {
                 'value': value,
@@ -453,7 +506,7 @@ def get_metrics_with_colors(metrics: Dict[str, float],
 
 def format_colorized_metrics(metrics: Dict[str, float], 
                            color_scheme: ColorScheme = ColorScheme.TERMINAL,
-                           epoch: int = 1, max_epochs: int = 100) -> str:
+                           epoch: int = 1, max_epochs: int = 100, phase: int = 1) -> str:
     """
     Quick function to format a full metrics dictionary with colors.
     
@@ -462,12 +515,13 @@ def format_colorized_metrics(metrics: Dict[str, float],
         color_scheme: Color scheme to use
         epoch: Current training epoch
         max_epochs: Total training epochs
+        phase: Training phase (1=single layer, 2=multi-layer)
         
     Returns:
         Formatted, colorized metrics summary
     """
     colorizer = MetricColorizer(color_scheme)
-    return colorizer.format_metric_summary(metrics, epoch, max_epochs)
+    return colorizer.format_metric_summary(metrics, epoch, max_epochs, phase)
 
 
 # Example usage and testing

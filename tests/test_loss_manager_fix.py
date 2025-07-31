@@ -9,9 +9,11 @@ without causing "Boolean value of Tensor with more than one value is ambiguous" 
 import torch
 import logging
 import sys
+from unittest.mock import patch
+
 sys.path.append('/Users/masdevid/Projects/smartcash')
 
-from smartcash.model.training.loss_manager import LossManager
+from smartcash.model.training.loss_manager import LossManager, YOLOLoss
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -22,87 +24,89 @@ def test_loss_manager_boolean_fix():
     """Test loss manager with various tensor configurations."""
     logger.info("🧪 Testing Loss Manager Boolean Tensor Fix")
     logger.info("=" * 50)
-    
+
     # Initialize loss manager with config
     config = {
         'model': {'num_classes': 17},  # SmartCash has 17 classes
         'training': {'loss_type': 'uncertainty_multi_task'}
     }
-    loss_manager = LossManager(config)
-    loss_manager.use_multi_task_loss = True  # Enable multi-task loss to trigger the fixed code
-    
-    test_cases = [
-        {
-            'name': 'Normal Case with Valid Targets',
-            'predictions': {
-                'layer_1': [torch.randn(2, 255, 20, 20)],
-                'layer_2': [torch.randn(2, 255, 40, 40)],
-                'layer_3': [torch.randn(2, 255, 80, 80)]
+    with patch('smartcash.model.training.loss_manager.YOLOLoss', autospec=True) as mock_yolo_loss:
+        mock_yolo_loss.return_value.return_value = (torch.tensor(0.5, requires_grad=True), {'box_loss': torch.tensor(0.1), 'obj_loss': torch.tensor(0.2), 'cls_loss': torch.tensor(0.2)})
+        loss_manager = LossManager(config)
+        loss_manager.use_multi_task_loss = True  # Enable multi-task loss to trigger the fixed code
+
+        test_cases = [
+            {
+                'name': 'Normal Case with Valid Targets',
+                'predictions': {
+                    'layer_1': [torch.randn(2, 255, 20, 20)],
+                    'layer_2': [torch.randn(2, 255, 40, 40)],
+                    'layer_3': [torch.randn(2, 255, 80, 80)]
+                },
+                'targets': torch.tensor([
+                    [0, 1, 0.5, 0.5, 0.3, 0.3],  # layer_1 target (class 1)
+                    [1, 8, 0.4, 0.6, 0.2, 0.4],  # layer_2 target (class 8)
+                    [0, 15, 0.3, 0.7, 0.1, 0.2]  # layer_3 target (class 15)
+                ]),
+                'should_succeed': True
             },
-            'targets': torch.tensor([
-                [0, 1, 0.5, 0.5, 0.3, 0.3],  # layer_1 target (class 1)
-                [1, 8, 0.4, 0.6, 0.2, 0.4],  # layer_2 target (class 8)
-                [0, 15, 0.3, 0.7, 0.1, 0.2]  # layer_3 target (class 15)
-            ]),
-            'should_succeed': True
-        },
-        {
-            'name': 'Empty Targets Case',
-            'predictions': {
-                'layer_1': [torch.randn(2, 255, 20, 20)]
+            {
+                'name': 'Empty Targets Case',
+                'predictions': {
+                    'layer_1': [torch.randn(2, 255, 20, 20)]
+                },
+                'targets': torch.empty(0, 6),
+                'should_succeed': True
             },
-            'targets': torch.empty(0, 6),
-            'should_succeed': True
-        },
-        {
-            'name': 'Single Target Case',
-            'predictions': {
-                'layer_1': [torch.randn(1, 255, 20, 20)]
+            {
+                'name': 'Single Target Case',
+                'predictions': {
+                    'layer_1': [torch.randn(1, 255, 20, 20)]
+                },
+                'targets': torch.tensor([[0, 2, 0.5, 0.5, 0.3, 0.3]]),
+                'should_succeed': True
             },
-            'targets': torch.tensor([[0, 2, 0.5, 0.5, 0.3, 0.3]]),
-            'should_succeed': True
-        },
-        {
-            'name': 'Multiple Targets Same Layer',
-            'predictions': {
-                'layer_1': [torch.randn(2, 255, 20, 20)]
-            },
-            'targets': torch.tensor([
-                [0, 1, 0.5, 0.5, 0.3, 0.3],
-                [0, 2, 0.4, 0.6, 0.2, 0.4],
-                [1, 3, 0.3, 0.7, 0.1, 0.2]
-            ]),
-            'should_succeed': True
-        }
-    ]
-    
-    for test_case in test_cases:
-        logger.info(f"\n📋 Test: {test_case['name']}")
-        
-        try:
-            # Test the loss computation
-            predictions = test_case['predictions']
-            targets = test_case['targets']
-            
-            # Call compute_loss which should trigger the fixed code
-            loss, metrics = loss_manager.compute_loss(predictions, targets, img_size=640)
-            
-            logger.info(f"   ✅ Success: Loss = {loss.item():.4f}")
-            logger.info(f"   📊 Metrics keys: {list(metrics.keys())}")
-            logger.info(f"   📊 Targets processed: {metrics.get('num_targets', 0)}")
-            
-            # Verify loss is a proper tensor
-            assert isinstance(loss, torch.Tensor), "Loss should be a tensor"
-            assert loss.requires_grad, "Loss should require gradients"
-            
-        except Exception as e:
-            if test_case['should_succeed']:
-                logger.error(f"   ❌ Unexpected failure: {e}")
-                import traceback
-                logger.error(traceback.format_exc())
-            else:
-                logger.info(f"   ✅ Expected failure: {e}")
-    
+            {
+                'name': 'Multiple Targets Same Layer',
+                'predictions': {
+                    'layer_1': [torch.randn(2, 255, 20, 20)]
+                },
+                'targets': torch.tensor([
+                    [0, 1, 0.5, 0.5, 0.3, 0.3],
+                    [0, 2, 0.4, 0.6, 0.2, 0.4],
+                    [1, 3, 0.3, 0.7, 0.1, 0.2]
+                ]),
+                'should_succeed': True
+            }
+        ]
+
+        for test_case in test_cases:
+            logger.info(f"\n📋 Test: {test_case['name']}")
+
+            try:
+                # Test the loss computation
+                predictions = test_case['predictions']
+                targets = test_case['targets']
+
+                # Call compute_loss which should trigger the fixed code
+                loss, metrics = loss_manager.compute_loss(predictions, targets, img_size=640)
+
+                logger.info(f"   ✅ Success: Loss = {loss.item():.4f}")
+                logger.info(f"   📊 Metrics keys: {list(metrics.keys())}")
+                logger.info(f"   📊 Targets processed: {metrics.get('num_targets', 0)}")
+
+                # Verify loss is a proper tensor
+                assert isinstance(loss, torch.Tensor), "Loss should be a tensor"
+                assert loss.requires_grad, "Loss should require gradients"
+
+            except Exception as e:
+                if test_case['should_succeed']:
+                    logger.error(f"   ❌ Unexpected failure: {e}")
+                    import traceback
+                    logger.error(traceback.format_exc())
+                else:
+                    logger.info(f"   ✅ Expected failure: {e}")
+
     logger.info(f"\n🎉 Loss manager boolean tensor testing completed!")
 
 

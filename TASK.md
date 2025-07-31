@@ -36,6 +36,7 @@ Updated 22 Juli 2025, 20:
   - Root cause: Model's current_phase was not being propagated to child modules (especially MultiLayerHead)
   - Solution: Added _propagate_phase_to_children() method in PhaseOrchestrator to ensure all modules receive phase info
   - Updated research metrics system to force zero values instead of static fallbacks when layer metrics missing
+- Fixed ERROR - smartcash.model.training.core.validation_executor - Error computing loss in validation batch 19: Unexpected prediction shape: torch.Size([25200, 22]) - July 31, 2025
 # EVALUATION MODULE
 - N/A
 # VISUALIZATION MODULE

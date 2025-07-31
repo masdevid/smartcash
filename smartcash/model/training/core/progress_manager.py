@@ -36,7 +36,8 @@ class ProgressManager:
         # State for visualization
         self._is_single_phase = False
     
-    def emit_epoch_metrics(self, phase_num: int, epoch: int, metrics: Dict[str, Any]):
+    def emit_epoch_metrics(self, phase_num: int, epoch: int, metrics: Dict[str, Any], 
+                          loss_breakdown: Dict[str, Any] = None):
         """
         Emit metrics callback for UI updates.
         
@@ -44,12 +45,19 @@ class ProgressManager:
             phase_num: Current phase number
             epoch: Current epoch number
             metrics: Metrics dictionary
+            loss_breakdown: Optional loss breakdown dictionary
         """
         if not self.emit_metrics_callback:
             return
         
         phase_name = 'training_phase_single' if self._is_single_phase else f'training_phase_{phase_num}'
-        self.emit_metrics_callback(phase_name, epoch, metrics)
+        
+        # Include loss breakdown in callback kwargs if available
+        callback_kwargs = {}
+        if loss_breakdown:
+            callback_kwargs['loss_breakdown'] = loss_breakdown
+            
+        self.emit_metrics_callback(phase_name, epoch, metrics, **callback_kwargs)
     
     def emit_training_charts(self, epoch: int, phase_num: int, final_metrics: dict, layer_metrics: dict):
         """

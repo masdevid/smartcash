@@ -460,7 +460,19 @@ class ParallelMAPCalculator:
                 logger.warning(f"mAP Debug - batch {batch_idx}: scale_pred is None")
             return None
             
-        if scale_pred.dim() == 4:
+        if scale_pred.dim() == 5:
+            # YOLO format: [batch_size, num_anchors, grid_height, grid_width, features]
+            batch_size, num_anchors, grid_h, grid_w, num_features = scale_pred.shape
+            if num_features < 7:
+                if batch_idx < 2:
+                    logger.warning(f"mAP Debug - batch {batch_idx}: Insufficient features {num_features}, need >= 7")
+                return None
+            # Flatten to [batch_size, num_detections, features] where num_detections = num_anchors * grid_h * grid_w
+            flattened = scale_pred.view(batch_size, -1, num_features)
+            if batch_idx < 2:
+                logger.debug(f"mAP Debug - batch {batch_idx}: Flattened 5D YOLO format [batch={batch_size}, anchors={num_anchors}, grid={grid_h}x{grid_w}, features={num_features}] -> [batch={batch_size}, detections={flattened.shape[1]}, features={num_features}]")
+            return flattened
+        elif scale_pred.dim() == 4:
             batch_size, _, _, _, num_features = scale_pred.shape
             if num_features < 7:
                 if batch_idx < 2:
@@ -478,7 +490,7 @@ class ParallelMAPCalculator:
             return scale_pred
         else:
             if batch_idx < 2:
-                logger.warning(f"mAP Debug - batch {batch_idx}: Invalid tensor format - expected 3D or 4D tensor, got {scale_pred.shape}")
+                logger.warning(f"mAP Debug - batch {batch_idx}: Invalid tensor format - expected 3D, 4D, or 5D tensor, got {scale_pred.shape}")
             return None
     
     def _process_coordinates(self, flat_pred, scale_pred, image_shape, device):

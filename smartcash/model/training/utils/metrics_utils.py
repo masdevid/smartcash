@@ -144,34 +144,80 @@ def filter_phase_relevant_metrics(metrics: Dict[str, float], phase_num: int) -> 
         return metrics
     
     if phase_num == 1:
-        # Phase 1: Only show metrics relevant to Layer 1 training
+        # Phase 1: Simple YOLO loss - focus on basic YOLO training metrics
         relevant_metrics = {}
         
-        # Always include core training metrics
-        core_metrics = ['train_loss', 'val_loss', 'val_accuracy','val_precision', 'val_recall', 'val_f1', 'learning_rate', 'epoch']
+        # Core YOLO training metrics
+        core_metrics = ['train_loss', 'val_loss', 'learning_rate', 'epoch']
         for metric in core_metrics:
             if metric in metrics:
                 relevant_metrics[metric] = metrics[metric]
         
-        # Include all layer_1_* metrics (these should be improving)
-        for key, value in metrics.items():
-            if key.startswith('layer_1_'):
-                relevant_metrics[key] = value
-        
-        # Optionally include uncertainty/loss components for debugging
-        debug_metrics = ['total_loss', 'layer_1_total_loss', 'layer_1_weighted_loss', 
-                        'layer_1_regularization', 'layer_1_uncertainty']
-        for metric in debug_metrics:
+        # YOLO detection metrics (if available)
+        yolo_metrics = ['val_map50', 'val_map50_95', 'val_precision', 'val_recall', 'val_f1', 'val_accuracy']
+        for metric in yolo_metrics:
             if metric in metrics:
                 relevant_metrics[metric] = metrics[metric]
         
-        logger.debug(f"Phase {phase_num}: Filtered {len(metrics)} metrics to {len(relevant_metrics)} relevant ones")
+        # Include layer_1 metrics (since Phase 1 focuses on single layer)
+        for key, value in metrics.items():
+            if key.startswith('layer_1_') and isinstance(value, (int, float)) and value > 0.0001:
+                relevant_metrics[key] = value
+        
+        # Skip multi-task loss components in Phase 1 (they shouldn't exist with simple YOLO loss)
+        # Only include if they appear (for debugging purposes)
+        if 'total_loss' in metrics and metrics['total_loss'] != metrics.get('train_loss', 0):
+            relevant_metrics['total_loss'] = metrics['total_loss']
+            logger.warning(f"Phase 1 showing total_loss ({metrics['total_loss']:.4f}) different from train_loss - this may indicate multi-task loss is being used incorrectly")
+        
+        logger.debug(f"Phase {phase_num}: Filtered {len(metrics)} metrics to {len(relevant_metrics)} core YOLO metrics")
         return relevant_metrics
     
     else:
-        # Phase 2: Show all metrics (full model is being fine-tuned)
-        logger.debug(f"Phase {phase_num}: Showing all {len(metrics)} metrics")
-        return metrics
+        # Phase 2: Organize metrics into logical groups for better readability
+        relevant_metrics = {}
+        
+        # Core multi-task training metrics (always shown first)
+        core_metrics = ['train_loss', 'val_loss', 'val_map50', 'learning_rate', 'epoch']
+        for metric in core_metrics:
+            if metric in metrics:
+                relevant_metrics[metric] = metrics[metric]
+        
+        # Multi-task loss components (specific to Phase 2)
+        if 'total_loss' in metrics and metrics['total_loss'] != metrics.get('train_loss', 0):
+            relevant_metrics['total_loss'] = metrics['total_loss']
+            # Include uncertainty metrics if available
+            uncertainty_metrics = ['layer_1_uncertainty', 'layer_2_uncertainty', 'layer_3_uncertainty']
+            for metric in uncertainty_metrics:
+                if metric in metrics:
+                    relevant_metrics[metric] = metrics[metric]
+        
+        # Standard validation metrics (same as Phase 1 + mAP50)
+        standard_val_metrics = [
+            'val_precision', 'val_recall', 'val_f1', 'val_accuracy'
+        ]
+        for metric in standard_val_metrics:
+            if metric in metrics:
+                relevant_metrics[metric] = metrics[metric]
+        
+        # Training layer performance (show actual layer training progress)
+        training_layer_metrics = [
+            'layer_1_accuracy', 'layer_1_precision', 'layer_1_recall', 'layer_1_f1',
+            'layer_2_accuracy', 'layer_2_precision', 'layer_2_recall', 'layer_2_f1',
+            'layer_3_accuracy', 'layer_3_precision', 'layer_3_recall', 'layer_3_f1'
+        ]
+        for metric in training_layer_metrics:
+            if metric in metrics:
+                relevant_metrics[metric] = metrics[metric]
+        
+        # Skip confusing or redundant metrics:
+        # - Hierarchical and contribution metrics (val_hierarchical_accuracy, val_*_contribution, etc.)
+        # - Research-specific metrics (val_research_primary_metric, val_multi_layer_benefit, etc.)
+        # - val_layer_X_accuracy/precision/recall/f1 (often 0.0000 and confusing)
+        # - val_detection_map50 (redundant with val_map50)
+        
+        logger.debug(f"Phase {phase_num}: Organized {len(metrics)} metrics into {len(relevant_metrics)} key metrics")
+        return relevant_metrics
 
 
 def format_metrics_for_display(metrics: Dict[str, float]) -> str:

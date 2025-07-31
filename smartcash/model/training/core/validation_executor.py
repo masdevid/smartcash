@@ -84,6 +84,7 @@ class ValidationExecutor:
         # Initialize collectors
         all_predictions = {}
         all_targets = {}
+        all_loss_breakdowns = []  # Collect loss breakdowns for aggregation
         
         # Start batch tracking for validation
         self.progress_tracker.start_batch_tracking(num_batches)
@@ -106,6 +107,10 @@ class ValidationExecutor:
                 
                 running_val_loss += batch_metrics['loss']
                 
+                # Collect loss breakdown for aggregation
+                if 'loss_breakdown' in batch_metrics and batch_metrics['loss_breakdown']:
+                    all_loss_breakdowns.append(batch_metrics['loss_breakdown'])
+                
                 # Optimized progress updates - reduce frequency for better performance
                 update_freq = max(1, num_batches // 10)  # Update 10 times max per validation
                 if batch_idx % update_freq == 0 or batch_idx == num_batches - 1:
@@ -127,9 +132,17 @@ class ValidationExecutor:
         self.progress_tracker.complete_batch_tracking()
         
         # Compute final metrics
-        return self._compute_final_metrics(
+        final_metrics = self._compute_final_metrics(
             running_val_loss, num_batches, all_predictions, all_targets, phase_num
         )
+        
+        # Aggregate loss breakdowns and add to final metrics
+        if all_loss_breakdowns:
+            aggregated_loss_breakdown = self._aggregate_loss_breakdowns(all_loss_breakdowns)
+            final_metrics['loss_breakdown'] = aggregated_loss_breakdown
+            logger.debug(f"Added aggregated loss breakdown with {len(aggregated_loss_breakdown)} components")
+        
+        return final_metrics
     
     def _process_validation_batch(self, images, targets, loss_manager, batch_idx, num_batches,
                                 phase_num, all_predictions, all_targets):
@@ -667,3 +680,46 @@ class ValidationExecutor:
         if hasattr(self.config, 'fast_validation') and self.config.get('fast_validation', False):
             self.fast_validation_enabled = True
             logger.info("⚡ Fast validation mode enabled - using sampling optimizations")
+    
+    def _aggregate_loss_breakdowns(self, all_loss_breakdowns: list) -> dict:
+        """
+        Aggregate loss breakdowns from all validation batches.
+        
+        Args:
+            all_loss_breakdowns: List of loss breakdown dictionaries from each batch
+            
+        Returns:
+            Dictionary containing averaged loss breakdown components
+        """
+        if not all_loss_breakdowns:
+            return {}
+        
+        logger.debug(f"Aggregating {len(all_loss_breakdowns)} loss breakdowns")
+        
+        # Collect all unique keys across all breakdowns
+        all_keys = set()
+        for breakdown in all_loss_breakdowns:
+            all_keys.update(breakdown.keys())
+        
+        aggregated = {}
+        
+        for key in all_keys:
+            values = []
+            for breakdown in all_loss_breakdowns:
+                if key in breakdown:
+                    value = breakdown[key]
+                    # Convert tensor values to float
+                    if hasattr(value, 'item'):
+                        value = value.item()
+                    elif hasattr(value, 'cpu'):
+                        value = value.cpu().numpy()
+                    
+                    if isinstance(value, (int, float)):
+                        values.append(value)
+            
+            # Average the values for this component
+            if values:
+                aggregated[key] = sum(values) / len(values)
+                logger.debug(f"  {key}: averaged {len(values)} values = {aggregated[key]:.6f}")
+        
+        return aggregated

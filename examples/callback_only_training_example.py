@@ -39,7 +39,7 @@ if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
 from smartcash.model.api.core import run_full_training_pipeline
-from training_args_helper import create_training_arg_parser, get_training_kwargs
+from examples.training_args_helper import create_training_arg_parser, get_training_kwargs
 from smartcash.model.training.utils.metric_color_utils import ColorScheme
 from smartcash.model.training.utils.ui_metrics_callback import create_ui_metrics_callback
 

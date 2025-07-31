@@ -55,10 +55,10 @@ class UIMetricsCallback:
             phase: Training phase name
             epoch: Current epoch number
             metrics: Dictionary of metric values
-            **kwargs: Additional parameters (max_epochs, etc.)
+            **kwargs: Additional parameters (max_epochs, loss_breakdown, etc.)
             
         Returns:
-            Dictionary containing original metrics plus color information
+            Dictionary containing original metrics plus color information and loss breakdown
         """
         # Store current state
         self.current_epoch = epoch
@@ -68,13 +68,29 @@ class UIMetricsCallback:
         # Get max epochs for context-aware coloring
         max_epochs = kwargs.get('max_epochs', 100)
         
-        # Generate comprehensive color information
-        colored_metrics = get_metrics_with_colors(metrics, epoch, max_epochs)
+        # Extract phase number from phase string (e.g., "training_phase_2" -> 2)
+        phase_num = 1  # Default to phase 1
+        if isinstance(phase, str):
+            if "phase_2" in phase.lower() or phase.lower() == "2":
+                phase_num = 2
+            elif "phase_1" in phase.lower() or phase.lower() == "1":
+                phase_num = 1
+        elif isinstance(phase, int):
+            phase_num = phase
+        
+        # Generate comprehensive color information with phase awareness
+        colored_metrics = get_metrics_with_colors(metrics, epoch, max_epochs, phase_num)
         self.latest_colored_metrics = colored_metrics
+        
+        # Extract loss breakdown before console output
+        loss_breakdown = kwargs.get('loss_breakdown', {})
         
         # Console output if verbose
         if self.verbose:
             self._print_console_metrics(phase, epoch, metrics, colored_metrics, **kwargs)
+            # Print loss breakdown if available
+            if loss_breakdown:
+                self._print_loss_breakdown(loss_breakdown)
         
         # Call UI callback if registered
         if self.ui_callback:
@@ -83,10 +99,13 @@ class UIMetricsCallback:
             except Exception as e:
                 print(f"Warning: UI callback failed: {e}")
         
+        # loss_breakdown already extracted above
+        
         # Return enhanced metrics data
         return {
             'original_metrics': metrics,
             'colored_metrics': colored_metrics,
+            'loss_breakdown': loss_breakdown,
             'phase': phase,
             'epoch': epoch,
             'max_epochs': max_epochs
@@ -104,9 +123,8 @@ class UIMetricsCallback:
         # Determine layer filtering based on phase
         show_layers, filter_zeros = self._determine_layer_display(phase, metrics)
         
-        # Print core metrics
-        core_metrics = ['train_loss', 'val_loss', 'val_map50', 'val_map50_95', 
-                       'val_precision', 'val_recall', 'val_f1', 'val_accuracy']
+        # Print phase-aware core metrics
+        core_metrics = self._get_phase_appropriate_core_metrics(phase, metrics)
         
         for metric_name in core_metrics:
             if metric_name in metrics:
@@ -128,6 +146,86 @@ class UIMetricsCallback:
         for metric_name, value in remaining_metrics.items():
             self._print_metric(metric_name, value, colored_metrics)
     
+    def _print_loss_breakdown(self, loss_breakdown: Dict[str, Any]):
+        """Print detailed loss breakdown information."""
+        print("\n📊 LOSS BREAKDOWN:")
+        
+        # Core loss components
+        core_losses = ['box_loss', 'obj_loss', 'cls_loss', 'total_loss']
+        for loss_name in core_losses:
+            if loss_name in loss_breakdown:
+                value = loss_breakdown[loss_name]
+                if hasattr(value, 'item'):
+                    value = value.item()
+                print(f"    {loss_name}: {value:.6f}")
+        
+        # Multi-task loss components
+        if any(key.startswith('layer_') for key in loss_breakdown.keys()):
+            print("\n  Multi-task Loss Components:")
+            
+            # Group by layer
+            layer_losses = {}
+            uncertainty_info = {}
+            
+            for key, value in loss_breakdown.items():
+                if hasattr(value, 'item'):
+                    value = value.item()
+                
+                if key.startswith('layer_') and '_' in key:
+                    layer_name = '_'.join(key.split('_')[:2])  # e.g., 'layer_1'
+                    loss_type = '_'.join(key.split('_')[2:])    # e.g., 'box_loss'
+                    
+                    if layer_name not in layer_losses:
+                        layer_losses[layer_name] = {}
+                    
+                    if 'uncertainty' in loss_type:
+                        uncertainty_info[layer_name] = value
+                    elif 'weighted_loss' in loss_type or 'regularization' in loss_type:
+                        layer_losses[layer_name][loss_type] = value
+                    elif loss_type in ['box_loss', 'obj_loss', 'cls_loss', 'total_loss']:
+                        layer_losses[layer_name][loss_type] = value
+            
+            # Print layer-wise losses
+            for layer_name in sorted(layer_losses.keys()):
+                print(f"\n    {layer_name.upper()}:")
+                layer_loss_dict = layer_losses[layer_name]
+                
+                # Print individual loss components
+                for loss_type in ['box_loss', 'obj_loss', 'cls_loss', 'total_loss']:
+                    if loss_type in layer_loss_dict:
+                        print(f"      {loss_type}: {layer_loss_dict[loss_type]:.6f}")
+                
+                # Print multi-task specific components
+                if 'weighted_loss' in layer_loss_dict:
+                    print(f"      weighted_loss: {layer_loss_dict['weighted_loss']:.6f}")
+                if 'regularization' in layer_loss_dict:
+                    print(f"      regularization: {layer_loss_dict['regularization']:.6f}")
+                
+                # Print uncertainty information
+                if layer_name in uncertainty_info:
+                    uncertainty = uncertainty_info[layer_name]
+                    weight = 1.0 / (2.0 * uncertainty) if uncertainty > 0 else 0.0
+                    print(f"      uncertainty (σ²): {uncertainty:.6f}")
+                    print(f"      dynamic_weight: {weight:.6f}")
+        
+        # Additional loss information
+        misc_info = {}
+        for key, value in loss_breakdown.items():
+            if not key.startswith('layer_') and key not in core_losses:
+                if hasattr(value, 'item'):
+                    value = value.item()
+                misc_info[key] = value
+        
+        if misc_info:
+            print("\n  Additional Loss Info:")
+            for key, value in misc_info.items():
+                if isinstance(value, (int, float)):
+                    print(f"    {key}: {value:.6f}")
+                else:
+                    print(f"    {key}: {value}")
+        
+        print()  # Empty line for spacing
+    
     def _print_metric(self, metric_name: str, value: Any, colored_metrics: Dict[str, Dict]):
         """Print a single metric with color coding."""
         if isinstance(value, (int, float)) and metric_name in colored_metrics:
@@ -138,45 +236,120 @@ class UIMetricsCallback:
         else:
             print(f"    {metric_name}: {value}")
     
+    def _get_phase_appropriate_core_metrics(self, phase: str, metrics: Dict[str, Any]) -> list:
+        """
+        Get core metrics appropriate for the current training phase.
+        
+        Args:
+            phase: Training phase name
+            metrics: Available metrics
+            
+        Returns:
+            List of core metric names appropriate for this phase
+        """
+        # Extract phase number for proper logic
+        phase_num = self._extract_phase_number(phase, metrics)
+        
+        if phase_num == 1:
+            # Phase 1: Focus on core training metrics only
+            core_metrics = [
+                'train_loss', 'val_loss', 'learning_rate', 'epoch',
+                'val_precision', 'val_recall', 'val_f1', 'val_accuracy'
+            ]
+            # Only include map50 if it exists (core detection metric)
+            if 'val_map50' in metrics:
+                core_metrics.insert(2, 'val_map50')  # Add after val_loss
+        else:
+            # Phase 2: Focus on core training + detection metrics
+            core_metrics = [
+                'train_loss', 'val_loss', 'val_map50', 'learning_rate', 'epoch',
+                'val_precision', 'val_recall', 'val_f1', 'val_accuracy'
+            ]
+            # No additional metrics needed - keep it clean
+        
+        # Filter to only include metrics that actually exist
+        return [metric for metric in core_metrics if metric in metrics]
+    
+    def _extract_phase_number(self, phase: str, metrics: Dict[str, Any]) -> int:
+        """
+        Extract phase number from phase string or infer from metrics.
+        
+        Args:
+            phase: Training phase name
+            metrics: Available metrics for inference
+            
+        Returns:
+            Phase number (1 or 2)
+        """
+        # Direct phase detection from string
+        if isinstance(phase, str):
+            if "phase_2" in phase.lower() or phase.lower() == "2":
+                return 2
+            elif "phase_1" in phase.lower() or phase.lower() == "1":
+                return 1
+        elif isinstance(phase, int):
+            return phase
+        
+        # Infer phase from available metrics (fallback)
+        # Phase 2 indicators: multiple active layers (simpler detection)
+        phase_2_indicators = []  # No specific research metrics needed
+        
+        has_phase_2_metrics = False  # Use layer activity detection instead
+        
+        # Also check for multiple active layers (indication of Phase 2)
+        active_layers = 0
+        for layer in ['layer_1', 'layer_2', 'layer_3']:
+            has_layer_activity = any(
+                metrics.get(f'{layer}_{metric}', 0) > 0.0001 or 
+                metrics.get(f'val_{layer}_{metric}', 0) > 0.0001
+                for metric in ['accuracy', 'precision', 'recall', 'f1']
+            )
+            if has_layer_activity:
+                active_layers += 1
+        
+        # If we have Phase 2 specific metrics OR multiple active layers, it's Phase 2
+        if has_phase_2_metrics or active_layers > 1:
+            return 2
+        else:
+            return 1
+    
     def _determine_layer_display(self, phase: str, metrics: Dict[str, Any]) -> Tuple[list, bool]:
         """
         Determine which layers to show and whether to filter zeros based on training phase.
         
-        This implements intelligent phase-aware metrics logic:
-        - Phase 1: Only show layer_1, filter zeros for clean output
-        - Phase 2: Show all layers (layer_1, layer_2, layer_3), don't filter
-        - Single Phase: Auto-detect active layers and adapt display
+        This implements intelligent phase-aware metrics logic aligned with new loss system:
+        - Phase 1: Simple YOLO loss - focus on layer_1, filter zeros for clean output
+        - Phase 2: Multi-task loss - show all layers with meaningful data
+        - Auto-detect based on actual metrics and loss type
         """
-        if phase.lower() == 'training_phase_1':
-            # Two-phase mode, phase 1: Only show layer_1 
-            return ['layer_1'], True  # Filter zeros to reduce clutter
-        elif phase.lower() == 'training_phase_2':
-            # Two-phase mode, phase 2: Show all layers
-            return ['layer_1', 'layer_2', 'layer_3'], False
-        elif phase.lower() == 'training_phase_single':
-            # Single-phase mode: Determine active layers from actual metrics
-            # Check which layers have meaningful (non-zero) metrics to determine if it's single or multi layer mode
-            layer_activity = {}
+        # Use the same phase detection logic
+        phase_num = self._extract_phase_number(phase, metrics)
+        
+        if phase_num == 1:
+            # Phase 1: Simple YOLO loss training
+            # Focus on layer_1 since that's what simple YOLO optimizes
+            # Filter zeros to show only meaningful metrics
+            return ['layer_1'], True
+        else:
+            # Phase 2: Multi-task loss training
+            # Show all layers that have meaningful data
+            active_layers = []
             for layer in ['layer_1', 'layer_2', 'layer_3']:
-                # Check if this layer has any meaningful metrics
+                # Check for any meaningful metrics for this layer
                 has_activity = any(
                     metrics.get(f'{layer}_{metric}', 0) > 0.0001 or 
                     metrics.get(f'val_{layer}_{metric}', 0) > 0.0001
                     for metric in ['accuracy', 'precision', 'recall', 'f1']
                 )
-                layer_activity[layer] = has_activity
+                if has_activity:
+                    active_layers.append(layer)
             
-            # Determine active layers
-            active_layers = [layer for layer, active in layer_activity.items() if active]
-            if len(active_layers) == 1:
-                # Single-phase, single-layer mode: only show the active layer
-                return active_layers, True  # Filter zeros for clean output
-            else:
-                # Single-phase, multi-layer mode: show all layers
-                return ['layer_1', 'layer_2', 'layer_3'], False
-        else:
-            # Default: show all layers
-            return ['layer_1', 'layer_2', 'layer_3'], False
+            # If no layers detected as active, default to all layers
+            if not active_layers:
+                active_layers = ['layer_1', 'layer_2', 'layer_3']
+            
+            # Don't filter zeros in Phase 2 - we want to see all multi-task metrics
+            return active_layers, False
     
     def _filter_layer_metrics(self, metrics: Dict[str, Any], show_layers: list, filter_zeros: bool) -> Dict[str, Any]:
         """
@@ -206,16 +379,36 @@ class UIMetricsCallback:
     
     def _get_remaining_metrics(self, metrics: Dict[str, Any], core_metrics: list, 
                              layer_metrics: Dict[str, Any], ap_metrics: Dict[str, Any]) -> Dict[str, Any]:
-        """Get metrics that don't fit other categories."""
+        """Get metrics that don't fit other categories, filtering out unwanted metrics."""
+        # Patterns of metrics to exclude completely
+        exclude_patterns = [
+            'hierarchical_accuracy', 'research_primary_metric', 'denomination_accuracy',
+            'multi_layer_benefit', '_contribution', 'layer_2_', 'layer_3_',
+            'map50_95', 'map75', 'ap_'
+        ]
+        
         remaining = {}
         for metric_name, value in metrics.items():
-            if (metric_name not in core_metrics and 
-                metric_name not in layer_metrics and
-                metric_name not in ap_metrics and
-                not metric_name.startswith('layer_') and
-                not metric_name.startswith('val_layer_') and
-                not metric_name.startswith('val_ap_')):
-                remaining[metric_name] = value
+            # Skip if already categorized
+            if (metric_name in core_metrics or 
+                metric_name in layer_metrics or
+                metric_name in ap_metrics):
+                continue
+                    
+            # Skip if matches exclude patterns
+            should_exclude = any(pattern in metric_name.lower() for pattern in exclude_patterns)
+            if should_exclude:
+                continue
+                
+            # Skip layer metrics for inactive layers
+            if (metric_name.startswith('layer_') or 
+                metric_name.startswith('val_layer_') or
+                metric_name.startswith('val_ap_')):
+                continue
+                
+            # Only include genuinely useful remaining metrics
+            remaining[metric_name] = value
+            
         return remaining
     
     def get_latest_metrics(self) -> Dict[str, Any]:
@@ -273,17 +466,15 @@ class UIMetricsCallback:
     
     def _get_display_mode_description(self, phase: str, show_layers: list, filter_zeros: bool) -> str:
         """Get a human-readable description of the current display mode."""
-        if phase.lower() == 'training_phase_1':
-            return "Phase 1: Single-layer focus (layer_1 only, filtered for clarity)"
-        elif phase.lower() == 'training_phase_2':
-            return "Phase 2: Multi-layer training (all layers visible)"
-        elif phase.lower() == 'training_phase_single':
-            if len(show_layers) == 1:
-                return f"Single-phase: Single-layer mode ({show_layers[0]} only, filtered)"
-            else:
-                return "Single-phase: Multi-layer mode (all layers visible)"
+        phase_num = self._extract_phase_number(phase, self.latest_metrics)
+        
+        if phase_num == 1:
+            return "Phase 1: Simple YOLO loss training (layer_1 focus, filtered for clarity)"
+        elif phase_num == 2:
+            layer_count = len(show_layers)
+            return f"Phase 2: Multi-task loss training ({layer_count} active layers, all metrics visible)"
         else:
-            return f"Custom phase: {len(show_layers)} layers visible"
+            return f"Custom phase: {len(show_layers)} layers visible (filter_zeros: {filter_zeros})"
 
 
 def create_ui_metrics_callback(verbose: bool = True, 

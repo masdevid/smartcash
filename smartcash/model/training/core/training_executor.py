@@ -94,7 +94,7 @@ class TrainingExecutor:
                     break
             
             # Process batch
-            loss, predictions, processed_predictions, processed_targets = self._process_training_batch(
+            loss, loss_breakdown, predictions, processed_predictions, processed_targets = self._process_training_batch(
                 images, targets, loss_manager, batch_idx, num_batches, phase_num
             )
             
@@ -135,6 +135,9 @@ class TrainingExecutor:
         # Complete batch tracking
         self.progress_tracker.complete_batch_tracking()
         
+        # Store last loss breakdown for metrics callback
+        self._last_loss_breakdown = getattr(self, '_last_loss_breakdown', loss_breakdown if 'loss_breakdown' in locals() else {})
+        
         return {'train_loss': running_loss / num_batches}
     
     def _process_training_batch(self, images, targets, loss_manager, batch_idx, num_batches, phase_num):
@@ -162,9 +165,9 @@ class TrainingExecutor:
                 )
             
             # Calculate loss
-            loss, _ = loss_manager.compute_loss(predictions, targets, images.shape[-1])
+            loss, loss_breakdown = loss_manager.compute_loss(predictions, targets, images.shape[-1])
         
-        return loss, predictions, processed_predictions, processed_targets
+        return loss, loss_breakdown, predictions, processed_predictions, processed_targets
     
     def _backward_pass(self, loss, optimizer, scaler):
         """Perform backward pass with optional mixed precision."""
@@ -186,3 +189,8 @@ class TrainingExecutor:
     def last_targets(self):
         """Get last batch targets for metrics calculation."""
         return self._last_targets
+    
+    @property
+    def last_loss_breakdown(self):
+        """Get last batch loss breakdown for metrics callback."""
+        return getattr(self, '_last_loss_breakdown', {})

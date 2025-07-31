@@ -170,9 +170,9 @@ class TrainingPhaseManager:
                     legacy_val_acc = final_metrics.get('val_accuracy', 0.0)
                     legacy_layer_1_acc = final_metrics.get('val_layer_1_accuracy', 0.0)
                     
-                    logger.info(f"🔍 Phase 1 research metrics validation:")
-                    logger.info(f"    val_denomination_accuracy: {val_denom_acc:.6f} (research metric)")
-                    logger.info(f"    train_denomination_accuracy: {train_denom_acc:.6f} (research metric)")
+                    logger.debug(f"🔍 Phase 1 research metrics validation:")
+                    logger.debug(f"    val_denomination_accuracy: {val_denom_acc:.6f} (research metric)")
+                    logger.debug(f"    train_denomination_accuracy: {train_denom_acc:.6f} (research metric)")
                     
                     # Only check legacy constraint if legacy metrics exist
                     if legacy_val_acc > 0.0 and legacy_layer_1_acc > 0.0:
@@ -186,7 +186,7 @@ class TrainingPhaseManager:
                     # Check research metrics consistency
                     research_diff = abs(val_denom_acc - train_denom_acc) if train_denom_acc > 0.0 else 0.0
                     if research_diff > 0.1:  # Allow normal train/val differences
-                        logger.info(f"📊 Normal train/validation difference: {research_diff:.6f}")
+                        logger.debug(f"📊 Normal train/validation difference: {research_diff:.6f}")
                     else:
                         logger.debug(f"✅ Research metrics consistent: difference = {research_diff:.6f}")
                 
@@ -226,8 +226,8 @@ class TrainingPhaseManager:
                     )
                     metric_name = primary_metric
                     current_val = final_metrics.get(primary_metric, 'N/A')
-                    logger.info(f"🎯 Phase {phase_num} research-focused selection: {metric_name} = {current_val} ({primary_mode})")
-                    logger.info(f"🔬 Research rationale: {criteria['research_justification']}")
+                    logger.debug(f"🎯 Phase {phase_num} research-focused selection: {metric_name} = {current_val} ({primary_mode})")
+                    logger.debug(f"🔬 Research rationale: {criteria['research_justification']}")
                 else:
                     # Use fallback metric
                     is_best = components['metrics_tracker'].is_best_model(
@@ -235,7 +235,7 @@ class TrainingPhaseManager:
                     )
                     metric_name = fallback_metric
                     current_val = final_metrics.get(fallback_metric, 'N/A')
-                    logger.info(f"🎯 Phase {phase_num} fallback selection: {metric_name} = {current_val} ({fallback_mode})")
+                    logger.debug(f"🎯 Phase {phase_num} fallback selection: {metric_name} = {current_val} ({fallback_mode})")
                     logger.warning(f"⚠️ Primary research metric {primary_metric} unavailable, using fallback")
                 
                 logger.debug(f"🔍 Best model check result: is_best = {is_best} for {metric_name} = {current_val}")
@@ -243,17 +243,17 @@ class TrainingPhaseManager:
                 # FALLBACK: Also check manually for improvement to ensure best checkpoints are saved
                 manual_is_best = self._manual_best_check(epoch, phase_num, final_metrics)
                 if manual_is_best and not is_best:
-                    logger.info(f"🔄 Manual best check overriding tracker decision")
+                    logger.debug(f"🔄 Manual best check overriding tracker decision")
                     is_best = True
                 
                 if is_best:
                     # Log which metric triggered the best model save
                     if phase_num == 1:
                         metric_value = final_metrics.get('val_accuracy', 'N/A')
-                        logger.info(f"🏆 New best model (Phase {phase_num}): val_accuracy = {metric_value}")
+                        logger.debug(f"🏆 New best model (Phase {phase_num}): val_accuracy = {metric_value}")
                     else:
                         metric_value = final_metrics.get('val_map50', 'N/A')
-                        logger.info(f"🏆 New best model (Phase {phase_num}): val_map50 = {metric_value}")
+                        logger.debug(f"🏆 New best model (Phase {phase_num}): val_map50 = {metric_value}")
                     
                     # Save complete metrics in checkpoint, not filtered ones
                     best_checkpoint_path = self.checkpoint_manager.save_checkpoint(
@@ -298,6 +298,29 @@ class TrainingPhaseManager:
         """Process and combine epoch metrics."""
         # Combine metrics efficiently
         final_metrics = {**train_metrics, **val_metrics}
+        
+        # Add loss breakdown from training executor if available
+        if hasattr(self.training_executor, 'last_loss_breakdown'):
+            train_loss_breakdown = self.training_executor.last_loss_breakdown
+            if train_loss_breakdown:
+                # Combine with validation loss breakdown if both exist
+                if 'loss_breakdown' in final_metrics:
+                    val_loss_breakdown = final_metrics['loss_breakdown']
+                    # Create combined loss breakdown with both training and validation
+                    combined_loss_breakdown = {}
+                    # Add training loss breakdown with train_ prefix
+                    for key, value in train_loss_breakdown.items():
+                        combined_loss_breakdown[f'train_{key}'] = value
+                    # Add validation loss breakdown with val_ prefix  
+                    for key, value in val_loss_breakdown.items():
+                        combined_loss_breakdown[f'val_{key}'] = value
+                    final_metrics['loss_breakdown'] = combined_loss_breakdown
+                    logger.debug(f"Combined train and validation loss breakdowns: {len(combined_loss_breakdown)} components")
+                else:
+                    # Only training loss breakdown available
+                    train_prefixed = {f'train_{k}': v for k, v in train_loss_breakdown.items()}
+                    final_metrics['loss_breakdown'] = train_prefixed
+                    logger.debug(f"Added training loss breakdown: {len(train_prefixed)} components")
         
         # Add metrics tracker computed metrics
         tracker_metrics = metrics_tracker.compute_epoch_metrics(epoch)
@@ -386,40 +409,47 @@ class TrainingPhaseManager:
             combined_metrics.update(training_research_metrics)
         
         # Keep validation metrics as they are (already processed by validation executor)
-        # Remove confusing old-format metrics
-        cleaned_metrics = self._remove_confusing_metrics(combined_metrics, phase_num)
+        # Filter out only truly unnecessary metrics, preserve loss_breakdown
+        filtered_metrics = self._filter_unnecessary_metrics(combined_metrics, phase_num)
         
-        return cleaned_metrics
+        return filtered_metrics
     
-    def _remove_confusing_metrics(self, metrics: Dict[str, float], phase_num: int) -> Dict[str, float]:
-        """Remove confusing or inappropriate metrics for the research context."""
-        # Patterns to remove based on phase
+    def _filter_unnecessary_metrics(self, metrics: Dict[str, Any], phase_num: int) -> Dict[str, Any]:
+        """Filter out only truly unnecessary metrics while preserving loss_breakdown."""
+        # Always preserve loss_breakdown regardless of phase
+        if 'loss_breakdown' in metrics:
+            loss_breakdown = metrics['loss_breakdown']
+            logger.debug(f"Preserving loss_breakdown with {len(loss_breakdown)} components")
+        
+        # Patterns to remove based on phase (be more selective)
         if phase_num == 1:
-            # Phase 1: Remove multi-layer and object detection metrics
+            # Phase 1: Only remove multi-layer metrics not relevant in Phase 1
             remove_patterns = [
-                'map50_95', 'map50', 'map75', 'map',  # Object detection metrics
                 'layer_2_', 'layer_3_',  # Multi-layer metrics not relevant in Phase 1
-                'box_loss', 'obj_loss', 'cls_loss'  # Low-level losses
+                'map50_95', 'map75'  # Only remove detailed mAP metrics, keep map50
             ]
         elif phase_num == 2:
-            # Phase 2: Remove only object detection metrics that don't support research
-            # Keep map50 as additional detection information
+            # Phase 2: Only remove very detailed mAP metrics
             remove_patterns = [
-                'map50_95', 'map75',  # Remove map50_95 and map75, but keep map50
-                'box_loss', 'obj_loss', 'cls_loss'  # Low-level losses
+                'map50_95', 'map75'  # Remove detailed mAP, keep map50 for detection info
             ]
         else:
-            remove_patterns = ['map50_95', 'box_loss', 'obj_loss', 'cls_loss']
+            remove_patterns = ['map50_95', 'map75']
         
-        cleaned = {}
+        filtered = {}
         for key, value in metrics.items():
+            # Always preserve loss_breakdown and its components
+            if key == 'loss_breakdown' or any(loss_comp in key for loss_comp in ['box_loss', 'obj_loss', 'cls_loss']):
+                filtered[key] = value
+                continue
+                
             should_remove = any(pattern in key.lower() for pattern in remove_patterns)
             if not should_remove:
-                cleaned[key] = value
+                filtered[key] = value
             else:
-                logger.debug(f"Removed confusing metric for Phase {phase_num}: {key}")
+                logger.debug(f"Filtered unnecessary metric for Phase {phase_num}: {key}")
         
-        return cleaned
+        return filtered
     
     def _ensure_required_metrics(self, final_metrics: Dict[str, Any]):
         """Ensure all required metrics are present with default values."""
@@ -437,7 +467,9 @@ class TrainingPhaseManager:
         Note: final_metrics received here should be phase-filtered to show only relevant metrics.
         """
         # Emit metrics callback for UI (using phase-filtered metrics)
-        self.progress_manager.emit_epoch_metrics(phase_num, epoch + 1, final_metrics)
+        # Extract loss breakdown if available from validation metrics
+        loss_breakdown = final_metrics.get('loss_breakdown', {})
+        self.progress_manager.emit_epoch_metrics(phase_num, epoch + 1, final_metrics, loss_breakdown)
         
         # Emit live chart data (using phase-filtered metrics)
         self.progress_manager.emit_training_charts(epoch, phase_num, final_metrics, layer_metrics)
@@ -618,14 +650,9 @@ class TrainingPhaseManager:
             self._manual_best_values = {}
         
         try:
-            if phase_num == 1:
-                metric_name = 'val_accuracy'
-                current_value = final_metrics.get('val_accuracy', 0.0)
-                mode = 'max'
-            else:
-                metric_name = 'val_map50'
-                current_value = final_metrics.get('val_map50', 0.0)
-                mode = 'max'
+            metric_name = 'val_accuracy'
+            current_value = final_metrics.get('val_accuracy', 0.0)
+            mode = 'max'
             
             # First epoch for this metric
             if metric_name not in self._manual_best_values:

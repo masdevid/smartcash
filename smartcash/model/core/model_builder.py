@@ -42,7 +42,6 @@ class ModelBuilder:
         
         # Force CPU mode to avoid MPS issues
         self.device = torch.device("cpu")
-        self.logger.debug("🖥️  Using CPU (MPS disabled due to compatibility issues)")
         
         # Set environment variables to prevent MPS usage
         import os
@@ -61,7 +60,6 @@ class ModelBuilder:
         # Initialize YOLOv5 integration if available
         if YOLOV5_INTEGRATION_AVAILABLE:
             self.yolov5_integration = SmartCashYOLOv5Integration(logger=self.logger)
-            self.logger.debug("✅ YOLOv5 integration available")
         else:
             self.yolov5_integration = None
             self.logger.warning("⚠️ YOLOv5 integration not available, using legacy mode only")
@@ -88,7 +86,10 @@ class ModelBuilder:
         detection_layers = detection_layers or ['layer_1', 'layer_2', 'layer_3']
         feature_optimization = feature_optimization or {'enabled': True}
         
-        self.logger.debug(f"🏗️ Building SmartCash YOLOv5 model: {backbone} | Mode: {layer_mode} | Architecture: yolov5")
+        if self.progress_bridge:
+            self.progress_bridge.update_operation(1, 4, f"Building SmartCash YOLOv5 model: {backbone} | Mode: {layer_mode} | Architecture: yolov5")
+        else:
+            self.logger.info(f"🏗️ Building SmartCash YOLOv5 model: {backbone} | Mode: {layer_mode} | Architecture: yolov5")
         
         # Always use YOLOv5 architecture
         if self.yolov5_integration:
@@ -119,7 +120,10 @@ class ModelBuilder:
         if not optimization_config.get('enabled', True):
             return model
             
-        self.logger.debug("🔧 Applying feature optimization...")
+        if self.progress_bridge:
+            self.progress_bridge.update_substep(1, 2, "Applying feature optimization...")
+        else:
+            self.logger.info("🔧 Applying feature optimization...")
         
         # Freeze backbone layers if specified
         if optimization_config.get('freeze_backbone', False):
@@ -204,7 +208,10 @@ class ModelBuilder:
                 model._smartcash_layer_mode = layer_mode
                 model._smartcash_detection_layers = detection_layers
                 
-            self.logger.info(f"✅ YOLOv5 model built successfully ({backbone})")
+            if self.progress_bridge:
+                self.progress_bridge.complete_operation(4, f"YOLOv5 model built successfully ({backbone})")
+            else:
+                self.logger.info(f"✅ YOLOv5 model built successfully ({backbone})")
             return model
             
         except Exception as e:

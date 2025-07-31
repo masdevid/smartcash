@@ -92,7 +92,7 @@ training:
   early_stopping:
     enabled: true
     patience: 15  # Epochs to wait before stopping
-    metric: val_map50  # Metric to monitor (val_loss, val_map50, val_accuracy, etc.)
+    metric: val_accuracy  # Keep using accuracy max as requested
     mode: max  # One of: min, max
     min_delta: 0.001  # Minimum change to qualify as improvement
     adaptive: false  # Enable adaptive early stopping

@@ -85,11 +85,12 @@ class UncertaintyMultiTaskLoss(nn.Module):
             total_loss: Weighted total loss
             loss_breakdown: Detailed loss components
         """
+        self.logger.debug(f"Multi-task loss forward: predictions={list(predictions.keys())}, targets={list(targets.keys())}")
         # Determine device from predictions or fallback to CPU
         device = torch.device('cpu')  # Default device
         if predictions:
             for pred_list in predictions.values():
-                if pred_list and isinstance(pred_list, list) and len(pred_list) > 0:
+                if pred_list is not None and isinstance(pred_list, list) and len(pred_list) > 0:
                     if isinstance(pred_list[0], torch.Tensor):
                         device = pred_list[0].device
                         break
@@ -146,22 +147,42 @@ class UncertaintyMultiTaskLoss(nn.Module):
                 if isinstance(layer_targets, torch.Tensor):
                     layer_targets = layer_targets.to(device)
                 
-                if layer_targets is not None and (not isinstance(layer_targets, (list, tuple)) or len(layer_targets) > 0):
+                # Safe check for valid targets - avoid Boolean tensor comparison
+                has_valid_targets = False
+                if layer_targets is not None:
+                    self.logger.debug(f"Checking targets for {layer_name}: type={type(layer_targets)}, tensor={torch.is_tensor(layer_targets)}")
+                    if torch.is_tensor(layer_targets):
+                        has_valid_targets = layer_targets.numel() > 0
+                        self.logger.debug(f"  {layer_name} tensor targets: numel={layer_targets.numel()}, valid={has_valid_targets}")
+                    elif isinstance(layer_targets, (list, tuple)):
+                        has_valid_targets = len(layer_targets) > 0
+                        self.logger.debug(f"  {layer_name} list/tuple targets: len={len(layer_targets)}, valid={has_valid_targets}")
+                    else:
+                        has_valid_targets = True
+                        self.logger.debug(f"  {layer_name} other targets: valid={has_valid_targets}")
+                
+                if has_valid_targets:
                     # Compute YOLO loss for this layer
                     loss_fn = self.layer_losses[layer_name]
                     try:
                         # Convert predictions to format expected by YOLOLoss
+                        self.logger.debug(f"Converting predictions for {layer_name}: {len(layer_preds)} prediction tensors")
                         converted_preds = convert_for_yolo_loss(layer_preds, img_size)
+                        self.logger.debug(f"Converted predictions for {layer_name}: {len(converted_preds)} tensors")
                         
                         # Call YOLOLoss with converted predictions
+                        self.logger.debug(f"Calling YOLOLoss for {layer_name} with targets shape: {layer_targets.shape if hasattr(layer_targets, 'shape') else 'no shape'}")
                         layer_loss, layer_components = loss_fn(converted_preds, layer_targets, img_size)
                         layer_losses[layer_name] = layer_loss
+                        self.logger.debug(f"YOLOLoss completed for {layer_name}: loss={layer_loss.item():.6f}")
                         
                         # Store individual loss components with layer prefix
                         for comp_name, comp_value in layer_components.items():
                             loss_breakdown[f"{layer_name}_{comp_name}"] = comp_value
                     except Exception as e:
+                        import traceback
                         self.logger.error(f"Error computing loss for layer {layer_name}: {str(e)}")
+                        self.logger.error(f"Traceback: {traceback.format_exc()}")
                         layer_losses[layer_name] = torch.tensor(0.0, device=device, requires_grad=True)
                         loss_breakdown[f"{layer_name}_total_loss"] = torch.tensor(0.0, device=device)
                 else:

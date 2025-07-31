@@ -305,7 +305,7 @@ class YOLOLoss(nn.Module):
                                 (gj >= 0) & (gj < target_obj.size(2)) & \
                                 (gi >= 0) & (gi < target_obj.size(3))
                     
-                    if valid_mask.any():
+                    if valid_mask.any().item():
                         # Update objectness target only for valid indices
                         target_obj[b[valid_mask], a[valid_mask], gj[valid_mask], gi[valid_mask]] = 1.0
                         
@@ -339,8 +339,8 @@ class YOLOLoss(nn.Module):
                     # If shapes don't match, create a new tensor with the correct shape
                     new_tobj = torch.zeros_like(pred_obj)
                     
-                    # If we have any positive samples, copy them to the correct positions
-                    if tobj.any():
+                    # If we have any positive samples, copy them to the correct positions  
+                    if tobj.any().item():
                         # Get indices of positive samples
                         pos_indices = (tobj > 0).nonzero(as_tuple=True)
                         
@@ -828,8 +828,10 @@ class LossManager:
         
         # Use MODEL_ARC.md compliant uncertainty-based multi-task loss if available
         if hasattr(self, 'use_multi_task_loss') and self.use_multi_task_loss:
+            self.logger.debug(f"Using multi-task loss computation for {len(predictions)} layers")
             return self._compute_multi_task_loss(predictions, targets, img_size)
         else:
+            self.logger.debug(f"Using individual loss computation for {len(predictions)} layers")
             return self._compute_individual_losses(predictions, targets, img_size)
     
     def _compute_multi_task_loss(self, predictions: Dict[str, List[torch.Tensor]], 
@@ -847,12 +849,12 @@ class LossManager:
                     layer_targets[layer_name] = filtered_targets
                 else:
                     # Log when no targets found for a layer
-                    logger.debug(f"No targets found for {layer_name}: filtered_targets type={type(filtered_targets)}, numel={filtered_targets.numel() if torch.is_tensor(filtered_targets) else 'N/A'}")
+                    self.logger.debug(f"No targets found for {layer_name}: filtered_targets type={type(filtered_targets)}, numel={filtered_targets.numel() if torch.is_tensor(filtered_targets) else 'N/A'}")
         
         # Debug: Check if we have any layer targets at all
         if len(layer_targets) == 0:
-            logger.warning(f"No layer targets found for any layer. Original targets shape: {targets.shape if hasattr(targets, 'shape') else 'no shape'}")
-            logger.warning(f"Available prediction layers: {list(predictions.keys())}")
+            self.logger.warning(f"No layer targets found for any layer. Original targets shape: {targets.shape if hasattr(targets, 'shape') else 'no shape'}")
+            self.logger.warning(f"Available prediction layers: {list(predictions.keys())}")
             # Return small loss instead of zero to avoid optimization issues
             return torch.tensor(1e-6, device=targets.device, requires_grad=True), metrics
         
@@ -872,6 +874,7 @@ class LossManager:
         
         try:
             # Use uncertainty-based multi-task loss
+            self.logger.debug(f"Calling multi_task_loss with predictions keys: {list(predictions.keys())}, layer_targets keys: {list(layer_targets.keys())}")
             total_loss, loss_breakdown = self.multi_task_loss(predictions, layer_targets, img_size)
             
             # Update metrics from loss breakdown
@@ -899,9 +902,11 @@ class LossManager:
             return total_loss, metrics
             
         except Exception as e:
+            import traceback
             self.logger.error(f"Error in multi-task loss computation: {str(e)}")
-            # Return zero metrics if there's an error
-            return torch.tensor(0.0, device=targets.device), metrics
+            self.logger.error(f"Traceback: {traceback.format_exc()}")
+            # Return small loss instead of zero to avoid optimization issues
+            return torch.tensor(1e-6, device=targets.device, requires_grad=True), metrics
     
     def _compute_individual_losses(self, predictions: Dict[str, List[torch.Tensor]], 
                                   targets: torch.Tensor, img_size: int = 640) -> Tuple[torch.Tensor, Dict[str, Any]]:
@@ -912,7 +917,7 @@ class LossManager:
         
         # Debug: Check if we have targets
         if not hasattr(targets, 'shape') or targets.numel() == 0:
-            logger.warning(f"Individual loss computation: No targets available. Targets type: {type(targets)}")
+            self.logger.warning(f"Individual loss computation: No targets available. Targets type: {type(targets)}")
             return torch.tensor(1e-6, device=device, requires_grad=True), loss_breakdown
         
         # Handle single layer mode
@@ -994,10 +999,18 @@ class LossManager:
         # Extract class IDs safely
         class_ids = targets[:, 1].long()  # Get all class IDs as long tensor
         
+        # Debug: Log original class IDs to understand filtering
+        unique_class_ids = torch.unique(class_ids).cpu().tolist()
+        self.logger.debug(f"Filter targets for {layer_name}: original classes={unique_class_ids}, valid_classes={valid_classes}")
+        
         # Create mask for valid classes
         mask = torch.zeros(targets.shape[0], dtype=torch.bool, device=targets.device)
         for class_id in valid_classes:
             mask |= (class_ids == class_id)
+        
+        # Debug: Check how many targets match
+        num_matching = mask.sum().item()
+        self.logger.debug(f"Filter targets for {layer_name}: {num_matching}/{targets.shape[0]} targets match valid classes")
         
         filtered_targets = targets[mask].clone()
         

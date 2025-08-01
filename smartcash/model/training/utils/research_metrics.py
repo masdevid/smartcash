@@ -24,28 +24,28 @@ class ResearchMetricsManager:
     """Manages research-focused metrics with clear naming and phase-appropriate selection."""
     
     def __init__(self):
-        """Initialize research metrics manager."""
+        """Initialize simplified metrics manager focused on standard YOLO metrics."""
+        # Simplified metrics - focus on standard YOLO training metrics
         self.phase_1_focus_metrics = [
-            'denomination_accuracy',  # Primary research metric: can we detect denominations?
-            'denomination_precision', 
-            'denomination_recall',
-            'denomination_f1'
+            'accuracy',  # Standard classification accuracy
+            'precision', 
+            'recall',
+            'f1',
+            'map50'      # Object detection mAP
         ]
         
         self.phase_2_focus_metrics = [
-            'denomination_accuracy',      # Still primary: did multi-layer improve denomination detection?
-            'hierarchical_accuracy',      # Combined multi-layer performance
-            'layer_1_contribution',       # Individual layer contributions
-            'layer_2_contribution',
-            'layer_3_contribution',
-            'multi_layer_benefit',        # Improvement over single-layer
-            'detection_map50'             # Additional detection performance information
+            'accuracy',       # Standard classification accuracy
+            'precision', 
+            'recall',
+            'f1',
+            'map50'          # Object detection mAP
         ]
     
     def standardize_metric_names(self, raw_metrics: Dict[str, float], phase_num: int, 
                                 is_validation: bool = False) -> Dict[str, float]:
         """
-        Convert raw metrics to standardized research-focused naming.
+        Convert raw metrics to standardized simple naming focused on YOLO metrics.
         
         Args:
             raw_metrics: Raw metrics from training/validation
@@ -58,289 +58,91 @@ class ResearchMetricsManager:
         standardized = {}
         prefix = "val_" if is_validation else "train_"
         
-        # Debug: Log loss key mapping for training loss issues
-        loss_key_found = None
-        if 'loss' in raw_metrics:
-            loss_key_found = 'loss'
-        elif 'train_loss' in raw_metrics:
-            loss_key_found = 'train_loss'
-        elif 'val_loss' in raw_metrics:
-            loss_key_found = 'val_loss'
+        # Simple approach: Just use the standard metrics from raw_metrics
+        # Focus on core YOLO metrics: loss, accuracy, precision, recall, f1, map50
         
-        if not is_validation and loss_key_found:
-            from smartcash.common.logger import get_logger
-            logger = get_logger(__name__)
-            logger.debug(f"🔍 Research metrics mapping: found loss in '{loss_key_found}' = {raw_metrics[loss_key_found]:.6f}")
+        # Loss (always included)
+        standardized[f"{prefix}loss"] = raw_metrics.get('loss', raw_metrics.get('train_loss', raw_metrics.get('val_loss', 0.0)))
         
-        # Debug: Log raw metrics for validation issues
+        # Classification metrics - use layer_1 if available, otherwise use generic
+        if 'layer_1_accuracy' in raw_metrics:
+            # Use layer_1 metrics (preferred for both Phase 1 and 2)
+            standardized[f"{prefix}accuracy"] = raw_metrics.get('layer_1_accuracy', 0.0)
+            standardized[f"{prefix}precision"] = raw_metrics.get('layer_1_precision', 0.0)
+            standardized[f"{prefix}recall"] = raw_metrics.get('layer_1_recall', 0.0)
+            standardized[f"{prefix}f1"] = raw_metrics.get('layer_1_f1', 0.0)
+        else:
+            # Use generic metrics as fallback
+            standardized[f"{prefix}accuracy"] = raw_metrics.get('accuracy', 0.0)
+            standardized[f"{prefix}precision"] = raw_metrics.get('precision', 0.0)
+            standardized[f"{prefix}recall"] = raw_metrics.get('recall', 0.0)
+            standardized[f"{prefix}f1"] = raw_metrics.get('f1', 0.0)
+        
+        # Detection metrics - mAP
+        if 'map50' in raw_metrics:
+            standardized[f"{prefix}map50"] = raw_metrics['map50']
+        elif 'val_map50' in raw_metrics:
+            standardized[f"{prefix}map50"] = raw_metrics['val_map50']
+        else:
+            standardized[f"{prefix}map50"] = 0.0
+        
+        # For validation metrics, also provide backward compatibility names
         if is_validation:
-            from smartcash.common.logger import get_logger
-            logger = get_logger(__name__)
-            has_layer_metrics = any('layer_' in key for key in raw_metrics.keys())
-            if not has_layer_metrics:
-                logger.warning(f"⚠️ Phase {phase_num} validation: No layer_* metrics in raw_metrics!")
-                logger.warning(f"   • Available keys: {list(raw_metrics.keys())}")
-            else:
-                layer_keys = [k for k in raw_metrics.keys() if 'layer_' in k]
-                logger.debug(f"✅ Phase {phase_num} validation: Found layer metrics: {layer_keys}")
+            # Ensure we have the expected validation metric names
+            if f"{prefix}accuracy" in standardized:
+                standardized["val_accuracy"] = standardized[f"{prefix}accuracy"]
+            if f"{prefix}precision" in standardized:
+                standardized["val_precision"] = standardized[f"{prefix}precision"]
+            if f"{prefix}recall" in standardized:
+                standardized["val_recall"] = standardized[f"{prefix}recall"]
+            if f"{prefix}f1" in standardized:
+                standardized["val_f1"] = standardized[f"{prefix}f1"]
+            if f"{prefix}map50" in standardized:
+                standardized["val_map50"] = standardized[f"{prefix}map50"]
         
-        # Phase 1: Focus on denomination detection (Layer 1 only)
-        if phase_num == 1:
-            # Check if layer_1 metrics are available (primary source)
-            has_layer_1_metrics = any(key.startswith('layer_1_') for key in raw_metrics.keys())
-            
-            
-            if has_layer_1_metrics:
-                # Use layer_1 metrics directly (preferred)
-                layer_1_accuracy = raw_metrics.get('layer_1_accuracy', 0.0)
-                layer_1_precision = raw_metrics.get('layer_1_precision', 0.0)
-                layer_1_recall = raw_metrics.get('layer_1_recall', 0.0)
-                layer_1_f1 = raw_metrics.get('layer_1_f1', 0.0)
-                
-                if is_validation:
-                    logger.debug(f"✅ Phase 1 using layer_1_* metrics directly:")
-                    logger.debug(f"   • layer_1_accuracy: {layer_1_accuracy:.6f}")
-                    logger.debug(f"   • layer_1_precision: {layer_1_precision:.6f}")
-            else:
-                if is_validation:
-                    logger.error(f"🚨 CRITICAL: Phase 1 layer_1_* metrics missing!")
-                    logger.error(f"   • Available raw keys: {list(raw_metrics.keys())}")
-                    logger.error(f"   • This indicates validation processing failed")
-                
-                # Try generic metrics as fallback, but this shouldn't happen if validation works correctly
-                layer_1_accuracy = raw_metrics.get('accuracy', 0.0)
-                layer_1_precision = raw_metrics.get('precision', 0.0)  
-                layer_1_recall = raw_metrics.get('recall', 0.0)
-                layer_1_f1 = raw_metrics.get('f1', 0.0)
-                
-                if is_validation:
-                    logger.error(f"   • Using fallback: accuracy={layer_1_accuracy:.6f}, precision={layer_1_precision:.6f}")
-                    logger.error(f"   • These may be static values - fix the validation executor!")
-            
-            # Debug: Log what values we're using for research metrics
-            if is_validation:
-                logger.debug(f"🔬 Phase 1 research metrics mapping:")
-                logger.debug(f"   • layer_1_accuracy: {layer_1_accuracy:.6f} (raw: {raw_metrics.get('layer_1_accuracy', 'N/A')})")
-                logger.debug(f"   • layer_1_precision: {layer_1_precision:.6f} (raw: {raw_metrics.get('layer_1_precision', 'N/A')})")
-                logger.debug(f"   • Available raw keys: {list(raw_metrics.keys())}")
-            
-            # Add small epsilon to avoid exactly zero values that might be interpreted as static
-            epsilon = 1e-6
-            layer_1_accuracy = max(epsilon, layer_1_accuracy)
-            layer_1_precision = max(epsilon, layer_1_precision)
-            layer_1_recall = max(epsilon, layer_1_recall)
-            layer_1_f1 = max(epsilon, layer_1_f1)
-            
-            standardized.update({
-                f"{prefix}denomination_accuracy": layer_1_accuracy,
-                f"{prefix}denomination_precision": layer_1_precision,
-                f"{prefix}denomination_recall": layer_1_recall,
-                f"{prefix}denomination_f1": layer_1_f1,
-                f"{prefix}loss": raw_metrics.get('loss', raw_metrics.get('train_loss', raw_metrics.get('val_loss', 0.0)))
-            })
-            
-            # Research interpretation metrics
-            standardized[f"{prefix}research_primary_metric"] = layer_1_accuracy
-            standardized[f"{prefix}research_interpretation"] = "single_layer_denomination_detection"
-            
-        # Phase 2: Focus on multi-layer hierarchical benefit
-        elif phase_num == 2:
-            # Individual layer contributions
-            layer_1_acc = raw_metrics.get('layer_1_accuracy', 0.0)
-            layer_2_acc = raw_metrics.get('layer_2_accuracy', 0.0) 
-            layer_3_acc = raw_metrics.get('layer_3_accuracy', 0.0)
-            
-            # Calculate hierarchical metrics
-            hierarchical_accuracy = self._calculate_hierarchical_accuracy(raw_metrics)
-            multi_layer_benefit = self._calculate_multi_layer_benefit(raw_metrics)
-            
-            standardized.update({
-                # Core research metrics
-                f"{prefix}denomination_accuracy": layer_1_acc,  # Still primary for comparison
-                f"{prefix}hierarchical_accuracy": hierarchical_accuracy,
-                f"{prefix}multi_layer_benefit": multi_layer_benefit,
-                
-                # Individual layer contributions  
-                f"{prefix}layer_1_contribution": layer_1_acc,
-                f"{prefix}layer_2_contribution": layer_2_acc,
-                f"{prefix}layer_3_contribution": layer_3_acc,
-                
-                # Supporting metrics
-                f"{prefix}loss": raw_metrics.get('loss', raw_metrics.get('train_loss', raw_metrics.get('val_loss', 0.0))),
-                f"{prefix}denomination_precision": raw_metrics.get('layer_1_precision', 0.0),
-                f"{prefix}denomination_recall": raw_metrics.get('layer_1_recall', 0.0),
-                f"{prefix}denomination_f1": raw_metrics.get('layer_1_f1', 0.0),
-                
-                # Additional detection information (Phase 2 only)
-                f"{prefix}detection_map50": raw_metrics.get('detection_map50', raw_metrics.get('map50', 0.0))
-            })
-            
-            # Ensure detection_map50 is included in Phase 2
-            if f"{prefix}detection_map50" not in standardized:
-                standardized[f"{prefix}detection_map50"] = 0.0
-            
-            # Research interpretation metrics
-            standardized[f"{prefix}research_primary_metric"] = hierarchical_accuracy
-            standardized[f"{prefix}research_interpretation"] = "multi_layer_hierarchical_detection"
-        
-        # Add backward compatibility metrics for UI and progress tracking
-        if is_validation:
-            # Provide legacy metric names for backward compatibility
-            if f"{prefix}denomination_accuracy" in standardized:
-                standardized["val_accuracy"] = standardized[f"{prefix}denomination_accuracy"]
-                logger.debug(f"🔄 Legacy compatibility: val_accuracy = {standardized['val_accuracy']:.6f} (from {prefix}denomination_accuracy)")
-            if f"{prefix}denomination_precision" in standardized:
-                standardized["val_precision"] = standardized[f"{prefix}denomination_precision"]
-                logger.debug(f"🔄 Legacy compatibility: val_precision = {standardized['val_precision']:.6f} (from {prefix}denomination_precision)")
-            if f"{prefix}denomination_recall" in standardized:
-                standardized["val_recall"] = standardized[f"{prefix}denomination_recall"]
-                logger.debug(f"🔄 Legacy compatibility: val_recall = {standardized['val_recall']:.6f} (from {prefix}denomination_recall)")
-            if f"{prefix}denomination_f1" in standardized:
-                standardized["val_f1"] = standardized[f"{prefix}denomination_f1"]
-                logger.debug(f"🔄 Legacy compatibility: val_f1 = {standardized['val_f1']:.6f} (from {prefix}denomination_f1)")
-            
-            # Debug: Check if we're getting the same static values
-            if "val_accuracy" in standardized and "val_precision" in standardized:
-                if (abs(standardized["val_accuracy"] - 0.0321) < 0.0001 and 
-                    abs(standardized["val_precision"] - 0.0010) < 0.0001):
-                    logger.error(f"🚨 STATIC VALIDATION METRICS DETECTED!")
-                    logger.error(f"   • val_accuracy: {standardized['val_accuracy']:.6f}")
-                    logger.error(f"   • val_precision: {standardized['val_precision']:.6f}")
-                    logger.error(f"   • Raw metrics input keys: {list(raw_metrics.keys())}")
-                    logger.error(f"   • Available layer metrics: {[k for k in raw_metrics.keys() if 'layer_' in k]}")
-        
-        # Remove confusing metrics that don't align with research goals
-        return self._filter_research_relevant_metrics(standardized, phase_num)
-    
-    def _calculate_hierarchical_accuracy(self, raw_metrics: Dict[str, float]) -> float:
-        """Calculate combined hierarchical accuracy across all active layers."""
-        layer_1_acc = raw_metrics.get('layer_1_accuracy', 0.0)
-        layer_2_acc = raw_metrics.get('layer_2_accuracy', 0.0)
-        layer_3_acc = raw_metrics.get('layer_3_accuracy', 0.0)
-        
-        # Weighted average: Layer 1 most important (denomination), others supportive
-        hierarchical_acc = (0.6 * layer_1_acc + 0.25 * layer_2_acc + 0.15 * layer_3_acc)
-        return hierarchical_acc
-    
-    def _calculate_multi_layer_benefit(self, raw_metrics: Dict[str, float]) -> float:
-        """Calculate improvement benefit from using multiple layers vs single layer."""
-        layer_1_acc = raw_metrics.get('layer_1_accuracy', 0.0)
-        hierarchical_acc = self._calculate_hierarchical_accuracy(raw_metrics)
-        
-        # Benefit = hierarchical performance - single layer performance
-        benefit = max(0.0, hierarchical_acc - layer_1_acc)
-        return benefit
-    
-    def _filter_research_relevant_metrics(self, metrics: Dict[str, float], phase_num: int) -> Dict[str, float]:
-        """Remove metrics that don't support the research goals."""
-        # Metrics to exclude (confusing/irrelevant for denomination research)
-        excluded_patterns = [
-            'map50_95',  # Not relevant for classification research
-            'map75',     # Object detection metric, not classification  
-            'box_loss',  # Low-level loss, not research-relevant
-            'obj_loss',  # Low-level loss, not research-relevant
-            'cls_loss'   # Low-level loss, not research-relevant
-        ]
-        
-        # In Phase 2, allow map50 and detection_map50 as additional information
-        if phase_num == 2:
-            # Remove 'map50' from exclusions for Phase 2
-            excluded_patterns = [p for p in excluded_patterns if p != 'map50']
-        
-        filtered = {}
-        for key, value in metrics.items():
-            # Skip if key contains any excluded pattern
-            if not any(pattern in key.lower() for pattern in excluded_patterns):
-                filtered[key] = value
-            else:
-                logger.debug(f"Filtered out non-research metric: {key}")
-        
-        return filtered
+        return standardized
     
     def get_best_model_criteria(self, phase_num: int) -> Dict[str, Any]:
         """
-        Get research-focused criteria for selecting the best model in each phase.
+        Get simplified criteria for selecting the best model.
         
         Args:
             phase_num: Current training phase
             
         Returns:
-            Dictionary with metric name, mode, and research justification
+            Dictionary with metric name and mode
         """
-        if phase_num == 1:
-            return {
-                'metric': 'val_denomination_accuracy',
-                'mode': 'max',
-                'research_justification': 'Phase 1 tests single-layer denomination detection capability',
-                'fallback_metric': 'val_denomination_f1',
-                'fallback_mode': 'max'
-            }
-        elif phase_num == 2:
-            return {
-                'metric': 'val_hierarchical_accuracy', 
-                'mode': 'max',
-                'research_justification': 'Phase 2 tests multi-layer hierarchical detection improvement',
-                'fallback_metric': 'val_multi_layer_benefit',
-                'fallback_mode': 'max'
-            }
-        else:
-            # Default fallback
-            return {
-                'metric': 'val_denomination_accuracy',
-                'mode': 'max', 
-                'research_justification': 'Default denomination detection focus',
-                'fallback_metric': 'val_loss',
-                'fallback_mode': 'min'
-            }
+        # Use accuracy as primary metric for all phases
+        return {
+            'metric': 'val_accuracy',
+            'mode': 'max',
+            'fallback_metric': 'val_f1',
+            'fallback_mode': 'max'
+        }
     
     def generate_research_summary(self, phase_num: int, final_metrics: Dict[str, float]) -> str:
-        """Generate research-focused summary of training results."""
-        if phase_num == 1:
-            denom_acc = final_metrics.get('val_denomination_accuracy', 0.0)
-            summary = f"""
-🔬 PHASE 1 RESEARCH RESULTS - Single-Layer Denomination Detection:
-• Denomination Accuracy: {denom_acc:.4f} ({denom_acc*100:.2f}%)
-• Research Question: Can Layer 1 alone detect Indonesian Rupiah denominations?
-• Result: {'SUCCESS' if denom_acc > 0.7 else 'MODERATE' if denom_acc > 0.5 else 'NEEDS_IMPROVEMENT'}
-• Interpretation: {'Strong single-layer performance' if denom_acc > 0.7 else 'Baseline established for multi-layer comparison'}
-            """.strip()
+        """Generate simple summary of training results."""
+        accuracy = final_metrics.get('val_accuracy', 0.0)
+        f1 = final_metrics.get('val_f1', 0.0)
+        map50 = final_metrics.get('val_map50', 0.0)
         
-        elif phase_num == 2:
-            denom_acc = final_metrics.get('val_denomination_accuracy', 0.0)
-            hierarchical_acc = final_metrics.get('val_hierarchical_accuracy', 0.0)
-            benefit = final_metrics.get('val_multi_layer_benefit', 0.0)
-            detection_map50 = final_metrics.get('val_detection_map50', 0.0)
-            
-            summary = f"""
-🔬 PHASE 2 RESEARCH RESULTS - Multi-Layer Hierarchical Detection:
-• Denomination Accuracy: {denom_acc:.4f} ({denom_acc*100:.2f}%)
-• Hierarchical Accuracy: {hierarchical_acc:.4f} ({hierarchical_acc*100:.2f}%)
-• Multi-Layer Benefit: +{benefit:.4f} (+{benefit*100:.2f}% improvement)
-• Additional Detection Info: mAP@0.5 = {detection_map50:.4f} ({detection_map50*100:.2f}%)
-• Research Question: Does multi-layer approach improve denomination detection?
-• Result: {'SIGNIFICANT_IMPROVEMENT' if benefit > 0.05 else 'MODERATE_IMPROVEMENT' if benefit > 0.02 else 'MINIMAL_BENEFIT'}
-• Interpretation: {'Multi-layer architecture provides substantial benefit' if benefit > 0.05 else 'Limited improvement from hierarchical approach'}
-            """.strip()
+        summary = f"""
+📊 PHASE {phase_num} TRAINING RESULTS:
+• Validation Accuracy: {accuracy:.4f} ({accuracy*100:.2f}%)
+• Validation F1: {f1:.4f} ({f1*100:.2f}%)
+• mAP@0.5: {map50:.4f} ({map50*100:.2f}%)
+        """.strip()
         
         return summary
     
     def log_phase_appropriate_metrics(self, phase_num: int, metrics: Dict[str, float]):
-        """Log only the metrics relevant to the current phase and research goals."""
-        if phase_num == 1:
-            logger.info("📊 PHASE 1 - Single-Layer Denomination Detection Metrics:")
-            for metric in self.phase_1_focus_metrics:
-                for prefix in ['train_', 'val_']:
-                    key = f"{prefix}{metric}"
-                    if key in metrics:
-                        logger.info(f"   • {key}: {metrics[key]:.6f}")
-        
-        elif phase_num == 2:
-            logger.info("📊 PHASE 2 - Multi-Layer Hierarchical Detection Metrics:")
-            for metric in self.phase_2_focus_metrics:
-                for prefix in ['train_', 'val_']:
-                    key = f"{prefix}{metric}"
-                    if key in metrics:
-                        logger.info(f"   • {key}: {metrics[key]:.6f}")
+        """Log standard YOLO metrics for both phases."""
+        logger.info(f"📊 PHASE {phase_num} - Standard YOLO Metrics:")
+        for metric in ['accuracy', 'precision', 'recall', 'f1', 'map50']:
+            for prefix in ['train_', 'val_']:
+                key = f"{prefix}{metric}"
+                if key in metrics:
+                    logger.info(f"   • {key}: {metrics[key]:.6f}")
 
 # Global instance
 _research_metrics_manager = None

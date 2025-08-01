@@ -765,11 +765,10 @@ class ComprehensiveMetricsTracker:
         """Extract research-focused accuracy trends from epoch metrics."""
         trends = {}
         
-        # Primary research metrics to track
+        # Primary metrics to track
         research_metrics = [
-            'val_denomination_accuracy',  # Phase 1 & 2 primary
-            'val_hierarchical_accuracy',  # Phase 2 primary
-            'train_denomination_accuracy',  # Training comparison
+            'val_accuracy',   # Primary validation metric
+            'train_accuracy', # Training comparison
         ]
         
         for metric_name in research_metrics:
@@ -797,12 +796,12 @@ class ComprehensiveMetricsTracker:
         """Extract secondary research metrics trends."""
         trends = {}
         
-        # Phase-appropriate secondary metrics
+        # Secondary metrics
         secondary_metrics = [
-            'val_multi_layer_benefit',    # Phase 2: improvement benefit
-            'val_detection_map50',        # Phase 2: additional detection info
-            'val_denomination_f1',        # Both phases: F1 score
-            'val_hierarchical_accuracy'   # Phase 2: combined accuracy
+            'val_map50',    # Object detection metric
+            'val_f1',       # F1 score
+            'val_precision', # Precision 
+            'val_recall'     # Recall
         ]
         
         for metric_name in secondary_metrics:
@@ -831,23 +830,13 @@ class ComprehensiveMetricsTracker:
     def _get_metric_display_name(self, metric_name: str) -> str:
         """Convert internal metric names to user-friendly display names."""
         display_names = {
-            'val_denomination_accuracy': 'Denomination Accuracy (Val)',
-            'train_denomination_accuracy': 'Denomination Accuracy (Train)',
-            'val_hierarchical_accuracy': 'Hierarchical Accuracy (Val)',
-            'val_multi_layer_benefit': 'Multi-Layer Benefit',
-            'val_detection_map50': 'Detection mAP@0.5',
-            'val_denomination_f1': 'Denomination F1 Score',
-            'val_denomination_precision': 'Denomination Precision',
-            'val_denomination_recall': 'Denomination Recall',
-            'val_layer_1_contribution': 'Layer 1 Contribution',
-            'val_layer_2_contribution': 'Layer 2 Contribution', 
-            'val_layer_3_contribution': 'Layer 3 Contribution',
-            # Legacy fallbacks
+            # Standard YOLO metrics
             'val_accuracy': 'Validation Accuracy',
             'train_accuracy': 'Training Accuracy',
             'val_precision': 'Validation Precision',
             'val_recall': 'Validation Recall',
-            'val_f1': 'Validation F1'
+            'val_f1': 'Validation F1',
+            'val_map50': 'mAP@0.5'
         }
         
         return display_names.get(metric_name, metric_name.replace('_', ' ').title())
@@ -860,39 +849,18 @@ class ComprehensiveMetricsTracker:
         latest_metrics = self.epoch_metrics[-1]
         summary_lines = []
         
-        # Phase-specific summaries
-        phase_num = latest_metrics.get('phase_num')
-        research_context = latest_metrics.get('research_context', '')
+        # Simple summary for both phases
+        val_acc = latest_metrics.get('val_accuracy')
+        if val_acc is not None:
+            summary_lines.append(f"• Validation Accuracy: {val_acc:.4f} ({val_acc*100:.2f}%)")
         
-        if phase_num == 1 or 'single_layer' in research_context:
-            # Phase 1: Focus on denomination detection
-            denom_acc = latest_metrics.get('val_denomination_accuracy')
-            if denom_acc is not None:
-                summary_lines.append(f"• Denomination Accuracy: {denom_acc:.4f} ({denom_acc*100:.2f}%)")
-            
-            denom_f1 = latest_metrics.get('val_denomination_f1')
-            if denom_f1 is not None:
-                summary_lines.append(f"• Denomination F1: {denom_f1:.4f}")
-                
-        elif phase_num == 2 or 'multi_layer' in research_context:
-            # Phase 2: Focus on hierarchical benefit
-            hier_acc = latest_metrics.get('val_hierarchical_accuracy')
-            if hier_acc is not None:
-                summary_lines.append(f"• Hierarchical Accuracy: {hier_acc:.4f} ({hier_acc*100:.2f}%)")
-            
-            benefit = latest_metrics.get('val_multi_layer_benefit')
-            if benefit is not None:
-                summary_lines.append(f"• Multi-Layer Benefit: +{benefit:.4f} (+{benefit*100:.2f}%)")
-            
-            detection_map = latest_metrics.get('val_detection_map50')
-            if detection_map is not None:
-                summary_lines.append(f"• Detection mAP@0.5: {detection_map:.4f} ({detection_map*100:.2f}%)")
+        val_f1 = latest_metrics.get('val_f1')
+        if val_f1 is not None:
+            summary_lines.append(f"• Validation F1: {val_f1:.4f}")
         
-        # Fallback to best available metrics
-        if not summary_lines:
-            val_acc = latest_metrics.get('val_accuracy')
-            if val_acc is not None:
-                summary_lines.append(f"• Best Validation Accuracy: {val_acc:.4f} ({val_acc*100:.2f}%)")
+        val_map50 = latest_metrics.get('val_map50')
+        if val_map50 is not None:
+            summary_lines.append(f"• mAP@0.5: {val_map50:.4f} ({val_map50*100:.2f}%)")
         
         return '\n'.join(summary_lines) if summary_lines else "• Research metrics not available"
     
@@ -949,41 +917,35 @@ class ComprehensiveMetricsTracker:
                 self.logger.warning(f"⚠️ Error saving research metrics summary: {e}")
     
     def _generate_research_metrics_summary(self) -> Dict[str, Any]:
-        """Generate comprehensive research metrics summary."""
+        """Generate simplified research metrics summary using standard YOLO metrics."""
         if not self.epoch_metrics:
             return {}
         
         research_trends = self._extract_all_research_trends()
         
         summary = {
-            'denomination_detection': {},
-            'hierarchical_performance': {},
+            'standard_detection': {},
             'training_progression': {}
         }
         
-        # Denomination detection analysis
-        if 'val_denomination_accuracy' in research_trends:
-            values = research_trends['val_denomination_accuracy']
-            summary['denomination_detection'] = {
+        # Standard YOLO detection analysis
+        if 'val_accuracy' in research_trends:
+            values = research_trends['val_accuracy']
+            summary['standard_detection'] = {
                 'best_accuracy': max(values),
                 'final_accuracy': values[-1],
                 'improvement': values[-1] - values[0] if len(values) > 1 else 0.0,
                 'epochs_to_best': values.index(max(values)) + 1
             }
         
-        # Hierarchical performance analysis  
-        if 'val_hierarchical_accuracy' in research_trends:
-            values = research_trends['val_hierarchical_accuracy']
-            summary['hierarchical_performance'] = {
-                'best_hierarchical_accuracy': max(values),
-                'final_hierarchical_accuracy': values[-1],
-                'hierarchical_improvement': values[-1] - values[0] if len(values) > 1 else 0.0
-            }
-        
-        if 'val_multi_layer_benefit' in research_trends:
-            values = research_trends['val_multi_layer_benefit']
-            summary['hierarchical_performance']['max_benefit'] = max(values)
-            summary['hierarchical_performance']['final_benefit'] = values[-1]
+        # Add mAP information if available
+        if 'val_map50' in research_trends:
+            values = research_trends['val_map50']
+            summary['standard_detection'].update({
+                'best_map50': max(values),
+                'final_map50': values[-1],
+                'map50_improvement': values[-1] - values[0] if len(values) > 1 else 0.0
+            })
         
         # Training progression
         summary['training_progression'] = {

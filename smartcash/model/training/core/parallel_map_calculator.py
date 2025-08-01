@@ -45,6 +45,11 @@ class ParallelMAPCalculator:
         # Performance tracking
         self.processing_times = []
         
+        # Debug counters
+        self.batches_attempted = 0
+        self.batches_successful = 0
+        self.batches_failed = 0
+        
         logger.debug(f"🚀 ParallelMAPCalculator initialized with {max_workers} workers")
     
     def process_batch_for_map(self, layer_preds, targets, image_shape, device, batch_idx):
@@ -59,6 +64,7 @@ class ParallelMAPCalculator:
             batch_idx: Current batch index
         """
         start_time = time.time()
+        self.batches_attempted += 1
         
         # Handle list, tuple, and tensor formats for mAP computation
         mAP_processed = False
@@ -76,7 +82,9 @@ class ParallelMAPCalculator:
                     self._add_to_map_calculator_sequential(layer_preds, targets, image_shape, device, batch_idx)
                 
                 mAP_processed = True
+                self.batches_successful += 1
             except Exception as e:
+                self.batches_failed += 1
                 if batch_idx < 5:
                     logger.warning(f"Parallel mAP processing failed for batch {batch_idx}: {e}")
                     import traceback
@@ -95,7 +103,9 @@ class ParallelMAPCalculator:
                     self._add_to_map_calculator_sequential(wrapped_preds, targets, image_shape, device, batch_idx)
                 
                 mAP_processed = True
+                self.batches_successful += 1
             except Exception as e:
+                self.batches_failed += 1
                 if batch_idx < 5:
                     logger.warning(f"Parallel mAP processing (tensor) failed for batch {batch_idx}: {e}")
         
@@ -371,63 +381,119 @@ class ParallelMAPCalculator:
             
             logger.debug(f"🚀 Parallel mAP Calculator Stats:")
             logger.debug(f"  Data: {num_predictions} predictions, {num_targets} targets")
+            logger.debug(f"  Batch processing: {self.batches_attempted} attempted, {self.batches_successful} successful, {self.batches_failed} failed")
+            logger.debug(f"  Success rate: {(self.batches_successful/self.batches_attempted*100):.1f}%" if self.batches_attempted > 0 else "  Success rate: N/A")
             logger.debug(f"  Avg batch processing time: {avg_processing_time:.4f}s")
             logger.debug(f"  Workers used: {self.max_workers}")
             
             if num_predictions == 0 or num_targets == 0:
                 logger.warning(f"⚠️ Insufficient data for mAP computation: {num_predictions} predictions, {num_targets} targets")
+                logger.debug(f"⚠️ ap_calculator.predictions type: {type(self.ap_calculator.predictions)}")
+                logger.debug(f"⚠️ ap_calculator.targets type: {type(self.ap_calculator.targets)}")
+                if hasattr(self.ap_calculator, 'predictions') and self.ap_calculator.predictions:
+                    logger.debug(f"⚠️ First prediction sample: {self.ap_calculator.predictions[0] if len(self.ap_calculator.predictions) > 0 else 'None'}")
+                if hasattr(self.ap_calculator, 'targets') and self.ap_calculator.targets:
+                    logger.debug(f"⚠️ First target sample: {self.ap_calculator.targets[0] if len(self.ap_calculator.targets) > 0 else 'None'}")
                 map_metrics['val_map50'] = 0.0
-                map_metrics['val_map50_95'] = 0.0
             else:
+                # Debug the first few predictions and targets to identify format issues
+                logger.debug(f"🔍 DEBUG: First 3 predictions: {self.ap_calculator.predictions[:3]}")
+                logger.debug(f"🔍 DEBUG: First 3 targets: {self.ap_calculator.targets[:3]}")
+                
+                # Analyze class distribution
+                pred_classes = [p[1] for p in self.ap_calculator.predictions]
+                target_classes = [t[0] for t in self.ap_calculator.targets]
+                unique_pred_classes = list(set(pred_classes))
+                unique_target_classes = list(set(target_classes))
+                
+                logger.debug(f"🔍 DEBUG: Predicted classes: {unique_pred_classes} (total: {len(pred_classes)})")
+                logger.debug(f"🔍 DEBUG: Target classes: {unique_target_classes} (total: {len(target_classes)})")
+                
+                # Check for class overlap
+                class_overlap = set(unique_pred_classes) & set(unique_target_classes)
+                logger.debug(f"🔍 DEBUG: Class overlap: {list(class_overlap)}")
+                
+                if not class_overlap:
+                    logger.warning("⚠️ ISSUE FOUND: No class overlap between predictions and targets!")
+                    logger.warning("   This will cause mAP=0.0 even with perfect IoU matches")
+                
+                # Analyze image ID distribution
+                pred_img_ids = [p[6] for p in self.ap_calculator.predictions]
+                target_img_ids = [t[5] for t in self.ap_calculator.targets]
+                unique_pred_img_ids = list(set(pred_img_ids))
+                unique_target_img_ids = list(set(target_img_ids))
+                
+                logger.debug(f"🔍 DEBUG: Predicted image IDs: {unique_pred_img_ids}")
+                logger.debug(f"🔍 DEBUG: Target image IDs: {unique_target_img_ids}")
+                
+                img_id_overlap = set(unique_pred_img_ids) & set(unique_target_img_ids)
+                logger.debug(f"🔍 DEBUG: Image ID overlap: {list(img_id_overlap)}")
+                
+                if not img_id_overlap:
+                    logger.warning("⚠️ ISSUE FOUND: No image ID overlap between predictions and targets!")
+                    logger.warning("   This will cause mAP=0.0 even with perfect class and IoU matches")
+                
                 # Optimization: For large datasets, use sampling to speed up computation
                 use_sampling = num_predictions > 1000 and num_targets > 1000
                 
                 if use_sampling:
                     logger.debug(f"⚡ Using sampling optimization for large dataset ({num_predictions} predictions)")
                     # Sample a subset for faster computation during training
-                    original_predictions = self.ap_calculator.predictions.copy()
-                    original_targets = self.ap_calculator.targets.copy()
-                    
-                    # Sample 70% of data for faster computation
-                    sample_size = min(700, int(0.7 * num_predictions))
-                    import random
-                    sample_indices = random.sample(range(num_predictions), sample_size)
-                    
-                    self.ap_calculator.predictions = [self.ap_calculator.predictions[i] for i in sample_indices]
-                    self.ap_calculator.targets = [self.ap_calculator.targets[i] for i in sample_indices]
+                    try:
+                        original_predictions = self.ap_calculator.predictions.copy()
+                        original_targets = self.ap_calculator.targets.copy()
+                        
+                        # Sample 70% of data for faster computation
+                        sample_size = min(700, int(0.7 * num_predictions))
+                        if sample_size > 0 and sample_size <= num_predictions:
+                            import random
+                            sample_indices = random.sample(range(num_predictions), sample_size)
+                            
+                            # Safe sampling with bounds checking
+                            sampled_predictions = []
+                            sampled_targets = []
+                            for i in sample_indices:
+                                if i < len(self.ap_calculator.predictions):
+                                    sampled_predictions.append(self.ap_calculator.predictions[i])
+                                if i < len(self.ap_calculator.targets):
+                                    sampled_targets.append(self.ap_calculator.targets[i])
+                            
+                            self.ap_calculator.predictions = sampled_predictions
+                            self.ap_calculator.targets = sampled_targets
+                            logger.debug(f"⚡ Sampled {len(sampled_predictions)} predictions, {len(sampled_targets)} targets")
+                        else:
+                            logger.debug(f"⚠️ Invalid sample size {sample_size}, skipping sampling")
+                            use_sampling = False
+                    except Exception as sampling_e:
+                        logger.warning(f"⚠️ Error during sampling, proceeding without sampling: {sampling_e}")
+                        use_sampling = False
                 
-                # Focus on mAP@0.5 (mAP50) as primary metric for faster computation
+                # Focus on mAP@0.5 (mAP50) as primary metric 
+                logger.debug(f"Computing mAP@0.5 with {num_predictions} predictions and {num_targets} targets")
                 map50, class_aps = self.ap_calculator.compute_map(iou_threshold=0.5)
                 map_metrics['val_map50'] = float(map50)
-                
-                # For mAP@0.5:0.95, use sampling or approximation to speed up training
-                if use_sampling:
-                    # Use approximate mAP@0.5:0.95 based on mAP@0.5 correlation
-                    # Research shows mAP@0.5:0.95 ≈ 0.6 * mAP@0.5 for most datasets
-                    map50_95 = map50 * 0.6
-                    logger.debug(f"⚡ Using approximated mAP@0.5:0.95 based on mAP@0.5 correlation")
-                else:
-                    # For smaller datasets, compute actual mAP@0.5:0.95
-                    map50_95 = self.ap_calculator.compute_map50_95()
-                
-                map_metrics['val_map50_95'] = float(map50_95)
                 
                 # Restore original data if sampling was used
                 if use_sampling:
                     self.ap_calculator.predictions = original_predictions
                     self.ap_calculator.targets = original_targets
                 
+                # Detailed class AP analysis
+                valid_class_aps = [ap for ap in class_aps.values() if ap > 0]
                 computation_time = time.time() - start_time
-                logger.info(f"✅ Parallel mAP computed: mAP@0.5={map50:.4f}, mAP@0.5:0.95={map50_95:.4f} ({computation_time:.3f}s)")
-                if class_aps and not use_sampling:
-                    logger.debug(f"Per-class APs: {class_aps}")
+                logger.info(f"✅ Parallel mAP computed: mAP@0.5={map50:.4f} ({computation_time:.3f}s)")
+                logger.debug(f"Per-class APs: {class_aps}")
+                logger.debug(f"Valid class APs (>0): {len(valid_class_aps)} out of {len(class_aps)}")
+                
+                if map50 == 0.0:
+                    logger.warning("⚠️ ISSUE: Parallel mAP@0.5 is 0.0 despite having data")
+                    logger.warning("   Check class overlap, image ID overlap, and coordinate formats above")
             
         except Exception as e:
             logger.warning(f"⚠️ Error computing parallel mAP (falling back to 0.0): {e}")
             import traceback
             logger.debug(f"Parallel mAP computation traceback: {traceback.format_exc()}")
             map_metrics['val_map50'] = 0.0
-            map_metrics['val_map50_95'] = 0.0
         
         return map_metrics
     
@@ -502,7 +568,10 @@ class ParallelMAPCalculator:
             
         img_h, img_w = image_shape[-2:]
         
-        if scale_pred.dim() == 4:
+        if scale_pred.dim() == 5:
+            # 5D format flattened to 3D: need specialized grid coordinate conversion
+            return self._process_5d_coordinates(flat_pred, scale_pred, img_h, img_w, device)
+        elif scale_pred.dim() == 4:
             return self._process_4d_coordinates(flat_pred, scale_pred, img_h, img_w, device)
         else:
             return self._process_3d_coordinates(flat_pred)
@@ -525,6 +594,47 @@ class ParallelMAPCalculator:
         xy_abs = (xy + grid_xy) * torch.tensor([grid_scale_x, grid_scale_y], device=device)
         wh_abs = wh * torch.tensor([grid_scale_x, grid_scale_y], device=device) * 0.5
         
+        x1 = xy_abs[..., 0] - wh_abs[..., 0]
+        y1 = xy_abs[..., 1] - wh_abs[..., 1]
+        x2 = xy_abs[..., 0] + wh_abs[..., 0]
+        y2 = xy_abs[..., 1] + wh_abs[..., 1]
+        
+        return torch.stack([x1, y1, x2, y2], dim=-1)
+    
+    def _process_5d_coordinates(self, flat_pred, scale_pred, img_h, img_w, device):
+        """Process 5D coordinate format (flattened from [batch, anchors, grid_h, grid_w, features])."""
+        batch_size, num_anchors, grid_h, grid_w, _ = scale_pred.shape
+        
+        xy = torch.sigmoid(flat_pred[..., :2])  # Center coordinates (0-1)
+        wh = torch.exp(flat_pred[..., 2:4])     # Width/height (relative to anchors)
+        
+        grid_scale_x = img_w / grid_w
+        grid_scale_y = img_h / grid_h
+        
+        # Create grid coordinates for flattened format
+        # flat_pred shape: [batch_size, num_anchors * grid_h * grid_w, features]
+        num_detections = flat_pred.shape[1]  # num_anchors * grid_h * grid_w
+        
+        # Generate grid coordinates for each detection
+        grid_coords = []
+        for i in range(batch_size):
+            batch_grid_coords = []
+            detection_idx = 0
+            for anchor in range(num_anchors):
+                for gy in range(grid_h):
+                    for gx in range(grid_w):
+                        batch_grid_coords.append([gx, gy])
+                        detection_idx += 1
+            grid_coords.append(batch_grid_coords)
+        
+        # Convert to tensor [batch_size, num_detections, 2]
+        grid_xy = torch.tensor(grid_coords, device=device, dtype=torch.float32)
+        
+        # Convert center coordinates to absolute
+        xy_abs = (xy + grid_xy) * torch.tensor([grid_scale_x, grid_scale_y], device=device)
+        
+        # Convert to corner coordinates [x1, y1, x2, y2]
+        wh_abs = wh * torch.tensor([grid_scale_x, grid_scale_y], device=device) * 0.5
         x1 = xy_abs[..., 0] - wh_abs[..., 0]
         y1 = xy_abs[..., 1] - wh_abs[..., 1]
         x2 = xy_abs[..., 0] + wh_abs[..., 0]

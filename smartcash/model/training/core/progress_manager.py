@@ -257,20 +257,22 @@ class ProgressManager:
         Returns:
             True if training should stop, False otherwise
         """
-        # Early stopping should only be active in Phase 2
-        # Phase 1 focuses on detection layer training where val_map50 is not meaningful
+        # Early stopping can now be active in both phases using val_accuracy
+        # Phase 1: val_accuracy is meaningful for classification performance
+        # Phase 2: val_accuracy continues to be meaningful for overall performance
         if phase_num == 1:
-            logger.debug(f"Phase 1: Early stopping skipped (detection layer training only)")
-            return False
+            logger.debug(f"Phase 1: Early stopping enabled using val_accuracy")
+        else:
+            logger.debug(f"Phase 2: Early stopping enabled using val_accuracy")
         
-        # Phase 2: Use val_map50 for early stopping as originally intended
-        monitor_metric = final_metrics.get('val_map50', 0)
+        # Use val_accuracy for early stopping (more reliable than val_map50)
+        monitor_metric = final_metrics.get('val_accuracy', 0)
         should_stop = early_stopping(monitor_metric, None, epoch)  # Don't pass model for saving
         
         if should_stop:
             logger.info(f"🛑 Early stopping triggered at epoch {epoch + 1}")
-            logger.info(f"   Monitoring val_map50: no improvement for {early_stopping.patience} epochs")
-            logger.info(f"   Best val_map50: {early_stopping.best_score:.6f} at epoch {early_stopping.best_epoch + 1}")
+            logger.info(f"   Monitoring val_accuracy: no improvement for {early_stopping.patience} epochs")
+            logger.info(f"   Best val_accuracy: {early_stopping.best_score:.6f} at epoch {early_stopping.best_epoch + 1}")
             
             # Add early stopping info to final metrics
             final_metrics['early_stopped'] = True

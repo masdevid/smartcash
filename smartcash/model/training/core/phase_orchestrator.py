@@ -150,10 +150,10 @@ class PhaseOrchestrator:
         es_config = self.config['training']['early_stopping'].copy()
         
         # Check if phase-specific early stopping is enabled
-        # For two-phase mode, Phase 1 should have early stopping disabled by default
+        # Now that we use val_accuracy, early stopping is useful for both phases
         training_mode = self.config.get('training_mode', 'single_phase')
         if training_mode == 'two_phase':
-            phase_1_enabled = es_config.get('phase_1_enabled', False)  # Disabled by default for Phase 1
+            phase_1_enabled = es_config.get('phase_1_enabled', True)   # Now enabled by default for Phase 1
             phase_2_enabled = es_config.get('phase_2_enabled', True)   # Enabled by default for Phase 2
         else:
             phase_1_enabled = es_config.get('phase_1_enabled', True)   # Single-phase respects config

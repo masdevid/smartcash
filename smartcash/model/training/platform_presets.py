@@ -198,7 +198,7 @@ class PlatformPresets:
             'early_stopping': {  # Add early stopping configuration
                 'enabled': True,
                 'patience': 10,
-                'metric': 'val_map50',
+                'metric': 'val_accuracy',
                 'mode': 'max',
                 'min_delta': 0.002
             }

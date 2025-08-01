@@ -109,7 +109,7 @@ class ConfigurationBuilder:
                 'enabled': True,
                 'patience': 10,
                 'min_delta': 0.001,
-                'monitor': 'val_loss'
+                'monitor': 'val_accuracy'
             }
         }
     

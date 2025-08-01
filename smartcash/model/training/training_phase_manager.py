@@ -160,35 +160,20 @@ class TrainingPhaseManager:
                 # Convert training metrics to research-focused format
                 final_metrics = self._apply_research_metrics_format(final_metrics, layer_metrics, phase_num)
                 
-                # Debug: Check research metrics consistency in Phase 1
-                if phase_num == 1:
-                    # Use research metrics names for consistency
-                    val_denom_acc = final_metrics.get('val_denomination_accuracy', 0.0)
-                    train_denom_acc = final_metrics.get('train_denomination_accuracy', 0.0)
-                    
-                    # Legacy metrics for comparison (if they exist)
-                    legacy_val_acc = final_metrics.get('val_accuracy', 0.0)
-                    legacy_layer_1_acc = final_metrics.get('val_layer_1_accuracy', 0.0)
-                    
-                    logger.debug(f"🔍 Phase 1 research metrics validation:")
-                    logger.debug(f"    val_denomination_accuracy: {val_denom_acc:.6f} (research metric)")
-                    logger.debug(f"    train_denomination_accuracy: {train_denom_acc:.6f} (research metric)")
-                    
-                    # Only check legacy constraint if legacy metrics exist
-                    if legacy_val_acc > 0.0 and legacy_layer_1_acc > 0.0:
-                        val_constraint_diff = abs(legacy_val_acc - legacy_layer_1_acc)
-                        if val_constraint_diff > 0.01:  # More tolerant for legacy metrics
-                            logger.warning(f"⚠️ Legacy metrics inconsistency: val_accuracy ({legacy_val_acc:.6f}) != val_layer_1_accuracy ({legacy_layer_1_acc:.6f})")
-                            logger.warning(f"⚠️ This is expected with the new research metrics system")
-                        else:
-                            logger.debug(f"✅ Legacy metrics consistent: difference = {val_constraint_diff:.6f}")
-                    
-                    # Check research metrics consistency
-                    research_diff = abs(val_denom_acc - train_denom_acc) if train_denom_acc > 0.0 else 0.0
-                    if research_diff > 0.1:  # Allow normal train/val differences
-                        logger.debug(f"📊 Normal train/validation difference: {research_diff:.6f}")
-                    else:
-                        logger.debug(f"✅ Research metrics consistent: difference = {research_diff:.6f}")
+                # Debug: Check metrics consistency
+                val_acc = final_metrics.get('val_accuracy', 0.0)
+                train_acc = final_metrics.get('train_accuracy', 0.0)
+                
+                logger.debug(f"🔍 Phase {phase_num} metrics validation:")
+                logger.debug(f"    val_accuracy: {val_acc:.6f}")
+                logger.debug(f"    train_accuracy: {train_acc:.6f}")
+                
+                # Check normal train/val differences
+                diff = abs(val_acc - train_acc) if train_acc > 0.0 else 0.0
+                if diff > 0.1:  # Allow normal train/val differences
+                    logger.debug(f"📊 Normal train/validation difference: {diff:.6f}")
+                else:
+                    logger.debug(f"✅ Metrics consistent: difference = {diff:.6f}")
                 
                 # Layer metrics merging is now handled in _apply_research_metrics_format method
                 # This ensures proper Phase 1 protection against training metrics overwriting validation metrics
@@ -226,8 +211,7 @@ class TrainingPhaseManager:
                     )
                     metric_name = primary_metric
                     current_val = final_metrics.get(primary_metric, 'N/A')
-                    logger.debug(f"🎯 Phase {phase_num} research-focused selection: {metric_name} = {current_val} ({primary_mode})")
-                    logger.debug(f"🔬 Research rationale: {criteria['research_justification']}")
+                    logger.debug(f"🎯 Phase {phase_num} best model selection: {metric_name} = {current_val} ({primary_mode})")
                 else:
                     # Use fallback metric
                     is_best = components['metrics_tracker'].is_best_model(

@@ -82,27 +82,67 @@ class MAPCalculator:
             
             if num_predictions == 0 or num_targets == 0:
                 logger.warning(f"⚠️ Insufficient data for mAP computation: {num_predictions} predictions, {num_targets} targets")
+                logger.debug(f"⚠️ ap_calculator.predictions type: {type(self.ap_calculator.predictions)}")  
+                logger.debug(f"⚠️ ap_calculator.targets type: {type(self.ap_calculator.targets)}")
                 map_metrics['val_map50'] = 0.0
-                map_metrics['val_map50_95'] = 0.0
             else:
+                # Debug the first few predictions and targets to identify format issues
+                logger.debug(f"🔍 DEBUG: First 3 predictions: {self.ap_calculator.predictions[:3]}")
+                logger.debug(f"🔍 DEBUG: First 3 targets: {self.ap_calculator.targets[:3]}")
+                
+                # Analyze class distribution
+                pred_classes = [p[1] for p in self.ap_calculator.predictions]
+                target_classes = [t[0] for t in self.ap_calculator.targets]
+                unique_pred_classes = list(set(pred_classes))
+                unique_target_classes = list(set(target_classes))
+                
+                logger.debug(f"🔍 DEBUG: Predicted classes: {unique_pred_classes} (total: {len(pred_classes)})")
+                logger.debug(f"🔍 DEBUG: Target classes: {unique_target_classes} (total: {len(target_classes)})")
+                
+                # Check for class overlap
+                class_overlap = set(unique_pred_classes) & set(unique_target_classes)
+                logger.debug(f"🔍 DEBUG: Class overlap: {list(class_overlap)}")
+                
+                if not class_overlap:
+                    logger.warning("⚠️ ISSUE FOUND: No class overlap between predictions and targets!")
+                    logger.warning("   This will cause mAP=0.0 even with perfect IoU matches")
+                
+                # Analyze image ID distribution
+                pred_img_ids = [p[6] for p in self.ap_calculator.predictions]
+                target_img_ids = [t[5] for t in self.ap_calculator.targets]
+                unique_pred_img_ids = list(set(pred_img_ids))
+                unique_target_img_ids = list(set(target_img_ids))
+                
+                logger.debug(f"🔍 DEBUG: Predicted image IDs: {unique_pred_img_ids}")
+                logger.debug(f"🔍 DEBUG: Target image IDs: {unique_target_img_ids}")
+                
+                img_id_overlap = set(unique_pred_img_ids) & set(unique_target_img_ids)
+                logger.debug(f"🔍 DEBUG: Image ID overlap: {list(img_id_overlap)}")
+                
+                if not img_id_overlap:
+                    logger.warning("⚠️ ISSUE FOUND: No image ID overlap between predictions and targets!")
+                    logger.warning("   This will cause mAP=0.0 even with perfect class and IoU matches")
+                
                 # Focus on mAP@0.5 (mAP50) as primary metric
+                logger.debug(f"Computing mAP@0.5 with {num_predictions} predictions and {num_targets} targets")
                 map50, class_aps = self.ap_calculator.compute_map(iou_threshold=0.5)
                 map_metrics['val_map50'] = float(map50)
                 
-                # Compute mAP@0.5:0.95 (can be slower, used for final evaluation)
-                map50_95 = self.ap_calculator.compute_map50_95()
-                map_metrics['val_map50_95'] = float(map50_95)
+                # Detailed class AP analysis
+                valid_class_aps = [ap for ap in class_aps.values() if ap > 0]
+                logger.info(f"✅ Computed mAP metrics: mAP@0.5={map50:.4f}")
+                logger.debug(f"Per-class APs: {class_aps}")
+                logger.debug(f"Valid class APs (>0): {len(valid_class_aps)} out of {len(class_aps)}")
                 
-                logger.info(f"✅ Computed mAP metrics: mAP@0.5={map50:.4f}, mAP@0.5:0.95={map50_95:.4f}")
-                if class_aps:
-                    logger.debug(f"Per-class APs: {class_aps}")
+                if map50 == 0.0:
+                    logger.warning("⚠️ ISSUE: mAP@0.5 is 0.0 despite having data")
+                    logger.warning("   Check class overlap, image ID overlap, and coordinate formats above")
             
         except Exception as e:
             logger.warning(f"⚠️ Error computing mAP (falling back to 0.0): {e}")
             import traceback
             logger.debug(f"mAP computation traceback: {traceback.format_exc()}")
             map_metrics['val_map50'] = 0.0
-            map_metrics['val_map50_95'] = 0.0
         
         return map_metrics
     
@@ -240,7 +280,10 @@ class MAPCalculator:
             
         img_h, img_w = image_shape[-2:]
         
-        if scale_pred.dim() == 4:
+        if scale_pred.dim() == 5:
+            # 5D format flattened to 3D: need specialized grid coordinate conversion
+            return self._process_5d_coordinates(flat_pred, scale_pred, img_h, img_w, device)
+        elif scale_pred.dim() == 4:
             # 4D format: need to convert grid coordinates
             return self._process_4d_coordinates(flat_pred, scale_pred, img_h, img_w, device)
         else:
@@ -268,6 +311,47 @@ class MAPCalculator:
         
         # Convert to corner coordinates [x1, y1, x2, y2]
         wh_abs = wh * torch.tensor([grid_scale_x, grid_scale_y], device=device) * 0.5  # Scale factor
+        x1 = xy_abs[..., 0] - wh_abs[..., 0]
+        y1 = xy_abs[..., 1] - wh_abs[..., 1]
+        x2 = xy_abs[..., 0] + wh_abs[..., 0]
+        y2 = xy_abs[..., 1] + wh_abs[..., 1]
+        
+        return torch.stack([x1, y1, x2, y2], dim=-1)
+    
+    def _process_5d_coordinates(self, flat_pred, scale_pred, img_h, img_w, device):
+        """Process 5D coordinate format (flattened from [batch, anchors, grid_h, grid_w, features])."""
+        batch_size, num_anchors, grid_h, grid_w, _ = scale_pred.shape
+        
+        xy = torch.sigmoid(flat_pred[..., :2])  # Center coordinates (0-1)
+        wh = torch.exp(flat_pred[..., 2:4])     # Width/height (relative to anchors)
+        
+        grid_scale_x = img_w / grid_w
+        grid_scale_y = img_h / grid_h
+        
+        # Create grid coordinates for flattened format
+        # flat_pred shape: [batch_size, num_anchors * grid_h * grid_w, features]
+        num_detections = flat_pred.shape[1]  # num_anchors * grid_h * grid_w
+        
+        # Generate grid coordinates for each detection
+        grid_coords = []
+        for i in range(batch_size):
+            batch_grid_coords = []
+            detection_idx = 0
+            for anchor in range(num_anchors):
+                for gy in range(grid_h):
+                    for gx in range(grid_w):
+                        batch_grid_coords.append([gx, gy])
+                        detection_idx += 1
+            grid_coords.append(batch_grid_coords)
+        
+        # Convert to tensor [batch_size, num_detections, 2]
+        grid_xy = torch.tensor(grid_coords, device=device, dtype=torch.float32)
+        
+        # Convert center coordinates to absolute
+        xy_abs = (xy + grid_xy) * torch.tensor([grid_scale_x, grid_scale_y], device=device)
+        
+        # Convert to corner coordinates [x1, y1, x2, y2]
+        wh_abs = wh * torch.tensor([grid_scale_x, grid_scale_y], device=device) * 0.5
         x1 = xy_abs[..., 0] - wh_abs[..., 0]
         y1 = xy_abs[..., 1] - wh_abs[..., 1]
         x2 = xy_abs[..., 0] + wh_abs[..., 0]

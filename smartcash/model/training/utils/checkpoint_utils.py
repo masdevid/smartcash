@@ -441,16 +441,13 @@ def _create_resume_info(checkpoint: Dict[str, Any], checkpoint_path: str, verbos
         
         # Check for phase 2 indicators
         # Phase 2 is characterized by:
-        # - Detection metrics: val_map50, val_detection_map50
+        # - Detection metrics: val_map50
         # - Multi-layer metrics: val_layer_2_*, val_layer_3_*
-        # - Research metrics: val_research_primary_metric, val_hierarchical_accuracy
-        has_detection_metrics = any(key in ['val_map50', 'val_detection_map50'] for key in metrics.keys())
+        has_detection_metrics = 'val_map50' in metrics
         has_multilayer_metrics = any(key.startswith('val_layer_2_') or key.startswith('val_layer_3_') for key in metrics.keys())
-        has_research_metrics = any(key in ['val_research_primary_metric', 'val_hierarchical_accuracy'] for key in metrics.keys())
-        has_layer_contribution = any('contribution' in key for key in metrics.keys())
         
-        # More comprehensive phase 2 detection
-        phase_2_indicators = has_detection_metrics or has_multilayer_metrics or has_research_metrics or has_layer_contribution
+        # Simple phase 2 detection
+        phase_2_indicators = has_detection_metrics or has_multilayer_metrics
         
         if saved_epoch == 0 and not phase_2_indicators:
             # Very early checkpoint, likely phase 1

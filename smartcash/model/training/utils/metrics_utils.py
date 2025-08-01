@@ -211,10 +211,9 @@ def filter_phase_relevant_metrics(metrics: Dict[str, float], phase_num: int) -> 
                 relevant_metrics[metric] = metrics[metric]
         
         # Skip confusing or redundant metrics:
-        # - Hierarchical and contribution metrics (val_hierarchical_accuracy, val_*_contribution, etc.)
-        # - Research-specific metrics (val_research_primary_metric, val_multi_layer_benefit, etc.)
-        # - val_layer_X_accuracy/precision/recall/f1 (often 0.0000 and confusing)
-        # - val_detection_map50 (redundant with val_map50)
+        # - Detailed layer metrics (val_layer_X_accuracy/precision/recall/f1 when confusing)
+        # - Redundant detection metrics (val_detection_map50 when val_map50 exists)
+        # - High-precision metrics that show as 0.0000 and confuse users
         
         logger.debug(f"Phase {phase_num}: Organized {len(metrics)} metrics into {len(relevant_metrics)} key metrics")
         return relevant_metrics

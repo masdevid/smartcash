@@ -324,7 +324,7 @@ class TrainingPipeline:
                 'enabled': kwargs.get('early_stopping_enabled', not kwargs.get('no_early_stopping', False)),
                 'patience': kwargs.get('patience', kwargs.get('early_stopping_patience', 10)),
                 'min_delta': kwargs.get('min_delta', kwargs.get('early_stopping_min_delta', 0.001)),
-                'monitor': kwargs.get('monitor', kwargs.get('early_stopping_metric', 'val_loss'))
+                'monitor': kwargs.get('monitor', kwargs.get('early_stopping_metric', 'val_accuracy'))
             }
         }
         

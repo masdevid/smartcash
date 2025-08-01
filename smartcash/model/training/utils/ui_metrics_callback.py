@@ -9,6 +9,9 @@ from typing import Dict, Any, Callable, Optional, Tuple
 from smartcash.model.training.utils.metric_color_utils import (
     MetricColorizer, ColorScheme, get_metrics_with_colors, get_metric_status
 )
+from smartcash.common.logger import get_logger
+
+logger = get_logger(__name__)
 
 
 class UIMetricsCallback:
@@ -85,6 +88,12 @@ class UIMetricsCallback:
         # Extract loss breakdown before console output
         loss_breakdown = kwargs.get('loss_breakdown', {})
         
+        # Debug: Log loss breakdown reception
+        if loss_breakdown:
+            logger.debug(f"UI Callback received loss_breakdown with {len(loss_breakdown)} components: {list(loss_breakdown.keys())}")
+        else:
+            logger.debug("UI Callback: No loss_breakdown received")
+        
         # Console output if verbose
         if self.verbose:
             self._print_console_metrics(phase, epoch, metrics, colored_metrics, **kwargs)
@@ -150,20 +159,29 @@ class UIMetricsCallback:
         """Print detailed loss breakdown information."""
         print("\n📊 LOSS BREAKDOWN:")
         
-        # Core loss components
+        # Core loss components - check both plain and prefixed versions
         core_losses = ['box_loss', 'obj_loss', 'cls_loss', 'total_loss']
         for loss_name in core_losses:
-            if loss_name in loss_breakdown:
-                value = loss_breakdown[loss_name]
-                if hasattr(value, 'item'):
-                    value = value.item()
-                print(f"    {loss_name}: {value:.6f}")
+            # Check train_ and val_ prefixed versions
+            for prefix in ['train_', 'val_', '']:
+                prefixed_name = f"{prefix}{loss_name}"
+                if prefixed_name in loss_breakdown:
+                    value = loss_breakdown[prefixed_name]
+                    if hasattr(value, 'item'):
+                        value = value.item()
+                    display_name = prefixed_name if prefix else loss_name
+                    print(f"    {display_name}: {value:.6f}")
         
-        # Multi-task loss components
-        if any(key.startswith('layer_') for key in loss_breakdown.keys()):
+        # Multi-task loss components - check for both plain and prefixed versions
+        has_layer_components = any(
+            key.startswith('layer_') or key.startswith('train_layer_') or key.startswith('val_layer_') 
+            for key in loss_breakdown.keys()
+        )
+        
+        if has_layer_components:
             print("\n  Multi-task Loss Components:")
             
-            # Group by layer
+            # Group by layer, handling prefixes
             layer_losses = {}
             uncertainty_info = {}
             
@@ -171,19 +189,35 @@ class UIMetricsCallback:
                 if hasattr(value, 'item'):
                     value = value.item()
                 
-                if key.startswith('layer_') and '_' in key:
-                    layer_name = '_'.join(key.split('_')[:2])  # e.g., 'layer_1'
-                    loss_type = '_'.join(key.split('_')[2:])    # e.g., 'box_loss'
+                # Handle both prefixed and non-prefixed layer keys
+                if any(pattern in key for pattern in ['layer_', 'train_layer_', 'val_layer_']):
+                    # Extract prefix and layer info
+                    if key.startswith('train_'):
+                        prefix = 'train_'
+                        remainder = key[6:]  # Remove 'train_'
+                    elif key.startswith('val_'):
+                        prefix = 'val_'
+                        remainder = key[4:]  # Remove 'val_'
+                    else:
+                        prefix = ''
+                        remainder = key
                     
-                    if layer_name not in layer_losses:
-                        layer_losses[layer_name] = {}
-                    
-                    if 'uncertainty' in loss_type:
-                        uncertainty_info[layer_name] = value
-                    elif 'weighted_loss' in loss_type or 'regularization' in loss_type:
-                        layer_losses[layer_name][loss_type] = value
-                    elif loss_type in ['box_loss', 'obj_loss', 'cls_loss', 'total_loss']:
-                        layer_losses[layer_name][loss_type] = value
+                    # Parse layer name and loss type
+                    if remainder.startswith('layer_') and '_' in remainder:
+                        parts = remainder.split('_')
+                        if len(parts) >= 3:
+                            layer_name = f"{prefix}{parts[0]}_{parts[1]}"  # e.g., 'train_layer_1'
+                            loss_type = '_'.join(parts[2:])    # e.g., 'box_loss'
+                            
+                            if layer_name not in layer_losses:
+                                layer_losses[layer_name] = {}
+                            
+                            if 'uncertainty' in loss_type:
+                                uncertainty_info[layer_name] = value
+                            elif 'weighted_loss' in loss_type or 'regularization' in loss_type:
+                                layer_losses[layer_name][loss_type] = value
+                            elif loss_type in ['box_loss', 'obj_loss', 'cls_loss', 'total_loss']:
+                                layer_losses[layer_name][loss_type] = value
             
             # Print layer-wise losses
             for layer_name in sorted(layer_losses.keys()):

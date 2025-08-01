@@ -20,17 +20,10 @@ def test_metrics_tracker_precision_fixes():
     print("🧪 Testing MetricsTracker floating point precision fixes...")
     
     try:
-        from smartcash.model.training.metrics_tracker import APCalculator, MetricsTracker
+        from smartcash.model.training.metrics_tracker import MetricsTracker  # APCalculator removed
         
-        # Test AP Calculator with perfect detection
-        calculator = APCalculator()
-        calculator.predictions = [[0.9, 0, 10, 10, 50, 50, 0]]
-        calculator.targets = [[0, 10, 10, 50, 50, 0]]
-        
-        ap = calculator.compute_ap(class_id=0, iou_threshold=0.5)
-        
-        # Test the precision fix - should use tolerance instead of exact equality
-        assert abs(ap - 1.0) < 1e-6, f"AP should be close to 1.0, got {ap}"
+        # Skip AP Calculator test (removed for performance)
+        # Focus on MetricsTracker testing
         
         # Test MetricsTracker
         config = {'training': {'validation': {'compute_map': True}}}

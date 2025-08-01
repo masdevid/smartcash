@@ -11,7 +11,7 @@ from unittest.mock import Mock, patch
 import torch
 
 from smartcash.model.training.core.validation_executor import ValidationExecutor
-from smartcash.model.training.core.parallel_map_calculator import ParallelMAPCalculator
+# from smartcash.model.training.core.parallel_map_calculator import ParallelMAPCalculator  # Removed
 from smartcash.model.training.utils.ui_metrics_callback import create_ui_metrics_callback
 from smartcash.model.training.utils.metric_color_utils import ColorScheme
 

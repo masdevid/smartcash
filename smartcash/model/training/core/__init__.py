@@ -9,9 +9,7 @@ from .phase_orchestrator import PhaseOrchestrator
 from .training_executor import TrainingExecutor
 from .validation_executor import ValidationExecutor
 from .prediction_processor import PredictionProcessor
-from .map_calculator import MAPCalculator
-from .parallel_map_calculator import ParallelMAPCalculator
-from .map_calculator_factory import MAPCalculatorFactory, create_optimal_map_calculator
+# mAP calculator modules removed - calculation disabled for performance
 from .training_checkpoint_adapter import TrainingCheckpointAdapter
 from .progress_manager import ProgressManager
 
@@ -20,10 +18,7 @@ __all__ = [
     'TrainingExecutor', 
     'ValidationExecutor',
     'PredictionProcessor',
-    'MAPCalculator',
-    'ParallelMAPCalculator',
-    'MAPCalculatorFactory',
-    'create_optimal_map_calculator',
+    # mAP calculator classes removed
     'TrainingCheckpointAdapter',
     'ProgressManager'
 ]

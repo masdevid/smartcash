@@ -47,22 +47,10 @@ def test_metrics_tracker_basic():
     print("🧪 Testing MetricsTracker basic functionality...")
     
     try:
-        from smartcash.model.training.metrics_tracker import APCalculator, MetricsTracker
+        from smartcash.model.training.metrics_tracker import MetricsTracker  # APCalculator removed
         
-        # Test AP Calculator
-        calculator = APCalculator()
-        
-        # Test IoU calculation
-        box1 = [10, 10, 50, 50]
-        box2 = [10, 10, 50, 50]
-        iou = calculator._calculate_iou(box1, box2)
-        assert abs(iou - 1.0) < 1e-6  # Perfect overlap
-        
-        # Test no overlap
-        box1 = [10, 10, 30, 30]
-        box2 = [50, 50, 70, 70]
-        iou = calculator._calculate_iou(box1, box2)
-        assert iou == 0.0
+        # Skip AP Calculator test (removed for performance)
+        # Test basic MetricsTracker instead
         
         # Test MetricsTracker
         config = {'training': {'validation': {'compute_map': True}}}

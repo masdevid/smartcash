@@ -243,20 +243,10 @@ class ValidationExecutor:
                     all_targets[layer_name] = []
                 
                 try:
-                    # Process predictions for mAP and classification metrics
-                    # Reduce sampling rate to get more mAP data (every batch in small validations)
-                    MAP_SAMPLE_RATE = self.config.get('training', {}).get('validation', {}).get('map_sample_rate', 1)  # Process every batch
-                    if batch_idx % MAP_SAMPLE_RATE == 0 or batch_idx < 5:  # Always include first 5 batches
-                        try:
-                            if batch_idx < 3:
-                                logger.debug(f"Processing mAP for {layer_name} batch {batch_idx}: preds type={type(layer_preds)}, targets shape={targets.shape}")
-                            self.map_calculator.process_batch_for_map(
-                                layer_preds, targets, images.shape, device, batch_idx
-                            )
-                        except Exception as map_e:
-                            logger.error(f"Error processing mAP for {layer_name} in batch {batch_idx}: {map_e}")
-                            import traceback
-                            logger.error(f"mAP error traceback: {traceback.format_exc()}")
+                    # mAP processing disabled for performance - calculation code preserved for future use
+                    # Note: self.map_calculator.process_batch_for_map() is still available but not called
+                    if batch_idx < 3:
+                        logger.debug(f"mAP processing disabled for {layer_name} batch {batch_idx} - focusing on classification metrics")
                     
                     # Process for classification metrics
                     layer_output = self.prediction_processor.extract_classification_predictions(
@@ -417,24 +407,13 @@ class ValidationExecutor:
                 'accuracy': 0.0
             })
         
-        # Compute mAP for object detection performance (all phases)
-        if self._should_compute_map_metrics(phase_num):
-            logger.info(f"Computing mAP for Phase {phase_num} object detection performance")
-            map_metrics = self.map_calculator.compute_final_map()
-            logger.info(f"mAP computation completed. Results: {map_metrics}")
-            
-            # Include map50 as core detection metric for all phases
-            if 'val_map50' in map_metrics:
-                raw_metrics['map50'] = map_metrics['val_map50']
-                raw_metrics['val_map50'] = map_metrics['val_map50']  # Also include with validation prefix
-                logger.info(f"📊 Phase {phase_num} mAP results: mAP@0.5 = {map_metrics['val_map50']:.4f}")
-            else:
-                logger.warning(f"⚠️ mAP computation did not return val_map50. Keys: {list(map_metrics.keys())}")
-                # Set fallback values
-                raw_metrics['map50'] = 0.0
-                raw_metrics['val_map50'] = 0.0
-        else:
-            logger.warning(f"⚠️ mAP computation skipped for Phase {phase_num}")
+        # mAP computation disabled for performance - calculation code preserved for future use
+        # Note: mAP calculation classes (map_calculator.py, parallel_map_calculator.py) remain available
+        logger.debug(f"📊 Phase {phase_num}: mAP computation disabled for faster training")
+        
+        # Set mAP values to 0 since we're not computing them
+        raw_metrics['map50'] = 0.0
+        raw_metrics['val_map50'] = 0.0
         
         # Convert to research-focused metrics with clear naming
         research_metrics_manager = get_research_metrics_manager()
@@ -451,10 +430,10 @@ class ValidationExecutor:
     
     def _should_compute_map_metrics(self, phase_num: int) -> bool:
         """Determine if mAP metrics should be computed for this phase."""
-        # mAP is a core object detection metric and should be computed in all phases
-        # Phase 1: Basic object detection performance
-        # Phase 2: Multi-layer detection performance
-        return True  # Always compute mAP for object detection tasks
+        # mAP computation disabled for performance - calculation code preserved for future use
+        # Note: mAP calculator classes remain available in map_calculator.py and parallel_map_calculator.py
+        # To re-enable: change return value to True and uncomment mAP processing code above
+        return False  # Disabled for faster training, focus on classification metrics
     
     def _compute_classification_metrics(self, all_predictions, all_targets):
         """Compute classification metrics from collected predictions and targets."""

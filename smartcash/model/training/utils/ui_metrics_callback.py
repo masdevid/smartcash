@@ -290,13 +290,14 @@ class UIMetricsCallback:
                 'train_loss', 'val_loss', 'learning_rate', 'epoch',
                 'val_precision', 'val_recall', 'val_f1', 'val_accuracy'
             ]
-            # Only include map50 if it exists (core detection metric)
-            if 'val_map50' in metrics:
-                core_metrics.insert(2, 'val_map50')  # Add after val_loss
+            # mAP metrics disabled for performance - focusing on classification metrics
+            # Note: to re-enable, uncomment the line below:
+            # if 'val_map50' in metrics:
+            #     core_metrics.insert(2, 'val_map50')  # Add after val_loss
         else:
-            # Phase 2: Focus on core training + detection metrics
+            # Phase 2: Focus on core training metrics (mAP disabled for performance)
             core_metrics = [
-                'train_loss', 'val_loss', 'val_map50', 'learning_rate', 'epoch',
+                'train_loss', 'val_loss', 'learning_rate', 'epoch',
                 'val_precision', 'val_recall', 'val_f1', 'val_accuracy'
             ]
             # No additional metrics needed - keep it clean

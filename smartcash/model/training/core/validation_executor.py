@@ -12,7 +12,7 @@ from typing import Dict
 from smartcash.common.logger import get_logger
 from smartcash.model.training.utils.metrics_utils import calculate_multilayer_metrics
 from .prediction_processor import PredictionProcessor
-from .map_calculator_factory import create_optimal_map_calculator
+# from .map_calculator_factory import create_optimal_map_calculator  # Removed mAP calculation
 
 logger = get_logger(__name__)
 
@@ -34,8 +34,7 @@ class ValidationExecutor:
         self.progress_tracker = progress_tracker
         self.prediction_processor = PredictionProcessor(config, model)
         
-        # Create optimal mAP calculator based on system capabilities
-        self.map_calculator = create_optimal_map_calculator()
+        # mAP calculator removed for performance optimization
     
     def validate_epoch(self, val_loader, loss_manager, 
                       epoch: int, total_epochs: int, phase_num: int, display_epoch: int = None) -> Dict[str, float]:
@@ -64,9 +63,8 @@ class ValidationExecutor:
             display_epoch = epoch + 1
         
         # Debug logging with optimization info
-        map_sample_rate = self.config.get('training', {}).get('validation', {}).get('map_sample_rate', 5)
         logger.debug(f"Starting validation epoch {display_epoch} with {num_batches} batches")
-        logger.debug(f"⚡ Optimizations: mAP sampling every {map_sample_rate} batches, Phase {phase_num} layer filtering")
+        logger.debug(f"⚡ Optimizations: Phase {phase_num} layer filtering, mAP calculation removed")
         if num_batches == 0:
             logger.warning("Validation loader is empty!")
             return self._get_empty_validation_metrics()
@@ -243,10 +241,7 @@ class ValidationExecutor:
                     all_targets[layer_name] = []
                 
                 try:
-                    # mAP processing disabled for performance - calculation code preserved for future use
-                    # Note: self.map_calculator.process_batch_for_map() is still available but not called
-                    if batch_idx < 3:
-                        logger.debug(f"mAP processing disabled for {layer_name} batch {batch_idx} - focusing on classification metrics")
+                    # Focus only on classification metrics (mAP processing removed)
                     
                     # Process for classification metrics
                     layer_output = self.prediction_processor.extract_classification_predictions(
@@ -407,13 +402,8 @@ class ValidationExecutor:
                 'accuracy': 0.0
             })
         
-        # mAP computation disabled for performance - calculation code preserved for future use
-        # Note: mAP calculation classes (map_calculator.py, parallel_map_calculator.py) remain available
-        logger.debug(f"📊 Phase {phase_num}: mAP computation disabled for faster training")
-        
-        # Set mAP values to 0 since we're not computing them
-        raw_metrics['map50'] = 0.0
-        raw_metrics['val_map50'] = 0.0
+        # mAP computation completely removed for performance optimization
+        logger.debug(f"📊 Phase {phase_num}: Focusing on classification metrics only")
         
         # Convert to research-focused metrics with clear naming
         research_metrics_manager = get_research_metrics_manager()
@@ -428,12 +418,7 @@ class ValidationExecutor:
         
         return standardized_metrics
     
-    def _should_compute_map_metrics(self, phase_num: int) -> bool:
-        """Determine if mAP metrics should be computed for this phase."""
-        # mAP computation disabled for performance - calculation code preserved for future use
-        # Note: mAP calculator classes remain available in map_calculator.py and parallel_map_calculator.py
-        # To re-enable: change return value to True and uncomment mAP processing code above
-        return False  # Disabled for faster training, focus on classification metrics
+    # _should_compute_map_metrics method removed - mAP computation completely disabled
     
     def _compute_classification_metrics(self, all_predictions, all_targets):
         """Compute classification metrics from collected predictions and targets."""

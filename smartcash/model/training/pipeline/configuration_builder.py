@@ -107,7 +107,7 @@ class ConfigurationBuilder:
             'training_mode': base_config['training_mode'],
             'early_stopping': {
                 'enabled': True,
-                'patience': 10,
+                'patience': 15,  # Default patience (can be overridden by user args)
                 'min_delta': 0.001,
                 'monitor': 'val_accuracy'
             }

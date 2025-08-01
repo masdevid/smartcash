@@ -30,16 +30,16 @@ class ResearchMetricsManager:
             'accuracy',  # Standard classification accuracy
             'precision', 
             'recall',
-            'f1',
-            'map50'      # Object detection mAP
+            'f1'
+            # 'map50'      # Object detection mAP - disabled for performance
         ]
         
         self.phase_2_focus_metrics = [
             'accuracy',       # Standard classification accuracy
             'precision', 
             'recall',
-            'f1',
-            'map50'          # Object detection mAP
+            'f1'
+            # 'map50'          # Object detection mAP - disabled for performance
         ]
     
     def standardize_metric_names(self, raw_metrics: Dict[str, float], phase_num: int, 
@@ -78,13 +78,7 @@ class ResearchMetricsManager:
             standardized[f"{prefix}recall"] = raw_metrics.get('recall', 0.0)
             standardized[f"{prefix}f1"] = raw_metrics.get('f1', 0.0)
         
-        # Detection metrics - mAP
-        if 'map50' in raw_metrics:
-            standardized[f"{prefix}map50"] = raw_metrics['map50']
-        elif 'val_map50' in raw_metrics:
-            standardized[f"{prefix}map50"] = raw_metrics['val_map50']
-        else:
-            standardized[f"{prefix}map50"] = 0.0
+        # mAP metrics completely removed - focusing on classification metrics only
         
         # For validation metrics, also provide backward compatibility names
         if is_validation:
@@ -97,8 +91,7 @@ class ResearchMetricsManager:
                 standardized["val_recall"] = standardized[f"{prefix}recall"]
             if f"{prefix}f1" in standardized:
                 standardized["val_f1"] = standardized[f"{prefix}f1"]
-            if f"{prefix}map50" in standardized:
-                standardized["val_map50"] = standardized[f"{prefix}map50"]
+            # mAP metrics removed
         
         return standardized
     
@@ -121,16 +114,18 @@ class ResearchMetricsManager:
         }
     
     def generate_research_summary(self, phase_num: int, final_metrics: Dict[str, float]) -> str:
-        """Generate simple summary of training results."""
+        """Generate simple summary of training results (classification metrics only)."""
         accuracy = final_metrics.get('val_accuracy', 0.0)
         f1 = final_metrics.get('val_f1', 0.0)
-        map50 = final_metrics.get('val_map50', 0.0)
+        precision = final_metrics.get('val_precision', 0.0)
+        recall = final_metrics.get('val_recall', 0.0)
         
         summary = f"""
 📊 PHASE {phase_num} TRAINING RESULTS:
 • Validation Accuracy: {accuracy:.4f} ({accuracy*100:.2f}%)
 • Validation F1: {f1:.4f} ({f1*100:.2f}%)
-• mAP@0.5: {map50:.4f} ({map50*100:.2f}%)
+• Validation Precision: {precision:.4f} ({precision*100:.2f}%)
+• Validation Recall: {recall:.4f} ({recall*100:.2f}%)
         """.strip()
         
         return summary
@@ -138,7 +133,7 @@ class ResearchMetricsManager:
     def log_phase_appropriate_metrics(self, phase_num: int, metrics: Dict[str, float]):
         """Log standard YOLO metrics for both phases."""
         logger.info(f"📊 PHASE {phase_num} - Standard YOLO Metrics:")
-        for metric in ['accuracy', 'precision', 'recall', 'f1', 'map50']:
+        for metric in ['accuracy', 'precision', 'recall', 'f1']:  # mAP removed
             for prefix in ['train_', 'val_']:
                 key = f"{prefix}{metric}"
                 if key in metrics:

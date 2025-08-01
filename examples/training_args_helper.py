@@ -54,7 +54,7 @@ Examples:
   %(prog)s --batch-size 8 --loss-type weighted_multi_task --verbose
   %(prog)s --no-tqdm --verbose  # Use simple text progress instead of tqdm bars
   %(prog)s --no-early-stopping --phase1-epochs 5 --phase2-epochs 10  # Disable early stopping
-  %(prog)s --patience 10 --es-metric val_loss --es-mode min --min-delta 0.01  # Custom early stopping
+  %(prog)s --patience 20 --es-metric val_accuracy --es-mode max --min-delta 0.01  # Custom early stopping
         """
     )
     
@@ -116,9 +116,9 @@ Examples:
                        help='Disable early stopping completely')
     parser.add_argument('--patience', type=int, default=15,
                        help='Early stopping patience - epochs to wait before stopping (default: 15)')
-    parser.add_argument('--es-metric', type=str, default='val_map50',
-                       choices=['val_map50', 'val_loss', 'train_loss', 'val_map75', 'val_accuracy'],
-                       help='Metric to monitor for early stopping (default: val_map50)')
+    parser.add_argument('--es-metric', type=str, default='val_accuracy',
+                       choices=['val_accuracy', 'val_loss', 'train_loss', 'val_f1', 'val_precision', 'val_recall'],
+                       help='Metric to monitor for early stopping (default: val_accuracy)')
     parser.add_argument('--es-mode', type=str, default='max',
                        choices=['max', 'min'],
                        help='Early stopping mode - max for metrics that should increase, min for metrics that should decrease (default: max)')

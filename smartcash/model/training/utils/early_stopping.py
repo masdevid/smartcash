@@ -241,7 +241,7 @@ class MultiMetricEarlyStopping:
         for config in metrics_config:
             metric_name = config['metric']
             self.stoppers[metric_name] = EarlyStopping(
-                patience=config.get('patience', 10),
+                patience=config.get('patience', 15),  # Match default from args parser
                 min_delta=config.get('min_delta', 0.001),
                 metric=metric_name,
                 mode=config.get('mode', 'max'),
@@ -421,7 +421,7 @@ def create_early_stopping(config: Dict[str, Any]) -> EarlyStopping:
         return NoEarlyStopping()
     
     return EarlyStopping(
-        patience=es_config.get('patience', 10),
+        patience=es_config.get('patience', 15),  # Match default from args parser
         min_delta=es_config.get('min_delta', 0.001),
         metric=es_config.get('metric', 'val_accuracy'),
         mode=es_config.get('mode', 'max'),
@@ -433,7 +433,7 @@ def create_adaptive_early_stopping(config: Dict[str, Any]) -> AdaptiveEarlyStopp
     es_config = config.get('training', {}).get('early_stopping', {})
     
     return AdaptiveEarlyStopping(
-        initial_patience=es_config.get('patience', 10),
+        initial_patience=es_config.get('patience', 15),  # Match default from args parser
         patience_factor=es_config.get('adaptive_factor', 1.5),
         max_patience=es_config.get('max_patience', 50),
         improvement_threshold=es_config.get('improvement_threshold', 0.01),

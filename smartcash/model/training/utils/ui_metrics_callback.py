@@ -419,7 +419,7 @@ class UIMetricsCallback:
         exclude_patterns = [
             'hierarchical_accuracy', 'research_primary_metric', 'denomination_accuracy',
             'multi_layer_benefit', '_contribution', 'layer_2_', 'layer_3_',
-            'map50_95', 'map75', 'ap_'
+            'map50_95', 'map75', 'ap_', 'map50', 'val_map50', 'train_map50'  # mAP metrics disabled
         ]
         
         remaining = {}
@@ -482,8 +482,8 @@ class UIMetricsCallback:
                 categories['loss_metrics'][metric_name] = color_data
             elif 'accuracy' in metric_name.lower():
                 categories['accuracy_metrics'][metric_name] = color_data
-            elif 'map' in metric_name.lower():
-                categories['map_metrics'][metric_name] = color_data
+            # elif 'map' in metric_name.lower():  # mAP metrics disabled for performance
+            #     categories['map_metrics'][metric_name] = color_data
             else:
                 categories['other_metrics'][metric_name] = color_data
         
@@ -573,7 +573,7 @@ if __name__ == "__main__":
         "train_loss": 0.7245,
         "val_loss": 2.3381,
         "val_accuracy": 0.25,
-        "val_map50": 0.0,
+        # "val_map50": 0.0,  # mAP metrics disabled for performance
         "layer_1_accuracy": 0.83,
         "layer_1_precision": 0.75,
         "layer_1_f1": 0.82

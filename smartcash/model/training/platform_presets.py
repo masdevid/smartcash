@@ -197,7 +197,7 @@ class PlatformPresets:
             },
             'early_stopping': {  # Add early stopping configuration
                 'enabled': True,
-                'patience': 10,
+                'patience': 15,  # Default patience (can be overridden by user args)
                 'metric': 'val_accuracy',
                 'mode': 'max',
                 'min_delta': 0.002

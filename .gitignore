@@ -135,3 +135,27 @@ data/
 .Trashes
 ehthumbs.db
 Thumbs.db
+# YOLOv5 specific ignores
+yolov5/.git
+# Training outputs
+yolov5/runs
+# Python cache
+__pycache__/
+*.py[cod]
+*.class
+# Local development
+.env
+.venv
+venv/
+ENV/
+# IDE specific files
+.vscode/
+.idea/
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db

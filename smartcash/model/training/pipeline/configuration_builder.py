@@ -48,6 +48,17 @@ class ConfigurationBuilder:
             'session_id': self.session_id
         }
         
+        # Add validation metrics configuration from command line args
+        validation_config = kwargs.get('validation_metrics_config', {})
+        if validation_config:
+            config['use_yolov5_builtin_metrics'] = validation_config.get('use_yolov5_builtin_metrics', False)
+            config['use_hierarchical_metrics'] = validation_config.get('use_hierarchical_metrics', True)
+            logger.info(f"📊 Validation metrics config: YOLOv5={config['use_yolov5_builtin_metrics']}, Hierarchical={config['use_hierarchical_metrics']}")
+        else:
+            # Default values when no config provided
+            config['use_yolov5_builtin_metrics'] = False
+            config['use_hierarchical_metrics'] = True
+        
         # Model configuration
         config['model'] = self._build_model_config(kwargs.get('model', {}), config)
         
@@ -110,6 +121,10 @@ class ConfigurationBuilder:
                 'patience': 15,  # Default patience (can be overridden by user args)
                 'min_delta': 0.001,
                 'monitor': 'val_accuracy'
+            },
+            'validation': {
+                'use_yolov5_builtin_metrics': base_config.get('use_yolov5_builtin_metrics', False),
+                'use_hierarchical_metrics': base_config.get('use_hierarchical_metrics', True)
             }
         }
     

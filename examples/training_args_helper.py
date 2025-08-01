@@ -125,6 +125,14 @@ Examples:
     parser.add_argument('--min-delta', type=float, default=0.001,
                        help='Minimum change to qualify as improvement for early stopping (default: 0.001)')
     
+    # Validation metrics configuration
+    parser.add_argument('--use-yolov5-metrics', action='store_true',
+                       help='Use YOLOv5 built-in metrics (precision, recall, F1 from object detection). Accuracy = mAP@0.5.')
+    parser.add_argument('--use-hierarchical-metrics', action='store_true', default=True,
+                       help='Use hierarchical multi-layer metrics (layer_1_accuracy, layer_2_accuracy, etc.) (default: enabled)')
+    parser.add_argument('--disable-hierarchical-metrics', action='store_true',
+                       help='Disable hierarchical metrics - only use YOLOv5 or fallback metrics')
+    
     # Single-phase specific options
     parser.add_argument('--single-layer-mode', type=str, default='multi',
                        choices=['single', 'multi'],
@@ -287,5 +295,10 @@ def get_training_kwargs(args: Any) -> dict:
         'early_stopping_patience': args.patience,
         'early_stopping_metric': args.es_metric,
         'early_stopping_mode': args.es_mode,
-        'early_stopping_min_delta': args.min_delta
+        'early_stopping_min_delta': args.min_delta,
+        # Validation metrics configuration
+        'validation_metrics_config': {
+            'use_yolov5_builtin_metrics': args.use_yolov5_metrics,
+            'use_hierarchical_metrics': args.use_hierarchical_metrics and not args.disable_hierarchical_metrics
+        }
     }

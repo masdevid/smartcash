@@ -78,7 +78,11 @@ class ResearchMetricsManager:
             standardized[f"{prefix}recall"] = raw_metrics.get('recall', 0.0)
             standardized[f"{prefix}f1"] = raw_metrics.get('f1', 0.0)
         
-        # mAP metrics completely removed - focusing on classification metrics only
+        # mAP metrics from YOLOv5 calculator
+        if 'map50' in raw_metrics:
+            standardized[f"{prefix}map50"] = raw_metrics.get('map50', 0.0)
+        if 'map50_95' in raw_metrics:
+            standardized[f"{prefix}map50_95"] = raw_metrics.get('map50_95', 0.0)
         
         # For validation metrics, also provide backward compatibility names
         if is_validation:
@@ -91,7 +95,11 @@ class ResearchMetricsManager:
                 standardized["val_recall"] = standardized[f"{prefix}recall"]
             if f"{prefix}f1" in standardized:
                 standardized["val_f1"] = standardized[f"{prefix}f1"]
-            # mAP metrics removed
+            # mAP metrics for validation
+            if f"{prefix}map50" in standardized:
+                standardized["val_map50"] = standardized[f"{prefix}map50"]
+            if f"{prefix}map50_95" in standardized:
+                standardized["val_map50_95"] = standardized[f"{prefix}map50_95"]
         
         return standardized
     
@@ -130,14 +138,60 @@ class ResearchMetricsManager:
         
         return summary
     
+    def identify_metrics_source(self, metrics: Dict[str, float]) -> str:
+        """
+        Identify which metrics computation method was used based on available metrics.
+        
+        Args:
+            metrics: Dictionary of computed metrics
+            
+        Returns:
+            String describing the metrics source
+        """
+        has_layer_metrics = any(key.startswith('layer_') for key in metrics.keys())
+        has_yolo_style = 'val_map50' in metrics and 'val_accuracy' in metrics
+        
+        if has_layer_metrics and has_yolo_style:
+            return "YOLOv5 + Hierarchical"
+        elif has_layer_metrics:
+            return "Hierarchical Only"  
+        elif has_yolo_style:
+            return "YOLOv5 Only"
+        else:
+            return "Unknown"
+
     def log_phase_appropriate_metrics(self, phase_num: int, metrics: Dict[str, float]):
-        """Log standard YOLO metrics for both phases."""
-        logger.info(f"📊 PHASE {phase_num} - Standard YOLO Metrics:")
-        for metric in ['accuracy', 'precision', 'recall', 'f1']:  # mAP removed
-            for prefix in ['train_', 'val_']:
-                key = f"{prefix}{metric}"
-                if key in metrics:
-                    logger.info(f"   • {key}: {metrics[key]:.6f}")
+        """Log metrics with source identification (YOLOv5 vs Hierarchical)."""
+        metrics_source = self.identify_metrics_source(metrics)
+        logger.info(f"📊 PHASE {phase_num} - Validation Metrics Summary ({metrics_source}):")
+        
+        # Log main validation metrics
+        main_metrics = ['val_accuracy', 'val_precision', 'val_recall', 'val_f1', 'val_map50']
+        for metric in main_metrics:
+            if metric in metrics:
+                logger.info(f"   • {metric}: {metrics[metric]:.6f}")
+        
+        # Log hierarchical layer metrics if present
+        layer_metrics = []
+        for key in sorted(metrics.keys()):
+            if key.startswith('layer_'):
+                layer_metrics.append(key)
+        
+        if layer_metrics:
+            logger.info(f"   📊 Hierarchical Layer Metrics:")
+            for metric in layer_metrics:
+                logger.info(f"     • {metric}: {metrics[metric]:.6f}")
+        
+        # Log additional training metrics if present
+        train_metrics = []
+        for key in sorted(metrics.keys()):
+            if key.startswith('train_') and key not in ['train_loss']:
+                train_metrics.append(key)
+        
+        if train_metrics:
+            logger.info(f"   📊 Training Metrics:")
+            for metric in train_metrics:
+                logger.info(f"     • {metric}: {metrics[metric]:.6f}")
 
 # Global instance
 _research_metrics_manager = None

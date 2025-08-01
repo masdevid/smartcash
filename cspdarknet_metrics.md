@@ -1,109 +1,48 @@
-📊 METRICS [TRAINING_PHASE_1] Epoch 25:
-    train_loss: 🟢 0.0552 (excellent)
-    val_loss: 🔴 11.4791 (critical)
-    val_precision: 🟢 0.9749 (excellent)
-    val_recall: 🟢 0.9738 (excellent)
-    val_f1: 🟢 0.9740 (excellent)
-    val_accuracy: 🟢 0.9738 (excellent)
-    layer_1_accuracy: 🟢 1.0000 (excellent)
-    layer_1_precision: 🟢 1.0000 (excellent)
-    layer_1_recall: 🟢 1.0000 (excellent)
-    layer_1_f1: 🟢 1.0000 (excellent)
-
-📊 METRICS [TRAINING_PHASE_1] Epoch 26:
-    train_loss: 🟢 0.0550 (excellent)
-    val_loss: 🔴 11.4786 (critical)
-    val_precision: 🟢 0.9745 (excellent)
-    val_recall: 🟢 0.9738 (excellent)
-    val_f1: 🟢 0.9737 (excellent)
-    val_accuracy: 🟢 0.9738 (excellent)
-    layer_1_accuracy: 🟢 1.0000 (excellent)
-    layer_1_precision: 🟢 1.0000 (excellent)
-    layer_1_recall: 🟢 1.0000 (excellent)
-    layer_1_f1: 🟢 1.0000 (excellent)
-X
-📊 METRICS [TRAINING_PHASE_1] Epoch 27:
-    train_loss: 🟢 0.0584 (excellent)
-    val_loss: 🔴 11.4805 (critical)
-    val_precision: 🟢 0.9036 (excellent)
-    val_recall: 🟢 0.9009 (excellent)
-    val_f1: 🔵 0.8997 (good)
-    val_accuracy: 🔵 0.9009 (good)
-    layer_1_accuracy: 🟢 1.0000 (excellent)
-    layer_1_precision: 🟢 1.0000 (excellent)
-    layer_1_recall: 🟢 1.0000 (excellent)
-    layer_1_f1: 🟢 1.0000 (excellent)
-
-=====
-📊 METRICS [TRAINING_PHASE_2] Epoch 13:
-    train_loss: 🟢 0.0911 (excellent)
-    val_loss: 🟠 11.4785 (poor)
-    val_precision: 🔴 0.1645 (critical)
-    val_recall: 🔴 0.0583 (critical)
-    val_f1: 🔴 0.0845 (critical)
-    val_accuracy: 🟠 0.0583 (poor)
-    layer_1_accuracy: 🟢 0.9375 (excellent)
-    layer_1_precision: 🟢 0.9500 (excellent)
-    layer_1_recall: 🟢 0.9375 (excellent)
-    layer_1_f1: 🟢 0.9306 (excellent)
-    layer_2_accuracy: 🟢 0.6875 (excellent)
-    layer_2_precision: 🔵 0.7750 (good)
-    layer_2_recall: 🟡 0.6875 (fair)
-    layer_2_f1: 🟡 0.6848 (fair)
-    layer_3_accuracy: 🟡 0.3125 (fair)
-    layer_3_precision: 🟢 1.0000 (excellent)
-    layer_3_recall: 🔴 0.3125 (critical)
-    layer_3_f1: 🟠 0.4762 (poor)
-    val_map50: 🔴 0.0000 (critical)
-📊 METRICS [TRAINING_PHASE_2] Epoch 14:
-    train_loss: 🟢 0.0899 (excellent)
-    val_loss: 🟠 11.4788 (poor)
-    val_precision: 🔴 0.1805 (critical)
-    val_recall: 🔴 0.0525 (critical)
-    val_f1: 🔴 0.0789 (critical)
-    val_accuracy: 🟠 0.0525 (poor)
-    layer_1_accuracy: 🟢 1.0000 (excellent)
-    layer_1_precision: 🟢 1.0000 (excellent)
-    layer_1_recall: 🟢 1.0000 (excellent)
-    layer_1_f1: 🟢 1.0000 (excellent)
-    layer_2_accuracy: 🔵 0.4375 (good)
-    layer_2_precision: 🔴 0.2604 (critical)
-    layer_2_recall: 🟠 0.4375 (poor)
-    layer_2_f1: 🔴 0.3250 (critical)
-    val_map50: 🔴 0.0000 (critical)
-📊 METRICS [TRAINING_PHASE_2] Epoch 15:
-    train_loss: 🟢 0.0894 (excellent)
-    val_loss: 🟠 11.4785 (poor)
-    val_precision: 🔴 0.2154 (critical)
-    val_recall: 🔴 0.0729 (critical)
-    val_f1: 🔴 0.1058 (critical)
-    val_accuracy: 🟠 0.0729 (poor)
-    layer_1_accuracy: 🟢 1.0000 (excellent)
-    layer_1_precision: 🟢 1.0000 (excellent)
-    layer_1_recall: 🟢 1.0000 (excellent)
-    layer_1_f1: 🟢 1.0000 (excellent)
-    layer_2_accuracy: 🟡 0.2500 (fair)
-    layer_2_precision: 🟢 0.9062 (excellent)
-    layer_2_recall: 🔴 0.2500 (critical)
-    layer_2_f1: 🔴 0.2411 (critical)
-    layer_3_accuracy: 🟠 0.0625 (poor)
-    layer_3_precision: 🟢 1.0000 (excellent)
-    layer_3_recall: 🔴 0.0625 (critical)
-    layer_3_f1: 🔴 0.1176 (critical)
-    val_map50: 🔴 0.0000 (critical)
-📊 METRICS [TRAINING_PHASE_2] Epoch 16:
-    train_loss: 🟢 0.0901 (excellent)
-    val_loss: 🟠 11.4786 (poor)
-    val_precision: 🔴 0.1371 (critical)
-    val_recall: 🔴 0.0496 (critical)
-    val_f1: 🔴 0.0717 (critical)
-    val_accuracy: 🔴 0.0496 (critical)
-    layer_1_accuracy: 🟢 1.0000 (excellent)
-    layer_1_precision: 🟢 1.0000 (excellent)
-    layer_1_recall: 🟢 1.0000 (excellent)
-    layer_1_f1: 🟢 1.0000 (excellent)
-    layer_2_accuracy: 🔵 0.4375 (good)
-    layer_2_precision: 🔴 0.2812 (critical)
-    layer_2_recall: 🟠 0.4375 (poor)
-    layer_2_f1: 🔴 0.3333 (critical)
-    val_map50: 🔴 0.0000 (critical)
+[2025-08-01 18:25:11] INFO - smartcash.model.training.core.validation_executor - 🔍 RAW PREDICTIONS DEBUG - Batch 0:
+[2025-08-01 18:25:11] INFO - smartcash.model.training.core.validation_executor -   • targets shape: torch.Size([61, 6])
+[2025-08-01 18:25:11] INFO - smartcash.model.training.core.validation_executor -   • targets sample: tensor([[0.00000, 0.00000, 0.50000, 0.50000, 1.00000, 0.75000],
+        [1.00000, 7.00000, 0.73750, 0.79688, 0.40312, 0.15000],
+        [1.00000, 7.00000, 0.96406, 0.50000, 0.07031, 0.75000]], device='mps:0')
+[2025-08-01 18:25:11] INFO - smartcash.model.training.core.validation_executor - 🔄 CONVERSION RESULTS:
+[2025-08-01 18:25:11] INFO - smartcash.model.training.core.validation_executor -   • map_predictions: torch.Size([16, 300, 6])
+[2025-08-01 18:25:11] INFO - smartcash.model.training.core.validation_executor -   • map_targets: torch.Size([36, 6])
+[2025-08-01 18:25:11] INFO - smartcash.model.training.core.validation_executor -   • prediction sample: tensor([1.13235e-01, 2.26613e-01, 3.07659e-02, 1.19420e-04, 1.53958e-02, 0.00000e+00], device='mps:0')
+[2025-08-01 18:25:11] INFO - smartcash.model.training.core.validation_executor -   • target sample: tensor([0.00000, 0.00000, 0.50000, 0.50000, 1.00000, 0.75000])
+[2025-08-01 18:25:11] INFO - smartcash.model.training.core.validation_executor - 🔍 mAP DEBUG - Batch 0:
+[2025-08-01 18:25:11] INFO - smartcash.model.training.core.validation_executor -   • Predictions shape: torch.Size([16, 300, 6])
+[2025-08-01 18:25:11] INFO - smartcash.model.training.core.validation_executor -   • Targets shape: torch.Size([36, 6])
+[2025-08-01 18:25:11] INFO - smartcash.model.training.core.validation_executor -   • Confidence range: 0.000000 - 0.080467
+[2025-08-01 18:25:11] INFO - smartcash.model.training.core.validation_executor -   • Non-zero confidences: 688/4800
+[2025-08-01 18:25:11] INFO - smartcash.model.training.core.validation_executor -   • Classes present: tensor([0., 2., 6.], device='mps:0')
+2025-08-01 18:25:22] INFO - smartcash.model.training.core.validation_executor - ✅ Computed validation metrics: ['layer_1_accuracy', 'layer_1_precision', 'layer_1_recall', 'layer_1_f1']
+[2025-08-01 18:25:22] INFO - smartcash.model.training.core.validation_executor - ✅ Found layer_1_accuracy = 0.26239067055393583                                                                                                                          
+[2025-08-01 18:25:22] INFO - smartcash.model.training.core.validation_executor - ✅ Computed 4 validation metrics: ['layer_1_accuracy', 'layer_1_precision', 'layer_1_recall', 'layer_1_f1']
+[2025-08-01 18:25:22] INFO - smartcash.model.training.core.validation_executor - 📊 Phase 1: Using YOLOv5 built-in metrics for validation
+[2025-08-01 18:25:22] INFO - smartcash.model.training.core.yolov5_map_calculator - 📊 mAP computation debug:
+[2025-08-01 18:25:22] INFO - smartcash.model.training.core.yolov5_map_calculator -   • Total stat batches: 22
+[2025-08-01 18:25:22] INFO - smartcash.model.training.core.yolov5_map_calculator -   • TP shape: (37991, 1), sum: 1
+[2025-08-01 18:25:22] INFO - smartcash.model.training.core.yolov5_map_calculator -   • Conf shape: (37991,), range: 0.0100-0.2749
+[2025-08-01 18:25:22] INFO - smartcash.model.training.core.yolov5_map_calculator -   • Pred classes: [0 2 5 6]
+[2025-08-01 18:25:22] INFO - smartcash.model.training.core.yolov5_map_calculator -   • Target classes: [0 1 2 3 4 5 6]
+[2025-08-01 18:25:22] INFO - smartcash.model.training.core.yolov5_map_calculator - mAP computation completed:
+[2025-08-01 18:25:22] INFO - smartcash.model.training.core.yolov5_map_calculator -   • mAP@0.5: 0.0000
+[2025-08-01 18:25:22] INFO - smartcash.model.training.core.yolov5_map_calculator -   • Precision: 0.0000
+[2025-08-01 18:25:22] INFO - smartcash.model.training.core.yolov5_map_calculator -   • Recall: 0.0011
+[2025-08-01 18:25:22] INFO - smartcash.model.training.core.yolov5_map_calculator -   • F1: 0.0000
+[2025-08-01 18:25:22] INFO - smartcash.model.training.core.validation_executor - YOLOv5 built-in metrics:
+[2025-08-01 18:25:22] INFO - smartcash.model.training.core.validation_executor -   • Precision: 0.0000
+[2025-08-01 18:25:22] INFO - smartcash.model.training.core.validation_executor -   • Recall: 0.0011
+[2025-08-01 18:25:22] INFO - smartcash.model.training.core.validation_executor -   • F1: 0.0000
+[2025-08-01 18:25:22] INFO - smartcash.model.training.core.validation_executor -   • mAP@0.5: 0.0000
+[2025-08-01 18:25:22] INFO - smartcash.model.training.core.yolov5_map_calculator - 📊 mAP computation debug:
+[2025-08-01 18:25:22] INFO - smartcash.model.training.core.yolov5_map_calculator -   • Total stat batches: 22
+[2025-08-01 18:25:22] INFO - smartcash.model.training.core.yolov5_map_calculator -   • TP shape: (37991, 1), sum: 1
+[2025-08-01 18:25:22] INFO - smartcash.model.training.core.yolov5_map_calculator -   • Conf shape: (37991,), range: 0.0100-0.2749
+[2025-08-01 18:25:22] INFO - smartcash.model.training.core.yolov5_map_calculator -   • Pred classes: [0 2 5 6]
+[2025-08-01 18:25:22] INFO - smartcash.model.training.core.yolov5_map_calculator -   • Target classes: [0 1 2 3 4 5 6]
+[2025-08-01 18:25:22] INFO - smartcash.model.training.core.yolov5_map_calculator - mAP computation completed:
+[2025-08-01 18:25:22] INFO - smartcash.model.training.core.yolov5_map_calculator -   • mAP@0.5: 0.0000
+[2025-08-01 18:25:22] INFO - smartcash.model.training.core.yolov5_map_calculator -   • Precision: 0.0000
+[2025-08-01 18:25:22] INFO - smartcash.model.training.core.yolov5_map_calculator -   • Recall: 0.0011
+[2025-08-01 18:25:22] INFO - smartcash.model.training.core.yolov5_map_calculator -   • F1: 0.0000
+[2025-08-01 18:25:22] INFO - smartcash.model.training.core.validation_executor - YOLOv5 mAP Results - mAP@0.5: 0.0000, Precision: 0.0000, Recall: 0.0011

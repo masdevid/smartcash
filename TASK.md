@@ -32,6 +32,24 @@ Updated 22 Juli 2025, 20:
 # AUGMENTATION MODULE
 - N/A
 # TRAINING MODULE
+- Fixed TypeError in core.py - August 1, 2025
+  - Root cause: The `run_full_training_pipeline` function in `core.py` was not passing the `patience` argument to the `TrainingPipeline`'s `run_full_training_pipeline` method.
+  - Solution: Modified the function to extract the `patience` argument from the `kwargs` and pass it to the method.
+- Fixed SyntaxError in training_pipeline.py - August 1, 2025
+  - Root cause: A parameter without a default value (`patience`) was following parameters with default values in the `run_full_training_pipeline` function.
+  - Solution: Moved the `patience` parameter to be the first argument after `self`.
+- Fixed issue where `--patience` argument was being overridden by a default value - August 1, 2025
+  - Root cause: The `run_full_training_pipeline` function in `training_pipeline.py` had a default value for the `patience` argument, which was overriding the value passed from the command line.
+  - Solution: Removed the default value from the function definition.
+- Fixed issue where `--patience` argument was being overridden by a default value - August 1, 2025
+  - Root cause: The `apply_configuration_overrides` function in `setup_utils.py` was not correctly handling the `patience` argument, causing it to be overridden by a default value.
+  - Solution: Modified the `apply_configuration_overrides` function to correctly handle the `patience` argument.
+- Fixed issue where `--patience` argument was being overridden by a default value - August 1, 2025
+  - Root cause: The training pipeline was prioritizing a default value over the command-line argument.
+  - Solution: Modified the code to prioritize the `--patience` argument.
+- Fixed AttributeError in progress_manager.py when early_stopping is None - August 1, 2025
+  - Root cause: handle_early_stopping function did not check if early_stopping object was None before accessing its attributes. The create_early_stopping factory function in early_stopping.py could also return None.
+  - Solution: Modified create_early_stopping to always return a valid (dummy) object. Added a check in handle_early_stopping to return False if early_stopping is None.
 - Fixed validation metrics stagnation issue (val_precision, val_recall, val_f1, val_accuracy) - July 31, 2025
   - Root cause: Model's current_phase was not being propagated to child modules (especially MultiLayerHead)
   - Solution: Added _propagate_phase_to_children() method in PhaseOrchestrator to ensure all modules receive phase info

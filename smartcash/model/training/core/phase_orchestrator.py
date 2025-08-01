@@ -102,7 +102,7 @@ class PhaseOrchestrator:
             metrics_tracker = MetricsTracker(config=self.config)
             
             # Set up early stopping
-            early_stopping = self._setup_early_stopping(phase_num)
+            early_stopping = self.setup_early_stopping(phase_num)
             
             return {
                 'train_loader': train_loader,
@@ -145,35 +145,45 @@ class PhaseOrchestrator:
                 logger.info(f"🎯 Phase {phase_num}: multi-layer mode (all layers)")
             self.model.force_single_layer = False  # Use phase-based logic
     
-    def _setup_early_stopping(self, phase_num: int):
+    def setup_early_stopping(self, phase_num: int):
         """Set up phase-specific early stopping configuration."""
-        es_config = self.config['training']['early_stopping'].copy()
+        # Get base early stopping configuration
+        es_config = self.config.get('training', {}).get('early_stopping', {})
+        
+        # Log the early stopping configuration for debugging
+        logger.info(f"🔍 Early stopping config: {es_config}")
         
         # Check if phase-specific early stopping is enabled
-        # Now that we use val_accuracy, early stopping is useful for both phases
-        training_mode = self.config.get('training_mode', 'single_phase')
-        if training_mode == 'two_phase':
-            phase_1_enabled = es_config.get('phase_1_enabled', True)   # Now enabled by default for Phase 1
-            phase_2_enabled = es_config.get('phase_2_enabled', True)   # Enabled by default for Phase 2
-        else:
-            phase_1_enabled = es_config.get('phase_1_enabled', True)   # Single-phase respects config
-            phase_2_enabled = es_config.get('phase_2_enabled', True)
+        phase_1_enabled = es_config.get('phase_1_enabled', False)  # Default disabled for Phase 1
+        phase_2_enabled = es_config.get('phase_2_enabled', True)   # Default enabled for Phase 2
         
         # For two-phase mode, apply phase-specific early stopping logic
-        if self.config.get('training_mode') == 'two_phase':
+        if self.config.get('training_mode', 'two_phase') == 'two_phase':
             if phase_num == 1:
-                es_config['enabled'] = phase_1_enabled
-                if not phase_1_enabled:
+                if phase_1_enabled:
+                    logger.info(f"✅ Early stopping enabled for Phase {phase_num}")
+                else:
                     logger.info(f"🚫 Early stopping disabled for Phase {phase_num}")
-            elif phase_num == 2:
-                es_config['enabled'] = phase_2_enabled
+                    return None  # Return None to disable early stopping
+            else:  # phase_num == 2
                 if phase_2_enabled:
                     logger.info(f"✅ Early stopping enabled for Phase {phase_num}")
                 else:
                     logger.info(f"🚫 Early stopping disabled for Phase {phase_num}")
+                    return None  # Return None to disable early stopping
+        else:
+            # For single-phase mode, use the general early stopping setting
+            if es_config.get('enabled', True):
+                logger.info(f"✅ Early stopping enabled for Phase {phase_num}")
+            else:
+                logger.info(f"🚫 Early stopping disabled for Phase {phase_num}")
+                return None  # Return None to disable early stopping
         
-        early_stopping = create_early_stopping({'training': {'early_stopping': es_config}})
-        logger.info(f"🔍 Early stopping object type: {type(early_stopping).__name__} | Config enabled: {es_config.get('enabled', True)}")
+        # Create early stopping instance with configuration
+        from smartcash.model.training.utils.early_stopping import create_early_stopping
+        early_stopping = create_early_stopping(self.config)
+        
+        logger.info(f"🔍 Early stopping object type: {type(early_stopping).__name__} | Config enabled: {es_config.get('enabled', True)} | Patience: {es_config.get('patience', 'N/A')}")
         
         return early_stopping
     

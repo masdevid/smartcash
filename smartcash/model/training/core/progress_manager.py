@@ -257,6 +257,9 @@ class ProgressManager:
         Returns:
             True if training should stop, False otherwise
         """
+        if not early_stopping:
+            return False
+            
         # Early stopping can now be active in both phases using val_accuracy
         # Phase 1: val_accuracy is meaningful for classification performance
         # Phase 2: val_accuracy continues to be meaningful for overall performance
@@ -264,6 +267,9 @@ class ProgressManager:
             logger.debug(f"Phase 1: Early stopping enabled using val_accuracy")
         else:
             logger.debug(f"Phase 2: Early stopping enabled using val_accuracy")
+        
+        # Log early stopping configuration
+        logger.debug(f"Early stopping config: patience={early_stopping.patience}, metric={early_stopping.metric}, mode={early_stopping.mode}")
         
         # Use val_accuracy for early stopping (more reliable than val_map50)
         monitor_metric = final_metrics.get('val_accuracy', 0)

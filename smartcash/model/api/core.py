@@ -433,7 +433,7 @@ def run_full_training_pipeline(**kwargs) -> Dict[str, Any]:
     pipeline = TrainingPipeline(**pipeline_args)
     
     # Run training
-    return pipeline.run_full_training_pipeline(**kwargs)
+    return pipeline.run_full_training_pipeline(patience=kwargs.pop('patience', 30), **kwargs)
 
 
 # Backwards compatibility aliases

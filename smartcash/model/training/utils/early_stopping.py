@@ -36,6 +36,9 @@ class EarlyStopping:
         self.save_best_path = save_best_path
         self.verbose = verbose
         
+        if self.verbose:
+            print(f"🔍 Early stopping initialized with patience={patience}, metric={metric}, mode={mode}")
+        
         # State tracking
         self.best_score = None
         self.best_epoch = 0
@@ -398,7 +401,7 @@ def create_early_stopping(config: Dict[str, Any]) -> EarlyStopping:
     """Factory function untuk create early stopping dari config"""
     es_config = config.get('training', {}).get('early_stopping', {})
     
-    if not es_config.get('enabled', True):
+    if not es_config or not es_config.get('enabled', True):
         # Return dummy early stopping yang never stops
         class NoEarlyStopping:
             def __init__(self):
@@ -406,6 +409,7 @@ def create_early_stopping(config: Dict[str, Any]) -> EarlyStopping:
                 self.best_score = 0.0
                 self.best_epoch = 0
                 self.metric = 'disabled'
+                self.mode = 'max'
                 self.should_stop = False
                 
             def __call__(self, score, model=None, epoch=0):

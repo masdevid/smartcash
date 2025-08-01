@@ -179,7 +179,7 @@ def apply_configuration_overrides(config: Dict[str, Any], **kwargs) -> Dict[str,
     early_stopping_keys = ['early_stopping_enabled', 'early_stopping_phase_1_enabled', 'early_stopping_phase_2_enabled',
                          'early_stopping_patience', 'early_stopping_metric', 
                          'early_stopping_mode', 'early_stopping_min_delta']
-    if any(es_key in kwargs for es_key in early_stopping_keys):
+    if any(es_key in kwargs for es_key in early_stopping_keys) or ('patience' in kwargs and kwargs['patience'] is not None):
         training_overrides['training'] = training_overrides.get('training', {})
         training_overrides['training']['early_stopping'] = training_overrides['training'].get('early_stopping', {})
         
@@ -192,6 +192,8 @@ def apply_configuration_overrides(config: Dict[str, Any], **kwargs) -> Dict[str,
             training_overrides['training']['early_stopping']['phase_2_enabled'] = kwargs['early_stopping_phase_2_enabled']
         if 'early_stopping_patience' in kwargs:
             training_overrides['training']['early_stopping']['patience'] = kwargs['early_stopping_patience']
+        if 'patience' in kwargs and kwargs['patience'] is not None:
+             training_overrides['training']['early_stopping']['patience'] = kwargs['patience']
         if 'early_stopping_metric' in kwargs:
             training_overrides['training']['early_stopping']['metric'] = kwargs['early_stopping_metric']
         if 'early_stopping_mode' in kwargs:
@@ -313,6 +315,22 @@ def apply_training_overrides(config: Dict[str, Any], **kwargs) -> Dict[str, Any]
             config['model'] = {}
         config['model']['layer_mode'] = kwargs['single_layer_mode']
         logger.debug(f"🎯 Single layer mode override: {kwargs['single_layer_mode']}")
+    
+    # Validation metrics configuration override
+    if 'validation_metrics_config' in kwargs and kwargs['validation_metrics_config']:
+        validation_config = kwargs['validation_metrics_config']
+        
+        # Add to training.validation section
+        if 'training' not in config:
+            config['training'] = {}
+        if 'validation' not in config['training']:
+            config['training']['validation'] = {}
+        
+        # Apply validation metrics settings
+        config['training']['validation']['use_yolov5_builtin_metrics'] = validation_config.get('use_yolov5_builtin_metrics', False)
+        config['training']['validation']['use_hierarchical_metrics'] = validation_config.get('use_hierarchical_metrics', True)
+        
+        logger.info(f"🎯 Validation metrics config override: YOLOv5={config['training']['validation']['use_yolov5_builtin_metrics']}, Hierarchical={config['training']['validation']['use_hierarchical_metrics']}")
     
     return config
 

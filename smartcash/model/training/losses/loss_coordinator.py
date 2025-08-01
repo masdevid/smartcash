@@ -34,7 +34,7 @@ class LossCoordinator:
         self.label_smoothing = loss_config.get('label_smoothing', 0.0)
         
         # Phase awareness for proper loss selection
-        self.current_phase = 1  # Default to Phase 1
+        self.current_phase = config.get('current_phase', 1)  # Read from config, default to Phase 1
         
         # Dynamic weighting parameters
         self.use_dynamic_weighting = loss_config.get('dynamic_weighting', True)
@@ -68,22 +68,24 @@ class LossCoordinator:
         should_use_multitask = (loss_type == 'uncertainty_multi_task' and self._is_multilayer_mode())
         
         if should_use_multitask:
-            # Use MODEL_ARC.md compliant uncertainty-based multi-task loss for ALL phases
-            from smartcash.model.training.multi_task_loss import create_banknote_multi_task_loss
+            # Use MODEL_ARC.md compliant uncertainty-based multi-task loss with phase-specific configuration
+            from smartcash.model.training.multi_task_loss import UncertaintyMultiTaskLoss
             
-            # Phase-specific layer configuration
+            # Phase-specific layer configuration according to phase-loss.json
             if self.current_phase == 1:
+                # Phase 1: Only layer_1 active (weight=1.0), layer_2/layer_3 inactive (weight=0.0)
                 layer_config = {
                     'layer_1': {'description': 'Full banknote detection', 'num_classes': 7}
                 }
-                self.logger.info(f"🔬 Phase {self.current_phase}: Using uncertainty multi-task loss (1 layer)")
+                self.logger.debug(f"Phase {self.current_phase}: Using uncertainty multi-task loss (1 layer)")
             else:
+                # Phase 2: All layers active with uncertainty-based weighting
                 layer_config = {
                     'layer_1': {'description': 'Full banknote detection', 'num_classes': 7},
                     'layer_2': {'description': 'Denomination-specific features', 'num_classes': 7}, 
                     'layer_3': {'description': 'Common features', 'num_classes': 3}
                 }
-                self.logger.info(f"🔬 Phase {self.current_phase}: Using uncertainty multi-task loss (3 layers)")
+                self.logger.debug(f"Phase {self.current_phase}: Using uncertainty multi-task loss (3 layers)")
             
             loss_config = {
                 'box_weight': self.box_weight,
@@ -96,8 +98,9 @@ class LossCoordinator:
                 'max_variance': self.max_variance
             }
             
-            self.multi_task_loss = create_banknote_multi_task_loss(
-                use_adaptive=False,
+            # Create UncertaintyMultiTaskLoss directly with phase-specific layer configuration
+            self.multi_task_loss = UncertaintyMultiTaskLoss(
+                layer_config=layer_config,
                 loss_config=loss_config
             )
             self.use_multi_task_loss = True
@@ -105,7 +108,7 @@ class LossCoordinator:
             # Use individual YOLO losses for backward compatibility
             self.use_multi_task_loss = False
             self._setup_individual_losses()
-            self.logger.info(f"⚙️ Phase {self.current_phase}: Using individual YOLO losses (fallback)")
+            self.logger.debug(f"Phase {self.current_phase}: Using individual YOLO losses (fallback)")
     
     def _setup_individual_losses(self) -> None:
         """Setup individual YOLO loss functions for each layer"""
@@ -170,10 +173,22 @@ class LossCoordinator:
     def _compute_multi_task_loss(self, predictions: Dict[str, list], 
                                 targets: torch.Tensor, img_size: int = 640) -> Tuple[torch.Tensor, Dict[str, Any]]:
         """Compute loss using MODEL_ARC.md compliant uncertainty-based multi-task loss"""
-        # Prepare targets for each layer
+        # Get active layers based on current phase (according to phase-loss.json)
+        if self.current_phase == 1:
+            active_layers = ['layer_1']  # Phase 1: Only layer_1 (weight=1.0)
+        else:
+            active_layers = ['layer_1', 'layer_2', 'layer_3']  # Phase 2: All layers with uncertainty weighting
+        
+        # Prepare targets and predictions only for active layers
         layer_targets = {}
-        for layer_name in ['layer_1', 'layer_2', 'layer_3']:
+        filtered_predictions = {}
+        
+        for layer_name in active_layers:
             if layer_name in predictions:
+                # Add predictions for active layers
+                filtered_predictions[layer_name] = predictions[layer_name]
+                
+                # Filter targets for this layer
                 filtered_targets = filter_targets_for_layer(targets, layer_name)
                 # Safe check for tensor size - avoid Boolean tensor comparison
                 if torch.is_tensor(filtered_targets) and filtered_targets.numel() > 0:
@@ -202,10 +217,12 @@ class LossCoordinator:
             'num_targets': targets.shape[0] if hasattr(targets, 'shape') and len(targets.shape) > 0 else 0
         }
         
+        self.logger.debug(f"Phase {self.current_phase}: Using {len(active_layers)} active layers: {active_layers}")
+        self.logger.debug(f"Filtered predictions keys: {list(filtered_predictions.keys())}, layer_targets keys: {list(layer_targets.keys())}")
+        
         try:
-            # Use uncertainty-based multi-task loss
-            self.logger.debug(f"Calling multi_task_loss with predictions keys: {list(predictions.keys())}, layer_targets keys: {list(layer_targets.keys())}")
-            total_loss, loss_breakdown = self.multi_task_loss(predictions, layer_targets, img_size)
+            # Use uncertainty-based multi-task loss with filtered predictions
+            total_loss, loss_breakdown = self.multi_task_loss(filtered_predictions, layer_targets, img_size)
             
             # Update metrics from loss breakdown
             if loss_breakdown:
@@ -292,7 +309,7 @@ class LossCoordinator:
                 if active_layers > 1:
                     # Multi-layer: average the losses
                     total_loss = torch.stack(layer_losses).mean()
-                    self.logger.debug(f"Multi-layer loss computed: {active_layers} layers, avg loss: {total_loss.item():.4f}")
+                    pass  # Removed verbose logging
                 else:
                     # Single layer: use the loss directly
                     total_loss = layer_losses[0]

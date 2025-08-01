@@ -90,6 +90,7 @@ class TrainingPipeline:
         logger.info(f"🔧 YOLOv5 integration: {'enabled' if use_yolov5_integration else 'disabled'}")
     
     def run_full_training_pipeline(self,
+                                  patience: int,
                                   backbone: str = 'cspdarknet',
                                   pretrained: bool = True,
                                   phase_1_epochs: int = 1,
@@ -104,7 +105,6 @@ class TrainingPipeline:
                                   phase_1_lr: float = 0.001,
                                   phase_2_lr: float = 0.0001,
                                   # Early stopping configuration
-                                  patience: int = 10,
                                   min_delta: float = 0.001,
                                   monitor: str = 'val_loss',
                                   # Training configuration

@@ -12,8 +12,8 @@ import time
 class EarlyStopping:
     """Early stopping implementation dengan multi-metric support dan checkpoint management"""
     
-    def __init__(self, patience: int = 10, min_delta: float = 0.001, 
-                 metric: str = 'val_map50', mode: str = 'max',
+    def __init__(self, patience: int = 30, min_delta: float = 0.001, 
+                 metric: str = 'val_accuracy', mode: str = 'max',
                  restore_best_weights: bool = True, save_best_path: Optional[str] = None,
                  verbose: bool = True):
         """
@@ -423,7 +423,7 @@ def create_early_stopping(config: Dict[str, Any]) -> EarlyStopping:
     return EarlyStopping(
         patience=es_config.get('patience', 10),
         min_delta=es_config.get('min_delta', 0.001),
-        metric=es_config.get('metric', 'val_map50'),
+        metric=es_config.get('metric', 'val_accuracy'),
         mode=es_config.get('mode', 'max'),
         verbose=True
     )
@@ -438,6 +438,6 @@ def create_adaptive_early_stopping(config: Dict[str, Any]) -> AdaptiveEarlyStopp
         max_patience=es_config.get('max_patience', 50),
         improvement_threshold=es_config.get('improvement_threshold', 0.01),
         min_delta=es_config.get('min_delta', 0.001),
-        metric=es_config.get('metric', 'val_map50'),
+        metric=es_config.get('metric', 'val_accuracy'),
         mode=es_config.get('mode', 'max')
     )

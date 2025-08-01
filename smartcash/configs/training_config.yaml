@@ -91,7 +91,7 @@ training:
   # Enhanced early stopping configuration
   early_stopping:
     enabled: true
-    patience: 15  # Epochs to wait before stopping
+    patience: 30  # Epochs to wait before stopping
     metric: val_accuracy  # Keep using accuracy max as requested
     mode: max  # One of: min, max
     min_delta: 0.001  # Minimum change to qualify as improvement
@@ -194,7 +194,6 @@ metrics:
     - train_loss  # Training loss
     - val_loss    # Validation loss
     - val_map50   # Mean Average Precision at IoU=0.5
-    - val_map75   # Mean Average Precision at IoU=0.75
   
   # Update frequency
   batch_update_frequency: adaptive  # 1-5 batches based on dataset size
@@ -286,20 +285,3 @@ session:
     training_phase_1: adaptive  # Adaptive batch updates
     training_phase_2: adaptive  # Adaptive batch updates
     summary_visualization: every_step # Update on each summary step
-
-# Integration compatibility
-compatibility:
-  # Backward compatibility
-  legacy_configs: supported   # Support old config formats
-  legacy_apis: supported      # Support old API calls
-  
-  # Forward compatibility
-  extensible_callbacks: true  # Support additional callbacks
-  plugin_architecture: true  # Support future plugins
-  
-  # UI framework compatibility
-  ui_frameworks:
-    - tkinter     # Native Python GUI
-    - qt          # Qt-based frameworks
-    - web         # Web-based interfaces
-    - jupyter     # Jupyter notebook integration

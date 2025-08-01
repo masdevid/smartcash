@@ -557,13 +557,56 @@ class ValidationExecutor:
             elif 'f1' in key:
                 f1_metrics.append(value)
         
-        # Update base metrics - these will be converted by research metrics system later
-        # Add small epsilon to avoid exactly zero values that might be interpreted as static
+        # Hierarchical metric computation - Layer 1 is primary, others are auxiliary
         epsilon = 1e-6
-        base_metrics['accuracy'] = max(epsilon, sum(accuracy_metrics) / len(accuracy_metrics)) if accuracy_metrics else epsilon
-        base_metrics['precision'] = max(epsilon, sum(precision_metrics) / len(precision_metrics)) if precision_metrics else epsilon
-        base_metrics['recall'] = max(epsilon, sum(recall_metrics) / len(recall_metrics)) if recall_metrics else epsilon
-        base_metrics['f1'] = max(epsilon, sum(f1_metrics) / len(f1_metrics)) if f1_metrics else epsilon
+        
+        if phase_num == 1:
+            # Phase 1: Use Layer 1 metrics directly (only layer_1 is training)
+            base_metrics['accuracy'] = computed_metrics.get('layer_1_accuracy', epsilon)
+            base_metrics['precision'] = computed_metrics.get('layer_1_precision', epsilon)
+            base_metrics['recall'] = computed_metrics.get('layer_1_recall', epsilon)
+            base_metrics['f1'] = computed_metrics.get('layer_1_f1', epsilon)
+            logger.debug(f"Phase 1: Using layer_1 metrics directly (single-layer training)")
+            
+        elif phase_num == 2:
+            # Phase 2: Hierarchical weighted combination
+            # Layer 1 (70%): Primary denomination detection - main research goal
+            # Layer 2 (20%): Denomination-specific features - supporting Layer 1
+            # Layer 3 (10%): Common security features - general banknote validation
+            
+            layer_1_acc = computed_metrics.get('layer_1_accuracy', 0.0)
+            layer_2_acc = computed_metrics.get('layer_2_accuracy', 0.0)
+            layer_3_acc = computed_metrics.get('layer_3_accuracy', 0.0)
+            
+            layer_1_prec = computed_metrics.get('layer_1_precision', 0.0)
+            layer_2_prec = computed_metrics.get('layer_2_precision', 0.0)
+            layer_3_prec = computed_metrics.get('layer_3_precision', 0.0)
+            
+            layer_1_rec = computed_metrics.get('layer_1_recall', 0.0)
+            layer_2_rec = computed_metrics.get('layer_2_recall', 0.0)
+            layer_3_rec = computed_metrics.get('layer_3_recall', 0.0)
+            
+            layer_1_f1 = computed_metrics.get('layer_1_f1', 0.0)
+            layer_2_f1 = computed_metrics.get('layer_2_f1', 0.0)
+            layer_3_f1 = computed_metrics.get('layer_3_f1', 0.0)
+            
+            # Weighted hierarchical combination
+            base_metrics['accuracy'] = max(epsilon, 0.7 * layer_1_acc + 0.2 * layer_2_acc + 0.1 * layer_3_acc)
+            base_metrics['precision'] = max(epsilon, 0.7 * layer_1_prec + 0.2 * layer_2_prec + 0.1 * layer_3_prec)
+            base_metrics['recall'] = max(epsilon, 0.7 * layer_1_rec + 0.2 * layer_2_rec + 0.1 * layer_3_rec)
+            base_metrics['f1'] = max(epsilon, 0.7 * layer_1_f1 + 0.2 * layer_2_f1 + 0.1 * layer_3_f1)
+            
+            logger.info(f"Phase 2 Hierarchical Metrics: layer_1={layer_1_acc:.4f} (70%), layer_2={layer_2_acc:.4f} (20%), layer_3={layer_3_acc:.4f} (10%)")
+            logger.info(f"Weighted val_accuracy: {base_metrics['accuracy']:.4f} (should reflect Layer 1 dominance)")
+            
+        else:
+            # Fallback: Simple averaging for unknown phases
+            logger.warning(f"Unknown phase {phase_num}, falling back to simple averaging")
+            base_metrics['accuracy'] = max(epsilon, sum(accuracy_metrics) / len(accuracy_metrics)) if accuracy_metrics else epsilon
+            base_metrics['precision'] = max(epsilon, sum(precision_metrics) / len(precision_metrics)) if precision_metrics else epsilon
+            base_metrics['recall'] = max(epsilon, sum(recall_metrics) / len(recall_metrics)) if recall_metrics else epsilon
+            base_metrics['f1'] = max(epsilon, sum(f1_metrics) / len(f1_metrics)) if f1_metrics else epsilon
+        
         
         # Debug: Check if we're creating static metrics from the generic averaging
         if (abs(base_metrics['accuracy'] - 0.0321) < 0.0001 and 

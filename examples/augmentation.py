@@ -77,6 +77,8 @@ def create_augmentation_config(args) -> Dict[str, Any]:
         config['augmentation']['target_count'] = args.target_count
     if args.augmentation_types:
         config['augmentation']['types'] = args.augmentation_types.split(',')
+    if args.intensity:
+        config['augmentation']['intensity'] = args.intensity
     
     # Set input/output directories
     config['paths'] = {
@@ -158,12 +160,14 @@ def main():
                       help='Output directory for augmented data (default: data/augmented/)')
     parser.add_argument('--splits', type=str, default='train',
                       help='Comma-separated list of splits to augment (default: train)')
-    parser.add_argument('--num-variations', type=int, default=int(os.getenv('AUG_NUM_VARIATIONS', 4)),
-                      help='Number of augmented variations per image (default: 2)')
-    parser.add_argument('--target-count', type=int, default=int(os.getenv('AUG_TARGET_COUNT', 4)),
+    parser.add_argument('--num-variations', type=int, default=int(os.getenv('AUG_NUM_VARIATIONS', 3)),
+                      help='Number of augmented variations per image (default: 3)')
+    parser.add_argument('--target-count', type=int, default=int(os.getenv('AUG_TARGET_COUNT', 1000)),
                       help='Target number of images per class (default: 1000)')
     parser.add_argument('--augmentation-types', type=str, default=os.getenv('AUG_TYPES', 'combined'),
                       help='Comma-separated list of augmentation types (default: combined)')
+    parser.add_argument('--intensity', type=float, default=float(os.getenv('AUG_INTENSITY', '0.8')),
+                      help='Augmentation intensity level (0.0-1.0, default: 0.8)')
     parser.add_argument('--normalization', type=str, default=os.getenv('NORMALIZATION', 'default'),
                       help='Normalization preset (default: default)')
     parser.add_argument('--img-size', type=int, default=int(os.getenv('IMG_SIZE', 640)),
@@ -216,6 +220,7 @@ def main():
     print(f"🔄 Augmentation types: {args.augmentation_types}")
     print(f"✨ Variations per image: {args.num_variations}")
     print(f"🎯 Target count per class: {args.target_count}")
+    print(f"⚡ Intensity level: {args.intensity}")
     print(f"🖼️  Image size: {args.img_size}x{args.img_size}")
     print(f"🔧 Normalization: {args.normalization}")
     print(f"⚡ Workers: {args.workers}")

@@ -83,10 +83,18 @@ def get_default_config():
                 'quarantine_invalid': True
             },
             'normalization': NORMALIZATION_PRESETS['default'].copy(),
+            'label_cleanup': {
+                'enabled': True,         # Enable label deduplication by default
+                'backup_enabled': True,  # Create backups before modifying labels
+                'skip_splits': [],       # Splits to skip during cleanup (e.g., ['test'])
+                'dry_run': False         # Set to True to analyze without making changes
+            },
             'output': {
-                'format': 'npy',
+                'format': 'dual',  # 'npy' for training, 'image' for augmentation
                 'preserve_originals': False,
-                'organize_by_split': True
+                'organize_by_split': True,
+                'save_npy': True,      # Save .npy files for training
+                'save_images': True    # Save .jpg files for augmentation
             },
             'target_splits': ['train', 'valid'],
             'sample_size': 0  # 0 = process all

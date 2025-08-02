@@ -151,8 +151,8 @@ class NormalizationEngine:
             npy_path = Path(output_path) / 'images' / f"{input_name}.npy"
             np.save(npy_path, normalized_image.astype(np.float32))
             
-            # Copy label ke preprocessed/labels
-            self._copy_corresponding_label(file_path, output_path, input_name)
+            # Copy label ke preprocessed/labels with deduplication
+            self._copy_and_deduplicate_corresponding_label(file_path, output_path, input_name)
             
             return {'status': 'success', 'file': file_path, 'output': str(npy_path)}
                 
@@ -169,8 +169,8 @@ class NormalizationEngine:
         }
         return method_to_preset.get(method, 'yolov5s')
     
-    def _copy_corresponding_label(self, source_image_path: str, output_path: str, filename: str):
-        """Copy label file ke preprocessed/labels"""
+    def _copy_and_deduplicate_corresponding_label(self, source_image_path: str, output_path: str, filename: str):
+        """Copy and deduplicate label file ke preprocessed/labels for layer_1 classes only"""
         try:
             source_dir = Path(source_image_path).parent.parent / 'labels'
             source_label = source_dir / f"{Path(source_image_path).stem}.txt"
@@ -180,11 +180,38 @@ class NormalizationEngine:
                 output_labels_dir.mkdir(parents=True, exist_ok=True)
                 output_label = output_labels_dir / f"{filename}.txt"
                 
-                import shutil
-                shutil.copy2(source_label, output_label)
+                # Read original label
+                with open(source_label, 'r', encoding='utf-8') as f:
+                    original_lines = f.readlines()
+                
+                # Apply label deduplication for layer_1 classes only
+                from smartcash.dataset.preprocessor.core.label_deduplicator import LabelDeduplicator
+                deduplicator = LabelDeduplicator(backup_enabled=False)
+                
+                deduplicated_lines = deduplicator.deduplicate_labels(
+                    [line.strip() for line in original_lines if line.strip()], 
+                    layer1_classes_only=True
+                )
+                
+                # Write deduplicated labels
+                with open(output_label, 'w', encoding='utf-8') as f:
+                    for line in deduplicated_lines:
+                        f.write(f"{line}\n")
                 
         except Exception as e:
-            self.logger.warning(f"⚠️ Error copying label untuk {filename}: {str(e)}")
+            self.logger.warning(f"⚠️ Error copying and deduplicating label untuk {filename}: {str(e)}")
+            # Fallback to regular copy if deduplication fails
+            try:
+                source_dir = Path(source_image_path).parent.parent / 'labels'
+                source_label = source_dir / f"{Path(source_image_path).stem}.txt"
+                if source_label.exists():
+                    output_labels_dir = Path(output_path) / 'labels'
+                    output_labels_dir.mkdir(parents=True, exist_ok=True)
+                    output_label = output_labels_dir / f"{filename}.txt"
+                    import shutil
+                    shutil.copy2(source_label, output_label)
+            except Exception as fallback_error:
+                self.logger.warning(f"⚠️ Fallback copy also failed untuk {filename}: {str(fallback_error)}")
     
     def _create_summary(self, result: Dict[str, Any], source_files: List[str], output_path: str) -> Dict[str, Any]:
         """📊 Create detailed summary dengan preprocessor API info"""

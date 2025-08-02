@@ -235,12 +235,14 @@ class YOLOv5ConfigManager:
         config['depth_multiple'] = config.get('depth_multiple', 0.33)  # model depth multiple
         config['width_multiple'] = config.get('width_multiple', 0.50)  # layer channel multiple
         
-        # Ensure we have anchors
+        # Ensure we have anchors - CUSTOM ANCHORS FOR INDONESIAN BANKNOTES
         if 'anchors' not in config:
+            # Based on bbox analysis: mean 255x249px, range 160-608px for 640x640 images
+            # Indonesian banknotes are medium-to-large objects requiring larger anchors
             config['anchors'] = [
-                [10, 13, 16, 30, 33, 23],  # P3/8
-                [30, 61, 62, 45, 59, 119],  # P4/16
-                [116, 90, 156, 198, 373, 326]  # P5/32
+                [80, 70, 120, 100, 160, 140],      # P3/8  - Small banknote fragments  
+                [200, 180, 280, 220, 320, 280],    # P4/16 - Standard banknote sizes
+                [400, 350, 480, 400, 580, 480]     # P5/32 - Large/close banknotes
             ]
         
         # Ensure we have a backbone and head
@@ -287,10 +289,11 @@ class YOLOv5ConfigManager:
         if 'nc' not in config:
             config['nc'] = 80  # default number of classes
         if 'anchors' not in config:
+            # Use the same custom anchors for Indonesian banknotes
             config['anchors'] = [
-                [10, 13, 16, 30, 33, 23],  # P3/8
-                [30, 61, 62, 45, 59, 119],  # P4/16
-                [116, 90, 156, 198, 373, 326]  # P5/32
+                [80, 70, 120, 100, 160, 140],      # P3/8  - Small banknote fragments  
+                [200, 180, 280, 220, 320, 280],    # P4/16 - Standard banknote sizes
+                [400, 350, 480, 400, 580, 480]     # P5/32 - Large/close banknotes
             ]
         
         return config

@@ -38,8 +38,8 @@ class ValidationExecutor:
         num_classes = config.get('model', {}).get('num_classes', 7)
         self.map_calculator = create_yolov5_map_calculator(
             num_classes=num_classes,
-            conf_thres=0.01,  # Lower threshold for early training epochs
-            iou_thres=0.45
+            conf_thres=0.005,  # Very low threshold for early training with new anchors
+            iou_thres=0.03   # AGGRESSIVE: Very low threshold for scale learning phase
         )
         
         # Configuration for metrics calculation method - check both locations
@@ -894,7 +894,7 @@ class ValidationExecutor:
                 # Filter out predictions with low confidence (optional optimization)
                 if num_features >= 5:  # Has confidence score
                     conf_scores = layer_1_preds[:, :, 4]  # Objectness/confidence at index 4
-                    conf_threshold = 0.01  # Very low threshold to keep most detections for mAP
+                    conf_threshold = 0.005  # Extra low threshold for early training with new anchors
                     
                     # Keep detections above threshold per batch
                     valid_detections = []

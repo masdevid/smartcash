@@ -17,7 +17,7 @@ class YOLOLoss(nn.Module):
     """Core YOLO loss implementation for currency detection"""
     
     def __init__(self, num_classes: int = 7, anchors: Optional[List] = None, 
-                 box_weight: float = 0.05, obj_weight: float = 4.0, cls_weight: float = 0.5,
+                 box_weight: float = 0.5, obj_weight: float = 1.5, cls_weight: float = 0.5,
                  focal_loss: bool = False, label_smoothing: float = 0.0, logger=None):
         """
         Initialize YOLO loss function.

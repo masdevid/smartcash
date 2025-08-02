@@ -169,7 +169,7 @@ def main() -> int:
     # Configure logger based on verbose flag
     global logger
     if args.verbose:
-        logger = get_logger("preprocessing_example", level="INFO")
+        logger = get_logger("preprocessing_example", level="DEBUG")
     
     # Create output directory if it doesn't exist
     os.makedirs(args.output_dir, exist_ok=True)
@@ -195,6 +195,7 @@ def main() -> int:
             logger.error(f"❌ Cleanup failed: {e}")
             return 1
     
+    
     # Create preprocessing configuration
     config = create_preprocessing_config(args)
     
@@ -211,6 +212,7 @@ def main() -> int:
     print(f"📦 Batch size: {args.batch_size}")
     print(f"🧹 Cleanup mode: {'Enabled' if args.cleanup else 'Disabled'}")
     print(f"🔍 Sample validation: {'Enabled' if config.get('preprocessing', {}).get('validation', {}).get('enabled', True) else 'Disabled'}")
+    print(f"🏷️ Label cleanup: Automatic during preprocessing (layer_1 duplicates only)")
     print(f"🗂️ Invalid sample quarantine: Enabled (data/invalid/)")
     print(f"📝 Verbose logging: {'Enabled' if args.verbose else 'Disabled'}")
     print("-" * 60)
@@ -228,6 +230,15 @@ def main() -> int:
         print("   • Invalid samples moved to data/invalid/ directory")
         print("   • Only valid samples proceed to preprocessing")
         print("-" * 60)
+    
+    # Show label cleanup info
+    print("🏷️ Label Cleanup Info:")
+    print("   • Automatically removes duplicate layer_1 labels during preprocessing")
+    print("   • Keeps only the largest bounding box for each layer_1 class (0-6)")
+    print("   • Preserves all layer_2 and layer_3 labels unchanged")
+    print("   • Raw data labels remain untouched - cleanup only in preprocessed output")
+    print("   • No backup needed since raw data is never modified")
+    print("-" * 60)
     
     try:
         # Set up optimized progress callback

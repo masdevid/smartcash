@@ -81,6 +81,26 @@ class YOLONormalizer:
             # Fallback: simple pixel denormalization
             return self._denormalize_pixels(normalized_image).astype(np.uint8)
     
+    def to_augmentation_format(self, normalized_image: np.ndarray) -> np.ndarray:
+        """🎨 Convert normalized array to format suitable for augmentation (padded, 0-255 range)"""
+        try:
+            # Convert from [0,1] to [0,255] but keep padding intact
+            # This maintains the padded format that provides safety margin for augmentation
+            augmentation_image = (normalized_image * 255.0).astype(np.uint8)
+            
+            # Ensure proper shape (H, W, C)
+            if len(augmentation_image.shape) == 2:
+                augmentation_image = cv2.cvtColor(augmentation_image, cv2.COLOR_GRAY2RGB)
+            elif augmentation_image.shape[2] == 1:
+                augmentation_image = cv2.cvtColor(augmentation_image, cv2.COLOR_GRAY2RGB)
+            
+            return augmentation_image
+            
+        except Exception as e:
+            self.logger.error(f"❌ Augmentation format conversion error: {str(e)}")
+            # Fallback: simple conversion
+            return (normalized_image * 255.0).astype(np.uint8)
+    
     def batch_normalize(self, images: list) -> Tuple[np.ndarray, list]:
         """📦 Batch normalization untuk multiple images"""
         if not self.batch_processing:
@@ -98,19 +118,27 @@ class YOLONormalizer:
     
     def transform_coordinates(self, coordinates: np.ndarray, metadata: Dict[str, Any], 
                             reverse: bool = False) -> np.ndarray:
-        """🔧 Transform YOLO coordinates untuk normalized space"""
+        """🔧 Transform YOLO coordinates to account for padding and scaling"""
         if len(coordinates) == 0:
             return coordinates
         
         try:
-            transform_info = metadata['transform_info']
+            transform_info = metadata.get('transform_info', {})
             
-            if not reverse:
-                # Original → Normalized
-                return self._apply_coordinate_transform(coordinates, transform_info)
+            # Apply transformation based on method
+            if transform_info.get('method') == 'padding':
+                if not reverse:
+                    # Apply padding transformation to YOLO coordinates
+                    return self._apply_yolo_padding_transform(coordinates, transform_info)
+                else:
+                    # Reverse padding transformation 
+                    return self._reverse_yolo_padding_transform(coordinates, transform_info)
             else:
-                # Normalized → Original  
-                return self._reverse_coordinate_transform(coordinates, transform_info)
+                # For simple resize, still apply coordinate clamping to fix oversized boxes
+                if not reverse:
+                    return self._clamp_oversized_coordinates(coordinates)
+                else:
+                    return coordinates
                 
         except Exception as e:
             self.logger.warning(f"⚠️ Coordinate transform warning: {str(e)}")
@@ -265,6 +293,91 @@ class YOLONormalizer:
                 transformed[:, 2] = transformed[:, 2] / scale_y
                 transformed[:, 3] = transformed[:, 3] / scale_x
                 transformed[:, 4] = transformed[:, 4] / scale_y
+        
+        return transformed
+    
+    def _apply_yolo_padding_transform(self, coords: np.ndarray, transform_info: Dict[str, Any]) -> np.ndarray:
+        """🎯 Apply padding transformation specifically for YOLO normalized coordinates"""
+        scale = transform_info['scale']
+        pad_x = transform_info['pad_x']
+        pad_y = transform_info['pad_y']
+        target_w, target_h = self.target_size
+        
+        transformed = coords.copy()
+        
+        if transformed.shape[1] >= 5:  # YOLO format: [class, x, y, w, h]
+            # Convert normalized coordinates to fit the padded space
+            # YOLO coordinates (0,1) need to be mapped to the scaled content area
+            
+            # Scale down the coordinates to fit the scaled content
+            transformed[:, 1] = transformed[:, 1] * scale  # x_center
+            transformed[:, 2] = transformed[:, 2] * scale  # y_center
+            transformed[:, 3] = transformed[:, 3] * scale  # width
+            transformed[:, 4] = transformed[:, 4] * scale  # height
+            
+            # Shift coordinates to account for padding offset (in normalized space)
+            pad_x_norm = pad_x / target_w
+            pad_y_norm = pad_y / target_h
+            
+            transformed[:, 1] = transformed[:, 1] + pad_x_norm  # x_center + x_offset
+            transformed[:, 2] = transformed[:, 2] + pad_y_norm  # y_center + y_offset
+            
+            # CRITICAL: Ensure no coordinates exceed 1.0 (clamp oversized boxes)
+            # This handles edge cases where original annotations were oversized
+            transformed[:, 3] = np.clip(transformed[:, 3], 0.0, 0.95)  # Max width 95%
+            transformed[:, 4] = np.clip(transformed[:, 4], 0.0, 0.95)  # Max height 95%
+            
+            # Ensure centers stay within valid bounds given the new dimensions
+            half_w = transformed[:, 3] / 2
+            half_h = transformed[:, 4] / 2
+            transformed[:, 1] = np.clip(transformed[:, 1], half_w, 1.0 - half_w)  # x_center bounds
+            transformed[:, 2] = np.clip(transformed[:, 2], half_h, 1.0 - half_h)  # y_center bounds
+        
+        return transformed
+    
+    def _reverse_yolo_padding_transform(self, coords: np.ndarray, transform_info: Dict[str, Any]) -> np.ndarray:
+        """🔄 Reverse padding transformation for YOLO normalized coordinates"""
+        scale = transform_info['scale']
+        pad_x = transform_info['pad_x']
+        pad_y = transform_info['pad_y']
+        target_w, target_h = self.target_size
+        
+        transformed = coords.copy()
+        
+        if transformed.shape[1] >= 5:  # YOLO format: [class, x, y, w, h]
+            # Reverse the padding offset
+            pad_x_norm = pad_x / target_w
+            pad_y_norm = pad_y / target_h
+            
+            transformed[:, 1] = transformed[:, 1] - pad_x_norm  # Remove x_offset
+            transformed[:, 2] = transformed[:, 2] - pad_y_norm  # Remove y_offset
+            
+            # Reverse the scaling
+            transformed[:, 1] = transformed[:, 1] / scale  # x_center
+            transformed[:, 2] = transformed[:, 2] / scale  # y_center
+            transformed[:, 3] = transformed[:, 3] / scale  # width
+            transformed[:, 4] = transformed[:, 4] / scale  # height
+        
+        return transformed
+    
+    def _clamp_oversized_coordinates(self, coords: np.ndarray) -> np.ndarray:
+        """🔧 Clamp oversized coordinates to valid YOLO bounds"""
+        if len(coords) == 0:
+            return coords
+            
+        import numpy as np
+        transformed = coords.copy()
+        
+        if transformed.shape[1] >= 5:  # YOLO format: [class, x, y, w, h]
+            # Clamp width and height to maximum 95% to provide safety margin
+            transformed[:, 3] = np.clip(transformed[:, 3], 0.0, 0.95)  # Max width 95%
+            transformed[:, 4] = np.clip(transformed[:, 4], 0.0, 0.95)  # Max height 95%
+            
+            # Ensure centers stay within valid bounds given the new dimensions
+            half_w = transformed[:, 3] / 2
+            half_h = transformed[:, 4] / 2
+            transformed[:, 1] = np.clip(transformed[:, 1], half_w, 1.0 - half_w)  # x_center bounds
+            transformed[:, 2] = np.clip(transformed[:, 2], half_h, 1.0 - half_h)  # y_center bounds
         
         return transformed
     

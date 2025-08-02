@@ -10,6 +10,7 @@ from smartcash.common.logger import get_logger
 from ..service import PreprocessingService
 from ..config.validator import validate_preprocessing_config
 from ..config.defaults import get_default_config
+from .label_cleanup_api import create_label_cleanup_api
 
 def preprocess_dataset(config: Dict[str, Any] = None,
                       progress_callback: Optional[Callable] = None,
@@ -59,7 +60,7 @@ def preprocess_dataset(config: Dict[str, Any] = None,
             result['configuration'] = {
                 'target_splits': merged_config['preprocessing']['target_splits'],
                 'normalization_preset': 'custom' if config else 'default',
-                'output_format': 'npy + txt labels'
+                'output_format': 'dual (.npy for training + .jpg for augmentation) + txt labels'
             }
         
         return result
@@ -284,3 +285,7 @@ def get_preprocessing_api():
 def start_preprocessing_operation(config: Dict[str, Any] = None, **kwargs) -> Dict[str, Any]:
     """Start a preprocessing operation"""
     return preprocess_dataset(config, **kwargs)
+
+# Note: Label cleanup is now automatically integrated into the preprocessing pipeline.
+# Duplicate layer_1 labels are removed during preprocessing, not as a separate step.
+# This ensures raw data remains untouched while preprocessing generates clean labels.

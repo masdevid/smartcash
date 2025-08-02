@@ -179,9 +179,9 @@ class AugmentationSampleGenerator:
             else:
                 return {'status': 'error', 'error': f'Source image tidak ditemukan: {source_img}'}
             
-            # Copy label
+            # Copy label with deduplication
             if source_label.exists():
-                shutil.copy2(source_label, target_label)
+                self._copy_and_deduplicate_label(source_label, target_label)
             else:
                 self.logger.warning(f"⚠️ Label tidak ditemukan untuk {sample_info['filename']}")
             
@@ -202,6 +202,34 @@ class AugmentationSampleGenerator:
             
         except Exception as e:
             return {'status': 'error', 'error': str(e)}
+    
+    def _copy_and_deduplicate_label(self, source_label: Path, target_label: Path):
+        """Copy and deduplicate label file for layer_1 classes during augmentation."""
+        try:
+            target_label.parent.mkdir(parents=True, exist_ok=True)
+            
+            # Read original label
+            with open(source_label, 'r', encoding='utf-8') as f:
+                original_lines = f.readlines()
+            
+            # Apply label deduplication for layer_1 classes only
+            from smartcash.dataset.preprocessor.core.label_deduplicator import LabelDeduplicator
+            deduplicator = LabelDeduplicator(backup_enabled=False)
+            
+            deduplicated_lines = deduplicator.deduplicate_labels(
+                [line.strip() for line in original_lines if line.strip()], 
+                layer1_classes_only=True
+            )
+            
+            # Write deduplicated labels
+            with open(target_label, 'w', encoding='utf-8') as f:
+                for line in deduplicated_lines:
+                    f.write(f"{line}\n")
+                    
+        except Exception as e:
+            self.logger.error(f"❌ Error copying and deduplicating label {source_label}: {str(e)}")
+            # Fallback to regular copy
+            shutil.copy2(source_label, target_label)
     
     def cleanup_augmentation_samples(self, target_split: str = None) -> Dict[str, Any]:
         """🧹 Cleanup sample_aug_* files dari preprocessed directory"""

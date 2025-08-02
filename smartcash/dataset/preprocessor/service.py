@@ -17,6 +17,7 @@ from .validation.sample_validator import create_invalid_sample_validator
 from .core.normalizer import YOLONormalizer
 from .core.file_processor import FileProcessor
 from .core.stats_collector import StatsCollector
+from .core.label_deduplicator import LabelDeduplicator
 
 class PreprocessingService:
     """🚀 Main preprocessing service dengan minimal validation dan YOLO normalization"""
@@ -39,6 +40,12 @@ class PreprocessingService:
         self.normalizer = YOLONormalizer(self.preprocessing_config['normalization'])
         self.file_processor = FileProcessor(self.performance_config)
         self.stats_collector = StatsCollector()
+        
+        # Initialize label cleanup component
+        label_cleanup_config = self.preprocessing_config.get('label_cleanup', {})
+        self.label_deduplicator = LabelDeduplicator(
+            backup_enabled=label_cleanup_config.get('backup_enabled', True)
+        )
         
         # Progress management
         self.progress_bridge = create_preprocessing_bridge()
@@ -168,7 +175,7 @@ class PreprocessingService:
             
             # Filename validation (with auto-rename if enabled)
             if self.preprocessing_config['validation']['filename_pattern']:
-                self.progress_bridge.update_phase_progress(75, 100, "Validating filenames")
+                self.progress_bridge.update_phase_progress(50, 100, "Validating filenames")
                 
                 for split in self._get_target_splits():
                     split_path = Path(self.data_config['dir']) / split / 'images'
@@ -182,6 +189,7 @@ class PreprocessingService:
                                     'success': False,
                                     'message': f"❌ Filename validation failed for {split}"
                                 }
+            
             
             self.progress_bridge.update_phase_progress(100, 100, "Validation complete")
             
@@ -284,12 +292,19 @@ class PreprocessingService:
                     # Normalize untuk YOLO
                     normalized, metadata = self.normalizer.normalize(image)
                     
-                    # Generate output filename
-                    output_name = f"pre_{img_file.stem}.npy"
-                    output_path = output_dir / 'images' / output_name
+                    # Generate output filenames
+                    base_name = f"pre_{img_file.stem}"
+                    npy_output_path = output_dir / 'images' / f"{base_name}.npy"
+                    img_output_path = output_dir / 'images' / f"{base_name}.jpg"
                     
-                    # Save normalized array
-                    success = self.file_processor.save_normalized_array(output_path, normalized, metadata)
+                    # Save normalized array (.npy for training)
+                    npy_success = self.file_processor.save_normalized_array(npy_output_path, normalized, metadata)
+                    
+                    # Save processed image (.jpg for augmentation)
+                    aug_image = self.normalizer.to_augmentation_format(normalized)
+                    img_success = self.file_processor.save_image(img_output_path, aug_image)
+                    
+                    success = npy_success and img_success
                     
                     if success:
                         # Process corresponding label - use validated labels if available
@@ -297,17 +312,18 @@ class PreprocessingService:
                         if label_file.exists():
                             # Use the validated bounding boxes from validation_info if available
                             if 'valid_bboxes' in validation_info and 'valid_class_labels' in validation_info:
-                                # Save cleaned label with only valid boxes
+                                # Save cleaned label with only valid boxes, apply coordinate transformation and deduplication
                                 label_output = output_dir / 'labels' / f"pre_{img_file.stem}.txt"
-                                self._save_cleaned_label(
+                                self._save_cleaned_and_deduplicated_label_with_transform(
                                     label_output, 
                                     validation_info['valid_bboxes'], 
-                                    validation_info['valid_class_labels']
+                                    validation_info['valid_class_labels'],
+                                    metadata
                                 )
                             else:
-                                # Copy original label
+                                # Copy original label, apply coordinate transformation and deduplication
                                 label_output = output_dir / 'labels' / f"pre_{img_file.stem}.txt"
-                                self.file_processor.copy_file(label_file, label_output)
+                                self._copy_and_deduplicate_label_with_transform(label_file, label_output, metadata)
                         
                         processed += 1
                     else:
@@ -348,6 +364,156 @@ class PreprocessingService:
                     f.write(f"{int(class_label)} {x:.6f} {y:.6f} {w:.6f} {h:.6f}\n")
         except Exception as e:
             self.logger.error(f"❌ Error saving cleaned label {label_path}: {str(e)}")
+    
+    def _save_cleaned_and_deduplicated_label(self, label_path: Path, bboxes: List[List[float]], class_labels: List[int]):
+        """Save cleaned and deduplicated label file with only valid bounding boxes."""
+        try:
+            label_path.parent.mkdir(parents=True, exist_ok=True)
+            
+            # Create YOLO format lines from bboxes and class labels
+            yolo_lines = []
+            for bbox, class_label in zip(bboxes, class_labels):
+                x, y, w, h = bbox
+                yolo_lines.append(f"{int(class_label)} {x:.6f} {y:.6f} {w:.6f} {h:.6f}")
+            
+            # Apply label deduplication for layer_1 classes only
+            label_cleanup_config = self.preprocessing_config.get('label_cleanup', {})
+            if label_cleanup_config.get('enabled', True):
+                deduplicated_lines = self.label_deduplicator.deduplicate_labels(yolo_lines, layer1_classes_only=True)
+            else:
+                deduplicated_lines = yolo_lines
+            
+            # Write deduplicated labels
+            with open(label_path, 'w') as f:
+                for line in deduplicated_lines:
+                    f.write(f"{line}\n")
+                    
+        except Exception as e:
+            self.logger.error(f"❌ Error saving cleaned and deduplicated label {label_path}: {str(e)}")
+    
+    def _copy_and_deduplicate_label(self, source_label: Path, target_label: Path):
+        """Copy and deduplicate label file during preprocessing."""
+        try:
+            target_label.parent.mkdir(parents=True, exist_ok=True)
+            
+            # Read original label
+            with open(source_label, 'r', encoding='utf-8') as f:
+                original_lines = f.readlines()
+            
+            # Apply label deduplication for layer_1 classes only
+            label_cleanup_config = self.preprocessing_config.get('label_cleanup', {})
+            if label_cleanup_config.get('enabled', True):
+                deduplicated_lines = self.label_deduplicator.deduplicate_labels(
+                    [line.strip() for line in original_lines if line.strip()], 
+                    layer1_classes_only=True
+                )
+            else:
+                deduplicated_lines = [line.strip() for line in original_lines if line.strip()]
+            
+            # Write deduplicated labels
+            with open(target_label, 'w', encoding='utf-8') as f:
+                for line in deduplicated_lines:
+                    f.write(f"{line}\n")
+                    
+        except Exception as e:
+            self.logger.error(f"❌ Error copying and deduplicating label {source_label}: {str(e)}")
+            # Fallback to regular copy
+            self.file_processor.copy_file(source_label, target_label)
+    
+    def _save_cleaned_and_deduplicated_label_with_transform(self, label_path: Path, 
+                                                          bboxes: List[List[float]], 
+                                                          class_labels: List[int],
+                                                          metadata: Dict[str, Any]):
+        """Save cleaned label with coordinate transformation and deduplication."""
+        try:
+            label_path.parent.mkdir(parents=True, exist_ok=True)
+            
+            # Convert bboxes to numpy array for coordinate transformation
+            import numpy as np
+            if bboxes:
+                # Create array with format [class, x, y, w, h]
+                coords_array = np.array([[class_labels[i]] + bbox for i, bbox in enumerate(bboxes)])
+                
+                # Apply coordinate transformation for padding
+                transformed_coords = self.normalizer.transform_coordinates(coords_array, metadata)
+                
+                # Convert back to lines
+                yolo_lines = []
+                for row in transformed_coords:
+                    class_id = int(row[0])
+                    x, y, w, h = row[1:5]
+                    yolo_lines.append(f"{class_id} {x:.6f} {y:.6f} {w:.6f} {h:.6f}")
+            else:
+                yolo_lines = []
+            
+            # Apply label deduplication for layer_1 classes only
+            label_cleanup_config = self.preprocessing_config.get('label_cleanup', {})
+            if label_cleanup_config.get('enabled', True):
+                deduplicated_lines = self.label_deduplicator.deduplicate_labels(yolo_lines, layer1_classes_only=True)
+            else:
+                deduplicated_lines = yolo_lines
+            
+            # Write transformed and deduplicated labels
+            with open(label_path, 'w') as f:
+                for line in deduplicated_lines:
+                    f.write(f"{line}\n")
+                    
+        except Exception as e:
+            self.logger.error(f"❌ Error saving transformed label {label_path}: {str(e)}")
+    
+    def _copy_and_deduplicate_label_with_transform(self, source_label: Path, target_label: Path, metadata: Dict[str, Any]):
+        """Copy label with coordinate transformation and deduplication."""
+        try:
+            target_label.parent.mkdir(parents=True, exist_ok=True)
+            
+            # Read original label
+            with open(source_label, 'r', encoding='utf-8') as f:
+                original_lines = [line.strip() for line in f.readlines() if line.strip()]
+            
+            if original_lines:
+                # Parse coordinates into numpy array
+                import numpy as np
+                coords_list = []
+                for line in original_lines:
+                    parts = line.split()
+                    if len(parts) >= 5:
+                        class_id = int(parts[0])
+                        x, y, w, h = map(float, parts[1:5])
+                        coords_list.append([class_id, x, y, w, h])
+                
+                if coords_list:
+                    coords_array = np.array(coords_list)
+                    
+                    # Apply coordinate transformation for padding
+                    transformed_coords = self.normalizer.transform_coordinates(coords_array, metadata)
+                    
+                    # Convert back to lines
+                    transformed_lines = []
+                    for row in transformed_coords:
+                        class_id = int(row[0])
+                        x, y, w, h = row[1:5]
+                        transformed_lines.append(f"{class_id} {x:.6f} {y:.6f} {w:.6f} {h:.6f}")
+                else:
+                    transformed_lines = original_lines
+            else:
+                transformed_lines = []
+            
+            # Apply label deduplication for layer_1 classes only
+            label_cleanup_config = self.preprocessing_config.get('label_cleanup', {})
+            if label_cleanup_config.get('enabled', True):
+                deduplicated_lines = self.label_deduplicator.deduplicate_labels(transformed_lines, layer1_classes_only=True)
+            else:
+                deduplicated_lines = transformed_lines
+            
+            # Write transformed and deduplicated labels
+            with open(target_label, 'w', encoding='utf-8') as f:
+                for line in deduplicated_lines:
+                    f.write(f"{line}\n")
+                    
+        except Exception as e:
+            self.logger.error(f"❌ Error copying and transforming label {source_label}: {str(e)}")
+            # Fallback to original method
+            self._copy_and_deduplicate_label(source_label, target_label)
     
     def _compile_final_stats(self, processing_result: Dict[str, Any], processing_time: float) -> Dict[str, Any]:
         """📊 Compile comprehensive final statistics including validation stats"""
@@ -408,3 +574,4 @@ class PreprocessingService:
         if isinstance(splits, str):
             return [splits] if splits != 'all' else ['train', 'valid', 'test']
         return splits
+    

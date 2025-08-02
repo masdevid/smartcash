@@ -65,6 +65,15 @@ class PipelineFactory:
                 rotate=(-rotation_limit, rotation_limit),
                 p=0.6
             ),
+            # BANKNOTE SCALE CURRICULUM: Teach model about banknote sizes
+            A.OneOf([
+                # Large scale: Simulate close-up banknotes (80-95% of image)
+                A.Affine(scale=(1.1, 1.3), p=1.0),
+                # Medium scale: Standard detection size (50-75% of image) 
+                A.Affine(scale=(0.9, 1.1), p=1.0),
+                # Small scale: Far banknotes (30-50% of image)
+                A.Affine(scale=(0.7, 0.9), p=1.0),
+            ], p=0.8),
             A.Perspective(scale=(0.02, 0.06), p=0.3),
             
             # Lighting variations

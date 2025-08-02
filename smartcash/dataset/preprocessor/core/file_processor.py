@@ -88,6 +88,35 @@ class FileProcessor:
             self.logger.error(f"❌ Error loading {array_path}: {str(e)}")
             return None, None
     
+    def save_image(self, output_path: Union[str, Path], image: np.ndarray) -> bool:
+        """💾 Save image in standard format for augmentation"""
+        try:
+            path = Path(output_path)
+            path.parent.mkdir(parents=True, exist_ok=True)
+            
+            # Ensure image is in proper format (H, W, C) and 0-255 range
+            if image.dtype != np.uint8:
+                image = image.astype(np.uint8)
+            
+            # Convert RGB to BGR for OpenCV
+            if len(image.shape) == 3 and image.shape[2] == 3:
+                image_bgr = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
+            else:
+                image_bgr = image
+            
+            # Save with high quality
+            success = cv2.imwrite(str(path), image_bgr, [cv2.IMWRITE_JPEG_QUALITY, 95])
+            
+            if not success:
+                self.logger.error(f"❌ OpenCV failed to save {output_path}")
+                return False
+            
+            return True
+            
+        except Exception as e:
+            self.logger.error(f"❌ Error saving image {output_path}: {str(e)}")
+            return False
+    
     def scan_files(self, directory: Union[str, Path], pattern: str = None, 
                   extensions: set = None) -> List[Path]:
         """🔍 Scan files menggunakan FileNamingManager patterns"""

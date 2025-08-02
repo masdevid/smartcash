@@ -349,13 +349,27 @@ class AugmentationEngine:
             if not cv2.imwrite(str(img_path), image, save_params):
                 return False
             
-            # Save only valid labels as .txt
+            # Save only valid labels as .txt with layer_1 deduplication
             label_path = output_dir / 'labels' / f"{filename}.txt"
             
+            # Apply extra padding transformation to create more safety margin for augmentation
+            padded_bboxes = self._apply_extra_padding_to_bboxes(valid_bboxes)
+            
+            # Create YOLO format lines from padded bboxes and class labels
+            yolo_lines = []
+            for bbox, class_label in zip(padded_bboxes, valid_class_labels):
+                x, y, w, h = bbox  # Already validated and padded
+                yolo_lines.append(f"{int(class_label)} {x:.6f} {y:.6f} {w:.6f} {h:.6f}")
+            
+            # Apply layer_1 deduplication
+            from smartcash.dataset.preprocessor.core.label_deduplicator import LabelDeduplicator
+            deduplicator = LabelDeduplicator(backup_enabled=False)
+            deduplicated_lines = deduplicator.deduplicate_labels(yolo_lines, layer1_classes_only=True)
+            
+            # Write deduplicated labels
             with open(label_path, 'w') as f:
-                for bbox, class_label in zip(valid_bboxes, valid_class_labels):
-                    x, y, w, h = bbox  # Already validated and normalized
-                    f.write(f"{int(class_label)} {x:.6f} {y:.6f} {w:.6f} {h:.6f}\n")
+                for line in deduplicated_lines:
+                    f.write(f"{line}\n")
             
             return True
             
@@ -484,6 +498,36 @@ class AugmentationEngine:
             self.logger.warning(f"⚠️ Error loading labels {label_path}: {str(e)}")
         
         return bboxes, class_labels
+    
+    def _apply_extra_padding_to_bboxes(self, bboxes: List) -> List:
+        """Apply extra padding transformation to create safety margin for augmentation"""
+        padded_bboxes = []
+        
+        # Define padding parameters (reduce size to create safety margin)
+        safety_scale = 0.90  # Scale down to 90% to create 10% safety margin
+        
+        for bbox in bboxes:
+            x_center, y_center, width, height = bbox
+            
+            # Scale down dimensions to create safety margin
+            new_width = width * safety_scale
+            new_height = height * safety_scale
+            
+            # Ensure scaled dimensions don't exceed maximum bounds
+            new_width = min(new_width, 0.85)  # Max 85% width
+            new_height = min(new_height, 0.85)  # Max 85% height
+            
+            # Keep centers the same but ensure they stay within bounds with new dimensions
+            half_w = new_width / 2
+            half_h = new_height / 2
+            
+            # Clamp centers to valid bounds
+            x_center = max(half_w, min(1.0 - half_w, x_center))
+            y_center = max(half_h, min(1.0 - half_h, y_center))
+            
+            padded_bboxes.append([x_center, y_center, new_width, new_height])
+        
+        return padded_bboxes
     
     def _report_progress(self, level: str, current: int, total: int, message: str, callback: Optional[Callable]):
         """Report progress dengan enhanced messaging"""

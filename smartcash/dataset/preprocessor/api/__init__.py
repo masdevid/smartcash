@@ -50,6 +50,11 @@ from .readiness_api import (
     get_preprocessing_directory_info
 )
 
+from .label_cleanup_api import (
+    LabelCleanupAPI,
+    create_label_cleanup_api
+)
+
 # Main API exports dengan focus pada core functionality
 __all__ = [
     # Core preprocessing
@@ -73,7 +78,11 @@ __all__ = [
     # Readiness checks
     'check_service_readiness',
     'check_existing_data',
-    'get_preprocessing_directory_info'
+    'get_preprocessing_directory_info',
+    
+    # Label cleanup
+    'LabelCleanupAPI', 
+    'create_label_cleanup_api'
 ]
 
 # === Enhanced API dengan progress integration ===

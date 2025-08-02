@@ -13,9 +13,12 @@ import torch
 import numpy as np
 from typing import Dict, List, Tuple, Optional
 
-# Initialize logger first
+# Initialize logger
 from smartcash.common.logger import get_logger
-logger = get_logger(__name__)
+logger = get_logger(__name__, level="WARNING")
+
+# Keep coordinate conversion and IoU analysis debug for essential monitoring
+DEBUG_MAP_CALC = True
 
 # Add YOLOv5 to path for imports with better path resolution
 # Current file is: smartcash/model/training/core/yolov5_map_calculator.py
@@ -39,17 +42,12 @@ non_max_suppression = None
 try:
     from utils.metrics import ap_per_class, box_iou
     from utils.general import xywh2xyxy, non_max_suppression
-    logger.debug("✅ Successfully imported YOLOv5 utilities (direct import)")
 except ImportError as e1:
-    logger.debug(f"Direct import failed: {e1}")
-    
     # Approach 2: Try importing from yolov5.utils (when YOLOv5 is pip installed)
     try:
         from yolov5.utils.metrics import ap_per_class, box_iou
         from yolov5.utils.general import xywh2xyxy, non_max_suppression
-        logger.debug("✅ Successfully imported YOLOv5 utilities (yolov5.utils)")
     except ImportError as e2:
-        logger.debug(f"yolov5.utils import failed: {e2}")
         
         # Approach 3: Try with explicit path manipulation (fallback)
         try:
@@ -61,20 +59,11 @@ except ImportError as e1:
                 os.chdir(str(YOLOV5_ROOT))
                 from utils.metrics import ap_per_class, box_iou
                 from utils.general import xywh2xyxy, non_max_suppression
-                logger.info("✅ Successfully imported YOLOv5 utilities (with cwd change)")
             else:
                 raise ImportError(f"YOLOv5 directory not found: {YOLOV5_ROOT}")
                 
-        except ImportError as e3:
-            logger.warning(f"All YOLOv5 import approaches failed:")
-            logger.warning(f"  • Direct import: {e1}")
-            logger.warning(f"  • yolov5.utils: {e2}")
-            logger.warning(f"  • CWD change: {e3}")
-            logger.warning(f"  • YOLOv5 path: {YOLOV5_ROOT}")
-            logger.warning(f"  • YOLOv5 exists: {YOLOV5_ROOT.exists()}")
-            logger.warning(f"  • Current working directory: {os.getcwd()}")
-            logger.warning(f"  • Python path: {sys.path[:3]}...")  # Show first 3 entries
-            logger.warning("Using fallback implementations")
+        except ImportError:
+            logger.warning("YOLOv5 utilities not found - using fallback implementations")
         finally:
             # Restore original working directory
             if 'original_cwd' in locals():
@@ -131,7 +120,6 @@ if box_iou is None:
 if non_max_suppression is None:
     def non_max_suppression(prediction, conf_thres=0.25, iou_thres=0.45, max_det=300):
         """Fallback NMS implementation."""
-        logger.warning("Using fallback NMS implementation - results may differ from YOLOv5")
         # Simple fallback that just filters by confidence
         output = []
         for pred in prediction:
@@ -152,7 +140,6 @@ if non_max_suppression is None:
 if ap_per_class is None:
     def ap_per_class(*args, **kwargs):
         """Fallback AP calculation."""
-        logger.warning("YOLOv5 ap_per_class not available - using fallback")
         # Return dummy values matching expected format
         return (
             np.array([0.0]),  # tp
@@ -173,7 +160,7 @@ class YOLOv5MapCalculator:
     standard YOLO evaluation protocols.
     """
     
-    def __init__(self, num_classes: int = 7, conf_thres: float = 0.01, iou_thres: float = 0.45):
+    def __init__(self, num_classes: int = 7, conf_thres: float = 0.005, iou_thres: float = 0.03):
         """
         Initialize YOLOv5 mAP calculator.
         
@@ -190,22 +177,13 @@ class YOLOv5MapCalculator:
         self.yolov5_available = ap_per_class is not None
         if not self.yolov5_available:
             logger.warning("YOLOv5 metrics not available - using fallback implementations")
-        else:
-            logger.info("✅ YOLOv5 metrics successfully loaded")
         
         # Storage for batch statistics
         self.stats = []  # List of [tp, conf, pred_cls, target_cls]
-        
-        logger.info(f"YOLOv5 mAP Calculator initialized:")
-        logger.info(f"  • Classes: {num_classes}")
-        logger.info(f"  • Confidence threshold: {conf_thres}")
-        logger.info(f"  • IoU threshold: {iou_thres}")
-        logger.info(f"  • YOLOv5 available: {self.yolov5_available}")
     
     def reset(self):
         """Reset accumulated statistics for new validation run."""
         self.stats.clear()
-        logger.debug("mAP calculator statistics reset")
     
     def update(self, predictions: torch.Tensor, targets: torch.Tensor):
         """
@@ -217,12 +195,8 @@ class YOLOv5MapCalculator:
             targets: Ground truth targets [num_targets, 6] 
                     where each target is [batch_idx, class, x, y, w, h]
         """
-        if not self.yolov5_available:
-            logger.debug("YOLOv5 not available - skipping mAP update")
-            return
         
-        if predictions is None or targets is None:
-            logger.debug(f"Predictions or targets are None - skipping mAP update")
+        if not self.yolov5_available or predictions is None or targets is None:
             return
         
         # Ensure tensors are on CPU for processing
@@ -234,27 +208,20 @@ class YOLOv5MapCalculator:
         try:
             # Apply NMS to predictions if not already applied
             if predictions.dim() == 3:  # [batch, detections, 6]
-                logger.debug(f"Applying NMS to predictions: {predictions.shape}")
-                
                 # Apply NMS per batch
                 nms_predictions = []
                 for batch_idx in range(predictions.shape[0]):
                     pred = predictions[batch_idx]
-                    logger.debug(f"Batch {batch_idx} before confidence filter: {pred.shape}, conf range: {pred[:, 4].min():.3f}-{pred[:, 4].max():.3f}")
                     
                     # Filter by confidence
                     pred = pred[pred[:, 4] > self.conf_thres]
-                    logger.debug(f"Batch {batch_idx} after confidence filter: {pred.shape} (threshold: {self.conf_thres})")
                     
                     if pred.shape[0] > 0:
                         # Convert xywh to xyxy for NMS
                         pred_xyxy = pred.clone()
                         pred_xyxy[:, :4] = xywh2xyxy(pred[:, :4])
                         
-                        # SIMPLIFIED: Skip YOLOv5 NMS for now as it's causing issues
-                        # Just add batch index and use all filtered predictions
-                        # This is acceptable for mAP calculation as we're computing per-class metrics
-                        logger.debug(f"Skipping complex NMS, using {pred.shape[0]} predictions for batch {batch_idx}")
+                        # Skip complex NMS, use filtered predictions
                         
                         # Add batch index to predictions: [batch_idx, x1, y1, x2, y2, conf, class]
                         batch_pred = torch.full((pred.shape[0], 1), batch_idx, dtype=torch.float32)
@@ -267,6 +234,7 @@ class YOLOv5MapCalculator:
                 else:
                     predictions = torch.empty((0, 7))  # [batch_idx, x1, y1, x2, y2, conf, class]
             
+            
             # Process targets and predictions for mAP calculation
             batch_stats = self._process_batch(predictions, targets)
             if batch_stats is not None:
@@ -274,8 +242,6 @@ class YOLOv5MapCalculator:
                 
         except Exception as e:
             logger.warning(f"Error updating mAP statistics: {e}")
-            logger.debug(f"Predictions shape: {predictions.shape if hasattr(predictions, 'shape') else 'N/A'}")
-            logger.debug(f"Targets shape: {targets.shape if hasattr(targets, 'shape') else 'N/A'}")
     
     def _process_batch(self, predictions: torch.Tensor, targets: torch.Tensor) -> Optional[Tuple]:
         """
@@ -310,11 +276,55 @@ class YOLOv5MapCalculator:
         
         # Convert target format from [batch_idx, class, x, y, w, h] to [batch_idx, x1, y1, x2, y2, class]
         target_boxes = targets.clone()
+        
+        if DEBUG_MAP_CALC:
+            logger.debug(f"🔧 Coordinate conversion debug:")
+            logger.debug(f"  • Original targets shape: {targets.shape}")
+            logger.debug(f"  • Target sample (xywh): {targets[0, 2:6] if targets.shape[0] > 0 else 'empty'}")
+            logger.debug(f"  • Predictions sample (xyxy): {predictions[0, 1:5] if predictions.shape[0] > 0 else 'empty'}")
+            
+            # Analyze target box sizes
+            if targets.shape[0] > 0:
+                target_widths = targets[:, 4]  # width column
+                target_heights = targets[:, 5]  # height column
+                logger.debug(f"  • Target widths: min={target_widths.min():.3f}, max={target_widths.max():.3f}, mean={target_widths.mean():.3f}")
+                logger.debug(f"  • Target heights: min={target_heights.min():.3f}, max={target_heights.max():.3f}, mean={target_heights.mean():.3f}")
+                large_boxes = ((target_widths > 0.8) | (target_heights > 0.8)).sum()
+                logger.debug(f"  • Oversized boxes (>80% image): {large_boxes.item()}/{targets.shape[0]}")
+                
+            # Analyze prediction box sizes
+            if predictions.shape[0] > 0:
+                pred_widths = predictions[:, 3] - predictions[:, 1]  # x2 - x1
+                pred_heights = predictions[:, 4] - predictions[:, 2]  # y2 - y1
+                logger.debug(f"  • Prediction widths: min={pred_widths.min():.3f}, max={pred_widths.max():.3f}, mean={pred_widths.mean():.3f}")
+                logger.debug(f"  • Prediction heights: min={pred_heights.min():.3f}, max={pred_heights.max():.3f}, mean={pred_heights.mean():.3f}")
+        
         target_boxes[:, 2:6] = xywh2xyxy(targets[:, 2:6])  # Convert xywh to xyxy
         target_boxes = target_boxes[:, [0, 2, 3, 4, 5, 1]]  # Reorder to [batch_idx, x1, y1, x2, y2, class]
         
+        if DEBUG_MAP_CALC:
+            logger.debug(f"  • Converted target sample (xyxy): {target_boxes[0, 1:5] if target_boxes.shape[0] > 0 else 'empty'}")
+            logger.debug(f"  • Target coordinate ranges: x1={target_boxes[:, 1].min():.3f}-{target_boxes[:, 1].max():.3f}, y1={target_boxes[:, 2].min():.3f}-{target_boxes[:, 2].max():.3f}")
+            logger.debug(f"  • Prediction coordinate ranges: x1={predictions[:, 1].min():.3f}-{predictions[:, 1].max():.3f}, y1={predictions[:, 2].min():.3f}-{predictions[:, 2].max():.3f}")
+        
+        # Debug IoU calculation
+        if DEBUG_MAP_CALC and predictions.shape[0] > 0 and target_boxes.shape[0] > 0:
+            sample_iou = box_iou(predictions[0:1, 1:5], target_boxes[0:1, 1:5])
+            logger.debug(f"  • Sample IoU: {sample_iou.item():.4f} (threshold: {self.iou_thres})")
+            logger.debug(f"  • Sample pred class: {predictions[0, 6].int().item()}, target class: {target_boxes[0, 5].int().item()}")
+        
         # Compute IoU between predictions and targets
         iou_matrix = box_iou(predictions[:, 1:5], target_boxes[:, 1:5])  # IoU between boxes
+        
+        if DEBUG_MAP_CALC:
+            logger.debug(f"🔍 IoU Matrix Analysis:")
+            logger.debug(f"  • IoU matrix shape: {iou_matrix.shape}")
+            logger.debug(f"  • IoU range: {iou_matrix.min():.6f} - {iou_matrix.max():.6f}")
+            logger.debug(f"  • IoU mean: {iou_matrix.mean():.6f}")
+            logger.debug(f"  • IoUs > threshold ({self.iou_thres}): {(iou_matrix > self.iou_thres).sum().item()}")
+            if iou_matrix.max() > 0:
+                logger.debug(f"  • Best IoU location: {torch.unravel_index(iou_matrix.argmax(), iou_matrix.shape)}")
+                logger.debug(f"  • Best IoU value: {iou_matrix.max().item():.6f}")
         
         # Find matches based on IoU threshold
         tp = torch.zeros((predictions.shape[0], 1), dtype=torch.bool)
@@ -340,6 +350,7 @@ class YOLOv5MapCalculator:
                         tp[pred_idx, 0] = True
                         matched_targets.add(target_idx)
                         matched_predictions.add(pred_idx)
+        
         
         return (
             tp,  # True positives
@@ -384,13 +395,6 @@ class YOLOv5MapCalculator:
             # Concatenate all statistics
             stats = [torch.cat(x, 0).cpu().numpy() for x in zip(*self.stats)]
             
-            logger.debug(f"📊 mAP computation debug:")
-            logger.debug(f"  • Total stat batches: {len(self.stats)}")
-            if len(stats) > 0:
-                logger.debug(f"  • TP shape: {stats[0].shape}, sum: {stats[0].sum()}")
-                logger.debug(f"  • Conf shape: {stats[1].shape}, range: {stats[1].min():.4f}-{stats[1].max():.4f}")
-                logger.debug(f"  • Pred classes: {np.unique(stats[2])}")
-                logger.debug(f"  • Target classes: {np.unique(stats[3])}")
             
             if len(stats) and stats[0].any():
                 # Compute AP per class using YOLOv5 function
@@ -410,11 +414,6 @@ class YOLOv5MapCalculator:
                 recall = r.mean()
                 f1_score = f1.mean()
                 
-                logger.info(f"mAP computation completed:")
-                logger.info(f"  • mAP@0.5: {map50:.4f}")
-                logger.info(f"  • Precision: {precision:.4f}")
-                logger.info(f"  • Recall: {recall:.4f}")
-                logger.info(f"  • F1: {f1_score:.4f}")
                 
                 return {
                     'map50': float(map50),
@@ -426,9 +425,6 @@ class YOLOv5MapCalculator:
             
         except Exception as e:
             logger.error(f"Error computing mAP: {e}")
-            logger.debug(f"Stats length: {len(self.stats)}")
-            if self.stats:
-                logger.debug(f"First stat shapes: {[x.shape for x in self.stats[0]]}")
         
         # Return zeros on error
         return {
@@ -440,7 +436,7 @@ class YOLOv5MapCalculator:
         }
 
 
-def create_yolov5_map_calculator(num_classes: int = 7, conf_thres: float = 0.01, iou_thres: float = 0.45) -> YOLOv5MapCalculator:
+def create_yolov5_map_calculator(num_classes: int = 7, conf_thres: float = 0.005, iou_thres: float = 0.03) -> YOLOv5MapCalculator:
     """
     Factory function to create YOLOv5 mAP calculator.
     

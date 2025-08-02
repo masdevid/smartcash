@@ -57,6 +57,10 @@ class TrainingPhaseManager:
             emit_live_chart_callback, visualization_manager
         )
         
+        # Simple best model tracking
+        self._best_metrics = {}
+        self._current_phase_num = 1
+        
         # Install signal handlers for graceful shutdown
         self.signal_handler = install_training_signal_handlers()
         
@@ -81,6 +85,9 @@ class TrainingPhaseManager:
             Dictionary containing training results and metrics
         """
         try:
+            # Set current phase number for tracking
+            self._current_phase_num = phase_num
+            
             # Set up phase components
             components = self.orchestrator.setup_phase(phase_num, epochs)
             
@@ -151,7 +158,7 @@ class TrainingPhaseManager:
                 
                 # Combine and process metrics
                 final_metrics = self._process_epoch_metrics(
-                    train_metrics, val_metrics, components['metrics_tracker'], epoch
+                    train_metrics, val_metrics, components['metrics_recorder'], epoch
                 )
                 
                 # Add layer metrics from training executor's last predictions
@@ -206,16 +213,16 @@ class TrainingPhaseManager:
                 
                 # Try primary metric first
                 if primary_metric in final_metrics and final_metrics[primary_metric] > 0.0:
-                    is_best = components['metrics_tracker'].is_best_model(
-                        metric_name=primary_metric, mode=primary_mode
+                    is_best = self._is_best_model(
+                        metric_name=primary_metric, current_value=final_metrics[primary_metric], mode=primary_mode
                     )
                     metric_name = primary_metric
                     current_val = final_metrics.get(primary_metric, 'N/A')
                     logger.debug(f"🎯 Phase {phase_num} best model selection: {metric_name} = {current_val} ({primary_mode})")
                 else:
                     # Use fallback metric
-                    is_best = components['metrics_tracker'].is_best_model(
-                        metric_name=fallback_metric, mode=fallback_mode
+                    is_best = self._is_best_model(
+                        metric_name=fallback_metric, current_value=final_metrics.get(fallback_metric, 0), mode=fallback_mode
                     )
                     metric_name = fallback_metric
                     current_val = final_metrics.get(fallback_metric, 'N/A')
@@ -278,7 +285,7 @@ class TrainingPhaseManager:
             return {'success': False, 'error': str(e)}
     
     def _process_epoch_metrics(self, train_metrics: Dict, val_metrics: Dict, 
-                              metrics_tracker, epoch: int) -> Dict[str, Any]:
+                              metrics_recorder, epoch: int) -> Dict[str, Any]:
         """Process and combine epoch metrics."""
         # Combine metrics efficiently
         final_metrics = {**train_metrics, **val_metrics}
@@ -306,9 +313,18 @@ class TrainingPhaseManager:
                     final_metrics['loss_breakdown'] = train_prefixed
                     logger.debug(f"Added training loss breakdown: {len(train_prefixed)} components")
         
-        # Add metrics tracker computed metrics
-        tracker_metrics = metrics_tracker.compute_epoch_metrics(epoch)
-        final_metrics.update(tracker_metrics)
+        # Record metrics with the JSON recorder
+        if metrics_recorder and hasattr(metrics_recorder, 'record_epoch'):
+            try:
+                # Determine current phase number
+                phase_num = getattr(self, '_current_phase_num', 1)
+                metrics_recorder.record_epoch(epoch + 1, phase_num, final_metrics)
+            except Exception as e:
+                logger.debug(f"Failed to record metrics: {e}")
+        
+        # Add learning rate to metrics if available
+        if hasattr(self, 'orchestrator') and hasattr(self.orchestrator, '_last_lr'):
+            final_metrics['learning_rate'] = self.orchestrator._last_lr
         
         return final_metrics
     
@@ -752,3 +768,32 @@ class TrainingPhaseManager:
         except Exception as e:
             logger.debug(f"⚠️ Manual best check failed: {e}")
             return False
+    
+    def _is_best_model(self, metric_name: str, current_value: float, mode: str = 'max') -> bool:
+        """
+        Simple best model tracking.
+        
+        Args:
+            metric_name: Name of the metric to track
+            current_value: Current value of the metric
+            mode: 'max' for higher is better, 'min' for lower is better
+            
+        Returns:
+            True if this is the best value seen so far
+        """
+        if metric_name not in self._best_metrics:
+            self._best_metrics[metric_name] = current_value
+            return True
+        
+        best_value = self._best_metrics[metric_name]
+        
+        if mode == 'max':
+            is_better = current_value > best_value
+        else:  # mode == 'min'
+            is_better = current_value < best_value
+        
+        if is_better:
+            self._best_metrics[metric_name] = current_value
+            return True
+        
+        return False

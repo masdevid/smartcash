@@ -150,7 +150,7 @@ class ValidationExecutor:
                     all_loss_breakdowns.append(batch_metrics['loss_breakdown'])
                 
                 # Optimized progress updates - reduce frequency for better performance
-                update_freq = max(1, num_batches // 10)  # Update 10 times max per validation
+                update_freq = max(1, num_batches // 11)  # Update ~9 times max per validation
                 if batch_idx % update_freq == 0 or batch_idx == num_batches - 1:
                     avg_loss = running_val_loss / (batch_idx + 1)
                     self.progress_tracker.update_batch_progress(
@@ -402,12 +402,10 @@ class ValidationExecutor:
                     import traceback
                     logger.error(f"   • Traceback: {traceback.format_exc()}")
             
-            # Summary logging for debugging static metrics issue
-            if batch_idx % 5 == 0 or failed_layers:  # Every 5th batch or if failures
-                logger.info(f"📊 Batch {batch_idx} collection summary: {processed_layers} successful, {len(failed_layers)} failed")
-                if failed_layers:
-                    logger.error(f"   • Failed layers: {failed_layers}")
-                    logger.error(f"   • This will contribute to missing layer_1_* metrics and static validation values!")
+            # Summary logging for debugging static metrics issue (only log errors)
+            if failed_layers:
+                logger.error(f"   • Failed layers: {failed_layers}")
+                logger.error(f"   • This will contribute to missing layer_1_* metrics and static validation values!")
                     
         except Exception as e:
             logger.error(f"❌ Critical error processing predictions in batch {batch_idx}: {e}")

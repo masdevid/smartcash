@@ -10,7 +10,7 @@ from .training_executor import TrainingExecutor
 from .validation_executor import ValidationExecutor
 from .prediction_processor import PredictionProcessor
 # mAP calculator modules removed - calculation disabled for performance
-from .training_checkpoint_adapter import TrainingCheckpointAdapter
+# TrainingCheckpointAdapter removed - using CheckpointManager directly
 from .progress_manager import ProgressManager
 
 __all__ = [
@@ -19,6 +19,6 @@ __all__ = [
     'ValidationExecutor',
     'PredictionProcessor',
     # mAP calculator classes removed
-    'TrainingCheckpointAdapter',
+    # TrainingCheckpointAdapter removed - using CheckpointManager directly
     'ProgressManager'
 ]

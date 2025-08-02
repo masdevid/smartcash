@@ -5,7 +5,7 @@ Deskripsi: Training package exports untuk Fase 2 implementation
 
 # Old training service removed - use merged training_pipeline instead
 from .data_loader_factory import DataLoaderFactory, create_data_loaders, get_dataset_stats
-from .metrics_tracker import MetricsTracker, create_metrics_tracker
+from .utils.metrics_history import create_metrics_recorder
 from .optimizer_factory import (
     OptimizerFactory, WarmupScheduler, 
     create_optimizer_and_scheduler, setup_optimizer_with_warmup,
@@ -74,7 +74,7 @@ __all__ = [
     'DataLoaderFactory', 'create_data_loaders', 'get_dataset_stats',
     
     # Metrics
-    'MetricsTracker', 'create_metrics_tracker',
+    'create_metrics_recorder',
     
     # Optimization
     'OptimizerFactory', 'WarmupScheduler', 'create_optimizer_and_scheduler',

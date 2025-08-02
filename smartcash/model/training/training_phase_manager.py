@@ -7,7 +7,7 @@ for better maintainability and separation of concerns.
 """
 
 import time
-from typing import Dict, Any, Optional, Callable
+from typing import Dict, Any, Optional
 
 from smartcash.common.logger import get_logger
 from smartcash.model.training.utils.metrics_utils import calculate_multilayer_metrics, filter_phase_relevant_metrics
@@ -18,9 +18,9 @@ from .core import (
     PhaseOrchestrator,
     TrainingExecutor, 
     ValidationExecutor,
-    TrainingCheckpointAdapter,
     ProgressManager
 )
+from smartcash.model.core.checkpoint_manager import create_checkpoint_manager
 
 logger = get_logger(__name__)
 
@@ -51,7 +51,7 @@ class TrainingPhaseManager:
         self.orchestrator = PhaseOrchestrator(model, model_api, config, progress_tracker)
         self.training_executor = TrainingExecutor(model, config, progress_tracker)
         self.validation_executor = ValidationExecutor(model, config, progress_tracker)
-        self.checkpoint_manager = TrainingCheckpointAdapter(model, model_api, config)
+        self.checkpoint_manager = create_checkpoint_manager(config, progress_tracker)
         self.progress_manager = ProgressManager(
             progress_tracker, emit_metrics_callback, 
             emit_live_chart_callback, visualization_manager
@@ -191,7 +191,7 @@ class TrainingPhaseManager:
                 # This saves the current training state for proper resume functionality
                 # Note: Use complete final_metrics for checkpoint saving, not filtered ones
                 self.checkpoint_manager.save_checkpoint(
-                    epoch, final_metrics, phase_num, is_best=False
+                    model=self.model, metrics=final_metrics, epoch=epoch, phase=phase_num, is_best=False
                 )
                 
                 # Check for best model using research-focused criteria
@@ -241,7 +241,7 @@ class TrainingPhaseManager:
                     
                     # Save complete metrics in checkpoint, not filtered ones
                     best_checkpoint_path = self.checkpoint_manager.save_checkpoint(
-                        epoch, final_metrics, phase_num, is_best=True
+                        model=self.model, metrics=final_metrics, epoch=epoch, phase=phase_num, is_best=True
                     )
                     best_metrics = final_metrics.copy()
                 else:
@@ -435,6 +435,78 @@ class TrainingPhaseManager:
         
         return filtered
     
+    def _emit_phase_completion_metrics_with_status(self, best_metrics: Dict[str, Any], final_metrics: Dict[str, Any], 
+                                                 epochs_completed: int, best_checkpoint_path: str, status: str):
+        """
+        Emit phase completion metrics callback with custom completion status.
+        
+        Args:
+            best_metrics: Best metrics achieved during the phase
+            final_metrics: Final metrics from the last epoch
+            epochs_completed: Number of epochs completed
+            best_checkpoint_path: Path to the best checkpoint saved
+            status: Completion status ('success', 'early_stopping', 'early_shutdown')
+        """
+        if not self.progress_manager.emit_metrics_callback:
+            return
+        
+        try:
+            # Determine current phase for callback
+            phase_name = 'training_phase_single' if self.progress_manager._is_single_phase else 'training_phase_completion'
+            
+            # Prepare comprehensive phase completion data
+            phase_completion_data = {
+                'type': 'phase_completion',
+                'phase': phase_name,
+                'epochs_completed': epochs_completed,
+                'best_metrics': best_metrics.copy(),
+                'final_metrics': final_metrics.copy(),
+                'best_checkpoint': best_checkpoint_path,
+                'completion_status': status
+            }
+            
+            # Add phase-specific summary information
+            if 'val_accuracy' in best_metrics:
+                phase_completion_data['best_accuracy'] = best_metrics['val_accuracy']
+            if 'val_loss' in best_metrics:
+                phase_completion_data['best_loss'] = best_metrics['val_loss']
+            if 'val_map50' in best_metrics:
+                phase_completion_data['best_map50'] = best_metrics['val_map50']
+            
+            # Log phase completion summary based on status
+            status_emoji = {
+                'success': '✅',
+                'early_stopping': '⏹️',
+                'early_shutdown': '🛑'
+            }.get(status, '📊')
+            
+            logger.info(f"📊 Phase completion summary ({status}):")
+            logger.info(f"   {status_emoji} Epochs completed: {epochs_completed}")
+            if best_checkpoint_path:
+                logger.info(f"   🏆 Best checkpoint: {best_checkpoint_path}")
+            
+            # Log key metrics if available
+            if 'val_accuracy' in best_metrics:
+                logger.info(f"   🎯 Best accuracy: {best_metrics['val_accuracy']:.4f}")
+            if 'val_loss' in best_metrics:
+                logger.info(f"   📉 Best loss: {best_metrics['val_loss']:.4f}")
+            if 'val_map50' in best_metrics:
+                logger.info(f"   🎯 Best mAP@0.5: {best_metrics['val_map50']:.4f}")
+            
+            # Emit the callback through the progress manager's proper method
+            # This ensures consistent callback handling and error checking
+            self.progress_manager.emit_epoch_metrics(
+                phase_num=0,  # Use 0 for phase completion (not phase-specific)
+                epoch=epochs_completed,
+                metrics=phase_completion_data,
+                loss_breakdown=None
+            )
+            
+            logger.debug(f"✅ Phase completion metrics callback emitted successfully (status: {status})")
+            
+        except Exception as e:
+            logger.warning(f"⚠️ Error emitting phase completion metrics: {str(e)}")
+    
     def _ensure_required_metrics(self, final_metrics: Dict[str, Any]):
         """Ensure all required metrics are present with default values."""
         # Ensure accuracy, precision, recall, f1 are always included (even if zero)
@@ -469,8 +541,14 @@ class TrainingPhaseManager:
             best_metrics = final_metrics.copy()
         if not best_checkpoint_path:
             best_checkpoint_path = self.checkpoint_manager.save_checkpoint(
-                epoch, final_metrics, phase_num, is_best=True
+                model=self.model, metrics=final_metrics, epoch=epoch, phase=phase_num, is_best=True
             )
+        
+        # Emit phase completion metrics for early stopping
+        self._emit_phase_completion_metrics_with_status(
+            best_metrics, final_metrics, epoch + 1, 
+            best_checkpoint_path, 'early_stopping'
+        )
         
         # Complete epoch tracking due to early stopping
         self.progress_manager.complete_epoch_early_stopping(
@@ -488,8 +566,9 @@ class TrainingPhaseManager:
         current_progress = epoch - start_epoch + 1  # +1 because we just completed this epoch
         total_progress = epochs - start_epoch
         self.progress_manager.update_epoch_progress(
-            current_progress, total_progress,
-            f"Epoch {display_epoch}/{epochs} completed in {epoch_duration:.1f}s - Loss: {final_metrics.get('train_loss', 0):.4f}"
+            display_epoch, epochs,
+            f"Epoch {display_epoch}/{epochs} completed in {epoch_duration:.1f}s - Loss: {final_metrics.get('train_loss', 0):.4f}",
+            progress_percentage=(current_progress / total_progress * 100) if total_progress > 0 else 100
         )
     
     def _prepare_phase_results(self, epoch: int, best_metrics: dict, 
@@ -500,9 +579,12 @@ class TrainingPhaseManager:
             best_metrics = final_metrics.copy()
         
         if not best_checkpoint_path:
-            best_checkpoint_path = self.checkpoint_manager.ensure_best_checkpoint(
-                epoch, final_metrics, 1  # Assume phase 1 if not specified
+            best_checkpoint_path = self.checkpoint_manager.save_checkpoint(
+                model=self.model, metrics=final_metrics, epoch=epoch, phase=1, is_best=True
             )
+        
+        # Emit phase completion metrics callback to show full best model metrics
+        self._emit_phase_completion_metrics_with_status(best_metrics, final_metrics, epoch + 1, best_checkpoint_path, 'success')
         
         return {
             'success': True,
@@ -577,6 +659,13 @@ class TrainingPhaseManager:
         if not best_metrics:
             best_metrics = final_metrics.copy() if final_metrics else {}
         
+        # Emit phase completion metrics for early shutdown
+        if best_metrics:  # Only emit if we have meaningful metrics
+            self._emit_phase_completion_metrics_with_status(
+                best_metrics, final_metrics or {}, epoch, 
+                best_checkpoint_path, 'early_shutdown'
+            )
+        
         return {
             'success': True,
             'epochs_completed': epoch,
@@ -624,7 +713,7 @@ class TrainingPhaseManager:
             logger.debug(f"⚠️ Train→validation optimization failed: {e}")
             pass
     
-    def _manual_best_check(self, epoch: int, phase_num: int, final_metrics: Dict[str, float]) -> bool:
+    def _manual_best_check(self, _epoch: int, _phase_num: int, final_metrics: Dict[str, float]) -> bool:
         """
         Manual fallback check for best model to ensure best checkpoints are saved.
         

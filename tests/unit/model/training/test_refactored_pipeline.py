@@ -147,8 +147,8 @@ def test_component_interfaces():
     # Test ValidationExecutor interface
     assert hasattr(manager.validation_executor, 'validate_epoch'), "ValidationExecutor missing validate_epoch method"
     
-    # Test TrainingCheckpointAdapter interface
-    assert hasattr(manager.checkpoint_manager, 'save_checkpoint'), "TrainingCheckpointAdapter missing save_checkpoint method"
+    # Test CheckpointManager interface  
+    assert hasattr(manager.checkpoint_manager, 'save_checkpoint'), "CheckpointManager missing save_checkpoint method"
     
     # Test ProgressManager interface
     assert hasattr(manager.progress_manager, 'emit_epoch_metrics'), "ProgressManager missing emit_epoch_metrics method"

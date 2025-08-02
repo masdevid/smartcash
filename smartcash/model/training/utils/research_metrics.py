@@ -161,37 +161,18 @@ class ResearchMetricsManager:
             return "Unknown"
 
     def log_phase_appropriate_metrics(self, phase_num: int, metrics: Dict[str, float]):
-        """Log metrics with source identification (YOLOv5 vs Hierarchical)."""
-        metrics_source = self.identify_metrics_source(metrics)
-        logger.info(f"📊 PHASE {phase_num} - Validation Metrics Summary ({metrics_source}):")
+        """Log essential metrics only - detailed metrics are now stored in JSON."""
+        # Log only core metrics summary - detailed data is in JSON files
+        val_loss = metrics.get('val_loss', 0.0)
+        val_map50 = metrics.get('val_map50', 0.0)
+        val_accuracy = metrics.get('val_accuracy', 0.0)
         
-        # Log main validation metrics
-        main_metrics = ['val_accuracy', 'val_precision', 'val_recall', 'val_f1', 'val_map50']
-        for metric in main_metrics:
-            if metric in metrics:
-                logger.info(f"   • {metric}: {metrics[metric]:.6f}")
+        if val_map50 > 0:
+            logger.info(f"📊 Phase {phase_num}: Val Loss={val_loss:.4f}, mAP@0.5={val_map50:.4f}, Accuracy={val_accuracy:.4f}")
+        else:
+            logger.info(f"📊 Phase {phase_num}: Val Loss={val_loss:.4f}, Accuracy={val_accuracy:.4f}")
         
-        # Log hierarchical layer metrics if present
-        layer_metrics = []
-        for key in sorted(metrics.keys()):
-            if key.startswith('layer_'):
-                layer_metrics.append(key)
-        
-        if layer_metrics:
-            logger.info(f"   📊 Hierarchical Layer Metrics:")
-            for metric in layer_metrics:
-                logger.info(f"     • {metric}: {metrics[metric]:.6f}")
-        
-        # Log additional training metrics if present
-        train_metrics = []
-        for key in sorted(metrics.keys()):
-            if key.startswith('train_') and key not in ['train_loss']:
-                train_metrics.append(key)
-        
-        if train_metrics:
-            logger.info(f"   📊 Training Metrics:")
-            for metric in train_metrics:
-                logger.info(f"     • {metric}: {metrics[metric]:.6f}")
+        # Note: Detailed metrics available in JSON history files
 
 # Global instance
 _research_metrics_manager = None

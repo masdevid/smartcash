@@ -65,8 +65,8 @@ class ComprehensiveMetricsTracker:
         self.save_dir.mkdir(parents=True, exist_ok=True)
         self.verbose = verbose
         
-        # Initialize logger
-        self.logger = get_logger(f'{__name__}.ComprehensiveMetricsTracker')
+        # Initialize logger - using instance logger as per QWEN.md guidelines
+        self.logger = get_logger(f'{self.__class__.__module__}.{self.__class__.__name__}')
         
         # Metrics storage
         self.epoch_metrics = []
@@ -91,7 +91,7 @@ class ComprehensiveMetricsTracker:
         }
         
         if verbose:
-            self.logger.info(f"📊 Comprehensive metrics tracker initialized")
+            self.logger.info("📊 Comprehensive metrics tracker initialized")
             self.logger.info(f"   • Layers: {list(num_classes_per_layer.keys())}")
             self.logger.info(f"   • Classes per layer: {num_classes_per_layer}")
             self.logger.info(f"   • Save directory: {self.save_dir}")
@@ -163,7 +163,7 @@ class ComprehensiveMetricsTracker:
             
         except Exception as e:
             if self.verbose:
-                self.logger.warning(f"⚠️ Error updating metrics: {e}")
+                self.logger.warning(f"⚠️ Error updating metrics: {str(e)}")
     
     def _calculate_layer_confusion_matrix(self, layer: str, predictions: np.ndarray, ground_truth: np.ndarray, epoch: int):
         """
@@ -206,7 +206,7 @@ class ComprehensiveMetricsTracker:
             
         except Exception as e:
             if self.verbose:
-                self.logger.warning(f"⚠️ Error calculating confusion matrix for {layer}: {e}")
+                self.logger.warning(f"⚠️ Error calculating confusion matrix for {layer}: {str(e)}")
     
     def generate_comprehensive_charts(self, session_id: str = None, phase_num: int = None) -> Dict[str, str]:
         """
@@ -280,7 +280,7 @@ class ComprehensiveMetricsTracker:
             
         except Exception as e:
             if self.verbose:
-                self.logger.error(f"❌ Error generating charts: {e}")
+                self.logger.error(f"❌ Error generating charts: {str(e)}")
             return {}
     
     def _generate_training_curves(self, session_dir: Path) -> Optional[str]:
@@ -355,7 +355,7 @@ class ComprehensiveMetricsTracker:
             
         except Exception as e:
             if self.verbose:
-                self.logger.warning(f"⚠️ Error generating training curves: {e}")
+                self.logger.warning(f"⚠️ Error generating training curves: {str(e)}")
             return None
     
     def _generate_confusion_matrix_chart(self, layer: str, session_dir: Path) -> Optional[str]:
@@ -397,7 +397,7 @@ class ComprehensiveMetricsTracker:
             
         except Exception as e:
             if self.verbose:
-                self.logger.warning(f"⚠️ Error generating confusion matrix for {layer}: {e}")
+                self.logger.warning(f"⚠️ Error generating confusion matrix for {layer}: {str(e)}")
             return None
     
     def _generate_layer_metrics_chart(self, session_dir: Path) -> Optional[str]:
@@ -438,7 +438,7 @@ class ComprehensiveMetricsTracker:
             
         except Exception as e:
             if self.verbose:
-                self.logger.warning(f"⚠️ Error generating layer metrics chart: {e}")
+                self.logger.warning(f"⚠️ Error generating layer metrics chart: {str(e)}")
             return None
     
     def _generate_phase_analysis_chart(self, session_dir: Path) -> Optional[str]:
@@ -478,7 +478,7 @@ class ComprehensiveMetricsTracker:
             
         except Exception as e:
             if self.verbose:
-                self.logger.warning(f"⚠️ Error generating phase analysis chart: {e}")
+                self.logger.warning(f"⚠️ Error generating phase analysis chart: {str(e)}")
             return None
     
     def _generate_lr_schedule_chart(self, session_dir: Path) -> Optional[str]:
@@ -510,7 +510,7 @@ class ComprehensiveMetricsTracker:
             
         except Exception as e:
             if self.verbose:
-                self.logger.warning(f"⚠️ Error generating LR schedule chart: {e}")
+                self.logger.warning(f"⚠️ Error generating LR schedule chart: {str(e)}")
             return None
     
     def _generate_research_dashboard(self, session_dir: Path, phase_num: int = None) -> Optional[str]:
@@ -596,7 +596,7 @@ class ComprehensiveMetricsTracker:
             
         except Exception as e:
             if self.verbose:
-                self.logger.warning(f"⚠️ Error generating research dashboard: {e}")
+                self.logger.warning(f"⚠️ Error generating research dashboard: {str(e)}")
             return None
     
     def _generate_research_phase_analysis_chart(self, session_dir: Path, phase_num: int = None) -> Optional[str]:
@@ -659,7 +659,7 @@ class ComprehensiveMetricsTracker:
             
         except Exception as e:
             if self.verbose:
-                self.logger.warning(f"⚠️ Error generating research phase analysis chart: {e}")
+                self.logger.warning(f"⚠️ Error generating research phase analysis chart: {str(e)}")
             return None
     
     def _generate_map_trends_chart(self, session_dir: Path) -> Optional[str]:
@@ -706,7 +706,7 @@ class ComprehensiveMetricsTracker:
             
         except Exception as e:
             if self.verbose:
-                self.logger.warning(f"⚠️ Error generating mAP trends chart: {e}")
+                self.logger.warning(f"⚠️ Error generating mAP trends chart: {str(e)}")
             return None
     
     def _get_dashboard_title_context(self, phase_num: int = None) -> str:
@@ -914,7 +914,7 @@ class ComprehensiveMetricsTracker:
                 
         except Exception as e:
             if self.verbose:
-                self.logger.warning(f"⚠️ Error saving research metrics summary: {e}")
+                self.logger.warning(f"⚠️ Error saving research metrics summary: {str(e)}")
     
     def _generate_research_metrics_summary(self) -> Dict[str, Any]:
         """Generate simplified research metrics summary using standard YOLO metrics."""
@@ -1002,11 +1002,10 @@ def create_visualization_manager(num_classes_per_layer: Dict[str, int],
     )
     
     if verbose:
-        from smartcash.common.logger import get_logger
-        logger = get_logger(__name__)
-        logger.info("🔬 Research-focused visualization manager created")
-        logger.info("   • Phase 1 focus: Single-layer denomination detection")
-        logger.info("   • Phase 2 focus: Multi-layer hierarchical detection + mAP@0.5")
-        logger.info("   • Backward compatibility: Legacy UI metrics supported")
+        # Use the tracker's logger for consistency
+        tracker.logger.info("🔬 Research-focused visualization manager created")
+        tracker.logger.info("   • Phase 1 focus: Single-layer denomination detection")
+        tracker.logger.info("   • Phase 2 focus: Multi-layer hierarchical detection + mAP@0.5")
+        tracker.logger.info("   • Backward compatibility: Legacy UI metrics supported")
     
     return tracker

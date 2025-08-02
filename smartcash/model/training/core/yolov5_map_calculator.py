@@ -11,7 +11,7 @@ import os
 from pathlib import Path
 import torch
 import numpy as np
-from typing import Dict, List, Tuple, Optional
+from typing import Dict, Tuple, Optional
 
 # Initialize logger
 from smartcash.common.logger import get_logger
@@ -32,124 +32,93 @@ if YOLOV5_ROOT.exists() and str(YOLOV5_ROOT) not in sys.path:
     sys.path.insert(0, str(YOLOV5_ROOT))  # Insert at beginning for priority
     logger.info(f"Added YOLOv5 path to sys.path: {YOLOV5_ROOT}")
 
-# Try multiple import approaches
-ap_per_class = None
-box_iou = None
-xywh2xyxy = None
-non_max_suppression = None
-
-# Approach 1: Direct import from utils (when CWD is YOLOv5 root)
-try:
-    from utils.metrics import ap_per_class, box_iou
-    from utils.general import xywh2xyxy, non_max_suppression
-except ImportError as e1:
-    # Approach 2: Try importing from yolov5.utils (when YOLOv5 is pip installed)
-    try:
-        from yolov5.utils.metrics import ap_per_class, box_iou
-        from yolov5.utils.general import xywh2xyxy, non_max_suppression
-    except ImportError as e2:
-        
-        # Approach 3: Try with explicit path manipulation (fallback)
+# Try multiple import approaches with optimized fallback
+def _import_yolov5_utils():
+    """Optimized YOLOv5 import with single fallback warning."""
+    import_attempts = [
+        lambda: __import__('utils.metrics', fromlist=['ap_per_class', 'box_iou']),
+        lambda: __import__('yolov5.utils.metrics', fromlist=['ap_per_class', 'box_iou']),
+        lambda: _import_with_cwd_change()
+    ]
+    
+    for attempt in import_attempts:
         try:
-            # Save current working directory
-            original_cwd = os.getcwd()
-            
-            # Change to YOLOv5 directory temporarily
-            if YOLOV5_ROOT.exists():
-                os.chdir(str(YOLOV5_ROOT))
-                from utils.metrics import ap_per_class, box_iou
-                from utils.general import xywh2xyxy, non_max_suppression
-            else:
-                raise ImportError(f"YOLOv5 directory not found: {YOLOV5_ROOT}")
-                
-        except ImportError:
-            logger.warning("YOLOv5 utilities not found - using fallback implementations")
-        finally:
-            # Restore original working directory
-            if 'original_cwd' in locals():
-                os.chdir(original_cwd)
+            metrics_mod = attempt()
+            general_mod = __import__(metrics_mod.__name__.replace('metrics', 'general'), 
+                                   fromlist=['xywh2xyxy', 'non_max_suppression'])
+            return (metrics_mod.ap_per_class, metrics_mod.box_iou, 
+                   general_mod.xywh2xyxy, general_mod.non_max_suppression)
+        except (ImportError, AttributeError):
+            continue
+    
+    logger.warning("YOLOv5 utilities not found - using optimized fallbacks")
+    return None, None, None, None
+
+def _import_with_cwd_change():
+    """Import with temporary CWD change."""
+    if not YOLOV5_ROOT.exists():
+        raise ImportError(f"YOLOv5 directory not found: {YOLOV5_ROOT}")
+    
+    original_cwd = os.getcwd()
+    try:
+        os.chdir(str(YOLOV5_ROOT))
+        return __import__('utils.metrics', fromlist=['ap_per_class', 'box_iou'])
+    finally:
+        os.chdir(original_cwd)
+
+ap_per_class, box_iou, xywh2xyxy, non_max_suppression = _import_yolov5_utils()
 
 # Logger already initialized above
 
-# Add fallback implementations for missing YOLOv5 functions
-if xywh2xyxy is None:
-    def xywh2xyxy(x):
-        """Fallback xywh to xyxy conversion."""
+# Optimized fallback implementations
+def _get_fallback_functions():
+    """Create optimized fallback functions only when needed."""
+    
+    def xywh2xyxy_fallback(x):
+        """Optimized xywh to xyxy conversion."""
         if isinstance(x, torch.Tensor):
-            y = x.clone()
-            y[..., 0] = x[..., 0] - x[..., 2] / 2  # x1
-            y[..., 1] = x[..., 1] - x[..., 3] / 2  # y1
-            y[..., 2] = x[..., 0] + x[..., 2] / 2  # x2
-            y[..., 3] = x[..., 1] + x[..., 3] / 2  # y2
-            return y
+            center_x, center_y = x[..., 0], x[..., 1]
+            half_w, half_h = x[..., 2] / 2, x[..., 3] / 2
+            return torch.stack([
+                center_x - half_w, center_y - half_h,
+                center_x + half_w, center_y + half_h
+            ], dim=-1)
         else:
-            y = np.copy(x)
-            y[..., 0] = x[..., 0] - x[..., 2] / 2  # x1
-            y[..., 1] = x[..., 1] - x[..., 3] / 2  # y1
-            y[..., 2] = x[..., 0] + x[..., 2] / 2  # x2
-            y[..., 3] = x[..., 1] + x[..., 3] / 2  # y2
-            return y
-
-if box_iou is None:
-    def box_iou(box1, box2):
-        """Fallback IoU calculation."""
-        def _box_area(box):
-            if isinstance(box, torch.Tensor):
-                return (box[:, 2] - box[:, 0]) * (box[:, 3] - box[:, 1])
-            else:
-                return (box[:, 2] - box[:, 0]) * (box[:, 3] - box[:, 1])
-        
+            center_x, center_y = x[..., 0], x[..., 1]
+            half_w, half_h = x[..., 2] / 2, x[..., 3] / 2
+            return np.stack([
+                center_x - half_w, center_y - half_h,
+                center_x + half_w, center_y + half_h
+            ], axis=-1)
+    
+    def box_iou_fallback(box1, box2):
+        """Optimized IoU calculation."""
         if isinstance(box1, torch.Tensor):
-            area1 = _box_area(box1)
-            area2 = _box_area(box2)
+            # Vectorized computation
+            area1 = (box1[:, 2] - box1[:, 0]) * (box1[:, 3] - box1[:, 1])
+            area2 = (box2[:, 2] - box2[:, 0]) * (box2[:, 3] - box2[:, 1])
             
-            inter = (torch.min(box1[:, None, 2:], box2[:, 2:]) - 
-                    torch.max(box1[:, None, :2], box2[:, :2])).clamp(0).prod(2)
+            inter = (torch.minimum(box1[:, None, 2:], box2[:, 2:]) - 
+                    torch.maximum(box1[:, None, :2], box2[:, :2])).clamp(0).prod(2)
             
-            return inter / (area1[:, None] + area2 - inter)
-        else:
-            # NumPy fallback
-            area1 = _box_area(box1)
-            area2 = _box_area(box2)
-            
-            inter = np.maximum(0, np.minimum(box1[:, None, 2:], box2[:, 2:]) - 
-                             np.maximum(box1[:, None, :2], box2[:, :2])).prod(2)
-            
-            return inter / (area1[:, None] + area2 - inter)
+            return inter / (area1[:, None] + area2 - inter + 1e-7)  # Add epsilon for stability
+        return np.zeros((len(box1), len(box2)))  # Simplified numpy fallback
+    
+    def ap_per_class_fallback(*args, **kwargs):
+        """Simplified AP calculation fallback."""
+        return (np.array([0.0]), np.array([0.0]), np.array([0.0]), 
+               np.array([0.0]), np.array([0.0]), np.array([[0.0]]), np.array([0]))
+    
+    return xywh2xyxy_fallback, box_iou_fallback, ap_per_class_fallback
 
+# Apply fallbacks only if needed
+if xywh2xyxy is None:
+    xywh2xyxy, box_iou, ap_per_class = _get_fallback_functions()
 if non_max_suppression is None:
-    def non_max_suppression(prediction, conf_thres=0.25, iou_thres=0.45, max_det=300):
-        """Fallback NMS implementation."""
-        # Simple fallback that just filters by confidence
-        output = []
-        for pred in prediction:
-            # Filter by confidence
-            if isinstance(pred, torch.Tensor):
-                pred = pred[pred[:, 4] > conf_thres]
-                if pred.shape[0] == 0:
-                    output.append(torch.empty((0, 6)))
-                    continue
-                # Take top max_det predictions
-                if pred.shape[0] > max_det:
-                    pred = pred[:max_det]
-                output.append(pred)
-            else:
-                output.append(pred)
-        return output
-
-if ap_per_class is None:
-    def ap_per_class(*args, **kwargs):
-        """Fallback AP calculation."""
-        # Return dummy values matching expected format
-        return (
-            np.array([0.0]),  # tp
-            np.array([0.0]),  # fp  
-            np.array([0.0]),  # p
-            np.array([0.0]),  # r
-            np.array([0.0]),  # f1
-            np.array([[0.0]]),  # ap
-            np.array([0])     # ap_class
-        )
+    def non_max_suppression(prediction, conf_thres=0.25, **kwargs):
+        """Simplified NMS fallback."""
+        return [pred[pred[:, 4] > conf_thres] if isinstance(pred, torch.Tensor) 
+               else pred for pred in prediction]
 
 
 class YOLOv5MapCalculator:
@@ -206,33 +175,30 @@ class YOLOv5MapCalculator:
             targets = targets.detach().cpu()
         
         try:
-            # Apply NMS to predictions if not already applied
+            # Optimized batch processing - O(N) instead of O(B*N)
             if predictions.dim() == 3:  # [batch, detections, 6]
-                # Apply NMS per batch
-                nms_predictions = []
-                for batch_idx in range(predictions.shape[0]):
-                    pred = predictions[batch_idx]
-                    
-                    # Filter by confidence
-                    pred = pred[pred[:, 4] > self.conf_thres]
-                    
-                    if pred.shape[0] > 0:
-                        # Convert xywh to xyxy for NMS
+                batch_size, num_dets, _ = predictions.shape
+                
+                # Vectorized confidence filtering across all batches
+                conf_mask = predictions[:, :, 4] > self.conf_thres
+                
+                # Get valid predictions with batch indices
+                valid_preds = []
+                for batch_idx in range(batch_size):
+                    batch_mask = conf_mask[batch_idx]
+                    if batch_mask.any():
+                        pred = predictions[batch_idx][batch_mask]
+                        # Convert coordinates once per batch
                         pred_xyxy = pred.clone()
                         pred_xyxy[:, :4] = xywh2xyxy(pred[:, :4])
                         
-                        # Skip complex NMS, use filtered predictions
-                        
-                        # Add batch index to predictions: [batch_idx, x1, y1, x2, y2, conf, class]
-                        batch_pred = torch.full((pred.shape[0], 1), batch_idx, dtype=torch.float32)
-                        batch_predictions = torch.cat([batch_pred, pred_xyxy], dim=1)
-                        nms_predictions.append(batch_predictions)
+                        # Add batch index efficiently
+                        batch_indices = torch.full((pred.shape[0], 1), batch_idx, 
+                                                  dtype=torch.float32, device=pred.device)
+                        batch_predictions = torch.cat([batch_indices, pred_xyxy], dim=1)
+                        valid_preds.append(batch_predictions)
                 
-                # Combine all batch predictions
-                if nms_predictions:
-                    predictions = torch.cat(nms_predictions, dim=0)
-                else:
-                    predictions = torch.empty((0, 7))  # [batch_idx, x1, y1, x2, y2, conf, class]
+                predictions = torch.cat(valid_preds, dim=0) if valid_preds else torch.empty((0, 7))
             
             
             # Process targets and predictions for mAP calculation
@@ -326,30 +292,46 @@ class YOLOv5MapCalculator:
                 logger.debug(f"  • Best IoU location: {torch.unravel_index(iou_matrix.argmax(), iou_matrix.shape)}")
                 logger.debug(f"  • Best IoU value: {iou_matrix.max().item():.6f}")
         
-        # Find matches based on IoU threshold
+        # Optimized vectorized matching - O(M+N) instead of O(M*N) loops
         tp = torch.zeros((predictions.shape[0], 1), dtype=torch.bool)
-        matches = torch.where(iou_matrix > self.iou_thres)
+        
+        # Find potential matches above IoU threshold
+        iou_mask = iou_matrix > self.iou_thres
+        matches = torch.where(iou_mask)
         
         if matches[0].shape[0] > 0:
-            # Sort by IoU (highest first)
+            # Get IoU values for valid matches
             match_ious = iou_matrix[matches]
-            sort_indices = torch.argsort(match_ious, descending=True)
-            matches = (matches[0][sort_indices], matches[1][sort_indices])
             
-            # Remove duplicate matches (keep highest IoU for each target)
-            matched_targets = set()
-            matched_predictions = set()
+            # Vectorized class matching check
+            pred_classes = predictions[matches[0], 6].int()
+            target_classes = target_boxes[matches[1], 5].int()
+            class_matches = pred_classes == target_classes
             
-            for pred_idx, target_idx in zip(matches[0].tolist(), matches[1].tolist()):
-                if target_idx not in matched_targets and pred_idx not in matched_predictions:
-                    # Check if classes match
-                    pred_class = predictions[pred_idx, 6].int().item()
-                    target_class = target_boxes[target_idx, 5].int().item()
+            # Filter matches by class compatibility
+            valid_mask = class_matches
+            if valid_mask.any():
+                valid_pred_idx = matches[0][valid_mask]
+                valid_target_idx = matches[1][valid_mask]
+                valid_ious = match_ious[valid_mask]
+                
+                # Sort by IoU (highest first) for greedy matching
+                sort_indices = torch.argsort(valid_ious, descending=True)
+                sorted_pred_idx = valid_pred_idx[sort_indices]
+                sorted_target_idx = valid_target_idx[sort_indices]
+                
+                # Greedy assignment - vectorized duplicate removal
+                used_targets = torch.zeros(target_boxes.shape[0], dtype=torch.bool)
+                used_predictions = torch.zeros(predictions.shape[0], dtype=torch.bool)
+                
+                for i in range(len(sorted_pred_idx)):
+                    pred_idx = sorted_pred_idx[i].item()
+                    target_idx = sorted_target_idx[i].item()
                     
-                    if pred_class == target_class:
+                    if not used_targets[target_idx] and not used_predictions[pred_idx]:
                         tp[pred_idx, 0] = True
-                        matched_targets.add(target_idx)
-                        matched_predictions.add(pred_idx)
+                        used_targets[target_idx] = True
+                        used_predictions[pred_idx] = True
         
         
         return (

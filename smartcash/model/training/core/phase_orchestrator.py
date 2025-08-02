@@ -12,7 +12,7 @@ from typing import Dict, Any, Optional, Callable
 
 from smartcash.common.logger import get_logger
 from smartcash.model.training.data_loader_factory import DataLoaderFactory
-from smartcash.model.training.metrics_tracker import MetricsTracker
+from smartcash.model.training.utils.metrics_history import create_metrics_recorder
 from smartcash.model.training.optimizer_factory import OptimizerFactory
 from smartcash.model.training.loss_manager import LossManager
 from smartcash.model.training.utils.early_stopping import create_early_stopping
@@ -98,8 +98,8 @@ class PhaseOrchestrator:
                 import torch
                 scaler = torch.amp.GradScaler('cuda')
             
-            # Set up metrics tracker
-            metrics_tracker = MetricsTracker(config=self.config)
+            # Set up metrics recorder for JSON-based metrics tracking
+            metrics_recorder = create_metrics_recorder("training_logs")
             
             # Set up early stopping
             early_stopping = self.setup_early_stopping(phase_num)
@@ -111,7 +111,7 @@ class PhaseOrchestrator:
                 'optimizer': optimizer,
                 'scheduler': scheduler,
                 'scaler': scaler,
-                'metrics_tracker': metrics_tracker,
+                'metrics_recorder': metrics_recorder,
                 'early_stopping': early_stopping,
                 'phase_config': phase_config
             }

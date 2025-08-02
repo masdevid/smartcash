@@ -219,7 +219,7 @@ class ProgressManager:
         if progress_percentage is not None:
             # Use custom percentage calculation for resumed training
             # Convert percentage back to relative position for progress bar
-            relative_current = int((progress_percentage / 100) * (total_epochs - 1))  
+            relative_current = int((progress_percentage / 100) * total_epochs)  
             self.progress_tracker.update_epoch_progress(epoch, total_epochs, message, relative_current)
         else:
             self.progress_tracker.update_epoch_progress(epoch, total_epochs, message)

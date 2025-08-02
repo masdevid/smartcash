@@ -525,10 +525,8 @@ class ValidationExecutor:
             })
         
         # Compute mAP metrics using YOLOv5 calculator
-        logger.debug(f"📊 Phase {phase_num}: Computing YOLOv5 mAP metrics")
         try:
             map_metrics = self.map_calculator.compute_map()
-            logger.info(f"YOLOv5 mAP Results - mAP@0.5: {map_metrics['map50']:.4f}, Precision: {map_metrics['precision']:.4f}, Recall: {map_metrics['recall']:.4f}")
             
             # Add mAP metrics to raw_metrics
             raw_metrics.update({
@@ -821,11 +819,7 @@ class ValidationExecutor:
             # Get the computed mAP metrics which include precision, recall, F1
             map_results = self.map_calculator.compute_map()
             
-            logger.info(f"YOLOv5 built-in metrics:")
-            logger.info(f"  • Precision: {map_results['precision']:.4f}")
-            logger.info(f"  • Recall: {map_results['recall']:.4f}")
-            logger.info(f"  • F1: {map_results['f1']:.4f}")
-            logger.info(f"  • mAP@0.5: {map_results['map50']:.4f}")
+            # YOLOv5 metrics computed - detailed metrics available in JSON files
             
             # For object detection, accuracy is often approximated as mAP or computed differently
             # We'll use mAP@0.5 as a proxy for overall detection accuracy

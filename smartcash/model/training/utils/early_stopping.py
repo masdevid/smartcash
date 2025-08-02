@@ -98,7 +98,7 @@ class EarlyStopping:
             
             if self.verbose:
                 direction = "↗️" if self.mode == 'max' else "↘️"
-                print(f"✨ Early stopping: {self.metric} improved {direction} {score:.6f} (epoch {epoch})")
+                print(f"✨ Early stopping: {self.metric} improved {direction} {score:.6f} (epoch {epoch + 1})")
         
         else:
             self.wait += 1
@@ -114,13 +114,13 @@ class EarlyStopping:
             self.should_stop = True
             
             if self.verbose:
-                print(f"🛑 Early stopping triggered! Best {self.metric}: {self.best_score:.6f} (epoch {self.best_epoch})")
+                print(f"🛑 Early stopping triggered! Best {self.metric}: {self.best_score:.6f} (epoch {self.best_epoch + 1})")
             
             # Restore best weights
             if self.restore_best_weights and model is not None and self.best_weights is not None:
                 model.load_state_dict(self.best_weights)
                 if self.verbose:
-                    print(f"🔄 Restored model weights dari epoch {self.best_epoch}")
+                    print(f"🔄 Restored model weights dari epoch {self.best_epoch + 1}")
         
         return self.should_stop
     
@@ -216,7 +216,7 @@ class EarlyStopping:
         status = "🛑 STOPPED" if self.should_stop else f"⏳ Waiting ({self.wait}/{self.patience})"
         direction = "↗️" if self.mode == 'max' else "↘️"
         
-        return f"Early stopping: {status} | Best {self.metric}: {self.best_score:.6f} {direction} (epoch {self.best_epoch})"
+        return f"Early stopping: {status} | Best {self.metric}: {self.best_score:.6f} {direction} (epoch {self.best_epoch + 1})"
 
 class MultiMetricEarlyStopping:
     """Early stopping dengan multiple metrics monitoring"""

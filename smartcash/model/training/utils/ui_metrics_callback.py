@@ -5,9 +5,11 @@ File: smartcash/model/training/utils/ui_metrics_callback.py
 Enhanced metrics callback that provides color information for both console and UI usage.
 """
 
+import json
+from pathlib import Path
 from typing import Dict, Any, Callable, Optional, Tuple
 from smartcash.model.training.utils.metric_color_utils import (
-    MetricColorizer, ColorScheme, get_metrics_with_colors, get_metric_status
+    MetricColorizer, ColorScheme, get_metrics_with_colors
 )
 from smartcash.common.logger import get_logger
 
@@ -20,17 +22,20 @@ class UIMetricsCallback:
     for both console display and UI integration.
     """
     
-    def __init__(self, verbose: bool = True, console_scheme: ColorScheme = ColorScheme.EMOJI):
+    def __init__(self, verbose: bool = True, console_scheme: ColorScheme = ColorScheme.EMOJI, 
+                 training_logs_dir: str = "training_logs"):
         """
         Initialize the UI metrics callback.
         
         Args:
             verbose: Whether to print verbose output
             console_scheme: Color scheme for console output
+            training_logs_dir: Directory containing JSON metrics files
         """
         self.verbose = verbose
         self.console_scheme = console_scheme
         self.colorizer = MetricColorizer(console_scheme)
+        self.training_logs_dir = Path(training_logs_dir)
         
         # Storage for UI access
         self.latest_metrics = {}
@@ -85,7 +90,7 @@ class UIMetricsCallback:
         colored_metrics = get_metrics_with_colors(metrics, epoch, max_epochs, phase_num)
         self.latest_colored_metrics = colored_metrics
         
-        # Extract loss breakdown before console output
+        # Extract loss breakdown from kwargs
         loss_breakdown = kwargs.get('loss_breakdown', {})
         
         # Debug: Log loss breakdown reception
@@ -108,8 +113,6 @@ class UIMetricsCallback:
             except Exception as e:
                 print(f"Warning: UI callback failed: {e}")
         
-        # loss_breakdown already extracted above
-        
         # Return enhanced metrics data
         return {
             'original_metrics': metrics,
@@ -121,7 +124,7 @@ class UIMetricsCallback:
         }
     
     def _print_console_metrics(self, phase: str, epoch: int, metrics: Dict[str, Any], 
-                             colored_metrics: Dict[str, Dict], **kwargs):
+                             colored_metrics: Dict[str, Dict]):
         """Print formatted metrics to console."""
         print(f"📊 METRICS [{phase.upper()}] Epoch {epoch}:")
         
@@ -326,12 +329,7 @@ class UIMetricsCallback:
             return phase
         
         # Infer phase from available metrics (fallback)
-        # Phase 2 indicators: multiple active layers (simpler detection)
-        phase_2_indicators = []  # No specific research metrics needed
-        
-        has_phase_2_metrics = False  # Use layer activity detection instead
-        
-        # Also check for multiple active layers (indication of Phase 2)
+        # Check for multiple active layers (indication of Phase 2)
         active_layers = 0
         for layer in ['layer_1', 'layer_2', 'layer_3']:
             has_layer_activity = any(
@@ -342,11 +340,8 @@ class UIMetricsCallback:
             if has_layer_activity:
                 active_layers += 1
         
-        # If we have Phase 2 specific metrics OR multiple active layers, it's Phase 2
-        if has_phase_2_metrics or active_layers > 1:
-            return 2
-        else:
-            return 1
+        # If we have multiple active layers, it's Phase 2
+        return 2 if active_layers > 1 else 1
     
     def _determine_layer_display(self, phase: str, metrics: Dict[str, Any]) -> Tuple[list, bool]:
         """
@@ -454,14 +449,202 @@ class UIMetricsCallback:
         """Get the latest colored metrics data."""
         return self.latest_colored_metrics.copy()
     
-    def get_metric_summary_for_ui(self) -> Dict[str, Any]:
-        """Get a comprehensive summary for UI display with intelligent phase-aware filtering."""
-        if not self.latest_colored_metrics:
+    def load_metrics_from_json(self, session_id: Optional[str] = None) -> Dict[str, Any]:
+        """
+        Load metrics data from JSON history files.
+        
+        Args:
+            session_id: Optional session ID to load specific session, otherwise loads latest
+            
+        Returns:
+            Dictionary with metrics history and loss breakdown data
+        """
+        try:
+            if session_id:
+                metrics_file = self.training_logs_dir / f"metrics_history_{session_id}.json"
+            else:
+                # Load latest session
+                latest_file = self.training_logs_dir / "latest_metrics.json"
+                if latest_file.exists():
+                    with open(latest_file, 'r') as f:
+                        latest_data = json.load(f)
+                        metrics_file = Path(latest_data['file_paths']['metrics'])
+                else:
+                    # Fallback: find most recent metrics file
+                    metrics_files = list(self.training_logs_dir.glob("metrics_history_*.json"))
+                    if not metrics_files:
+                        logger.warning("No metrics files found")
+                        return {}
+                    metrics_file = max(metrics_files, key=lambda f: f.stat().st_mtime)
+            
+            if not metrics_file.exists():
+                logger.warning(f"Metrics file not found: {metrics_file}")
+                return {}
+            
+            with open(metrics_file, 'r') as f:
+                metrics_history = json.load(f)
+            
+            logger.debug(f"Loaded {len(metrics_history)} epoch records from {metrics_file}")
+            return {'metrics_history': metrics_history, 'file_path': str(metrics_file)}
+            
+        except Exception as e:
+            logger.error(f"Failed to load metrics from JSON: {e}")
+            return {}
+    
+    def get_latest_epoch_metrics(self, session_id: Optional[str] = None) -> Dict[str, Any]:
+        """
+        Get metrics for the latest epoch from JSON files.
+        
+        Args:
+            session_id: Optional session ID
+            
+        Returns:
+            Latest epoch metrics with mAP data and loss breakdown
+        """
+        data = self.load_metrics_from_json(session_id)
+        if not data or 'metrics_history' not in data:
             return {}
         
-        # Apply intelligent phase-aware logic for UI display
-        show_layers, filter_zeros = self._determine_layer_display(self.current_phase, self.latest_metrics)
-        filtered_layer_metrics = self._filter_layer_metrics(self.latest_metrics, show_layers, filter_zeros)
+        metrics_history = data['metrics_history']
+        if not metrics_history:
+            return {}
+        
+        # Get latest epoch
+        latest_epoch = metrics_history[-1]
+        
+        # Extract mAP metrics
+        map_metrics = {}
+        for key in ['val_map50', 'val_map50_95', 'val_precision', 'val_recall', 'val_f1']:
+            if latest_epoch.get(key) is not None:
+                map_metrics[key] = latest_epoch[key]
+        
+        # Extract loss breakdown from additional_metrics if available
+        loss_breakdown = {}
+        if latest_epoch.get('additional_metrics'):
+            for key, value in latest_epoch['additional_metrics'].items():
+                if 'loss' in key.lower():
+                    loss_breakdown[key] = value
+        
+        result = {
+            'epoch': latest_epoch['epoch'],
+            'phase': latest_epoch['phase'],
+            'timestamp': latest_epoch['timestamp'],
+            'core_metrics': {
+                'train_loss': latest_epoch['train_loss'],
+                'val_loss': latest_epoch['val_loss'],
+                'learning_rate': latest_epoch['learning_rate']
+            },
+            'map_metrics': map_metrics,
+            'loss_breakdown': loss_breakdown
+        }
+        
+        # Add layer metrics
+        layer_metrics = {}
+        for key, value in latest_epoch.items():
+            if key.startswith('layer_') and value is not None:
+                layer_metrics[key] = value
+        result['layer_metrics'] = layer_metrics
+        
+        return result
+    
+    def get_phase_metrics_history(self, phase: int, session_id: Optional[str] = None) -> Dict[str, Any]:
+        """
+        Get metrics history for a specific phase.
+        
+        Args:
+            phase: Phase number (1 or 2)
+            session_id: Optional session ID
+            
+        Returns:
+            Phase-specific metrics history with trends
+        """
+        data = self.load_metrics_from_json(session_id)
+        if not data or 'metrics_history' not in data:
+            return {}
+        
+        metrics_history = data['metrics_history']
+        
+        # Filter by phase
+        phase_data = [record for record in metrics_history if record['phase'] == phase]
+        
+        if not phase_data:
+            return {'phase': phase, 'epochs': []}
+        
+        # Extract time series for key metrics
+        epochs = [record['epoch'] for record in phase_data]
+        
+        series = {
+            'loss': {
+                'epochs': epochs,
+                'train_loss': [record['train_loss'] for record in phase_data],
+                'val_loss': [record['val_loss'] for record in phase_data]
+            },
+            'map_metrics': {
+                'epochs': epochs,
+                'val_map50': [record.get('val_map50', 0) for record in phase_data],
+                'val_precision': [record.get('val_precision', 0) for record in phase_data],
+                'val_recall': [record.get('val_recall', 0) for record in phase_data]
+            },
+            'learning_rate': {
+                'epochs': epochs,
+                'values': [record['learning_rate'] for record in phase_data]
+            }
+        }
+        
+        # Add layer metrics if available
+        layer_series = {}
+        for layer in ['layer_1', 'layer_2', 'layer_3']:
+            layer_accuracy = []
+            for record in phase_data:
+                acc = record.get(f'{layer}_accuracy')
+                layer_accuracy.append(acc if acc is not None else 0)
+            
+            if any(acc > 0 for acc in layer_accuracy):  # Only include if has data
+                layer_series[f'{layer}_accuracy'] = {
+                    'epochs': epochs,
+                    'values': layer_accuracy
+                }
+        
+        series['layer_metrics'] = layer_series
+        
+        return {
+            'phase': phase,
+            'total_epochs': len(phase_data),
+            'best_val_loss': min(record['val_loss'] for record in phase_data),
+            'best_map50': max(record.get('val_map50', 0) for record in phase_data),
+            'series': series
+        }
+    
+    def get_metric_summary_for_ui(self) -> Dict[str, Any]:
+        """Get a comprehensive summary for UI display with JSON-loaded data."""
+        # Try to load latest metrics from JSON first
+        latest_data = self.get_latest_epoch_metrics()
+        
+        if latest_data:
+            # Use JSON data
+            metrics = {}
+            metrics.update(latest_data['core_metrics'])
+            metrics.update(latest_data['map_metrics'])
+            metrics.update(latest_data['layer_metrics'])
+            
+            phase = latest_data['phase']
+            epoch = latest_data['epoch']
+            loss_breakdown = latest_data['loss_breakdown']
+        else:
+            # Fallback to in-memory data
+            if not self.latest_colored_metrics:
+                return {}
+            metrics = self.latest_metrics
+            phase = self.current_phase
+            epoch = self.current_epoch
+            loss_breakdown = {}
+        
+        # Apply phase-aware filtering
+        show_layers, filter_zeros = self._determine_layer_display(str(phase), metrics)
+        filtered_layer_metrics = self._filter_layer_metrics(metrics, show_layers, filter_zeros)
+        
+        # Generate colored metrics for current data
+        colored_metrics = get_metrics_with_colors(metrics, epoch, 100, int(phase))
         
         # Categorize metrics for UI display
         categories = {
@@ -472,7 +655,7 @@ class UIMetricsCallback:
             'other_metrics': {}
         }
         
-        for metric_name, color_data in self.latest_colored_metrics.items():
+        for metric_name, color_data in colored_metrics.items():
             # Apply phase-aware filtering for layer metrics
             if any(layer in metric_name.lower() for layer in ['layer_1', 'layer_2', 'layer_3']):
                 # Only include layer metrics that passed the intelligent filtering
@@ -482,21 +665,22 @@ class UIMetricsCallback:
                 categories['loss_metrics'][metric_name] = color_data
             elif 'accuracy' in metric_name.lower():
                 categories['accuracy_metrics'][metric_name] = color_data
-            # elif 'map' in metric_name.lower():  # mAP metrics disabled for performance
-            #     categories['map_metrics'][metric_name] = color_data
+            elif 'map' in metric_name.lower():
+                categories['map_metrics'][metric_name] = color_data
             else:
                 categories['other_metrics'][metric_name] = color_data
         
         return {
             'categories': categories,
-            'epoch': self.current_epoch,
-            'phase': self.current_phase,
+            'epoch': epoch,
+            'phase': phase,
+            'loss_breakdown': loss_breakdown,
             'phase_info': {
                 'active_layers': show_layers,
                 'filter_zeros': filter_zeros,
-                'display_mode': self._get_display_mode_description(self.current_phase, show_layers, filter_zeros)
+                'display_mode': self._get_display_mode_description(str(phase), show_layers, filter_zeros)
             },
-            'timestamp': None  # Could add timestamp if needed
+            'data_source': 'json' if latest_data else 'memory'
         }
     
     def _get_display_mode_description(self, phase: str, show_layers: list, filter_zeros: bool) -> str:
@@ -514,7 +698,8 @@ class UIMetricsCallback:
 
 def create_ui_metrics_callback(verbose: bool = True, 
                              console_scheme: ColorScheme = ColorScheme.EMOJI,
-                             ui_callback: Optional[Callable] = None) -> UIMetricsCallback:
+                             ui_callback: Optional[Callable] = None,
+                             training_logs_dir: str = "training_logs") -> UIMetricsCallback:
     """
     Factory function to create a UI-enhanced metrics callback.
     
@@ -522,18 +707,19 @@ def create_ui_metrics_callback(verbose: bool = True,
         verbose: Whether to print console output
         console_scheme: Color scheme for console display
         ui_callback: Optional UI callback function
+        training_logs_dir: Directory containing JSON metrics files
         
     Returns:
         UIMetricsCallback instance
     """
-    callback = UIMetricsCallback(verbose, console_scheme)
+    callback = UIMetricsCallback(verbose, console_scheme, training_logs_dir)
     if ui_callback:
         callback.set_ui_callback(ui_callback)
     return callback
 
 
 # Example UI callback function
-def example_ui_callback(phase: str, epoch: int, metrics: Dict[str, Any], colored_metrics: Dict[str, Dict]):
+def example_ui_callback(phase: str, epoch: int, _metrics: Dict[str, Any], colored_metrics: Dict[str, Dict]):
     """
     Example UI callback function showing how to handle the color data.
     

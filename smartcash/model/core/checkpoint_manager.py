@@ -74,7 +74,9 @@ class CheckpointManager:
                 self.progress_bridge.update_operation(4, "🧹 Cleaning up old checkpoints...")
                 self._cleanup_old_checkpoints()
             
-            self.progress_bridge.complete_operation(4, f"✅ Checkpoint saved: {checkpoint_name}")
+            # Complete checkpoint operation without affecting overall training progress
+            self.progress_bridge._notify_progress(4, 4, f"✅ Checkpoint saved: {checkpoint_name}", "checkpoint")
+            self.progress_bridge._reset_operation_state()
             
             # Log save info (reduced verbosity)
             # file_size = checkpoint_path.stat().st_size / (1024 * 1024)  # MB
@@ -85,7 +87,7 @@ class CheckpointManager:
         except Exception as e:
             error_msg = f"❌ Checkpoint save failed: {str(e)}"
             self.logger.error(error_msg)
-            self.progress_bridge.error(error_msg)
+            self.progress_bridge.operation_error(error_msg, "checkpoint")
             raise RuntimeError(error_msg)
     
     def load_checkpoint(self, model: torch.nn.Module, checkpoint_path: Optional[str] = None, 
@@ -125,7 +127,9 @@ class CheckpointManager:
             if 'scheduler' in kwargs and 'scheduler_state_dict' in checkpoint_data:
                 kwargs['scheduler'].load_state_dict(checkpoint_data['scheduler_state_dict'])
             
-            self.progress_bridge.complete_operation(3, f"✅ Checkpoint loaded: {checkpoint_path.name}")
+            # Complete checkpoint load operation without affecting overall training progress
+            self.progress_bridge._notify_progress(3, 3, f"✅ Checkpoint loaded: {checkpoint_path.name}", "checkpoint")
+            self.progress_bridge._reset_operation_state()
             
             # Return checkpoint info
             return {
@@ -145,7 +149,7 @@ class CheckpointManager:
         except Exception as e:
             error_msg = f"❌ Checkpoint load failed: {str(e)}"
             self.logger.error(error_msg)
-            self.progress_bridge.error(error_msg)
+            self.progress_bridge.operation_error(error_msg, "checkpoint")
             raise RuntimeError(error_msg)
     
     def list_checkpoints(self) -> List[Dict[str, Any]]:

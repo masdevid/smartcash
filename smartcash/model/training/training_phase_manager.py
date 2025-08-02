@@ -51,7 +51,7 @@ class TrainingPhaseManager:
         self.orchestrator = PhaseOrchestrator(model, model_api, config, progress_tracker)
         self.training_executor = TrainingExecutor(model, config, progress_tracker)
         self.validation_executor = ValidationExecutor(model, config, progress_tracker)
-        self.checkpoint_manager = create_checkpoint_manager(config, progress_tracker)
+        self.checkpoint_manager = create_checkpoint_manager(config)
         self.progress_manager = ProgressManager(
             progress_tracker, emit_metrics_callback, 
             emit_live_chart_callback, visualization_manager
@@ -153,7 +153,7 @@ class TrainingPhaseManager:
                 # Validation
                 val_metrics = self.validation_executor.validate_epoch(
                     components['val_loader'], components['loss_manager'], 
-                    epoch, epochs, phase_num, display_epoch=display_epoch
+                    epoch, phase_num, display_epoch
                 )
                 
                 # Combine and process metrics
@@ -290,28 +290,41 @@ class TrainingPhaseManager:
         # Combine metrics efficiently
         final_metrics = {**train_metrics, **val_metrics}
         
+        # Add layer-specific metrics if available
+        phase_num = getattr(self, '_current_phase_num', 1)
+        layer_metrics = self._compute_layer_metrics(phase_num)
+        if layer_metrics:
+            final_metrics.update(layer_metrics)
+            logger.debug(f"Added {len(layer_metrics)} layer metrics to final metrics")
+        
         # Add loss breakdown from training executor if available
         if hasattr(self.training_executor, 'last_loss_breakdown'):
             train_loss_breakdown = self.training_executor.last_loss_breakdown
             if train_loss_breakdown:
+                # Add individual training loss components directly to final_metrics
+                for key, value in train_loss_breakdown.items():
+                    final_metrics[f'train_{key}'] = value
+                
                 # Combine with validation loss breakdown if both exist
                 if 'loss_breakdown' in final_metrics:
                     val_loss_breakdown = final_metrics['loss_breakdown']
-                    # Create combined loss breakdown with both training and validation
-                    combined_loss_breakdown = {}
-                    # Add training loss breakdown with train_ prefix
-                    for key, value in train_loss_breakdown.items():
-                        combined_loss_breakdown[f'train_{key}'] = value
-                    # Add validation loss breakdown with val_ prefix  
+                    # Add validation loss breakdown components
                     for key, value in val_loss_breakdown.items():
+                        final_metrics[f'val_{key}'] = value
+                    logger.debug(f"Added validation loss breakdown: {len(val_loss_breakdown)} components")
+                
+                # Also preserve combined loss_breakdown for compatibility
+                combined_loss_breakdown = {}
+                for key, value in train_loss_breakdown.items():
+                    combined_loss_breakdown[f'train_{key}'] = value
+                if 'loss_breakdown' in final_metrics and isinstance(final_metrics['loss_breakdown'], dict):
+                    for key, value in final_metrics['loss_breakdown'].items():
                         combined_loss_breakdown[f'val_{key}'] = value
-                    final_metrics['loss_breakdown'] = combined_loss_breakdown
-                    logger.debug(f"Combined train and validation loss breakdowns: {len(combined_loss_breakdown)} components")
-                else:
-                    # Only training loss breakdown available
-                    train_prefixed = {f'train_{k}': v for k, v in train_loss_breakdown.items()}
-                    final_metrics['loss_breakdown'] = train_prefixed
-                    logger.debug(f"Added training loss breakdown: {len(train_prefixed)} components")
+                
+                final_metrics['loss_breakdown'] = combined_loss_breakdown
+                logger.debug(f"Added training loss breakdown: {len(train_loss_breakdown)} components")
+            else:
+                logger.debug("Training executor has no loss breakdown available")
         
         # Record metrics with the JSON recorder
         if metrics_recorder and hasattr(metrics_recorder, 'record_epoch'):
@@ -797,3 +810,23 @@ class TrainingPhaseManager:
             return True
         
         return False
+    
+    def handle_phase_transition(self, new_phase_num: int, components: Dict[str, Any]):
+        """Handle transition to a new training phase and update metrics recorder."""
+        logger.info(f"Handling phase transition to phase {new_phase_num}")
+        
+        # Update current phase tracking
+        old_phase = getattr(self, '_current_phase_num', 1)
+        self._current_phase_num = new_phase_num
+        
+        # Update metrics recorder if available
+        metrics_recorder = components.get('metrics_recorder')
+        if metrics_recorder and hasattr(metrics_recorder, 'update_phase'):
+            try:
+                metrics_recorder.update_phase(new_phase_num)
+                logger.info(f"Updated metrics recorder from phase {old_phase} to phase {new_phase_num}")
+            except Exception as e:
+                logger.warning(f"Failed to update metrics recorder phase: {e}")
+        
+        # Log phase transition for debugging
+        logger.info(f"Phase transition completed: {old_phase} → {new_phase_num}")

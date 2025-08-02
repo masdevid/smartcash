@@ -98,8 +98,24 @@ class PhaseOrchestrator:
                 import torch
                 scaler = torch.amp.GradScaler('cuda')
             
-            # Set up metrics recorder for JSON-based metrics tracking
-            metrics_recorder = create_metrics_recorder("training_logs")
+            # Set up metrics recorder for JSON-based metrics tracking with structured naming
+            # Handle both dict and object-style config access
+            if isinstance(self.config, dict):
+                backbone = self.config.get('backbone', 'unknown')
+                data_name = self.config.get('data_name', 'data')
+                resume_mode = self.config.get('resume', False)
+            else:
+                backbone = getattr(self.config, 'backbone', 'unknown')
+                data_name = getattr(self.config, 'data_name', 'data') 
+                resume_mode = getattr(self.config, 'resume', False)
+            
+            metrics_recorder = create_metrics_recorder(
+                output_dir="logs/training",
+                backbone=backbone,
+                data_name=data_name, 
+                phase_num=phase_num,
+                resume_mode=resume_mode
+            )
             
             # Set up early stopping
             early_stopping = self.setup_early_stopping(phase_num)

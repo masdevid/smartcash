@@ -12,10 +12,9 @@ Usage:
     python examples/callback_only_training_example.py --optimizer adamw --scheduler cosine --weight-decay 1e-2 --phase1-epochs 1
     python examples/callback_only_training_example.py --resume data/checkpoints/best_model.pt --resume-optimizer --resume-scheduler
     
-Validation Metrics Options:
-    python examples/callback_only_training_example.py --use-yolov5-metrics --phase1-epochs 1  # Use YOLOv5 built-in metrics
-    python examples/callback_only_training_example.py --disable-hierarchical-metrics --use-yolov5-metrics --phase1-epochs 1  # YOLOv5 only
-    python examples/callback_only_training_example.py --use-yolov5-metrics --phase1-epochs 1  # Both YOLOv5 + hierarchical (default)
+Validation Metrics:
+    # Training automatically uses hierarchical validation (YOLOv5 + per-layer metrics)
+    # No additional flags needed - optimized for Indonesian banknote detection
     
 Features:
     - Automatic memory cleanup on interruption (Ctrl+C)
@@ -462,21 +461,9 @@ def main():
             print(f"   └─ Cosine annealing: eta_min={args.cosine_eta_min}")
         
         # Show validation metrics configuration
-        hierarchical_enabled = args.use_hierarchical_metrics and not args.disable_hierarchical_metrics
-        metrics_modes = []
-        if args.use_yolov5_metrics:
-            metrics_modes.append("YOLOv5 built-in")
-        if hierarchical_enabled:
-            metrics_modes.append("Hierarchical multi-layer")
-        
-        if metrics_modes:
-            print(f"📊 VALIDATION METRICS: {' + '.join(metrics_modes)}")
-            if args.use_yolov5_metrics:
-                print("   └─ YOLOv5: accuracy=mAP@0.5, precision/recall/F1 from object detection")
-            if hierarchical_enabled:
-                print("   └─ Hierarchical: layer_1_accuracy, layer_2_accuracy, layer_3_accuracy")
-        else:
-            print("📊 VALIDATION METRICS: Fallback mode (basic metrics only)")
+        print("📊 VALIDATION METRICS: YOLOv5 hierarchical + per-layer metrics")
+        print("   └─ YOLOv5: accuracy=mAP@0.5, precision/recall/F1 from hierarchical object detection")
+        print("   └─ Per-layer: layer_1_accuracy, layer_2_accuracy, layer_3_accuracy")
         
         # Show resume info
         if args.resume:

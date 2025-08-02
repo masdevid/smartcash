@@ -15,9 +15,8 @@ from smartcash.model.training.utils.progress_tracker import TrainingProgressTrac
 class CheckpointManager:
     """💾 Manager untuk checkpoint operations dengan automatic naming"""
     
-    def __init__(self, config: Dict[str, Any], progress_bridge: TrainingProgressTracker):
+    def __init__(self, config: Dict[str, Any]):
         self.config = config
-        self.progress_bridge = progress_bridge
         self.logger = get_logger("model.checkpoint")
         
         # Checkpoint configuration
@@ -35,17 +34,13 @@ class CheckpointManager:
         """💾 Save model checkpoint dengan automatic naming"""
         
         try:
-            self.progress_bridge.start_operation("Saving Checkpoint", 4)
-            
             # Generate checkpoint filename
-            self.progress_bridge.update_operation(1, "📝 Generating checkpoint name...")
             if checkpoint_name is None:
                 checkpoint_name = self._generate_checkpoint_name(metrics, **kwargs)
             
             checkpoint_path = self.save_dir / checkpoint_name
             
             # Prepare checkpoint data
-            self.progress_bridge.update_operation(2, "📦 Preparing checkpoint data...")
             checkpoint_data = {
                 'model_state_dict': model.state_dict(),
                 'model_config': getattr(model, 'config', {}),
@@ -66,28 +61,22 @@ class CheckpointManager:
                 checkpoint_data['phase'] = kwargs['phase']
             
             # Save checkpoint
-            self.progress_bridge.update_operation(3, f"💾 Saving to {checkpoint_name}...")
             torch.save(checkpoint_data, checkpoint_path)
+            
+            # Log save info
+            is_best = kwargs.get('is_best', False)
+            log_message = f"✅ {'Best' if is_best else 'Last'} checkpoint saved successfully at {checkpoint_path}"
+            self.logger.info(log_message)
             
             # Cleanup old checkpoints
             if self.auto_cleanup:
-                self.progress_bridge.update_operation(4, "🧹 Cleaning up old checkpoints...")
                 self._cleanup_old_checkpoints()
-            
-            # Complete checkpoint operation without affecting overall training progress
-            self.progress_bridge._notify_progress(4, 4, f"✅ Checkpoint saved: {checkpoint_name}", "checkpoint")
-            self.progress_bridge._reset_operation_state()
-            
-            # Log save info (reduced verbosity)
-            # file_size = checkpoint_path.stat().st_size / (1024 * 1024)  # MB
-            # self.logger.info(f"💾 Checkpoint saved: {checkpoint_name} ({file_size:.1f}MB)")
             
             return str(checkpoint_path)
             
         except Exception as e:
             error_msg = f"❌ Checkpoint save failed: {str(e)}"
             self.logger.error(error_msg)
-            self.progress_bridge.operation_error(error_msg, "checkpoint")
             raise RuntimeError(error_msg)
     
     def load_checkpoint(self, model: torch.nn.Module, checkpoint_path: Optional[str] = None, 
@@ -95,11 +84,8 @@ class CheckpointManager:
         """📂 Load model dari checkpoint"""
         
         try:
-            self.progress_bridge.start_operation("Loading Checkpoint", 3)
-            
             # Find checkpoint jika tidak specified
             if checkpoint_path is None:
-                self.progress_bridge.update_operation(1, "🔍 Finding best checkpoint...")
                 checkpoint_path = self._find_best_checkpoint()
                 if checkpoint_path is None:
                     raise FileNotFoundError("❌ No checkpoint found")
@@ -109,7 +95,6 @@ class CheckpointManager:
                 raise FileNotFoundError(f"❌ Checkpoint not found: {checkpoint_path}")
             
             # Load checkpoint data
-            self.progress_bridge.update_operation(2, f"📂 Loading {checkpoint_path.name}...")
             from smartcash.common.checkpoint_utils import safe_load_checkpoint
             checkpoint_data = safe_load_checkpoint(str(checkpoint_path))
             
@@ -126,10 +111,6 @@ class CheckpointManager:
             
             if 'scheduler' in kwargs and 'scheduler_state_dict' in checkpoint_data:
                 kwargs['scheduler'].load_state_dict(checkpoint_data['scheduler_state_dict'])
-            
-            # Complete checkpoint load operation without affecting overall training progress
-            self.progress_bridge._notify_progress(3, 3, f"✅ Checkpoint loaded: {checkpoint_path.name}", "checkpoint")
-            self.progress_bridge._reset_operation_state()
             
             # Return checkpoint info
             return {
@@ -149,7 +130,6 @@ class CheckpointManager:
         except Exception as e:
             error_msg = f"❌ Checkpoint load failed: {str(e)}"
             self.logger.error(error_msg)
-            self.progress_bridge.operation_error(error_msg, "checkpoint")
             raise RuntimeError(error_msg)
     
     def list_checkpoints(self) -> List[Dict[str, Any]]:
@@ -365,6 +345,6 @@ class CheckpointManager:
 
 
 # Factory function
-def create_checkpoint_manager(config: Dict[str, Any], progress_bridge: TrainingProgressTracker) -> CheckpointManager:
+def create_checkpoint_manager(config: Dict[str, Any]) -> CheckpointManager:
     """🏭 Factory untuk membuat CheckpointManager"""
-    return CheckpointManager(config, progress_bridge)
+    return CheckpointManager(config)

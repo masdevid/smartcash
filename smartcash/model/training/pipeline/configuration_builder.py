@@ -45,19 +45,14 @@ class ConfigurationBuilder:
             'phase_2_epochs': kwargs.get('phase_2_epochs', 1),
             'checkpoint_dir': Path(kwargs.get('checkpoint_dir', 'data/checkpoints')),
             'force_cpu': kwargs.get('force_cpu', False),
-            'session_id': self.session_id
+            'session_id': self.session_id,
+            'debug_map': kwargs.get('debug_map', False)
         }
         
         # Add validation metrics configuration from command line args
         validation_config = kwargs.get('validation_metrics_config', {})
-        if validation_config:
-            config['use_yolov5_builtin_metrics'] = validation_config.get('use_yolov5_builtin_metrics', False)
-            config['use_hierarchical_metrics'] = validation_config.get('use_hierarchical_metrics', True)
-            logger.info(f"📊 Validation metrics config: YOLOv5={config['use_yolov5_builtin_metrics']}, Hierarchical={config['use_hierarchical_metrics']}")
-        else:
-            # Default values when no config provided
-            config['use_yolov5_builtin_metrics'] = False
-            config['use_hierarchical_metrics'] = True
+        # Validation metrics always use hierarchical approach (YOLOv5 + per-layer)
+        logger.info(f"📊 Validation metrics: Using hierarchical validation (YOLOv5 + per-layer)")
         
         # Model configuration
         config['model'] = self._build_model_config(kwargs.get('model', {}), config)
@@ -70,6 +65,9 @@ class ConfigurationBuilder:
         
         # Paths configuration
         config['paths'] = self._build_paths_config(config)
+        
+        # Device configuration
+        config['device'] = self._build_device_config(config)
         
         # Apply training overrides
         config = self._apply_overrides(config, **kwargs)
@@ -123,8 +121,7 @@ class ConfigurationBuilder:
                 'monitor': 'val_accuracy'
             },
             'validation': {
-                'use_yolov5_builtin_metrics': base_config.get('use_yolov5_builtin_metrics', False),
-                'use_hierarchical_metrics': base_config.get('use_hierarchical_metrics', True)
+                'use_hierarchical_validation': True
             }
         }
     
@@ -135,6 +132,23 @@ class ConfigurationBuilder:
             'visualization': 'data/visualization',
             'logs': 'data/logs'
         }
+    
+    def _build_device_config(self, base_config: Dict[str, Any]) -> Dict[str, Any]:
+        """Build device configuration compatible with platform presets."""
+        if base_config.get('force_cpu', False):
+            return {
+                'device': 'cpu',
+                'mixed_precision': False,
+                'memory_fraction': 1.0,
+                'allow_tf32': False
+            }
+        else:
+            return {
+                'device': 'auto',  # Will be auto-detected by platform presets
+                'mixed_precision': True,
+                'memory_fraction': 0.8,
+                'allow_tf32': True
+            }
     
     def _apply_overrides(self, config: Dict[str, Any], **kwargs) -> Dict[str, Any]:
         """Apply configuration overrides from kwargs."""

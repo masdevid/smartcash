@@ -135,20 +135,31 @@ class ValidationBatchProcessor:
                         logger.debug(f"Skipping inactive layer {layer_name} in Phase {phase_num}")
                     continue
                     
+                if batch_idx == 0:
+                    logger.debug(f"🔄 Starting processing for {layer_name}")
+                    
                 if layer_name not in all_predictions:
                     all_predictions[layer_name] = []
                     all_targets[layer_name] = []
                 
                 try:
                     # Process for classification metrics
+                    if batch_idx == 0:
+                        logger.debug(f"🔄 {layer_name}: calling extract_classification_predictions")
                     layer_output = self.prediction_processor.extract_classification_predictions(
                         layer_preds, images.shape[0], device
                     )
+                    if batch_idx == 0:
+                        logger.debug(f"✅ {layer_name}: extract_classification_predictions completed")
                     
                     # Extract target classes with phase-aware filtering
+                    if batch_idx == 0:
+                        logger.debug(f"🔄 {layer_name}: calling extract_target_classes")
                     layer_targets = self.prediction_processor.extract_target_classes(
                         targets, images.shape[0], device, layer_name
                     )
+                    if batch_idx == 0:
+                        logger.debug(f"✅ {layer_name}: extract_target_classes completed")
                     
                     # Validate outputs before adding to collections
                     if layer_output is not None and layer_targets is not None:

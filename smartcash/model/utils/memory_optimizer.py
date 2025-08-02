@@ -35,7 +35,7 @@ class MemoryOptimizer:
         """Initialize memory optimizer with device detection."""
         self.device = device or self._detect_optimal_device()
         self.platform_info = self._get_platform_info()
-        logger.info(f"🧠 Memory optimizer initialized for {self.device}")
+        logger.debug(f"🧠 Memory optimizer initialized for {self.device}")
     
     def _detect_optimal_device(self) -> torch.device:
         """Detect the most memory-efficient device available."""
@@ -57,7 +57,7 @@ class MemoryOptimizer:
             device = torch.device('cpu')
             # Optimize CPU threading to prevent semaphore leaking
             torch.set_num_threads(min(4, os.cpu_count() or 4))
-            logger.info(f"🖥️ Using CPU with {torch.get_num_threads()} threads")
+            logger.debug(f"🖥️ Using CPU with {torch.get_num_threads()} threads")
             return device
     
     def _get_platform_info(self) -> Dict[str, Any]:
@@ -85,7 +85,7 @@ class MemoryOptimizer:
             torch.backends.cudnn.benchmark = False  # Reduce memory fragmentation
             config['mixed_precision'] = True
             config['compile_model'] = True
-            logger.info("⚡ CUDA memory optimization enabled")
+            logger.debug("⚡ CUDA memory optimization enabled")
             
         elif self.device.type == 'mps':
             # MPS optimizations - set valid watermark ratios
@@ -96,7 +96,7 @@ class MemoryOptimizer:
             config['mixed_precision'] = False  # MPS doesn't support AMP
             config['compile_model'] = False    # torch.compile issues on M1
             config['memory_efficient'] = True
-            logger.info("🧠 MPS memory management enabled with conservative watermarks")
+            logger.debug("🧠 MPS memory management enabled with conservative watermarks")
             
         else:
             # CPU optimizations to prevent semaphore leaking
@@ -108,7 +108,7 @@ class MemoryOptimizer:
             config['compile_model'] = False
             config['memory_efficient'] = True
             config['num_workers'] = max(2, min(4, self.platform_info['cpu_count'] // 2))  # Minimum 2 workers
-            logger.info("🖥️ CPU semaphore leak prevention enabled")
+            logger.debug("🖥️ CPU semaphore leak prevention enabled")
         
         # Common optimizations
         torch.backends.cudnn.benchmark = False  # Reduce memory fragmentation
@@ -165,7 +165,7 @@ class MemoryOptimizer:
             'drop_last': True
         }
         
-        logger.info(f"📊 Optimal batch config: {batch_size} batch × {gradient_accumulation_steps} accumulation = {effective_batch_size} effective")
+        logger.debug(f"📊 Optimal batch config: {batch_size} batch × {gradient_accumulation_steps} accumulation = {effective_batch_size} effective")
         return result
     
     def cleanup_memory(self, aggressive: bool = False) -> None:
@@ -180,7 +180,7 @@ class MemoryOptimizer:
                 for _ in range(cleanup_rounds):
                     torch.mps.empty_cache()
                     gc.collect()
-                logger.info(f"🧹 MPS memory cleaned ({'aggressive' if aggressive else 'standard'})")
+                logger.debug(f"🧹 MPS memory cleaned ({'aggressive' if aggressive else 'standard'})")
             except RuntimeError as e:
                 logger.warning(f"⚠️ MPS cache warning: {e}")
                 
@@ -189,14 +189,14 @@ class MemoryOptimizer:
             torch.cuda.synchronize()
             if aggressive:
                 torch.cuda.ipc_collect()
-            logger.info(f"🧹 CUDA memory cleaned ({'aggressive' if aggressive else 'standard'})")
+            logger.debug(f"🧹 CUDA memory cleaned ({'aggressive' if aggressive else 'standard'})")
             
         else:
             # CPU cleanup
             if aggressive:
                 for _ in range(3):
                     gc.collect()
-            logger.info("🧹 CPU memory cleaned")
+            logger.debug("🧹 CPU memory cleaned")
     
     def emergency_memory_cleanup(self) -> None:
         """Emergency memory cleanup for out-of-memory situations."""
@@ -212,7 +212,7 @@ class MemoryOptimizer:
                 for _ in range(10):
                     torch.mps.empty_cache()
                     gc.collect()
-                logger.info("🚨 Emergency MPS cleanup completed")
+                logger.debug("🚨 Emergency MPS cleanup completed")
             except RuntimeError:
                 pass
                 
@@ -220,9 +220,9 @@ class MemoryOptimizer:
             torch.cuda.empty_cache()
             torch.cuda.synchronize()
             torch.cuda.ipc_collect()
-            logger.info("🚨 Emergency CUDA cleanup completed")
+            logger.debug("🚨 Emergency CUDA cleanup completed")
         
-        logger.info("🚨 Emergency cleanup finished")
+        logger.debug("🚨 Emergency cleanup finished")
     
     def get_memory_status(self) -> Dict[str, Any]:
         """Get current memory status for monitoring."""
@@ -269,7 +269,7 @@ class MemoryOptimizer:
         if memory_config.get('compile_model', False):
             try:
                 model = torch.compile(model)
-                logger.info("⚡ Model compiled for optimization")
+                logger.debug("⚡ Model compiled for optimization")
             except Exception as e:
                 logger.warning(f"⚠️ Model compilation failed: {e}")
         

@@ -56,7 +56,7 @@ class SmartCashModelAPI:
         
         # Initialize YOLOv5-compatible model builder
         self.model_builder = ModelBuilder(self.config, self.progress_bridge)
-        self.checkpoint_manager = CheckpointManager(self.config, self.progress_bridge)
+        self.checkpoint_manager = CheckpointManager(self.config)
         
         
         # Model state

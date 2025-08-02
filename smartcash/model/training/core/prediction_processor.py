@@ -283,6 +283,7 @@ class PredictionProcessor:
                 logger.debug(f"   • Predicted classes: {pred_classes.tolist()}")
                 logger.debug(f"   • Max prediction confidence: {layer_output.max().item():.6f}")
                 logger.debug(f"   • Min prediction confidence: {layer_output.min().item():.6f}")
+                self._debug_counter += 1  # Increment to limit debug logging
         else:
             # Generate random predictions instead of zeros to avoid static metrics
             num_classes = self._get_num_classes_for_current_context()
@@ -290,6 +291,7 @@ class PredictionProcessor:
             layer_output = torch.sigmoid(random_preds)  # Convert to probabilities
             if self._debug_counter <= 3:
                 logger.debug(f"   • No detections found - returning random predictions for debugging")
+                self._debug_counter += 1  # Increment to limit debug logging
         
         return layer_output
     

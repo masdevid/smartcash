@@ -17,6 +17,14 @@ from .validation_metrics_computer import ValidationMetricsComputer
 from .validation_model_manager import ValidationModelManager
 from .validation_map_processor import ValidationMapProcessor
 
+# Pre-import signal handler to avoid blocking import during validation loop
+try:
+    from smartcash.model.training.utils.signal_handler import is_shutdown_requested
+except ImportError:
+    # Fallback if signal handler not available
+    def is_shutdown_requested():
+        return False
+
 logger = get_logger(__name__)
 
 
@@ -41,10 +49,12 @@ class ValidationExecutor:
         
         # Initialize YOLOv5-based mAP calculator
         num_classes = config.get('model', {}).get('num_classes', 7)
+        debug_map = config.get('debug_map', False)
         self.map_calculator = create_yolov5_map_calculator(
             num_classes=num_classes,
             conf_thres=0.005,  # Very low threshold for early training with new anchors
-            iou_thres=0.03   # AGGRESSIVE: Very low threshold for scale learning phase
+            iou_thres=0.03,   # AGGRESSIVE: Very low threshold for scale learning phase
+            debug=debug_map
         )
         
         # Initialize SRP components
@@ -53,25 +63,12 @@ class ValidationExecutor:
         self.model_manager = ValidationModelManager(model)
         self.map_processor = ValidationMapProcessor(self.map_calculator)
         
-        # Configuration for metrics calculation method - check both locations
-        validation_config = config.get('training', {}).get('validation', {})
-        nested_yolov5 = validation_config.get('use_yolov5_builtin_metrics', False)
-        toplevel_yolov5 = config.get('use_yolov5_builtin_metrics', False)
-        
-        self.use_yolov5_metrics = nested_yolov5 or toplevel_yolov5
-        self.use_hierarchical_metrics = (
-            validation_config.get('use_hierarchical_metrics', True) and 
-            config.get('use_hierarchical_metrics', True)
-        )
-        
         logger.info(f"Validation metrics configuration:")
         logger.info(f"  • YOLOv5 mAP calculator: {num_classes} classes")
-        logger.info(f"  • Use YOLOv5 built-in metrics: {self.use_yolov5_metrics}")
-        logger.info(f"  • Use hierarchical metrics: {self.use_hierarchical_metrics}")
+        logger.info(f"  • Using hierarchical validation (YOLOv5 + per-layer metrics)")
         
-        if self.use_yolov5_metrics and not self.map_calculator.yolov5_available:
-            logger.warning("YOLOv5 metrics requested but YOLOv5 not available - falling back to hierarchical metrics")
-            self.use_yolov5_metrics = False
+        if not self.map_calculator.yolov5_available:
+            logger.warning("YOLOv5 not available - using fallback metrics")
     
     def validate_epoch(self, val_loader, loss_manager, 
                       epoch: int, phase_num: int, display_epoch: int = None) -> Dict[str, float]:
@@ -100,6 +97,9 @@ class ValidationExecutor:
         
         # Reset mAP calculator for new validation epoch
         self.map_calculator.reset()
+        
+        # Clear cached mAP results in metrics computer to ensure fresh computation
+        self.metrics_computer._cached_map_results = None
         
         # Debug logging with optimization info
         logger.debug(f"Starting validation epoch {display_epoch} with {num_batches} batches")
@@ -131,7 +131,6 @@ class ValidationExecutor:
             for batch_idx, (images, targets) in enumerate(val_loader):
                 # Check for shutdown signal every few batches for responsive interruption
                 if batch_idx % 10 == 0:  # Check every 10 batches
-                    from smartcash.model.training.utils.signal_handler import is_shutdown_requested
                     if is_shutdown_requested():
                         logger.info("🛑 Shutdown requested during validation batch processing")
                         break
@@ -156,8 +155,15 @@ class ValidationExecutor:
                         targets, images, batch_idx
                     )
                 
-                # Progress updates - standard frequency
-                update_freq = max(1, num_batches // 10)  # Update 10 times max per validation
+                # Progress updates - more responsive frequency
+                # For responsive UX, update more frequently for larger datasets
+                if num_batches <= 10:
+                    update_freq = 1  # Update every batch for small sets
+                elif num_batches <= 50:
+                    update_freq = max(1, num_batches // 5)  # Update ~5 times 
+                else:
+                    update_freq = max(1, num_batches // 20)  # Update ~20 times for large sets
+                
                 if batch_idx % update_freq == 0 or batch_idx == num_batches - 1:
                     avg_loss = running_val_loss / (batch_idx + 1)
                     self.progress_tracker.update_batch_progress(
@@ -170,10 +176,18 @@ class ValidationExecutor:
         # Complete batch tracking
         self.progress_tracker.complete_batch_tracking()
         
+        # Add progress feedback for final metrics computation
+        logger.info(f"📊 Computing final validation metrics for epoch {display_epoch}...")
+        if self.progress_tracker.progress_callback:
+            self.progress_tracker.progress_callback('batch', 100, 100, f"Computing validation metrics for epoch {display_epoch}...")
+        
         # Compute final metrics using metrics computer
         final_metrics = self.metrics_computer.compute_final_metrics(
             running_val_loss, num_batches, all_predictions, all_targets, phase_num
         )
+        
+        # Confirm metrics computation completed
+        logger.debug(f"✅ Final validation metrics computed for epoch {display_epoch}")
         
         # Aggregate loss breakdowns and add to final metrics
         if all_loss_breakdowns:

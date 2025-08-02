@@ -40,7 +40,7 @@ class SmartCashModelAPI:
         
         # Initialize core components
         self.model_builder = ModelBuilder(self.config, self.progress_bridge)
-        self.checkpoint_manager = CheckpointManager(self.config, self.progress_bridge)
+        self.checkpoint_manager = CheckpointManager(self.config)
         
         # Model state
         self.model = None

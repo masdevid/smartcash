@@ -23,7 +23,7 @@ class UIMetricsCallback:
     """
     
     def __init__(self, verbose: bool = True, console_scheme: ColorScheme = ColorScheme.EMOJI, 
-                 training_logs_dir: str = "training_logs"):
+                 training_logs_dir: str = "logs/training"):
         """
         Initialize the UI metrics callback.
         
@@ -42,6 +42,10 @@ class UIMetricsCallback:
         self.latest_colored_metrics = {}
         self.current_epoch = 0
         self.current_phase = ""
+        
+        # Model and data info for filename generation
+        self.backbone = "unknown"
+        self.data_name = "data"
         
         # Optional UI callback function
         self.ui_callback: Optional[Callable] = None
@@ -461,19 +465,24 @@ class UIMetricsCallback:
         """
         try:
             if session_id:
+                # Fallback to old naming scheme for backward compatibility
                 metrics_file = self.training_logs_dir / f"metrics_history_{session_id}.json"
             else:
-                # Load latest session
-                latest_file = self.training_logs_dir / "latest_metrics.json"
+                # Load latest session for this backbone
+                latest_file = self.training_logs_dir / f"latest_metrics_{self.backbone}.json"
                 if latest_file.exists():
                     with open(latest_file, 'r') as f:
                         latest_data = json.load(f)
                         metrics_file = Path(latest_data['file_paths']['metrics'])
                 else:
-                    # Fallback: find most recent metrics file
-                    metrics_files = list(self.training_logs_dir.glob("metrics_history_*.json"))
+                    # Look for new structured naming pattern
+                    new_pattern = f"metrics_history_{self.backbone}_{self.data_name}_phase*.json"
+                    metrics_files = list(self.training_logs_dir.glob(new_pattern))
                     if not metrics_files:
-                        logger.warning("No metrics files found")
+                        # Try old pattern as fallback
+                        metrics_files = list(self.training_logs_dir.glob("metrics_history_*.json"))
+                    if not metrics_files:
+                        logger.warning(f"No metrics files found for backbone {self.backbone}")
                         return {}
                     metrics_file = max(metrics_files, key=lambda f: f.stat().st_mtime)
             
@@ -699,7 +708,9 @@ class UIMetricsCallback:
 def create_ui_metrics_callback(verbose: bool = True, 
                              console_scheme: ColorScheme = ColorScheme.EMOJI,
                              ui_callback: Optional[Callable] = None,
-                             training_logs_dir: str = "training_logs") -> UIMetricsCallback:
+                             training_logs_dir: str = "logs/training",
+                             backbone: str = "unknown",
+                             data_name: str = "data") -> UIMetricsCallback:
     """
     Factory function to create a UI-enhanced metrics callback.
     
@@ -708,11 +719,15 @@ def create_ui_metrics_callback(verbose: bool = True,
         console_scheme: Color scheme for console display
         ui_callback: Optional UI callback function
         training_logs_dir: Directory containing JSON metrics files
+        backbone: Backbone model name for filename
+        data_name: Dataset name for filename
         
     Returns:
         UIMetricsCallback instance
     """
     callback = UIMetricsCallback(verbose, console_scheme, training_logs_dir)
+    callback.backbone = backbone
+    callback.data_name = data_name
     if ui_callback:
         callback.set_ui_callback(ui_callback)
     return callback

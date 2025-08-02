@@ -98,8 +98,16 @@ def apply_force_cpu_configuration(config: Dict[str, Any]) -> Dict[str, Any]:
         Updated configuration with CPU settings
     """
     logger.debug("🖥️ Force CPU mode enabled - disabling GPU/MPS detection")
+    
+    # Ensure device configuration structure exists
+    if 'device' not in config:
+        config['device'] = {}
+    
+    # Force CPU device configuration
     config['device']['device'] = 'cpu'
-    config['device']['auto_detect'] = False
+    config['device']['mixed_precision'] = False  # Disable mixed precision for CPU
+    config['device']['memory_fraction'] = 1.0    # Use full memory for CPU
+    config['device']['allow_tf32'] = False       # Not applicable for CPU
     
     # Configure data loader settings for CPU mode to prevent semaphore leaks
     if 'data' not in config:
@@ -326,11 +334,10 @@ def apply_training_overrides(config: Dict[str, Any], **kwargs) -> Dict[str, Any]
         if 'validation' not in config['training']:
             config['training']['validation'] = {}
         
-        # Apply validation metrics settings
-        config['training']['validation']['use_yolov5_builtin_metrics'] = validation_config.get('use_yolov5_builtin_metrics', False)
-        config['training']['validation']['use_hierarchical_metrics'] = validation_config.get('use_hierarchical_metrics', True)
+        # Apply validation metrics settings (always hierarchical)
+        config['training']['validation']['use_hierarchical_validation'] = True
         
-        logger.info(f"🎯 Validation metrics config override: YOLOv5={config['training']['validation']['use_yolov5_builtin_metrics']}, Hierarchical={config['training']['validation']['use_hierarchical_metrics']}")
+        logger.info(f"🎯 Validation metrics: Using hierarchical validation (YOLOv5 + per-layer)")
     
     return config
 

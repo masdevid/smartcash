@@ -84,6 +84,14 @@ class ResearchMetricsManager:
         if 'map50_95' in raw_metrics:
             standardized[f"{prefix}map50_95"] = raw_metrics.get('map50_95', 0.0)
         
+        # mAP-specific precision, recall, F1 (from mAP computation)
+        if 'map_precision' in raw_metrics:
+            standardized[f"{prefix}map50_precision"] = raw_metrics.get('map_precision', 0.0)
+        if 'map_recall' in raw_metrics:
+            standardized[f"{prefix}map50_recall"] = raw_metrics.get('map_recall', 0.0)
+        if 'map_f1' in raw_metrics:
+            standardized[f"{prefix}map50_f1"] = raw_metrics.get('map_f1', 0.0)
+        
         # For validation metrics, also provide backward compatibility names
         if is_validation:
             # Ensure we have the expected validation metric names
@@ -100,6 +108,13 @@ class ResearchMetricsManager:
                 standardized["val_map50"] = standardized[f"{prefix}map50"]
             if f"{prefix}map50_95" in standardized:
                 standardized["val_map50_95"] = standardized[f"{prefix}map50_95"]
+            # mAP-specific metrics for validation
+            if f"{prefix}map50_precision" in standardized:
+                standardized["val_map50_precision"] = standardized[f"{prefix}map50_precision"]
+            if f"{prefix}map50_recall" in standardized:
+                standardized["val_map50_recall"] = standardized[f"{prefix}map50_recall"]
+            if f"{prefix}map50_f1" in standardized:
+                standardized["val_map50_f1"] = standardized[f"{prefix}map50_f1"]
         
         return standardized
     

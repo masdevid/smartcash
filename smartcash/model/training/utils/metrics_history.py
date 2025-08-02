@@ -35,11 +35,24 @@ class EpochMetrics:
     val_f1: Optional[float] = None
     val_accuracy: Optional[float] = None
     
+    # mAP-specific metrics (from mAP calculator)
+    val_map50_precision: Optional[float] = None
+    val_map50_recall: Optional[float] = None
+    val_map50_f1: Optional[float] = None
+    
     # Multi-task metrics (Phase 2)
     total_loss: Optional[float] = None
     layer_1_uncertainty: Optional[float] = None
     layer_2_uncertainty: Optional[float] = None
     layer_3_uncertainty: Optional[float] = None
+    
+    # Loss breakdown components
+    train_bbox_loss: Optional[float] = None
+    train_obj_loss: Optional[float] = None
+    train_cls_loss: Optional[float] = None
+    val_bbox_loss: Optional[float] = None
+    val_obj_loss: Optional[float] = None
+    val_cls_loss: Optional[float] = None
     
     # Layer-specific metrics
     layer_1_accuracy: Optional[float] = None
@@ -67,26 +80,47 @@ class MetricsHistoryRecorder:
     and visualization manager access.
     """
     
-    def __init__(self, output_dir: str = "training_logs", session_id: Optional[str] = None):
+    def __init__(self, output_dir: str = "logs/training", session_id: Optional[str] = None, 
+                 backbone: Optional[str] = None, data_name: Optional[str] = None, 
+                 phase_num: Optional[int] = None, resume_mode: bool = False):
         """
         Initialize metrics history recorder.
         
         Args:
             output_dir: Directory to store metrics history files
             session_id: Optional session ID for file naming (auto-generated if None)
+            backbone: Backbone model name for filename
+            data_name: Dataset name for filename
+            phase_num: Current phase number for phase-specific files
+            resume_mode: Whether to resume existing files or create new ones
         """
         self.output_dir = Path(output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
         
-        # Generate session ID if not provided
-        if session_id is None:
+        # Detect backbone from various sources if not provided
+        if not backbone or backbone == "unknown":
+            backbone = self._detect_backbone_from_environment()
+        
+        self.backbone = backbone or "unknown"
+        self.data_name = data_name or "data"
+        self.phase_num = phase_num or 1
+        self.resume_mode = resume_mode
+        
+        # Generate session ID if not provided (only for non-resume mode)
+        if session_id is None and not resume_mode:
             session_id = datetime.now().strftime("%Y%m%d_%H%M%S")
         self.session_id = session_id
         
-        # File paths for different data
-        self.metrics_file = self.output_dir / f"metrics_history_{session_id}.json"
-        self.phase_summary_file = self.output_dir / f"phase_summary_{session_id}.json"
-        self.latest_file = self.output_dir / "latest_metrics.json"
+        # Create phase-specific filenames with backbone and data info
+        if resume_mode:
+            # In resume mode, find existing file for this backbone/data/phase combination
+            self._setup_resume_files()
+        else:
+            # Create new files with structured naming
+            self._setup_new_files()
+        
+        # Latest metrics file uses backbone name
+        self.latest_file = self.output_dir / f"latest_metrics_{self.backbone}.json"
         
         # In-memory storage for current session
         self.history: List[EpochMetrics] = []
@@ -95,8 +129,98 @@ class MetricsHistoryRecorder:
         # Load existing data if available
         self._load_existing_data()
         
-        logger.info(f"MetricsHistoryRecorder initialized for session {session_id}")
+        logger.info(f"MetricsHistoryRecorder initialized - Backbone: {self.backbone}, Data: {self.data_name}, Phase: {self.phase_num}")
         logger.info(f"Metrics file: {self.metrics_file}")
+        logger.info(f"Resume mode: {self.resume_mode}")
+    
+    def _setup_new_files(self):
+        """Setup file paths for new training session."""
+        # Use simple naming without session_id for resume compatibility
+        self.metrics_file = self.output_dir / f"metrics_history_{self.backbone}_{self.data_name}_phase{self.phase_num}.json"
+        self.phase_summary_file = self.output_dir / f"phase_summary_{self.backbone}_{self.data_name}.json"
+    
+    def _setup_resume_files(self):
+        """Setup file paths for resume mode - find existing files."""
+        # Look for existing metrics files matching backbone, data, and phase (without session_id)
+        self.metrics_file = self.output_dir / f"metrics_history_{self.backbone}_{self.data_name}_phase{self.phase_num}.json"
+        self.phase_summary_file = self.output_dir / f"phase_summary_{self.backbone}_{self.data_name}.json"
+        
+        if self.metrics_file.exists():
+            logger.info(f"Resume mode: Found existing metrics file {self.metrics_file}")
+        else:
+            logger.info(f"Resume mode: Creating new metrics file {self.metrics_file}")
+        
+        if self.phase_summary_file.exists():
+            logger.info(f"Resume mode: Found existing phase summary file {self.phase_summary_file}")
+        else:
+            logger.info(f"Resume mode: Creating new phase summary file {self.phase_summary_file}")
+    
+    def update_phase(self, new_phase_num: int):
+        """Update the phase number and adjust file paths accordingly."""
+        logger.info(f"Updating metrics recorder from phase {self.phase_num} to phase {new_phase_num}")
+        
+        # Save current data before switching phases
+        self.save_to_file()
+        
+        # Update phase and create new file paths
+        self.phase_num = new_phase_num
+        if self.resume_mode:
+            self._setup_resume_files()
+        else:
+            self._setup_new_files()
+        
+        # Clear in-memory data for new phase (but keep phase summaries)
+        self.history.clear()
+        
+        # Load existing data for this phase if available
+        self._load_existing_data()
+        
+        logger.info(f"Switched to phase {new_phase_num}, metrics file: {self.metrics_file}")
+    
+    def _detect_backbone_from_environment(self) -> str:
+        """Try to detect backbone from various sources in the environment."""
+        try:
+            # Try to get from shared registry or global config
+            from smartcash.common.config_manager import ConfigManager
+            config_manager = ConfigManager.get_instance()
+            
+            # Check training config
+            if hasattr(config_manager, 'config') and config_manager.config:
+                backbone = config_manager.config.get('backbone')
+                if backbone and backbone != "unknown":
+                    logger.debug(f"Detected backbone from config manager: {backbone}")
+                    return backbone
+                    
+                # Check nested model config
+                model_config = config_manager.config.get('model', {})
+                backbone = model_config.get('backbone')
+                if backbone and backbone != "unknown":
+                    logger.debug(f"Detected backbone from model config: {backbone}")
+                    return backbone
+            
+            # Try to find from existing log files in the same directory
+            if self.output_dir.exists():
+                for log_file in self.output_dir.glob("metrics_history_*_data_phase*.json"):
+                    filename = log_file.stem
+                    parts = filename.split('_')
+                    if len(parts) >= 3 and parts[2] != "unknown":
+                        backbone = parts[2]
+                        logger.debug(f"Detected backbone from existing log files: {backbone}")
+                        return backbone
+                        
+                # Check latest_metrics files
+                for latest_file in self.output_dir.glob("latest_metrics_*.json"):
+                    filename = latest_file.stem
+                    if filename.startswith("latest_metrics_"):
+                        backbone = filename.replace("latest_metrics_", "")
+                        if backbone and backbone != "unknown":
+                            logger.debug(f"Detected backbone from latest_metrics file: {backbone}")
+                            return backbone
+                        
+        except Exception as e:
+            logger.debug(f"Failed to detect backbone from environment: {e}")
+        
+        return "unknown"
     
     def _load_existing_data(self):
         """Load existing metrics data if files exist."""
@@ -145,7 +269,8 @@ class MetricsHistoryRecorder:
             # Fill YOLO detection metrics
             yolo_metrics = [
                 'val_map50', 'val_map50_95', 'val_precision', 
-                'val_recall', 'val_f1', 'val_accuracy'
+                'val_recall', 'val_f1', 'val_accuracy',
+                'val_map50_precision', 'val_map50_recall', 'val_map50_f1'
             ]
             for metric in yolo_metrics:
                 if metric in metrics:
@@ -156,6 +281,15 @@ class MetricsHistoryRecorder:
                 'total_loss', 'layer_1_uncertainty', 'layer_2_uncertainty', 'layer_3_uncertainty'
             ]
             for metric in multitask_metrics:
+                if metric in metrics:
+                    setattr(epoch_record, metric, metrics[metric])
+            
+            # Fill loss breakdown components
+            loss_breakdown_metrics = [
+                'train_bbox_loss', 'train_obj_loss', 'train_cls_loss',
+                'val_bbox_loss', 'val_obj_loss', 'val_cls_loss'
+            ]
+            for metric in loss_breakdown_metrics:
                 if metric in metrics:
                     setattr(epoch_record, metric, metrics[metric])
             
@@ -171,8 +305,9 @@ class MetricsHistoryRecorder:
             
             # Store additional metrics that don't fit standard schema
             additional = {}
-            standard_metrics = set(['epoch', 'phase'] + yolo_metrics + multitask_metrics + layer_metrics + 
-                                 ['train_loss', 'val_loss', 'learning_rate'])
+            standard_metrics = set(['epoch', 'phase'] + yolo_metrics + multitask_metrics + 
+                                   loss_breakdown_metrics + layer_metrics + 
+                                   ['train_loss', 'val_loss', 'learning_rate'])
             for key, value in metrics.items():
                 if key not in standard_metrics and isinstance(value, (int, float)):
                     additional[key] = float(value)
@@ -349,16 +484,24 @@ class MetricsHistoryRecorder:
             logger.error(f"Failed to save latest metrics: {e}")
 
 
-def create_metrics_recorder(output_dir: str = "training_logs", 
-                           session_id: Optional[str] = None) -> MetricsHistoryRecorder:
+def create_metrics_recorder(output_dir: str = "logs/training", 
+                           session_id: Optional[str] = None,
+                           backbone: Optional[str] = None,
+                           data_name: Optional[str] = None,
+                           phase_num: Optional[int] = None,
+                           resume_mode: bool = False) -> MetricsHistoryRecorder:
     """
     Factory function to create metrics history recorder.
     
     Args:
         output_dir: Directory to store metrics files
         session_id: Optional session ID for file naming
+        backbone: Backbone model name for filename
+        data_name: Dataset name for filename  
+        phase_num: Current phase number for phase-specific files
+        resume_mode: Whether to resume existing files or create new ones
         
     Returns:
         MetricsHistoryRecorder instance
     """
-    return MetricsHistoryRecorder(output_dir, session_id)
+    return MetricsHistoryRecorder(output_dir, session_id, backbone, data_name, phase_num, resume_mode)

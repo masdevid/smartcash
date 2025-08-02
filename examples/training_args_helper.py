@@ -55,6 +55,7 @@ Examples:
   %(prog)s --no-tqdm --verbose  # Use simple text progress instead of tqdm bars
   %(prog)s --no-early-stopping --phase1-epochs 5 --phase2-epochs 10  # Disable early stopping
   %(prog)s --patience 20 --es-metric val_accuracy --es-mode max --min-delta 0.01  # Custom early stopping
+  %(prog)s --debug-map --verbose  # Enable hierarchical mAP debug logging
         """
     )
     
@@ -125,13 +126,7 @@ Examples:
     parser.add_argument('--min-delta', type=float, default=0.001,
                        help='Minimum change to qualify as improvement for early stopping (default: 0.001)')
     
-    # Validation metrics configuration
-    parser.add_argument('--use-yolov5-metrics', action='store_true',
-                       help='Use YOLOv5 built-in metrics (precision, recall, F1 from object detection). Accuracy = mAP@0.5.')
-    parser.add_argument('--use-hierarchical-metrics', action='store_true', default=True,
-                       help='Use hierarchical multi-layer metrics (layer_1_accuracy, layer_2_accuracy, etc.) (default: enabled)')
-    parser.add_argument('--disable-hierarchical-metrics', action='store_true',
-                       help='Disable hierarchical metrics - only use YOLOv5 or fallback metrics')
+    # Note: Validation metrics now always use both YOLOv5 hierarchical and per-layer metrics
     
     # Single-phase specific options
     parser.add_argument('--single-layer-mode', type=str, default='multi',
@@ -147,6 +142,8 @@ Examples:
                        help='Disable tqdm progress bars (use simple text output instead)')
     parser.add_argument('--force-cpu', action='store_true',
                        help='Force CPU training mode (disables GPU/MPS autodetection)')
+    parser.add_argument('--debug-map', action='store_true',
+                       help='Enable debug logging for hierarchical mAP calculations (default: False)')
     
     return parser
 
@@ -200,7 +197,8 @@ def print_training_configuration(args: Any) -> None:
         ("Batch size", 'Auto-detected' if args.batch_size is None else args.batch_size),
         ("Verbose logging", 'Enabled' if args.verbose else 'Disabled'),
         ("Progress bars", 'Simple text' if args.no_tqdm else 'tqdm (visual)'),
-        ("Device mode", 'CPU (forced)' if args.force_cpu else 'Auto-detect')
+        ("Device mode", 'CPU (forced)' if args.force_cpu else 'Auto-detect'),
+        ("Debug mAP", 'Enabled' if args.debug_map else 'Disabled')
     ]
     
     for param_name, param_value in training_params:
@@ -296,9 +294,10 @@ def get_training_kwargs(args: Any) -> dict:
         'early_stopping_metric': args.es_metric,
         'early_stopping_mode': args.es_mode,
         'early_stopping_min_delta': args.min_delta,
-        # Validation metrics configuration
+        # Validation metrics: Always use both YOLOv5 hierarchical and per-layer metrics
         'validation_metrics_config': {
-            'use_yolov5_builtin_metrics': args.use_yolov5_metrics,
-            'use_hierarchical_metrics': args.use_hierarchical_metrics and not args.disable_hierarchical_metrics
-        }
+            'use_hierarchical_validation': True
+        },
+        # Debug configuration
+        'debug_map': args.debug_map
     }

@@ -460,7 +460,7 @@ def create_training_visualizer(metrics_file: str, output_dir: str = "charts") ->
     return TrainingChartsVisualizer(metrics_file, output_dir)
 
 
-def visualize_latest_training(training_logs_dir: str = "training_logs", 
+def visualize_latest_training(training_logs_dir: str = "logs/training", 
                             output_dir: str = "charts") -> Optional[Dict[str, Any]]:
     """
     Automatically visualize the latest training session.

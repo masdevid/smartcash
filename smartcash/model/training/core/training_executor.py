@@ -63,8 +63,8 @@ class TrainingExecutor:
         last_predictions = None
         last_targets = None
         
-        # Progress update frequency for performance
-        update_freq = max(1, num_batches // 20)  # Update 20 times per epoch max
+        # Progress update frequency for performance (reduced from 20 to 10 updates per epoch)
+        update_freq = max(1, num_batches // 10)  # Update 10 times per epoch max for better performance
         
         # Calculate display epoch if not provided
         if display_epoch is None:
@@ -86,8 +86,8 @@ class TrainingExecutor:
         logger.info(f"🚀 Starting training epoch {display_epoch}/{total_epochs} with {num_batches} batches")
         
         for batch_idx, (images, targets) in enumerate(train_loader):
-            # Check for shutdown signal every few batches for responsive interruption
-            if batch_idx % 10 == 0:  # Check every 10 batches
+            # Check for shutdown signal less frequently for better performance
+            if batch_idx % 25 == 0:  # Check every 25 batches (reduced from 10)
                 from smartcash.model.training.utils.signal_handler import is_shutdown_requested
                 if is_shutdown_requested():
                     logger.info("🛑 Shutdown requested during training batch processing")
@@ -142,13 +142,19 @@ class TrainingExecutor:
     
     def _process_training_batch(self, images, targets, loss_manager, batch_idx, num_batches, phase_num):
         """Process a single training batch."""
-        # Move data to device efficiently
-        device = next(self.model.parameters()).device
-        images = images.to(device, non_blocking=True)
-        targets = targets.to(device, non_blocking=True)
+        # Cache device detection for performance
+        if not hasattr(self, '_cached_device'):
+            self._cached_device = next(self.model.parameters()).device
         
-        # Forward pass with mixed precision
-        with autocast('cuda', enabled=hasattr(self, 'scaler') and self.scaler is not None):
+        # Move data to device efficiently
+        images = images.to(self._cached_device, non_blocking=True)
+        targets = targets.to(self._cached_device, non_blocking=True)
+        
+        # Forward pass with mixed precision (cache scaler check)
+        if not hasattr(self, '_use_amp'):
+            self._use_amp = hasattr(self, 'scaler') and self.scaler is not None
+        
+        with autocast('cuda', enabled=self._use_amp):
             predictions = self.model(images)
             
             # Normalize predictions format
@@ -156,18 +162,51 @@ class TrainingExecutor:
                 predictions, phase_num, batch_idx
             )
             
-            # Process predictions for metrics (only last batch)
+            # Process predictions for metrics (only last batch - skip during most training)
             processed_predictions = None
             processed_targets = None
             if batch_idx == num_batches - 1:
-                processed_predictions, processed_targets = self.prediction_processor.process_for_metrics(
-                    predictions, targets, images, device
-                )
+                # Choose processing method based on phase and predictions format
+                if self._should_use_full_metrics_processing(predictions, phase_num):
+                    # Use full processing for Phase 2 multi-layer metrics
+                    processed_predictions, processed_targets = self.prediction_processor.process_for_metrics(
+                        predictions, targets, images, self._cached_device
+                    )
+                else:
+                    # Use lightweight processing for Phase 1 or single-layer training
+                    processed_predictions, processed_targets = self.prediction_processor.process_for_metrics_lightweight(
+                        predictions, targets, self._cached_device
+                    )
             
             # Calculate loss
             loss, loss_breakdown = loss_manager.compute_loss(predictions, targets, images.shape[-1])
         
         return loss, loss_breakdown, predictions, processed_predictions, processed_targets
+    
+    def _should_use_full_metrics_processing(self, predictions: Dict, phase_num: int) -> bool:
+        """
+        Determine if full metrics processing should be used based on phase and prediction format.
+        
+        Args:
+            predictions: Model predictions
+            phase_num: Current training phase
+            
+        Returns:
+            True if full processing should be used, False for lightweight processing
+        """
+        # Use full processing for Phase 2 multi-layer predictions
+        if phase_num == 2 and isinstance(predictions, dict):
+            # Check if we have multiple layers in predictions
+            layer_count = len([k for k in predictions.keys() if k.startswith('layer_')])
+            if layer_count > 1:
+                return True
+        
+        # Use full processing if we have multi-layer predictions regardless of phase
+        if isinstance(predictions, dict) and len(predictions) > 1:
+            return True
+        
+        # Default to lightweight processing for Phase 1 or single-layer
+        return False
     
     def _backward_pass(self, loss, optimizer, scaler):
         """Perform backward pass with optional mixed precision."""

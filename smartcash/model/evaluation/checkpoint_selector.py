@@ -96,7 +96,7 @@ class CheckpointSelector:
                 safe_globals = []
             
             with torch.serialization.safe_globals(safe_globals):
-                checkpoint_data = torch.load(checkpoint_path, map_location='cpu')
+                checkpoint_data = torch.load(checkpoint_path, map_location='cpu', weights_only=False)
             
             # Extract metadata
             metadata = self._extract_checkpoint_metadata(checkpoint_path, checkpoint_data)
@@ -146,7 +146,7 @@ class CheckpointSelector:
                 safe_globals = []
             
             with torch.serialization.safe_globals(safe_globals):
-                checkpoint_data = torch.load(checkpoint_path, map_location='cpu')
+                checkpoint_data = torch.load(checkpoint_path, map_location='cpu', weights_only=False)
             
             # Validate required keys
             missing_keys = [key for key in self.required_keys if key not in checkpoint_data]
@@ -208,29 +208,65 @@ class CheckpointSelector:
                 for pattern in self.filename_patterns:
                     checkpoint_files = list(scan_path.glob(pattern))
                     
+                    # Group checkpoints by base name to prioritize unified checkpoints
+                    checkpoint_groups = {}
                     for checkpoint_file in checkpoint_files:
+                        # Extract base name without phase suffix
+                        base_name = checkpoint_file.name
+                        if '_phase1.pt' in base_name:
+                            base_name = base_name.replace('_phase1.pt', '.pt')
+                        elif '_phase2.pt' in base_name:
+                            base_name = base_name.replace('_phase2.pt', '.pt')
+                        
+                        if base_name not in checkpoint_groups:
+                            checkpoint_groups[base_name] = []
+                        checkpoint_groups[base_name].append(checkpoint_file)
+                    
+                    # Process each group, prioritizing unified checkpoints
+                    for base_name, group_files in checkpoint_groups.items():
+                        # Sort by preference: unified first, then phase2, then phase1
+                        def checkpoint_priority(cp_file):
+                            filename = cp_file.name
+                            if '_phase1.pt' in filename:
+                                return 2  # Lowest priority
+                            elif '_phase2.pt' in filename:
+                                return 1  # Medium priority  
+                            else:
+                                return 0  # Highest priority (unified)
+                        
+                        group_files.sort(key=checkpoint_priority)
+                        
+                        # Process the highest priority checkpoint from each group
+                        preferred_checkpoint = group_files[0]
+                        
                         try:
                             # Validate checkpoint before adding to cache
-                            is_valid, validation_msg = self.validate_checkpoint(str(checkpoint_file))
+                            is_valid, validation_msg = self.validate_checkpoint(str(preferred_checkpoint))
                             
                             if is_valid:
-                                metadata = self._extract_checkpoint_metadata(checkpoint_file)
+                                metadata = self._extract_checkpoint_metadata(preferred_checkpoint)
                                 
                                 # Apply minimum mAP filter
                                 val_map = metadata.get('metrics', {}).get('val_map', 0)
                                 if val_map >= self.min_val_map:
-                                    self._checkpoint_cache[str(checkpoint_file)] = metadata
+                                    self._checkpoint_cache[str(preferred_checkpoint)] = metadata
                                     total_files_found += 1
+                                    
+                                    # Log what was selected
+                                    if len(group_files) > 1:
+                                        skipped = [f.name for f in group_files[1:]]
+                                        self.logger.debug(f"🎯 Selected unified checkpoint {preferred_checkpoint.name}, skipped phase-specific: {', '.join(skipped)}")
                                 else:
-                                    self.logger.debug(f"⚠️ Checkpoint {checkpoint_file.name} below minimum mAP threshold: {val_map:.3f} < {self.min_val_map}")
+                                    self.logger.debug(f"⚠️ Checkpoint {preferred_checkpoint.name} below minimum mAP threshold: {val_map:.3f} < {self.min_val_map}")
                             else:
-                                self.logger.debug(f"⚠️ Invalid checkpoint {checkpoint_file.name}: {validation_msg}")
+                                self.logger.debug(f"⚠️ Invalid checkpoint {preferred_checkpoint.name}: {validation_msg}")
                                 
                         except Exception as e:
-                            self.logger.debug(f"⚠️ Error reading {checkpoint_file.name}: {str(e)}")
+                            self.logger.debug(f"⚠️ Error reading {preferred_checkpoint.name}: {str(e)}")
         
         self.logger.info(f"📋 Scanned {len(self._checkpoint_cache)} valid checkpoints from {len(self.discovery_paths)} discovery paths")
         self.logger.info(f"🎯 Found {total_files_found} checkpoints meeting criteria (mAP >= {self.min_val_map})")
+        self.logger.info(f"🎯 Unified checkpoints prioritized over phase-specific variants")
     
     def _extract_checkpoint_metadata(self, checkpoint_path: Path, 
                                    checkpoint_data: Dict[str, Any] = None) -> Dict[str, Any]:
@@ -246,11 +282,12 @@ class CheckpointSelector:
                 safe_globals = []
             
             with torch.serialization.safe_globals(safe_globals):
-                checkpoint_data = torch.load(checkpoint_path, map_location='cpu')
+                checkpoint_data = torch.load(checkpoint_path, map_location='cpu', weights_only=False)
         
         # Parse filename pattern: enhanced for new training pipeline formats
         # Updated to handle unified training pipeline checkpoint naming
         filename_patterns = [
+            r'best_(\w+)_(\w+)_(\w+)_(\w+)_(\w+)_(\d{8})\.pt',  # New format: best_backbone_phase_mode_frozen_pretrained_date.pt
             r'best_(\w+)_(\w+)_(\w+)_(\d{8})\.pt',  # Original pattern: best_model_backbone_mode_date.pt
             r'best_(\w+)_(efficientnet_b4)_(\w+)_(\d{8})\.pt',  # EfficientNet-B4 specific
             r'best_(\w+)_(cspdarknet)_(\w+)_(\d{8})\.pt',  # CSPDarknet specific
@@ -271,20 +308,23 @@ class CheckpointSelector:
             if match:
                 groups = match.groups()
                 
-                if i <= 2:  # Original patterns: best_model_backbone_mode_date.pt
+                if i == 0:  # New format: best_backbone_phase_mode_frozen_pretrained_date.pt
+                    backbone, phase_mode, layer_mode, frozen_status, pretrained, date_str = groups
+                    model_name = 'smartcash'
+                elif i <= 3:  # Original patterns: best_model_backbone_mode_date.pt
                     model_name, backbone, layer_mode, date_str = groups
-                elif i == 3:  # YOLOv5 format: best_yolov5_backbone_mode_date.pt
+                elif i == 5:  # YOLOv5 format: best_yolov5_backbone_mode_date.pt
                     backbone, layer_mode, date_str = groups
                     model_name = 'smartcash_yolov5'
-                elif i == 4:  # Unified format: unified_backbone_mode_best_date.pt
+                elif i == 6:  # Unified format: unified_backbone_mode_best_date.pt
                     backbone, layer_mode, date_str = groups
                     model_name = 'smartcash_unified'
-                elif i == 5:  # Simple format: smartcash_backbone_best.pt
+                elif i == 7:  # Simple format: smartcash_backbone_best.pt
                     backbone = groups[0]
                     model_name = 'smartcash'
                     layer_mode = 'multi'
                     date_str = None
-                elif i == 6:  # Generic: best_model.pt
+                elif i == 8:  # Generic: best_model.pt
                     model_name = 'smartcash'
                     backbone = 'cspdarknet'  # Default backbone
                     layer_mode = 'multi'
@@ -333,10 +373,25 @@ class CheckpointSelector:
             {}
         )
         
-        # Extract config from various locations
+        # Convert new training pipeline metrics to evaluation format
+        if 'val_map50' in metrics and 'val_map' not in metrics:
+            metrics['val_map'] = metrics['val_map50']  # Map val_map50 to val_map for compatibility
+            
+        # Ensure minimum required metrics exist
+        if 'val_map' not in metrics:
+            # Try alternative metric names
+            metrics['val_map'] = (
+                metrics.get('mAP', 0) or
+                metrics.get('map50', 0) or
+                metrics.get('val_accuracy', 0) or  # Fallback to accuracy if no mAP
+                0
+            )
+        
+        # Extract config from various locations (updated for new training pipeline)
         config = (
             checkpoint_data.get('config', {}) or
             checkpoint_data.get('training_config', {}) or
+            checkpoint_data.get('model_config', {}) or  # New training pipeline uses model_config
             {}
         )
         

@@ -67,6 +67,11 @@ class ValidationMetricsComputer:
         # Compute mAP metrics using YOLOv5 calculator (cached to avoid duplicate computation)
         try:
             logger.debug("🧮 Computing YOLOv5 mAP metrics...")
+            
+            # Enhanced debug logging for mAP investigation
+            if hasattr(self.map_calculator, 'debug') and self.map_calculator.debug:
+                logger.info(f"🐛 Debug mode: Writing detailed mAP analysis to debug log file")
+                
             import time
             start_time = time.time()
             

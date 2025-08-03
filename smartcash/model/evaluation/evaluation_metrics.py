@@ -412,6 +412,55 @@ class EvaluationMetrics:
         """📋 Generate comprehensive metrics summary for evaluation scenarios"""
         summary = {}
         
+        # Debug: Log prediction and ground truth format
+        if predictions:
+            self.logger.debug(f"🔍 First prediction format: {predictions[0]}")
+            if predictions[0].get('detections'):
+                self.logger.debug(f"🔍 Detection format: {type(predictions[0]['detections'])}")
+                if isinstance(predictions[0]['detections'], list) and predictions[0]['detections']:
+                    self.logger.debug(f"🔍 First detection: {predictions[0]['detections'][0]}")
+                elif isinstance(predictions[0]['detections'], dict):
+                    self.logger.debug(f"🔍 Detection layers: {list(predictions[0]['detections'].keys())}")
+        
+        if ground_truths:
+            self.logger.debug(f"🔍 First ground truth format: {ground_truths[0]}")
+            if ground_truths[0].get('annotations'):
+                self.logger.debug(f"🔍 Annotation format: {type(ground_truths[0]['annotations'])}")
+                if ground_truths[0]['annotations']:
+                    self.logger.debug(f"🔍 First annotation: {ground_truths[0]['annotations'][0]}")
+        
+        # Count total predictions and ground truths
+        total_predictions = sum(len(pred.get('detections', [])) for pred in predictions)
+        total_ground_truths = sum(len(gt.get('annotations', [])) for gt in ground_truths)
+        self.logger.info(f"🔍 Total predictions: {total_predictions}, Total ground truths: {total_ground_truths}")
+        
+        # Debug: Analyze predicted vs ground truth classes
+        if predictions and ground_truths:
+            pred_classes = set()
+            gt_classes = set()
+            
+            for pred in predictions:
+                for det in pred.get('detections', []):
+                    if 'class_id' in det:
+                        pred_classes.add(det['class_id'])
+            
+            for gt in ground_truths:
+                for ann in gt.get('annotations', []):
+                    if 'class_id' in ann:
+                        gt_classes.add(ann['class_id'])
+            
+            self.logger.info(f"🔍 Predicted classes: {sorted(pred_classes)}")
+            self.logger.info(f"🔍 Ground truth classes: {sorted(gt_classes)}")
+            self.logger.info(f"🔍 Class overlap: {sorted(pred_classes.intersection(gt_classes))}")
+            
+            # Show sample prediction and ground truth
+            if predictions[0].get('detections'):
+                sample_det = predictions[0]['detections'][0]
+                self.logger.debug(f"🔍 Sample prediction: {sample_det}")
+            if ground_truths[0].get('annotations'):
+                sample_gt = ground_truths[0]['annotations'][0]
+                self.logger.debug(f"🔍 Sample ground truth: {sample_gt}")
+        
         # Flatten multi-layer predictions for evaluation if needed
         flattened_predictions = self._flatten_multi_layer_predictions(predictions)
         

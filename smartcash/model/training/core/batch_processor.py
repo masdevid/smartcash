@@ -92,16 +92,22 @@ class BatchProcessor:
             
             # Validate tensor formats
             if not self._validate_tensor_formats(predictions, targets):
+                if self.debug:
+                    logger.debug(f"❌ Tensor format validation failed - pred_shape: {predictions.shape}, target_shape: {targets.shape}")
                 return None
             
             # Convert target format and validate
             target_boxes = self._convert_target_format(targets)
             if target_boxes is None:
+                if self.debug:
+                    logger.debug(f"❌ Target format conversion failed")
                 return None
             
             # Compute IoU matrix with memory optimization
             iou_matrix = self._compute_iou_matrix(predictions, target_boxes)
             if iou_matrix is None:
+                if self.debug:
+                    logger.debug(f"❌ IoU matrix computation failed")
                 return None
             
             # Perform optimized prediction-target matching

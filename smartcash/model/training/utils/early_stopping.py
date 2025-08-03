@@ -8,6 +8,7 @@ import numpy as np
 from typing import Optional, Dict, Any, List
 from pathlib import Path
 import time
+from datetime import datetime
 
 class EarlyStopping:
     """Early stopping implementation dengan multi-metric support dan checkpoint management"""
@@ -397,7 +398,7 @@ class AdaptiveEarlyStopping(EarlyStopping):
         return {**base_info, **adaptive_info}
 
 # Convenience functions
-def create_early_stopping(config: Dict[str, Any]) -> EarlyStopping:
+def create_early_stopping(config: Dict[str, Any], save_best_path: Optional[str] = None) -> EarlyStopping:
     """Factory function untuk create early stopping dari config"""
     es_config = config.get('training', {}).get('early_stopping', {})
     
@@ -424,11 +425,42 @@ def create_early_stopping(config: Dict[str, Any]) -> EarlyStopping:
         
         return NoEarlyStopping()
     
+    # Use provided save_best_path if available
+    if save_best_path is None and es_config.get('save_best_model', True):
+        # Get checkpoint configuration
+        checkpoint_config = config.get('checkpoint', {})
+        save_dir = Path(checkpoint_config.get('save_dir', 'data/checkpoints'))
+        save_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Generate best checkpoint filename using similar logic as CheckpointManager
+        model_config = config.get('model', {})
+        training_config = config.get('training', {})
+        
+        backbone = model_config.get('backbone', 'unknown')
+        training_mode = training_config.get('training_mode', 'two_phase')
+        layer_mode = model_config.get('layer_mode', 'multi')
+        freeze_backbone = model_config.get('freeze_backbone', False)
+        freeze_status = 'frozen' if freeze_backbone else 'unfrozen'
+        pretrained = model_config.get('pretrained', False)
+        
+        # Build best checkpoint filename
+        name_parts = ['best', backbone, training_mode, layer_mode, freeze_status]
+        if pretrained:
+            name_parts.append('pretrained')
+        
+        # Add timestamp for early stopping best model (separate from checkpoint manager)
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        name_parts.append(f'es_{timestamp}')  # 'es' prefix to distinguish from regular best checkpoints
+        
+        filename = '_'.join(name_parts) + '.pt'
+        save_best_path = str(save_dir / filename)
+    
     return EarlyStopping(
         patience=es_config.get('patience', 15),  # Match default from args parser
         min_delta=es_config.get('min_delta', 0.001),
         metric=es_config.get('metric', 'val_accuracy'),
         mode=es_config.get('mode', 'max'),
+        save_best_path=save_best_path,
         verbose=True
     )
 

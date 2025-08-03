@@ -50,8 +50,27 @@ class TrainingPhaseManager:
         # Initialize core components
         self.orchestrator = PhaseOrchestrator(model, model_api, config, progress_tracker)
         self.training_executor = TrainingExecutor(model, config, progress_tracker)
+        
+        # Enhanced debug logging for validation executor creation
+        debug_map_flag = config.get('debug_map', False)
+        if debug_map_flag:
+            logger.info(f"🐛 TrainingPhaseManager: Creating ValidationExecutor with debug_map=True")
+        
         self.validation_executor = ValidationExecutor(model, config, progress_tracker)
+        
+        # Verify debug logging was properly initialized
+        if debug_map_flag:
+            map_calc_debug = getattr(self.validation_executor.map_calculator, 'debug', False)
+            debug_logger_exists = hasattr(self.validation_executor.map_calculator, 'debug_logger') and self.validation_executor.map_calculator.debug_logger is not None
+            logger.info(f"🐛 ValidationExecutor created: map_calc_debug={map_calc_debug}, debug_logger_exists={debug_logger_exists}")
         self.checkpoint_manager = create_checkpoint_manager(config)
+        
+        # Final debug verification
+        if debug_map_flag:
+            from pathlib import Path
+            log_dir = Path("logs/validation_metrics")
+            debug_files = list(log_dir.glob("*.log")) if log_dir.exists() else []
+            logger.info(f"🐛 TrainingPhaseManager initialized: {len(debug_files)} debug files exist")
         self.progress_manager = ProgressManager(
             progress_tracker, emit_metrics_callback, 
             emit_live_chart_callback, visualization_manager
@@ -87,9 +106,14 @@ class TrainingPhaseManager:
         try:
             # Set current phase number for tracking
             self._current_phase_num = phase_num
+
+            # Generate save_best_path for early stopping
+            es_save_path = self.checkpoint_manager._generate_checkpoint_name(
+                metrics={}, is_best=True, es_best=True
+            )
             
             # Set up phase components
-            components = self.orchestrator.setup_phase(phase_num, epochs)
+            components = self.orchestrator.setup_phase(phase_num, epochs, save_best_path=es_save_path)
             
             # Log comprehensive batch size information
             self._log_training_batch_summary(components, phase_num)
@@ -239,12 +263,8 @@ class TrainingPhaseManager:
                 
                 if is_best:
                     # Log which metric triggered the best model save
-                    if phase_num == 1:
-                        metric_value = final_metrics.get('val_accuracy', 'N/A')
-                        logger.debug(f"🏆 New best model (Phase {phase_num}): val_accuracy = {metric_value}")
-                    else:
-                        metric_value = final_metrics.get('val_map50', 'N/A')
-                        logger.debug(f"🏆 New best model (Phase {phase_num}): val_map50 = {metric_value}")
+                    metric_value = final_metrics.get('val_accuracy', 'N/A')
+                    logger.debug(f"🏆 New best model (Phase {phase_num}): val_accuracy = {metric_value}")
                     
                     # Save complete metrics in checkpoint, not filtered ones
                     best_checkpoint_path = self.checkpoint_manager.save_checkpoint(

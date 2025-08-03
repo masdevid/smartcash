@@ -160,7 +160,8 @@ class MetricsHistoryRecorder:
         logger.info(f"Updating metrics recorder from phase {self.phase_num} to phase {new_phase_num}")
         
         # Save current data before switching phases
-        self.save_to_file()
+        self._save_metrics()
+        self._save_phase_summary()
         
         # Update phase and create new file paths
         self.phase_num = new_phase_num
@@ -223,21 +224,41 @@ class MetricsHistoryRecorder:
         return "unknown"
     
     def _load_existing_data(self):
-        """Load existing metrics data if files exist."""
+        """Load existing metrics data if files exist (only in resume mode)."""
         try:
-            if self.metrics_file.exists():
-                with open(self.metrics_file, 'r') as f:
-                    data = json.load(f)
-                    self.history = [EpochMetrics(**record) for record in data]
-                logger.info(f"Loaded {len(self.history)} existing metric records")
-            
-            if self.phase_summary_file.exists():
-                with open(self.phase_summary_file, 'r') as f:
-                    self.phase_summaries = json.load(f)
-                logger.info(f"Loaded phase summaries for phases: {list(self.phase_summaries.keys())}")
+            if self.resume_mode:
+                # Resume mode: Load existing data if files exist
+                if self.metrics_file.exists():
+                    with open(self.metrics_file, 'r') as f:
+                        data = json.load(f)
+                        self.history = [EpochMetrics(**record) for record in data]
+                    logger.info(f"Resume mode: Loaded {len(self.history)} existing metric records")
+                
+                if self.phase_summary_file.exists():
+                    with open(self.phase_summary_file, 'r') as f:
+                        self.phase_summaries = json.load(f)
+                    logger.info(f"Resume mode: Loaded phase summaries for phases: {list(self.phase_summaries.keys())}")
+            else:
+                # Fresh training mode: Clear any existing files and start fresh
+                if self.metrics_file.exists():
+                    logger.info(f"Fresh training: Removing existing metrics file {self.metrics_file}")
+                    self.metrics_file.unlink()
+                
+                if self.phase_summary_file.exists():
+                    logger.info(f"Fresh training: Removing existing phase summary file {self.phase_summary_file}")
+                    self.phase_summary_file.unlink()
+                
+                if self.latest_file.exists():
+                    logger.info(f"Fresh training: Removing existing latest metrics file {self.latest_file}")
+                    self.latest_file.unlink()
+                
+                # Initialize empty state for fresh training
+                self.history = []
+                self.phase_summaries = {}
+                logger.info("Fresh training: Initialized empty metrics history")
                 
         except Exception as e:
-            logger.warning(f"Failed to load existing metrics data: {e}")
+            logger.warning(f"Failed to load/clear existing metrics data: {e}")
             self.history = []
             self.phase_summaries = {}
     
@@ -315,14 +336,31 @@ class MetricsHistoryRecorder:
             if additional:
                 epoch_record.additional_metrics = additional
             
-            # Add to history
-            self.history.append(epoch_record)
+            # Add to history with resume mode awareness
+            if self.resume_mode:
+                # In resume mode, check for existing record with same epoch and phase
+                existing_index = None
+                for i, existing_record in enumerate(self.history):
+                    if existing_record.epoch == epoch and existing_record.phase == phase:
+                        existing_index = i
+                        break
+                
+                if existing_index is not None:
+                    # Update existing record instead of appending
+                    self.history[existing_index] = epoch_record
+                    logger.debug(f"Resume mode: Updated existing epoch {epoch} metrics for phase {phase}")
+                else:
+                    # Record doesn't exist yet, append normally
+                    self.history.append(epoch_record)
+                    logger.debug(f"Resume mode: Added new epoch {epoch} metrics for phase {phase}")
+            else:
+                # Fresh training mode: always append
+                self.history.append(epoch_record)
+                logger.debug(f"Fresh training: Recorded epoch {epoch} metrics for phase {phase}")
             
             # Save immediately to disk
             self._save_metrics()
             self._save_latest()
-            
-            logger.debug(f"Recorded epoch {epoch} metrics for phase {phase}")
             
         except Exception as e:
             logger.error(f"Failed to record epoch {epoch} metrics: {e}")

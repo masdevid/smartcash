@@ -108,7 +108,7 @@
 
 
 ### 📚 Documentation & Explainability
-- **Update `ARCHITECTURE.md`** when new UI related features are added, dependencies change, or setup steps are modified.
+- **Update resolved issue in `TASK.md`** when learn valuable fix lessons.
 - **Comment non-obvious code** and ensure everything is understandable to a mid-level developer.
 - When writing complex logic, **add an inline `# Reason:` comment** explaining the why, not just the what.
 

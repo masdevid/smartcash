@@ -36,7 +36,9 @@ class ConfigurationBuilder:
         Returns:
             Complete training configuration dictionary
         """
-        # Base configuration
+        # Base configuration with enhanced debug tracking
+        debug_map_value = kwargs.get('debug_map', False)
+        
         config = {
             'backbone': kwargs.get('backbone', 'cspdarknet'),
             'pretrained': kwargs.get('pretrained', True),
@@ -46,8 +48,14 @@ class ConfigurationBuilder:
             'checkpoint_dir': Path(kwargs.get('checkpoint_dir', 'data/checkpoints')),
             'force_cpu': kwargs.get('force_cpu', False),
             'session_id': self.session_id,
-            'debug_map': kwargs.get('debug_map', False)
+            'debug_map': debug_map_value,
+            'start_phase': kwargs.get('start_phase', 1)
         }
+        
+        # Enhanced debug flag tracking
+        if debug_map_value:
+            logger.info(f"🐛 ConfigurationBuilder: debug_map={debug_map_value} received from kwargs")
+            logger.info(f"🐛 ConfigurationBuilder: debug_map stored in config={config.get('debug_map')}")
         
         # Add validation metrics configuration from command line args
         validation_config = kwargs.get('validation_metrics_config', {})
@@ -71,6 +79,10 @@ class ConfigurationBuilder:
         
         # Apply training overrides
         config = self._apply_overrides(config, **kwargs)
+        
+        # Final debug flag verification
+        if debug_map_value:
+            logger.info(f"🐛 ConfigurationBuilder: Final config debug_map={config.get('debug_map')}")
         
         logger.info(f"🔧 Training configuration built: {config['backbone']} | yolov5")
         return config

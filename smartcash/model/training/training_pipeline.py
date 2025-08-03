@@ -252,7 +252,7 @@ class TrainingPipeline:
     def _setup_training_config(self, **kwargs) -> Dict[str, Any]:
         """Setup training configuration"""
         
-        # Base configuration
+        # Base configuration with debug flag included
         config = {
             'backbone': kwargs.get('backbone', 'cspdarknet'),
             'pretrained': kwargs.get('pretrained', True),
@@ -261,7 +261,8 @@ class TrainingPipeline:
             'phase_2_epochs': kwargs.get('phase_2_epochs', 1),
             'checkpoint_dir': Path(kwargs.get('checkpoint_dir', 'data/checkpoints')),
             'force_cpu': kwargs.get('force_cpu', False),
-            'session_id': self.training_session_id
+            'session_id': self.training_session_id,
+            'debug_map': kwargs.get('debug_map', False)  # CRITICAL: Include debug_map flag
         }
         
         # Model configuration

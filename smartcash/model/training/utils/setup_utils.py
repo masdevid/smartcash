@@ -339,6 +339,24 @@ def apply_training_overrides(config: Dict[str, Any], **kwargs) -> Dict[str, Any]
         
         logger.info(f"🎯 Validation metrics: Using hierarchical validation (YOLOv5 + per-layer)")
     
+    # Resume training configuration overrides
+    if 'resume_checkpoint' in kwargs and kwargs['resume_checkpoint']:
+        config['resume'] = True
+        config['resume_checkpoint'] = kwargs['resume_checkpoint']
+        logger.debug(f"🎯 Resume checkpoint override: {kwargs['resume_checkpoint']}")
+    
+    if 'resume_optimizer_state' in kwargs and kwargs['resume_optimizer_state']:
+        config['resume_optimizer_state'] = kwargs['resume_optimizer_state']
+        logger.debug(f"🎯 Resume optimizer state override: {kwargs['resume_optimizer_state']}")
+    
+    if 'resume_scheduler_state' in kwargs and kwargs['resume_scheduler_state']:
+        config['resume_scheduler_state'] = kwargs['resume_scheduler_state']
+        logger.debug(f"🎯 Resume scheduler state override: {kwargs['resume_scheduler_state']}")
+    
+    if 'resume_epoch' in kwargs and kwargs['resume_epoch'] is not None:
+        config['resume_epoch'] = kwargs['resume_epoch']
+        logger.debug(f"🎯 Resume epoch override: {kwargs['resume_epoch']}")
+    
     return config
 
 

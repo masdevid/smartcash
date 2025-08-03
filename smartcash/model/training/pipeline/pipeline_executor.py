@@ -336,28 +336,76 @@ class PipelineExecutor:
             # Store reference for finalization phase
             self.training_phase_manager = phase_manager
             
-            # Run training phases based on mode
+            # Run training phases based on mode and start_phase configuration
+            start_phase = config.get('start_phase', 1)
+            
             if config['training_mode'] == 'two_phase':
-                # Phase 1: Frozen backbone training
-                self.progress_tracker.start_phase('training_phase_1', 6)
-                phase1_result = phase_manager.run_training_phase(
-                    phase_num=1, 
-                    epochs=config['phase_1_epochs'], 
-                    start_epoch=0
-                )
-                
-                if not phase1_result.get('success', False):
-                    return phase1_result
-                
-                # Phase 2: Fine-tuning training
-                self.progress_tracker.start_phase('training_phase_2', 6)
-                phase2_result = phase_manager.run_training_phase(
-                    phase_num=2, 
-                    epochs=config['phase_2_epochs'], 
-                    start_epoch=0
-                )
-                
-                return phase2_result
+                if start_phase == 1:
+                    # Normal two-phase training: Start from Phase 1
+                    logger.info("🚀 Starting normal two-phase training from Phase 1")
+                    
+                    # Phase 1: Frozen backbone training
+                    self.progress_tracker.start_phase('training_phase_1', 6)
+                    phase1_result = phase_manager.run_training_phase(
+                        phase_num=1, 
+                        epochs=config['phase_1_epochs'], 
+                        start_epoch=0
+                    )
+                    
+                    if not phase1_result.get('success', False):
+                        return phase1_result
+                    
+                    # Clone best model from Phase 1 with _phase1 suffix before starting Phase 2
+                    phase1_backup_path = self._create_phase_backup(phase1_result.get('best_checkpoint'), 1)
+                    
+                    # Transition to Phase 2
+                    phase2_result = self._transition_to_phase2_and_train(phase_manager, config, phase1_result)
+                    
+                    # Clone best model from Phase 2 with _phase2 suffix when completed
+                    self._create_phase_backup(phase2_result.get('best_checkpoint'), 2)
+                    
+                    return phase2_result
+                    
+                elif start_phase == 2:
+                    # Jump directly to Phase 2
+                    logger.info("🚀 Jumping directly to Phase 2 training")
+                    
+                    # Check if we should override standard best model with backup
+                    if not config.get('resume_checkpoint'):
+                        # Starting new Phase 2 training - override standard best.pt with backup if available
+                        phase1_backup_path = self._find_phase_backup_model(1, config)
+                        if phase1_backup_path:
+                            logger.info(f"📦 Overriding standard best.pt with Phase 1 backup for new Phase 2 training")
+                            self._override_standard_best_with_backup(phase1_backup_path, config)
+                        else:
+                            # Check if there's an existing standard best model
+                            standard_best_path = self._find_standard_best_model(config)
+                            if standard_best_path:
+                                logger.warning("⚠️ No Phase 1 backup found - using existing standard best.pt")
+                            else:
+                                # Neither backup nor standard best model exists - cannot jump to Phase 2
+                                error_msg = (
+                                    "❌ Cannot jump to Phase 2: No Phase 1 backup model found and no standard best model exists. "
+                                    "Please either:\n"
+                                    "  1. Run Phase 1 training first (--start-phase 1), or\n"
+                                    "  2. Provide an existing standard best model in the checkpoint directory"
+                                )
+                                logger.error(error_msg)
+                                return {
+                                    'success': False,
+                                    'error': error_msg
+                                }
+                    else:
+                        # Resume mode - keep standard best.pt as-is
+                        logger.info("🔄 Resume mode: keeping standard best.pt unchanged")
+                    
+                    # Jump directly to Phase 2 training (always uses standard best.pt)
+                    phase2_result = self._run_phase2_only(phase_manager, config)
+                    
+                    # Clone best model from Phase 2 with _phase2 suffix when completed
+                    self._create_phase_backup(phase2_result.get('best_checkpoint'), 2)
+                    
+                    return phase2_result
             else:
                 # Single phase training
                 self.progress_tracker.start_phase('training_phase_single', 6)
@@ -418,13 +466,14 @@ class PipelineExecutor:
                         phase1_result['training_mode'] = 'two_phase'
                         return phase1_result
                     
-                    # Phase 2: Fine-tuning training (start from beginning)
-                    self.progress_tracker.start_phase('training_phase_2', 6)
-                    phase2_result = phase_manager.run_training_phase(
-                        phase_num=2, 
-                        epochs=config['phase_2_epochs'], 
-                        start_epoch=0
-                    )
+                    # Create Phase 1 backup model
+                    self._create_phase_backup(phase1_result.get('best_checkpoint'), 1)
+                    
+                    # Transition to Phase 2
+                    phase2_result = self._transition_to_phase2_and_train(phase_manager, config, phase1_result)
+                    
+                    # Create Phase 2 backup model
+                    self._create_phase_backup(phase2_result.get('best_checkpoint'), 2)
                     
                     # Add phase information for finalization
                     phase2_result['completed_phase'] = 2
@@ -434,12 +483,35 @@ class PipelineExecutor:
                 elif resume_phase == 2:
                     # Skip Phase 1, resume from Phase 2
                     logger.info(f"🔄 Skipping Phase 1, resuming Phase 2 from epoch {resume_epoch}")
+                    
+                    # Unfreeze backbone for Phase 2 resume
+                    self._unfreeze_backbone_for_phase2()
+                    
+                    # CRITICAL: Propagate Phase 2 state to all model components for resume
+                    logger.info("🔄 Propagating Phase 2 state to model components (resume mode)")
+                    try:
+                        if hasattr(phase_manager, 'phase_orchestrator'):
+                            phase_manager.phase_orchestrator.propagate_phase_to_model(self.model, 2)
+                            logger.info("✅ Phase 2 state propagated via phase orchestrator (resume)")
+                        else:
+                            # Fallback: direct phase setting
+                            if hasattr(self.model, 'current_phase'):
+                                self.model.current_phase = 2
+                                logger.info("✅ Set model.current_phase = 2 (resume)")
+                            else:
+                                logger.warning("⚠️ Model doesn't have current_phase attribute (resume)")
+                    except Exception as e:
+                        logger.warning(f"⚠️ Phase propagation failed (resume): {e}")
+                    
                     self.progress_tracker.start_phase('training_phase_2', 6)
                     phase2_result = phase_manager.run_training_phase(
                         phase_num=2, 
                         epochs=config['phase_2_epochs'], 
                         start_epoch=resume_epoch - 1  # Convert to 0-based
                     )
+                    
+                    # Create Phase 2 backup model
+                    self._create_phase_backup(phase2_result.get('best_checkpoint'), 2)
                     
                     # Add phase information for finalization
                     phase2_result['completed_phase'] = 2
@@ -550,3 +622,424 @@ class PipelineExecutor:
                 self.log_callback(level, message, log_data)
             except Exception as e:
                 logger.warning(f"Log callback error: {e}")
+    
+    def _create_phase_backup(self, checkpoint_path: str, phase_num: int) -> str:
+        """Create backup copy of phase checkpoint with phase suffix."""
+        if not checkpoint_path:
+            return None
+            
+        try:
+            import shutil
+            from pathlib import Path
+            
+            best_checkpoint_path = Path(checkpoint_path)
+            backup_checkpoint_path = best_checkpoint_path.parent / (best_checkpoint_path.stem + f'_phase{phase_num}' + best_checkpoint_path.suffix)
+            shutil.copy2(best_checkpoint_path, backup_checkpoint_path)
+            logger.info(f"✅ Created Phase {phase_num} backup model: {backup_checkpoint_path}")
+            return str(backup_checkpoint_path)
+        except Exception as e:
+            logger.warning(f"⚠️ Failed to create Phase {phase_num} backup model: {e}")
+            return None
+    
+    def _find_phase_backup_model(self, phase_num: int, config: Dict[str, Any]) -> str:
+        """Find existing phase backup model."""
+        try:
+            from pathlib import Path
+            import glob
+            
+            checkpoint_dir = Path(config.get('checkpoint_dir', 'data/checkpoints'))
+            
+            # Look for backup models with phase suffix
+            pattern = str(checkpoint_dir / f"*_phase{phase_num}.pt")
+            backup_files = glob.glob(pattern)
+            
+            if backup_files:
+                # Sort by modification time, get the most recent
+                backup_files.sort(key=lambda x: Path(x).stat().st_mtime, reverse=True)
+                backup_path = backup_files[0]
+                logger.info(f"📦 Found Phase {phase_num} backup model: {backup_path}")
+                return backup_path
+            else:
+                logger.warning(f"⚠️ No Phase {phase_num} backup model found in {checkpoint_dir}")
+                return None
+        except Exception as e:
+            logger.error(f"❌ Failed to find Phase {phase_num} backup model: {e}")
+            return None
+    
+    def _override_standard_best_with_backup(self, backup_path: str, config: Dict[str, Any]):
+        """Override standard best model with backup model content (file copy only)."""
+        try:
+            import shutil
+            from pathlib import Path
+            
+            backup_checkpoint_path = Path(backup_path)
+            checkpoint_dir = Path(config.get('checkpoint_dir', 'data/checkpoints'))
+            
+            # Find the current best model using the naming convention
+            standard_best_path = self._find_standard_best_model(config)
+            
+            if standard_best_path:
+                # Copy backup to standard best model location (override)
+                shutil.copy2(backup_checkpoint_path, standard_best_path)
+                logger.info(f"✅ Standard best model overridden with Phase 1 backup: {standard_best_path}")
+                logger.info("🔄 Training will load from standard best model (now contains Phase 1 backup)")
+            else:
+                # No existing best model, create new one with full naming convention
+                new_best_path = self._generate_new_best_model_name(config)
+                
+                shutil.copy2(backup_checkpoint_path, new_best_path)
+                logger.info(f"✅ Created new standard best model from Phase 1 backup: {new_best_path}")
+                
+        except Exception as e:
+            logger.error(f"❌ Failed to override standard best model with backup: {e}")
+    
+    def _generate_new_best_model_name(self, config: Dict[str, Any]) -> str:
+        """Generate new best model filename using the full naming convention."""
+        try:
+            from datetime import datetime
+            from pathlib import Path
+            
+            checkpoint_dir = Path(config.get('checkpoint_dir', 'data/checkpoints'))
+            
+            # Get model configuration for naming
+            model_config = config.get('model', {})
+            training_config = config.get('training', {})
+            
+            # Extract naming components (same logic as checkpoint manager)
+            backbone = model_config.get('backbone', config.get('backbone', 'unknown'))
+            
+            # Determine training mode
+            training_mode = training_config.get('training_mode', config.get('training_mode', 'two_phase'))
+            if training_mode not in ['single_phase', 'two_phase']:
+                training_mode = 'two_phase'  # Default fallback
+            
+            # Determine layer mode
+            layer_mode = model_config.get('layer_mode', 'multi')
+            if 'detection_layers' in model_config:
+                num_layers = len(model_config['detection_layers'])
+                layer_mode = 'single' if num_layers == 1 else 'multi'
+            
+            # Determine freeze status
+            freeze_backbone = model_config.get('freeze_backbone', False)
+            freeze_status = 'frozen' if freeze_backbone else 'unfrozen'
+            
+            # Check if pretrained is enabled
+            pretrained = model_config.get('pretrained', config.get('pretrained', False))
+            pretrained_suffix = 'pretrained' if pretrained else ''
+            
+            # Get current date
+            date_str = datetime.now().strftime('%Y%m%d')
+            
+            # Build checkpoint name parts for best checkpoints
+            name_parts = [
+                'best',
+                backbone,
+                training_mode,
+                layer_mode,
+                freeze_status
+            ]
+            
+            # Add pretrained suffix only if True
+            if pretrained_suffix:
+                name_parts.append(pretrained_suffix)
+            
+            name_parts.append(date_str)
+            filename = '_'.join(name_parts) + '.pt'
+            
+            return checkpoint_dir / filename
+            
+        except Exception as e:
+            # Fallback to simple naming if anything goes wrong
+            logger.warning(f"⚠️ Error generating full checkpoint name: {e}, using fallback")
+            from datetime import datetime
+            from pathlib import Path
+            
+            checkpoint_dir = Path(config.get('checkpoint_dir', 'data/checkpoints'))
+            backbone = config.get('backbone', 'unknown')
+            date_str = datetime.now().strftime('%Y%m%d')
+            filename = f"best_{backbone}_{date_str}.pt"
+            return checkpoint_dir / filename
+    
+    def _transition_to_phase2_and_train(self, phase_manager, config: Dict[str, Any], phase1_result: Dict[str, Any]) -> Dict[str, Any]:
+        """Handle transition from Phase 1 to Phase 2 and run Phase 2 training."""
+        # CRITICAL: Phase 1 to Phase 2 transition logic
+        
+        # 1. Save Phase 1 checkpoint data for loading into rebuilt model
+        phase1_checkpoint_data = None
+        if phase1_result.get('best_checkpoint'):
+            try:
+                checkpoint_path = phase1_result['best_checkpoint']
+                logger.info(f"🔄 Loading Phase 1 best checkpoint data for Phase 2 transition: {checkpoint_path}")
+                
+                import torch
+                # Use weights_only=False for compatibility with PyTorch 2.6+
+                phase1_checkpoint_data = torch.load(checkpoint_path, map_location='cpu', weights_only=False)
+                logger.info("✅ Phase 1 checkpoint data loaded for model rebuilding")
+            except Exception as e:
+                logger.error(f"❌ Failed to load Phase 1 checkpoint: {e}")
+                # Continue anyway - Phase 2 will start from current model state
+        
+        # 2. Rebuild model with unfrozen backbone configuration for Phase 2
+        logger.info("🏗️ Rebuilding model with unfrozen backbone configuration for Phase 2")
+        phase2_model = self._rebuild_model_for_phase2(config)
+        
+        # 3. Load Phase 1 weights into the rebuilt model
+        if phase1_checkpoint_data and 'model_state_dict' in phase1_checkpoint_data:
+            try:
+                # Attempt to load state dict with strict=False to handle minor mismatches
+                missing_keys, unexpected_keys = phase2_model.load_state_dict(phase1_checkpoint_data['model_state_dict'], strict=False)
+                
+                if missing_keys or unexpected_keys:
+                    logger.warning(f"⚠️ Partial weight loading - Missing keys: {len(missing_keys)}, Unexpected keys: {len(unexpected_keys)}")
+                    if missing_keys:
+                        logger.debug(f"Missing keys: {missing_keys[:5]}...")  # Show first 5
+                    if unexpected_keys:
+                        logger.debug(f"Unexpected keys: {unexpected_keys[:5]}...")  # Show first 5
+                    logger.info("✅ Phase 1 weights loaded with some architecture differences (non-critical layers skipped)")
+                else:
+                    logger.info("✅ Phase 1 weights loaded completely into rebuilt Phase 2 model")
+                    
+            except Exception as e:
+                logger.warning(f"⚠️ Failed to load Phase 1 weights into rebuilt model: {e}")
+                logger.info("🔄 Phase 2 will use newly initialized model weights")
+                
+                # Additional debugging information
+                if "size mismatch" in str(e):
+                    logger.info("🔍 Architecture mismatch detected - this may indicate configuration preservation issue")
+                    logger.info("🔍 Recommendation: Check if multi-layer configuration was properly preserved during rebuild")
+        
+        # 4. Replace the current model with the rebuilt Phase 2 model
+        self.model = phase2_model
+        logger.info("🔄 Model replaced with Phase 2 configuration")
+        
+        # Phase 2: Fine-tuning training
+        self.progress_tracker.start_phase('training_phase_2', 6)
+        return phase_manager.run_training_phase(
+            phase_num=2, 
+            epochs=config['phase_2_epochs'], 
+            start_epoch=0
+        )
+    
+    def _rebuild_model_for_phase2(self, config: Dict[str, Any]):
+        """Rebuild model with unfrozen backbone configuration for Phase 2."""
+        try:
+            logger.info("🏗️ Building new model with Phase 2 configuration (unfrozen backbone)")
+            
+            # Create a modified config for Phase 2 with unfrozen backbone
+            phase2_config = config.copy()
+            
+            # CRITICAL: Preserve the multi-layer configuration from Phase 1
+            # The original model config must be preserved to maintain architecture compatibility
+            original_model_config = config.get('model', {})
+            
+            # Update model config to ensure backbone is unfrozen while preserving multi-layer setup
+            if 'model' not in phase2_config:
+                phase2_config['model'] = {}
+            
+            # Preserve all original model configuration parameters
+            phase2_config['model'].update(original_model_config)
+            
+            # Only override the freeze_backbone setting for Phase 2
+            phase2_config['model']['freeze_backbone'] = False
+            
+            # Log the preserved configuration
+            model_config = phase2_config['model']
+            logger.info("🔥 Phase 2 model config: freeze_backbone = False")
+            logger.info(f"🔧 Preserved layer_mode: {model_config.get('layer_mode', 'N/A')}")
+            logger.info(f"🔧 Preserved detection_layers: {model_config.get('detection_layers', 'N/A')}")
+            logger.info(f"🔧 Preserved num_classes: {model_config.get('num_classes', 'N/A')}")
+            
+            # Rebuild model using the model API
+            if self.model_api:
+                logger.info("🔧 Using model API to rebuild model for Phase 2")
+                
+                # Use the preserved model configuration for rebuilding
+                
+                # Build new model with unfrozen backbone and preserved multi-layer config
+                build_result = self.model_api.build_model(model_config=model_config)
+                
+                # Log the build result for debugging
+                if build_result['success']:
+                    built_model = build_result['model']
+                    # Check if the model has the expected architecture
+                    if hasattr(built_model, 'yolov5_model') and hasattr(built_model.yolov5_model.model, 'model'):
+                        # Get the detection head to verify the output size
+                        detection_head = built_model.yolov5_model.model.model[-1]
+                        if hasattr(detection_head, 'm') and len(detection_head.m) > 0:
+                            head_output_size = detection_head.m[0].weight.shape[0] if hasattr(detection_head.m[0], 'weight') else 'unknown'
+                            logger.info(f"🔧 Phase 2 model detection head output size: {head_output_size}")
+                            logger.info(f"🔧 Expected: 66 for multi-layer (7+7+3)*6, or similar multi-layer config")
+                        else:
+                            logger.warning("⚠️ Could not inspect detection head structure")
+                    else:
+                        logger.warning("⚠️ Could not inspect model architecture for compatibility")
+                
+                if build_result['success']:
+                    new_model = build_result['model']
+                    logger.info("✅ Phase 2 model rebuilt successfully with unfrozen backbone and preserved configuration")
+                    return new_model
+                else:
+                    logger.error(f"❌ Failed to rebuild model for Phase 2: {build_result.get('error')}")
+                    logger.info("🔄 Falling back to manual backbone unfreezing (preserves architecture)")
+                    # Fallback to current model with manual unfreezing - this preserves the architecture
+                    self._unfreeze_backbone_for_phase2()
+                    return self.model
+            else:
+                logger.warning("⚠️ No model API available - using manual backbone unfreezing")
+                # Fallback to current model with manual unfreezing
+                self._unfreeze_backbone_for_phase2()
+                return self.model
+                
+        except Exception as e:
+            logger.error(f"❌ Error rebuilding model for Phase 2: {e}")
+            logger.info("🔄 Falling back to manual backbone unfreezing")
+            # Fallback to current model with manual unfreezing
+            self._unfreeze_backbone_for_phase2()
+            return self.model
+    
+    def _run_phase2_only(self, phase_manager, config: Dict[str, Any]) -> Dict[str, Any]:
+        """Run Phase 2 training only (for direct Phase 2 start)."""
+        # Save standard best model data before rebuilding
+        standard_checkpoint_data = None
+        standard_best_path = self._find_standard_best_model(config)
+        
+        if standard_best_path:
+            try:
+                import torch
+                logger.info(f"🔄 Loading standard best model data for Phase 2: {standard_best_path}")
+                # Use weights_only=False for compatibility with PyTorch 2.6+
+                standard_checkpoint_data = torch.load(standard_best_path, map_location='cpu', weights_only=False)
+                logger.info("✅ Standard best model data loaded for model rebuilding")
+            except Exception as e:
+                logger.warning(f"⚠️ Failed to load standard best model: {e}")
+        
+        # Rebuild model with unfrozen backbone configuration for Phase 2
+        logger.info("🏗️ Rebuilding model with unfrozen backbone configuration for Phase 2")
+        phase2_model = self._rebuild_model_for_phase2(config)
+        
+        # Load standard best model weights into the rebuilt model
+        if standard_checkpoint_data and 'model_state_dict' in standard_checkpoint_data:
+            try:
+                # Attempt to load state dict with strict=False to handle minor mismatches
+                missing_keys, unexpected_keys = phase2_model.load_state_dict(standard_checkpoint_data['model_state_dict'], strict=False)
+                
+                if missing_keys or unexpected_keys:
+                    logger.warning(f"⚠️ Partial weight loading - Missing keys: {len(missing_keys)}, Unexpected keys: {len(unexpected_keys)}")
+                    if missing_keys:
+                        logger.debug(f"Missing keys: {missing_keys[:5]}...")  # Show first 5
+                    if unexpected_keys:
+                        logger.debug(f"Unexpected keys: {unexpected_keys[:5]}...")  # Show first 5
+                    logger.info("✅ Standard best model weights loaded with some architecture differences (non-critical layers skipped)")
+                else:
+                    logger.info("✅ Standard best model weights loaded completely into rebuilt Phase 2 model")
+                    
+            except Exception as e:
+                logger.warning(f"⚠️ Failed to load standard best weights into rebuilt model: {e}")
+                logger.info("🔄 Phase 2 will use newly initialized model weights")
+                
+                # Additional debugging information
+                if "size mismatch" in str(e):
+                    logger.info("🔍 Architecture mismatch detected - this may indicate configuration preservation issue")
+                    logger.info("🔍 Recommendation: Check if multi-layer configuration was properly preserved during rebuild")
+        
+        # Replace the current model with the rebuilt Phase 2 model
+        self.model = phase2_model
+        logger.info("🔄 Model replaced with Phase 2 configuration")
+        
+        # CRITICAL: Propagate Phase 2 state to all model components after model replacement
+        logger.info("🔄 Propagating Phase 2 state to model components")
+        try:
+            # Use phase orchestrator to properly set phase state
+            if hasattr(phase_manager, 'phase_orchestrator'):
+                phase_manager.phase_orchestrator.propagate_phase_to_model(self.model, 2)
+                logger.info("✅ Phase 2 state propagated via phase orchestrator")
+            else:
+                # Fallback: direct phase setting
+                if hasattr(self.model, 'current_phase'):
+                    self.model.current_phase = 2
+                    logger.info("✅ Set model.current_phase = 2")
+                else:
+                    logger.warning("⚠️ Model doesn't have current_phase attribute")
+        except Exception as e:
+            logger.warning(f"⚠️ Phase propagation failed: {e}")
+        
+        # Phase 2: Fine-tuning training
+        self.progress_tracker.start_phase('training_phase_2', 6)
+        return phase_manager.run_training_phase(
+            phase_num=2, 
+            epochs=config['phase_2_epochs'], 
+            start_epoch=0
+        )
+    
+    def _find_standard_best_model(self, config: Dict[str, Any]) -> str:
+        """Find standard best model using naming convention (excludes backup models with _phase suffixes)."""
+        try:
+            from pathlib import Path
+            import glob
+            
+            checkpoint_dir = Path(config.get('checkpoint_dir', 'data/checkpoints'))
+            
+            # Look for best models with standard naming convention: best_*.pt
+            pattern = str(checkpoint_dir / "best_*.pt")
+            all_best_files = glob.glob(pattern)
+            
+            # Filter out backup models with _phase1 or _phase2 suffixes
+            standard_best_files = []
+            for file_path in all_best_files:
+                file_name = Path(file_path).stem  # Get filename without extension
+                # Exclude files that end with _phase1 or _phase2
+                if not (file_name.endswith('_phase1') or file_name.endswith('_phase2')):
+                    standard_best_files.append(file_path)
+            
+            if standard_best_files:
+                # Sort by modification time, get the most recent
+                standard_best_files.sort(key=lambda x: Path(x).stat().st_mtime, reverse=True)
+                best_path = standard_best_files[0]
+                logger.debug(f"📦 Found standard best model: {best_path}")
+                return best_path
+            else:
+                logger.debug(f"⚠️ No standard best model found in {checkpoint_dir} (excluding backup models)")
+                return None
+        except Exception as e:
+            logger.error(f"❌ Failed to find standard best model: {e}")
+            return None
+    
+    def _load_standard_best_model(self, config: Dict[str, Any]):
+        """Load standard best model into current model for Phase 2 training."""
+        try:
+            import torch
+            
+            # Find the current best model using the naming convention
+            best_model_path = self._find_standard_best_model(config)
+            
+            if best_model_path:
+                logger.info(f"🔄 Loading standard best model for Phase 2 training: {best_model_path}")
+                # Use weights_only=False for compatibility with PyTorch 2.6+
+                checkpoint = torch.load(best_model_path, map_location='cpu', weights_only=False)
+                if 'model_state_dict' in checkpoint:
+                    self.model.load_state_dict(checkpoint['model_state_dict'])
+                    logger.info("✅ Standard best model loaded into current model")
+                else:
+                    logger.warning("⚠️ No model_state_dict found in standard best model")
+            else:
+                logger.warning("⚠️ No standard best model found")
+                
+        except Exception as e:
+            logger.error(f"❌ Failed to load standard best model: {e}")
+    
+    def _unfreeze_backbone_for_phase2(self):
+        """Unfreeze backbone parameters for Phase 2 training."""
+        try:
+            if hasattr(self.model, 'unfreeze_backbone'):
+                self.model.unfreeze_backbone()
+                logger.info("🔥 Backbone unfrozen for Phase 2 fine-tuning")
+            else:
+                # Manual backbone unfreezing
+                backbone_params_unfrozen = 0
+                for name, param in self.model.named_parameters():
+                    if any(backbone_part in name.lower() for backbone_part in ['backbone', 'model.0', 'model.1', 'model.2', 'model.3', 'model.4']):
+                        param.requires_grad = True
+                        backbone_params_unfrozen += 1
+                logger.info(f"🔥 Manually unfroze {backbone_params_unfrozen} backbone parameters for Phase 2")
+        except Exception as e:
+            logger.warning(f"⚠️ Failed to unfreeze backbone: {e}")

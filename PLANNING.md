@@ -224,6 +224,8 @@ All cells are created minimalistic with single execution `initialize_[module]_ui
    - `cell_3_4_evaluation.py`: `initialize_evaluation_ui(display=True)` - Evaluate model performance on test set
 
 # Training Backend:
+
+## 🎯 Training Modes & Prediction Structure
 1. Single-Phase + Multi-Layer (training_mode='single_phase', layer_mode='multi'):
     - Return 3 predictions: {'layer_1': pred, 'layer_2': pred, 'layer_3': pred}
     - Processes all layers in a single training phase
@@ -233,6 +235,104 @@ All cells are created minimalistic with single execution `initialize_[module]_ui
 3. Two-Phase Mode:
     - Phase 1: Return 1 prediction: {'layer_1': pred}
     - Phase 2: Return 3 predictions: {'layer_1': pred, 'layer_2': pred, 'layer_3': pred}
+
+## 🔧 Hierarchical Validation System
+
+### Phase-Aware Validation Processing
+- **Phase 1 (Frozen Backbone)**: Standard single-layer validation for classes 0-6
+- **Phase 2 (Unfrozen Backbone)**: Hierarchical multi-layer validation with confidence modulation
+
+### Layer Architecture & Class Distribution
+```
+Layer 1: Denomination Detection (Classes 0-6)
+├── 001, 002, 005, 010, 020, 050, 100 (Indonesian Rupiah denominations)
+├── Purpose: Primary task - banknote denomination identification
+└── Metrics: Primary validation metrics (mAP, precision, recall, F1)
+
+Layer 2: Confidence Features (Classes 7-13)  
+├── Denomination-specific visual cues and features
+├── Purpose: Enhanced denomination validation through visual features
+└── Integration: Spatial overlap + confidence modulation with Layer 1
+
+Layer 3: Money Validation (Classes 14-16)
+├── Security features and authenticity markers
+├── Purpose: General money validation (authentic banknote detection)
+└── Integration: Money authenticity threshold + confidence boost/reduction
+```
+
+### Hierarchical Processing Flow (Phase 2 Only)
+```
+Input: All predictions (classes 0-16)
+    ↓
+Phase Detection: max_class >= 7 → Phase 2 hierarchical processing
+    ↓
+Layer 1 Filtering: Extract classes 0-6 for primary evaluation
+    ↓
+Confidence Modulation:
+    • Layer 2 Match: Same denomination + spatial IoU > 0.1
+    • Layer 3 Match: Money validation + spatial IoU > 0.1
+    • Hierarchical Boost: conf × (1 + layer2_conf × layer3_conf) if layer3_conf > 0.1
+    • Confidence Reduction: conf × 0.1 if layer3_conf ≤ 0.1 (not money)
+    ↓
+Metrics Calculation: mAP, precision, recall, F1 on enhanced Layer 1 predictions
+```
+
+### Key Benefits
+- **Focused Evaluation**: Primary metrics measure denomination detection quality (main task)
+- **Intelligent Filtering**: Layer 3 ensures predictions are validated as actual money
+- **Research Insights**: Per-layer metrics preserved for detailed analysis
+- **Phase Consistency**: Phase 1 establishes baseline, Phase 2 adds hierarchical enhancement
+- **Memory Optimization**: Chunked processing for large prediction sets (>10K predictions)
+
+### Implementation Files
+- `yolov5_map_calculator.py`: Hierarchical mAP calculation with confidence modulation
+- `validation_metrics_computer.py`: Hierarchical validation metrics alignment  
+- `hierarchical_processor.py`: Core hierarchical filtering and confidence modulation logic
+
+## 📊 Loss Calculation Strategy
+
+### Phase 1: Frozen Backbone Training
+```
+Description: Backbone frozen, only train Layer 1 head (coarse/global detection)
+Backbone State: frozen
+Active Layers: layer_1 only
+Loss Weights:
+├── layer_1: 1.0 (full weight)
+├── layer_2: 0.0 (not trained)
+└── layer_3: 0.0 (not trained)
+
+Purpose: Stabilize initial learning and establish baseline detection
+Optional: Small warmup weights (0.1) for layer_2 and layer_3 can be added
+```
+
+### Phase 2: Uncertainty-Weighted Multi-Task Learning
+```
+Description: Backbone unfrozen, fine-tune all layers with uncertainty-based weighting
+Backbone State: unfrozen  
+Active Layers: layer_1, layer_2, layer_3
+Loss Calculation Method: uncertainty_weighted_loss
+
+Mathematical Formulation:
+L_total = Σ (1 / (2 * σ_i²)) * L_i + log(σ_i)
+
+Where:
+├── L_i: Loss for layer i (i = 1, 2, 3)
+├── σ_i: Learnable uncertainty parameter for layer i
+├── 1/(2*σ_i²): Automatic weight based on uncertainty
+└── log(σ_i): Regularization term to prevent σ_i → 0
+
+Layer-Specific Weights:
+├── Layer 1: L1_weight = 1 / (2 * σ1²), learnable σ1
+├── Layer 2: L2_weight = 1 / (2 * σ2²), learnable σ2  
+└── Layer 3: L3_weight = 1 / (2 * σ3²), learnable σ3
+```
+
+### Key Benefits of Uncertainty Weighting
+- **Adaptive Balancing**: Automatically adjusts contribution of each layer based on task difficulty
+- **Prevents Domination**: No single layer can dominate the loss function
+- **Multi-Task Optimization**: Improved multi-task learning through uncertainty-based weighting
+- **Self-Regulating**: Learnable σ parameters adapt during training to optimal values
+- **Mathematical Foundation**: Based on principled uncertainty estimation in multi-task learning
 ## 🧪 Testing Strategy
 
 ### UIModule Testing Approach

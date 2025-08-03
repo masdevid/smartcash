@@ -64,7 +64,7 @@ This document outlines the architecture and rationale for a YOLOv5-based model u
   },
   "layer_2": {
     "description": "Nominal-defining features (unique visual cues)",
-    "examples": ["Large printed number", "Portrait", "Watermark", "Braile"],
+    "examples": ["Large printed number", "Nominal Text", "Braile"],
     "classes": ["l2_001", "l2_002", "l2_005", "l2_010", "l2_020", "l2_050", "l2_100"]
   },
   "layer_3": {

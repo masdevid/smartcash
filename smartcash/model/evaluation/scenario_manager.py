@@ -82,6 +82,7 @@ class ScenarioManager:
             'display_name': scenario_config.get('name', 'Position Variation'),
             'enabled': True,
             'data_path': str(output_dir),
+            'status': 'successful',
             'generation_result': result,
             'validation': validation,
             'config': scenario_config
@@ -121,6 +122,7 @@ class ScenarioManager:
             'display_name': scenario_config.get('name', 'Lighting Variation'),
             'enabled': True,
             'data_path': str(output_dir),
+            'status': 'successful',
             'generation_result': result,
             'validation': validation,
             'config': scenario_config
@@ -139,7 +141,7 @@ class ScenarioManager:
         
         # Check if data already exists
         if scenario_dir.exists() and not force_regenerate:
-            validation = self.test_augmentation.validate_scenario_data(str(scenario_dir))
+            validation = self.scenario_augmentation.validate_scenario_data(str(scenario_dir))
             if validation['valid']:
                 self.logger.info(f"📁 Using existing {scenario_name} data")
                 return {'status': 'existing', 'validation': validation, 'data_path': str(scenario_dir)}
@@ -187,7 +189,7 @@ class ScenarioManager:
         
         # Validate data
         if scenario_dir.exists():
-            data_validation = self.test_augmentation.validate_scenario_data(str(scenario_dir))
+            data_validation = self.scenario_augmentation.validate_scenario_data(str(scenario_dir))
             validation_result['data_valid'] = data_validation['valid']
             
             if not data_validation['valid']:

@@ -57,13 +57,14 @@ class PhaseOrchestrator:
             # Recursively propagate to grandchildren
             self._propagate_phase_to_children(child, phase_num)
     
-    def setup_phase(self, phase_num: int, epochs: int) -> Dict[str, Any]:
+    def setup_phase(self, phase_num: int, epochs: int, save_best_path: Optional[str] = None) -> Dict[str, Any]:
         """
         Set up training phase with all required components.
         
         Args:
             phase_num: Training phase number (1 or 2)
             epochs: Total number of epochs to train for
+            save_best_path: Path to save the best model checkpoint.
             
         Returns:
             Dictionary containing all setup components
@@ -99,15 +100,32 @@ class PhaseOrchestrator:
                 scaler = torch.amp.GradScaler('cuda')
             
             # Set up metrics recorder for JSON-based metrics tracking with structured naming
+            # Debug: Log config contents for resume troubleshooting
+            logger.debug(f"Phase orchestrator config type: {type(self.config)}")
+            if isinstance(self.config, dict):
+                config_keys = list(self.config.keys())
+                logger.debug(f"Config dict keys: {config_keys}")
+                # Show resume-related keys specifically
+                resume_related = {k: v for k, v in self.config.items() if 'resume' in k.lower()}
+                logger.debug(f"Resume-related config: {resume_related}")
+            
             # Handle both dict and object-style config access
             if isinstance(self.config, dict):
                 backbone = self.config.get('backbone', 'unknown')
                 data_name = self.config.get('data_name', 'data')
-                resume_mode = self.config.get('resume', False)
+                # Check both 'resume' and 'resume_checkpoint' keys for resume mode
+                resume_value = self.config.get('resume', False)
+                resume_checkpoint_value = self.config.get('resume_checkpoint')
+                resume_mode = resume_value or bool(resume_checkpoint_value)
+                logger.debug(f"Config dict - resume: {resume_value}, resume_checkpoint: {resume_checkpoint_value}, final resume_mode: {resume_mode}")
             else:
                 backbone = getattr(self.config, 'backbone', 'unknown')
                 data_name = getattr(self.config, 'data_name', 'data') 
-                resume_mode = getattr(self.config, 'resume', False)
+                # Check both 'resume' and 'resume_checkpoint' attributes for resume mode
+                resume_value = getattr(self.config, 'resume', False)
+                resume_checkpoint_value = getattr(self.config, 'resume_checkpoint', None)
+                resume_mode = resume_value or bool(resume_checkpoint_value)
+                logger.debug(f"Config object - resume: {resume_value}, resume_checkpoint: {resume_checkpoint_value}, final resume_mode: {resume_mode}")
             
             metrics_recorder = create_metrics_recorder(
                 output_dir="logs/training",
@@ -118,7 +136,7 @@ class PhaseOrchestrator:
             )
             
             # Set up early stopping
-            early_stopping = self.setup_early_stopping(phase_num)
+            early_stopping = self.setup_early_stopping(phase_num, save_best_path=save_best_path)
             
             return {
                 'train_loader': train_loader,
@@ -153,15 +171,50 @@ class PhaseOrchestrator:
             else:
                 self.model.force_single_layer = False
                 logger.info(f"🎯 Single-phase mode: using multi-layer output")
+            
+            # Handle backbone freezing for single-phase mode
+            single_freeze_backbone = self.config.get('single_phase_freeze_backbone', False)
+            self._configure_backbone_freezing(single_freeze_backbone, phase_num)
+            
         elif training_mode == 'two_phase':
-            # Two-phase mode: Phase 1 = single layer, Phase 2 = multi layer
+            # Two-phase mode: Phase 1 = single layer + frozen backbone, Phase 2 = multi layer + unfrozen backbone
             if phase_num == 1:
                 logger.info(f"🎯 Phase {phase_num}: single layer mode (layer_1 only)")
+                # Phase 1: Freeze backbone
+                self._configure_backbone_freezing(freeze=True, phase_num=phase_num)
             else:
                 logger.info(f"🎯 Phase {phase_num}: multi-layer mode (all layers)")
+                # Phase 2: Unfreeze backbone (this will be handled by pipeline executor)
+                # We don't unfreeze here because the checkpoint loading should happen first
+                
             self.model.force_single_layer = False  # Use phase-based logic
     
-    def setup_early_stopping(self, phase_num: int):
+    def _configure_backbone_freezing(self, freeze: bool, phase_num: int):
+        """Configure backbone freezing for the current training phase."""
+        try:
+            if hasattr(self.model, 'freeze_backbone') and hasattr(self.model, 'unfreeze_backbone'):
+                if freeze:
+                    self.model.freeze_backbone()
+                    logger.info(f"❄️ Backbone frozen for Phase {phase_num}")
+                else:
+                    self.model.unfreeze_backbone()
+                    logger.info(f"🔥 Backbone unfrozen for Phase {phase_num}")
+            else:
+                # Manual backbone freezing/unfreezing
+                backbone_params_modified = 0
+                for name, param in self.model.named_parameters():
+                    # Identify backbone parameters by common naming patterns
+                    if any(backbone_part in name.lower() for backbone_part in ['backbone', 'model.0', 'model.1', 'model.2', 'model.3', 'model.4']):
+                        param.requires_grad = not freeze
+                        backbone_params_modified += 1
+                
+                action = "frozen" if freeze else "unfrozen"
+                logger.info(f"{'❄️' if freeze else '🔥'} Manually {action} {backbone_params_modified} backbone parameters for Phase {phase_num}")
+                
+        except Exception as e:
+            logger.warning(f"⚠️ Failed to configure backbone freezing: {e}")
+    
+    def setup_early_stopping(self, phase_num: int, save_best_path: Optional[str] = None):
         """Set up phase-specific early stopping configuration."""
         # Get base early stopping configuration
         es_config = self.config.get('training', {}).get('early_stopping', {})
@@ -197,7 +250,7 @@ class PhaseOrchestrator:
         
         # Create early stopping instance with configuration
         from smartcash.model.training.utils.early_stopping import create_early_stopping
-        early_stopping = create_early_stopping(self.config)
+        early_stopping = create_early_stopping(self.config, save_best_path=save_best_path)
         
         logger.info(f"🔍 Early stopping object type: {type(early_stopping).__name__} | Config enabled: {es_config.get('enabled', True)} | Patience: {es_config.get('patience', 'N/A')}")
         

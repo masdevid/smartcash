@@ -56,21 +56,57 @@ from smartcash.model.evaluation import (
 from smartcash.model.api.core import create_api
 
 
-def create_evaluation_config() -> Dict[str, Any]:
-    """Create default evaluation configuration."""
+def create_evaluation_config(args=None) -> Dict[str, Any]:
+    """Create evaluation configuration with optional custom paths from arguments."""
+    
+    # Default paths
+    test_dir = "data/preprocessed/test"
+    evaluation_dir = "data/evaluation"
+    results_dir = "data/evaluation/results"
+    charts_dir = "data/evaluation/charts"
+    logs_dir = "logs/validation_metrics"
+    checkpoint_dir = "data/checkpoints"
+    
+    # Override with command line arguments if provided
+    if args:
+        test_dir = getattr(args, 'test_data_dir', test_dir)
+        results_dir = getattr(args, 'results_output_dir', results_dir)
+        charts_dir = getattr(args, 'charts_output_dir', charts_dir)
+        evaluation_dir = getattr(args, 'scenario_data_dir', evaluation_dir)
+        logs_dir = getattr(args, 'logs_dir', logs_dir)
+        checkpoint_dir = getattr(args, 'checkpoint_dir', checkpoint_dir)
+    
+    # Build discovery paths (include custom checkpoint dir first if different from default)
+    discovery_paths = []
+    if checkpoint_dir != "data/checkpoints":
+        discovery_paths.append(checkpoint_dir)
+    discovery_paths.extend([
+        "data/checkpoints",
+        "runs/train/*/weights",
+        "models/checkpoints"
+    ])
+    
     return {
+        "model": {
+            "model_name": "smartcash_yolov5_integrated",
+            "backbone": "cspdarknet",
+            "pretrained": True,
+            "layer_mode": "multi",
+            "detection_layers": ["layer_1", "layer_2", "layer_3"],
+            "num_classes": 17,  # Updated for hierarchical prediction (Layer 1: 0-6, Layer 2: 7-13, Layer 3: 14-16)
+            "img_size": 640,
+            "feature_optimization": {"enabled": True}
+        },
         "evaluation": {
             "data": {
-                "test_dir": "data/preprocessed/test",
-                "evaluation_dir": "data/evaluation",
-                "results_dir": "data/evaluation/results"
+                "test_dir": test_dir,
+                "evaluation_dir": evaluation_dir,
+                "results_dir": results_dir,
+                "charts_dir": charts_dir,
+                "logs_dir": logs_dir
             },
             "checkpoints": {
-                "discovery_paths": [
-                    "data/checkpoints",
-                    "runs/train/*/weights",
-                    "models/checkpoints"
-                ],
+                "discovery_paths": discovery_paths,
                 "filename_patterns": [
                     "best_*.pt",
                     "last.pt",
@@ -91,7 +127,7 @@ def create_evaluation_config() -> Dict[str, Any]:
                     "augmentation_config": {
                         "num_variations": 5,
                         "rotation_range": [-15, 15],
-                        "translation_range": 0.1,
+                        "translation_range": [-0.1, 0.1],
                         "scale_range": [0.8, 1.2]
                     }
                 },
@@ -302,38 +338,103 @@ def run_single_scenario(args) -> Dict[str, Any]:
     """Run evaluation on a single scenario."""
     print(f"🎯 Running single scenario evaluation: {args.scenario}")
     
-    config = create_evaluation_config()
+    config = create_evaluation_config(args)
     
-    # Create model API if needed
+    # Create model API with enhanced error handling
     model_api = None
     if args.checkpoint:
         try:
             print(f"🔧 Creating model API for checkpoint: {args.checkpoint}")
-            model_api = create_api(
-                config=config,
-                use_yolov5_integration=True
-            )
+            # Let the evaluation service create the API with checkpoint-specific config
+            # This ensures proper model configuration matching the checkpoint
+            model_api = None  # Will be created in evaluation service
+            print(f"📝 Model API will be created automatically by evaluation service")
         except Exception as e:
             print(f"⚠️ Warning: Could not create model API: {e}")
     
-    # Create evaluation service
-    service = create_evaluation_service(model_api=model_api, config=config)
-    
-    # Run scenario evaluation
-    result = service.run_scenario(args.scenario, args.checkpoint)
+    # Create evaluation service with enhanced configuration
+    try:
+        service = create_evaluation_service(model_api=model_api, config=config)
+        
+        # Run scenario evaluation
+        result = service.run_scenario(args.scenario, args.checkpoint)
+    except Exception as e:
+        print(f"❌ Error during scenario evaluation: {e}")
+        if args.verbose:
+            import traceback
+            traceback.print_exc()
+        return {'status': 'error', 'error': str(e)}
     
     if result['status'] == 'success':
         print(f"✅ Scenario evaluation completed successfully!")
         
         metrics = result['metrics']
-        print(f"\n📊 Results for {args.scenario}:")
-        print(f"   mAP: {metrics.get('mAP', 0):.3f}")
-        print(f"   Precision: {metrics.get('precision', 0):.3f}")
-        print(f"   Recall: {metrics.get('recall', 0):.3f}")
-        print(f"   F1-Score: {metrics.get('f1_score', 0):.3f}")
+        print(f"\n📊 Comprehensive Results for {args.scenario}:")
         
+        # mAP-based metrics (YOLOv5 training module)
+        print(f"\n🎯 mAP-based Metrics (Object Detection):")
+        print(f"   map50: {metrics.get('map50', 0):.3f}")
+        print(f"   map50_precision: {metrics.get('map50_precision', 0):.3f}")
+        print(f"   map50_recall: {metrics.get('map50_recall', 0):.3f}")
+        print(f"   map50_f1: {metrics.get('map50_f1', 0):.3f}")
+        
+        # Denomination classification metrics (7 classes)
+        print(f"\n💰 Denomination Classification Metrics (7 Classes):")
+        print(f"   accuracy: {metrics.get('accuracy', 0):.3f}")
+        print(f"   precision: {metrics.get('precision', 0):.3f}")
+        print(f"   recall: {metrics.get('recall', 0):.3f}")
+        print(f"   f1: {metrics.get('f1', 0):.3f}")
+        
+        # Performance metrics
+        print(f"\n⏱️ Performance Metrics:")
         if 'inference_time_avg' in metrics:
-            print(f"   Avg Inference Time: {metrics['inference_time_avg']:.3f}s")
+            print(f"   inference_time: {metrics['inference_time_avg']:.3f}s")
+            print(f"   fps: {metrics.get('fps', 0):.1f}")
+        
+        # Show confusion matrix if available
+        if 'confusion_matrix' in metrics:
+            confusion_matrix = metrics['confusion_matrix']
+            matrix_size = len(confusion_matrix)
+            
+            if matrix_size == 8:
+                print(f"\n📊 Confusion Matrix (8x8 - Denomination Classes + No Detection):")
+                print("     ", end="")
+                for i in range(7):
+                    print(f"  {i:2d}", end="")
+                print("  ND")  # No Detection
+            else:
+                print(f"\n📊 Confusion Matrix ({matrix_size}x{matrix_size} - Denomination Classes):")
+                print("     ", end="")
+                for i in range(matrix_size):
+                    print(f"  {i:2d}", end="")
+            
+            print()
+            for i, row in enumerate(confusion_matrix):
+                if matrix_size == 8 and i < 7:
+                    print(f" {i:2d}: ", end="")
+                elif matrix_size == 8 and i == 7:
+                    print(f" ND: ", end="")  # No Detection row
+                else:
+                    print(f" {i:2d}: ", end="")
+                    
+                for val in row:
+                    print(f"{val:4d}", end="")
+                print()
+            
+            # Show additional denomination metrics details
+            if 'total_samples' in metrics:
+                print(f"\n📊 Denomination Classification Details:")
+                print(f"   Total ground truth samples: {metrics['total_samples']}")
+                print(f"   Successfully detected: {metrics.get('detected_samples', 0)}")
+                print(f"   Missed detections: {metrics.get('missed_samples', 0)}")
+                detection_rate = (metrics.get('detected_samples', 0) / metrics['total_samples']) * 100 if metrics['total_samples'] > 0 else 0
+                print(f"   Detection rate: {detection_rate:.1f}%")
+        
+        # Legacy compatibility
+        if 'mAP' in metrics:
+            print(f"\n📈 Legacy Metrics:")
+            print(f"   mAP (legacy): {metrics.get('mAP', 0):.3f}")
+            print(f"   F1-Score (legacy): {metrics.get('f1_score', 0):.3f}")
         
     else:
         print(f"❌ Scenario evaluation failed: {result.get('error', 'Unknown error')}")
@@ -345,7 +446,7 @@ def run_all_scenarios(args) -> Dict[str, Any]:
     """Run evaluation on all enabled scenarios."""
     print(f"🚀 Running comprehensive evaluation on all scenarios")
     
-    config = create_evaluation_config()
+    config = create_evaluation_config(args)
     
     # Determine checkpoints to use
     checkpoints = get_selected_checkpoints(args, config)
@@ -361,15 +462,22 @@ def run_all_scenarios(args) -> Dict[str, Any]:
     metrics_callback = create_metrics_callback(args.verbose)
     progress_callback = create_progress_callback(args.verbose)
     
-    # Run comprehensive evaluation
-    result = run_evaluation_pipeline(
-        scenarios=None,  # Use all enabled scenarios
-        checkpoints=checkpoints,
-        model_api=None,  # Let the service create the API
-        config=config,
-        progress_callback=progress_callback,
-        ui_components={}
-    )
+    # Run comprehensive evaluation with improved error handling
+    try:
+        result = run_evaluation_pipeline(
+            scenarios=None,  # Use all enabled scenarios
+            checkpoints=checkpoints,
+            model_api=None,  # Let the service create the API
+            config=config,
+            progress_callback=progress_callback,
+            ui_components={}
+        )
+    except Exception as e:
+        print(f"❌ Error during evaluation pipeline: {e}")
+        if args.verbose:
+            import traceback
+            traceback.print_exc()
+        return {'status': 'error', 'error': str(e)}
     
     if result['status'] == 'success':
         print(f"\n✅ Comprehensive evaluation completed!")
@@ -401,7 +509,7 @@ def compare_backbones(args) -> Dict[str, Any]:
     """Compare performance across different backbones."""
     print(f"⚖️ Comparing backbone performance")
     
-    config = create_evaluation_config()
+    config = create_evaluation_config(args)
     
     # Get available checkpoints
     checkpoint_selector = create_checkpoint_selector(config)
@@ -429,20 +537,23 @@ def compare_backbones(args) -> Dict[str, Any]:
     
     print(f"📊 Found checkpoints for backbones: {list(backbone_best.keys())}")
     
-    # Run evaluation for each backbone
+    # Run evaluation for each backbone with error handling
     results = {}
     for backbone, checkpoint_path in backbone_best.items():
         print(f"\n🏗️ Evaluating {backbone} backbone...")
         print(f"   Using checkpoint: {Path(checkpoint_path).name}")
         
-        result = run_evaluation_pipeline(
-            scenarios=['position_variation', 'lighting_variation'],
-            checkpoints=[checkpoint_path],
-            config=config,
-            progress_callback=create_progress_callback(args.verbose)
-        )
-        
-        results[backbone] = result
+        try:
+            result = run_evaluation_pipeline(
+                scenarios=['position_variation', 'lighting_variation'],
+                checkpoints=[checkpoint_path],
+                config=config,
+                progress_callback=create_progress_callback(args.verbose)
+            )
+            results[backbone] = result
+        except Exception as e:
+            print(f"❌ Error evaluating {backbone}: {e}")
+            results[backbone] = {'status': 'error', 'error': str(e)}
     
     # Display comparison
     print(f"\n📊 BACKBONE COMPARISON RESULTS")
@@ -472,7 +583,7 @@ def list_available_resources(args) -> None:
     print(f"📋 Available Resources")
     print("=" * 40)
     
-    config = create_evaluation_config()
+    config = create_evaluation_config(args)
     
     # List checkpoints
     print(f"\n🏷️ Available Checkpoints:")
@@ -518,7 +629,7 @@ def setup_scenarios(args) -> None:
     """Setup and prepare evaluation scenarios."""
     print(f"🚀 Setting up evaluation scenarios")
     
-    config = create_evaluation_config()
+    config = create_evaluation_config(args)
     scenario_manager = create_scenario_manager(config)
     
     # Prepare all scenarios
@@ -531,7 +642,8 @@ def setup_scenarios(args) -> None:
     
     # Display detailed results
     for scenario_name, scenario_result in result['results'].items():
-        if scenario_result['status'] == 'successful' or scenario_result['status'] == 'existing':
+        status = scenario_result.get('status', 'unknown')
+        if status in ['successful', 'existing']:
             print(f"   ✅ {scenario_name}: Ready")
             if 'validation' in scenario_result:
                 validation = scenario_result['validation']
@@ -568,6 +680,18 @@ Examples:
   
   # Setup evaluation scenarios (required before first evaluation)
   python examples/evaluations.py --setup-scenarios --force-regenerate
+  
+  # Use custom data directories (useful for different datasets or environments)
+  python examples/evaluations.py --scenario position_variation --checkpoint best_model.pt \\
+    --test-data-dir /path/to/custom/test/data \\
+    --charts-output-dir /path/to/custom/charts \\
+    --results-output-dir /path/to/custom/results
+  
+  # Evaluate with external test data and save charts to specific location
+  python examples/evaluations.py --all-scenarios --checkpoint-dir /external/checkpoints \\
+    --test-data-dir /external/test/data \\
+    --charts-output-dir /external/evaluation/charts \\
+    --scenario-data-dir /external/evaluation/scenarios
         """
     )
     
@@ -610,6 +734,18 @@ Examples:
                        help='Force regeneration of scenario data')
     parser.add_argument('--verbose', action='store_true',
                        help='Enable verbose output')
+    
+    # Custom folder paths for different data sources
+    parser.add_argument('--test-data-dir', type=str, default='data/preprocessed/test',
+                       help='Directory containing test data (default: data/preprocessed/test)')
+    parser.add_argument('--charts-output-dir', type=str, default='data/evaluation/charts',
+                       help='Directory to save evaluation charts (default: data/evaluation/charts)')
+    parser.add_argument('--results-output-dir', type=str, default='data/evaluation/results',
+                       help='Directory to save evaluation results (default: data/evaluation/results)')
+    parser.add_argument('--scenario-data-dir', type=str, default='data/evaluation',
+                       help='Directory containing scenario data (default: data/evaluation)')
+    parser.add_argument('--logs-dir', type=str, default='logs/validation_metrics',
+                       help='Directory for evaluation logs (default: logs/validation_metrics)')
     
     return parser
 

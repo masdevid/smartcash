@@ -390,6 +390,39 @@ class SmartCashModelAPI:
                 'success': False,
                 'error': str(e)
             }
+    
+    def load_checkpoint(self, checkpoint_path: Optional[str] = None, **kwargs) -> Dict[str, Any]:
+        """
+        Load model from checkpoint.
+        
+        Args:
+            checkpoint_path: Path to checkpoint file
+            **kwargs: Additional loading parameters
+            
+        Returns:
+            Loading result dictionary
+        """
+        try:
+            if not hasattr(self, 'model') or self.model is None:
+                # Build model first if not already built
+                build_result = self.build_model(**kwargs)
+                if not build_result.get('success', False):
+                    return build_result
+            
+            result = self.checkpoint_manager.load_checkpoint(self.model, checkpoint_path)
+            self.logger.info(f"✅ Checkpoint loaded: {result['checkpoint_path']}")
+            
+            # Add success field for evaluation service compatibility
+            result['success'] = True
+            return result
+            
+        except Exception as e:
+            error_msg = f"❌ Checkpoint loading failed: {str(e)}"
+            self.logger.error(error_msg)
+            return {
+                'success': False,
+                'error': str(e)
+            }
 
 
 def create_api(config_path: Optional[str] = None, **kwargs) -> SmartCashModelAPI:

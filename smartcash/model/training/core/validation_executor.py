@@ -188,7 +188,7 @@ class ValidationExecutor:
                 if hasattr(self.prediction_processor, 'last_normalized_predictions') and self.prediction_processor.last_normalized_predictions is not None:
                     self.map_processor.update_map_calculator(
                         self.prediction_processor.last_normalized_predictions,
-                        targets, images, batch_idx
+                        targets, images, batch_idx, epoch
                     )
                 else:
                     # Fallback: Try to get predictions from batch processor if available
@@ -196,7 +196,7 @@ class ValidationExecutor:
                         if self.batch_processor.prediction_processor.last_normalized_predictions is not None:
                             self.map_processor.update_map_calculator(
                                 self.batch_processor.prediction_processor.last_normalized_predictions,
-                                targets, images, batch_idx
+                                targets, images, batch_idx, epoch
                             )
                     else:
                         # Log the issue for debugging

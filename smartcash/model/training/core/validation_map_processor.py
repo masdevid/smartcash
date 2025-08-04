@@ -25,7 +25,7 @@ class ValidationMapProcessor:
         """
         self.map_calculator = map_calculator
     
-    def update_map_calculator(self, predictions, targets, images, batch_idx):
+    def update_map_calculator(self, predictions, targets, images, batch_idx, epoch=0):
         """
         Update mAP calculator with batch data for object detection metrics.
         
@@ -34,6 +34,7 @@ class ValidationMapProcessor:
             targets: Ground truth targets
             images: Input images
             batch_idx: Current batch index
+            epoch: Current epoch number for debug logging
         """
         try:
             # Debug: Log raw prediction data (only when debug logging is enabled)
@@ -76,7 +77,7 @@ class ValidationMapProcessor:
                         logger.debug(f"  • Non-zero confidences: {(conf_scores > 0.01).sum().item()}/{conf_scores.numel()}")
                         logger.debug(f"  • Classes present: {map_predictions[:, :, 5].unique() if map_predictions.dim() == 3 else map_predictions[:, 5].unique()}")
                 
-                self.map_calculator.update(map_predictions, map_targets)
+                self.map_calculator.update(map_predictions, map_targets, epoch)
                 
                 if batch_idx == 0:
                     logger.debug(f"mAP data - Predictions: {map_predictions.shape}, Targets: {map_targets.shape}")

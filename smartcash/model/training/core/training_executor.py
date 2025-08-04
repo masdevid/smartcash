@@ -186,33 +186,20 @@ class TrainingExecutor:
     
     def _should_process_batch_for_metrics(self, batch_idx: int, num_batches: int) -> bool:
         """
-        Determine if this batch should be processed for metrics to manage memory usage.
+        Determine if this batch should be processed for metrics.
         
-        Strategy: Process every Nth batch and always process the last batch to get
-        a representative sample across the epoch.
+        Layer metrics are critical for accurate training assessment, so we process
+        ALL batches to ensure reliable metrics calculation.
         
         Args:
             batch_idx: Current batch index
             num_batches: Total number of batches in epoch
             
         Returns:
-            True if batch should be processed for metrics
+            True (always process all batches for accurate metrics)
         """
-        # Always process the last batch
-        if batch_idx == num_batches - 1:
-            return True
-        
-        # For smaller datasets (<=10 batches), process all batches
-        if num_batches <= 10:
-            return True
-        
-        # For medium datasets (11-50 batches), process every 3rd batch
-        elif num_batches <= 50:
-            return batch_idx % 3 == 0
-        
-        # For large datasets (>50 batches), process every 5th batch
-        else:
-            return batch_idx % 5 == 0
+        # Process ALL batches for accurate layer metrics
+        return True
     
     def _should_use_full_metrics_processing(self, predictions: Dict, phase_num: int) -> bool:
         """

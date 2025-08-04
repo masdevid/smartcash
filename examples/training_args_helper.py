@@ -59,6 +59,7 @@ Examples:
   %(prog)s --no-tqdm --verbose  # Use simple text progress instead of tqdm bars
   %(prog)s --no-early-stopping --phase1-epochs 5 --phase2-epochs 10  # Disable early stopping
   %(prog)s --patience 20 --es-metric val_accuracy --es-mode max --min-delta 0.01  # Custom early stopping
+  %(prog)s --phase-specific-early-stopping --phase1-epochs 5 --phase2-epochs 10  # Smart phase-aware early stopping
   %(prog)s --debug-map --verbose  # Enable hierarchical mAP debug logging
         """
     )
@@ -124,6 +125,8 @@ Examples:
                        help='Enable early stopping (default: enabled based on config)')
     parser.add_argument('--no-early-stopping', action='store_true',
                        help='Disable early stopping completely')
+    parser.add_argument('--phase-specific-early-stopping', action='store_true',
+                       help='Enable phase-specific early stopping with custom criteria for Phase 1 and Phase 2')
     parser.add_argument('--patience', type=int, default=15,
                        help='Early stopping patience - epochs to wait before stopping (default: 15)')
     parser.add_argument('--es-metric', type=str, default='val_accuracy',
@@ -255,6 +258,8 @@ def print_training_configuration(args: Any) -> None:
     print(f"\n🛑 Early Stopping Configuration:")
     if args.no_early_stopping:
         es_status = "Disabled"
+    elif args.phase_specific_early_stopping:
+        es_status = "Phase-specific (smart criteria)"
     elif args.early_stopping:
         es_status = "Enabled (forced)"
     else:
@@ -262,11 +267,16 @@ def print_training_configuration(args: Any) -> None:
     
     print(f"   • Status: {es_status}")
     if not args.no_early_stopping:
-        print(f"   • Patience: {args.patience} epochs")
-        print(f"   • Metric: {args.es_metric}")
-        mode_desc = 'increase' if args.es_mode == 'max' else 'decrease'
-        print(f"   • Mode: {args.es_mode} (better values should {mode_desc})")
-        print(f"   • Min delta: {args.min_delta}")
+        if args.phase_specific_early_stopping:
+            print(f"   • Type: Phase-specific with custom criteria")
+            print(f"   • Phase 1: Train loss plateau + val_accuracy stability")
+            print(f"   • Phase 2: F1/mAP improvement + overfitting detection")
+        else:
+            print(f"   • Patience: {args.patience} epochs")
+            print(f"   • Metric: {args.es_metric}")
+            mode_desc = 'increase' if args.es_mode == 'max' else 'decrease'
+            print(f"   • Mode: {args.es_mode} (better values should {mode_desc})")
+            print(f"   • Min delta: {args.min_delta}")
     
     print("\n" + "=" * 80)
 
@@ -313,9 +323,11 @@ def get_training_kwargs(args: Any) -> dict:
         # Early stopping configuration parameters
         'early_stopping_enabled': not args.no_early_stopping,
         'early_stopping_patience': args.patience,
+        'patience': args.patience,  # Also include direct patience mapping for fallback compatibility
         'early_stopping_metric': args.es_metric,
         'early_stopping_mode': args.es_mode,
         'early_stopping_min_delta': args.min_delta,
+        'phase_specific_early_stopping': args.phase_specific_early_stopping,
         # Validation metrics: Always use both YOLOv5 hierarchical and per-layer metrics
         'validation_metrics_config': {
             'use_hierarchical_validation': True

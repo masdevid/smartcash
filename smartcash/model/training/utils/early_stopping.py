@@ -397,6 +397,370 @@ class AdaptiveEarlyStopping(EarlyStopping):
         
         return {**base_info, **adaptive_info}
 
+class PhaseSpecificEarlyStopping:
+    """Early stopping dengan phase-specific criteria untuk SmartCash two-phase training"""
+    
+    def __init__(self, phase1_config: Dict[str, Any] = None, phase2_config: Dict[str, Any] = None, 
+                 verbose: bool = True):
+        """
+        Initialize phase-specific early stopping
+        
+        Args:
+            phase1_config: Configuration untuk Phase 1 early stopping criteria
+            phase2_config: Configuration untuk Phase 2 early stopping criteria  
+            verbose: Print status messages
+        """
+        self.verbose = verbose
+        self.current_phase = 1
+        self.should_stop = False
+        self.stopped_epoch = 0
+        self.stop_reason = ""
+        
+        # Phase 1 configuration - Train loss plateau + val_accuracy/f1 stability
+        self.phase1_config = phase1_config or {
+            'loss_patience': 8,           # Epochs untuk monitor train loss plateau
+            'loss_min_delta': 0.01,       # Minimum delta untuk loss improvement
+            'metric_patience': 6,         # Epochs untuk monitor val_accuracy/f1 stability
+            'metric_min_delta': 0.005,    # Minimum delta untuk metric improvement
+            'metric_name': 'val_accuracy', # Primary metric (val_accuracy atau f1)
+            'stability_threshold': 0.002   # Threshold untuk "stabil atau naik pelan"
+        }
+        
+        # Phase 2 configuration - F1 dan mAP improvement with overfitting detection  
+        self.phase2_config = phase2_config or {
+            'f1_patience': 10,            # Patience untuk F1 improvement
+            'map_patience': 10,           # Patience untuk mAP improvement  
+            'min_improvement': 0.01,      # Minimum improvement threshold
+            'overfitting_threshold': 0.05, # Max train/val gap sebelum overfitting
+            'overfitting_patience': 5,    # Epochs untuk monitor overfitting
+            'combo_mode': 'both'          # 'both' (F1 and mAP), 'any' (F1 or mAP)
+        }
+        
+        # State tracking untuk Phase 1
+        self.phase1_loss_history = []
+        self.phase1_metric_history = []
+        self.phase1_loss_wait = 0
+        self.phase1_metric_wait = 0
+        self.phase1_best_loss = None
+        self.phase1_best_metric = None
+        
+        # State tracking untuk Phase 2
+        self.phase2_f1_history = []
+        self.phase2_map_history = []
+        self.phase2_train_val_gaps = []
+        self.phase2_f1_wait = 0
+        self.phase2_map_wait = 0
+        self.phase2_overfitting_wait = 0
+        self.phase2_best_f1 = None
+        self.phase2_best_map = None
+        
+        if self.verbose:
+            print(f"🎯 Phase-specific early stopping initialized")
+            print(f"   Phase 1: Loss patience={self.phase1_config['loss_patience']}, "
+                  f"Metric patience={self.phase1_config['metric_patience']}")
+            print(f"   Phase 2: F1/mAP patience={self.phase2_config['f1_patience']}, "
+                  f"Overfitting threshold={self.phase2_config['overfitting_threshold']}")
+    
+    def set_phase(self, phase: int) -> None:
+        """Set current training phase"""
+        if phase != self.current_phase:
+            self.current_phase = phase
+            if self.verbose:
+                print(f"🔄 Early stopping switched to Phase {phase}")
+    
+    def __call__(self, metrics: Dict[str, float], model: Optional[torch.nn.Module] = None,
+                 epoch: int = None) -> bool:
+        """
+        Check early stopping berdasarkan current phase dan metrics
+        
+        Args:
+            metrics: Dictionary containing training metrics
+            model: Model untuk weight management
+            epoch: Current epoch number
+            
+        Returns:
+            True jika should stop
+        """
+        epoch = epoch or 0
+        
+        if self.current_phase == 1:
+            return self._check_phase1_stopping(metrics, epoch)
+        elif self.current_phase == 2:
+            return self._check_phase2_stopping(metrics, epoch)
+        else:
+            if self.verbose:
+                print(f"⚠️ Unknown phase {self.current_phase}, no early stopping applied")
+            return False
+    
+    def _check_phase1_stopping(self, metrics: Dict[str, float], epoch: int) -> bool:
+        """
+        Phase 1 criteria: Train loss mulai mendatar + val_accuracy atau f1 stabil atau naik pelan
+        """
+        train_loss = metrics.get('train_loss')
+        metric_name = self.phase1_config['metric_name']
+        metric_value = metrics.get(metric_name)
+        
+        if train_loss is None or metric_value is None:
+            return False
+        
+        # Track histories
+        self.phase1_loss_history.append(train_loss)
+        self.phase1_metric_history.append(metric_value)
+        
+        # Check train loss plateau
+        loss_plateaued = self._check_loss_plateau(train_loss)
+        
+        # Check metric stability/slow improvement
+        metric_stable = self._check_metric_stability(metric_value)
+        
+        # Early stop jika BOTH conditions met
+        if loss_plateaued and metric_stable:
+            self.should_stop = True
+            self.stopped_epoch = epoch
+            self.stop_reason = f"Phase 1: Train loss plateau ({self.phase1_loss_wait}/{self.phase1_config['loss_patience']}) + {metric_name} stable ({self.phase1_metric_wait}/{self.phase1_config['metric_patience']})"
+            
+            if self.verbose:
+                print(f"🛑 Phase 1 early stopping triggered!")
+                print(f"   📉 Train loss plateaued: {train_loss:.6f} (wait: {self.phase1_loss_wait})")
+                print(f"   📊 {metric_name} stable: {metric_value:.6f} (wait: {self.phase1_metric_wait})")
+            
+            return True
+        
+        # Update wait counters and provide feedback
+        if self.verbose and (loss_plateaued or metric_stable):
+            status_parts = []
+            if loss_plateaued:
+                status_parts.append(f"Loss plateaued ({self.phase1_loss_wait}/{self.phase1_config['loss_patience']})")
+            if metric_stable:
+                status_parts.append(f"{metric_name} stable ({self.phase1_metric_wait}/{self.phase1_config['metric_patience']})")
+            
+            if status_parts:
+                print(f"⏳ Phase 1 ES: {' + '.join(status_parts)}")
+        
+        return False
+    
+    def _check_loss_plateau(self, current_loss: float) -> bool:
+        """Check if train loss has plateaued"""
+        if self.phase1_best_loss is None or current_loss < (self.phase1_best_loss - self.phase1_config['loss_min_delta']):
+            self.phase1_best_loss = current_loss
+            self.phase1_loss_wait = 0
+            return False
+        else:
+            self.phase1_loss_wait += 1
+            return self.phase1_loss_wait >= self.phase1_config['loss_patience']
+    
+    def _check_metric_stability(self, current_metric: float) -> bool:
+        """Check if validation metric is stable atau naik pelan"""
+        stability_threshold = self.phase1_config['stability_threshold']
+        
+        if self.phase1_best_metric is None:
+            self.phase1_best_metric = current_metric
+            self.phase1_metric_wait = 0
+            return False
+        
+        # Check untuk improvement yang significant
+        improvement = current_metric - self.phase1_best_metric
+        
+        if improvement > self.phase1_config['metric_min_delta']:
+            # Significant improvement - reset wait
+            self.phase1_best_metric = current_metric
+            self.phase1_metric_wait = 0
+            return False
+        elif improvement > stability_threshold:
+            # Small improvement (naik pelan) - increment wait but slower
+            self.phase1_metric_wait += 0.5
+        else:
+            # No improvement atau decline (stabil) - increment wait
+            self.phase1_metric_wait += 1
+        
+        return self.phase1_metric_wait >= self.phase1_config['metric_patience']
+    
+    def _check_phase2_stopping(self, metrics: Dict[str, float], epoch: int) -> bool:
+        """
+        Phase 2 criteria: F1 dan mAP meningkat dan stabil, overfitting belum terlihat (gap train/val kecil)
+        """
+        f1_score = metrics.get('f1') or metrics.get('val_f1')
+        map_score = metrics.get('map50') or metrics.get('val_map50') 
+        train_loss = metrics.get('train_loss')
+        val_loss = metrics.get('val_loss')
+        
+        if f1_score is None or map_score is None:
+            return False
+        
+        # Track histories
+        self.phase2_f1_history.append(f1_score)
+        self.phase2_map_history.append(map_score)
+        
+        # Track train/val gap untuk overfitting detection
+        if train_loss is not None and val_loss is not None:
+            gap = abs(val_loss - train_loss)
+            self.phase2_train_val_gaps.append(gap)
+        
+        # Check F1 stagnation
+        f1_stagnant = self._check_phase2_metric_stagnation(f1_score, 'f1')
+        
+        # Check mAP stagnation  
+        map_stagnant = self._check_phase2_metric_stagnation(map_score, 'map')
+        
+        # Check overfitting
+        overfitting_detected = self._check_overfitting()
+        
+        # Determine stopping condition berdasarkan combo_mode
+        combo_mode = self.phase2_config['combo_mode']
+        
+        if overfitting_detected:
+            self.should_stop = True
+            self.stopped_epoch = epoch
+            self.stop_reason = f"Phase 2: Overfitting detected (train/val gap > {self.phase2_config['overfitting_threshold']})"
+            
+            if self.verbose:
+                print(f"🛑 Phase 2 early stopping triggered!")
+                print(f"   📈 Overfitting detected: train/val gap too large")
+            
+            return True
+        
+        elif combo_mode == 'both' and f1_stagnant and map_stagnant:
+            self.should_stop = True
+            self.stopped_epoch = epoch
+            self.stop_reason = f"Phase 2: Both F1 and mAP stagnant"
+            
+            if self.verbose:
+                print(f"🛑 Phase 2 early stopping triggered!")
+                print(f"   📊 F1 stagnant: {f1_score:.6f} (wait: {self.phase2_f1_wait})")
+                print(f"   📊 mAP stagnant: {map_score:.6f} (wait: {self.phase2_map_wait})")
+            
+            return True
+        
+        elif combo_mode == 'any' and (f1_stagnant or map_stagnant):
+            stagnant_metric = "F1" if f1_stagnant else "mAP"
+            self.should_stop = True
+            self.stopped_epoch = epoch
+            self.stop_reason = f"Phase 2: {stagnant_metric} stagnant"
+            
+            if self.verbose:
+                print(f"🛑 Phase 2 early stopping triggered!")
+                print(f"   📊 {stagnant_metric} stagnant")
+            
+            return True
+        
+        # Provide progress feedback
+        if self.verbose and (f1_stagnant or map_stagnant or overfitting_detected):
+            status_parts = []
+            if f1_stagnant:
+                status_parts.append(f"F1 stagnant ({self.phase2_f1_wait}/{self.phase2_config['f1_patience']})")
+            if map_stagnant:
+                status_parts.append(f"mAP stagnant ({self.phase2_map_wait}/{self.phase2_config['map_patience']})")
+            if overfitting_detected:
+                status_parts.append(f"Overfitting risk ({self.phase2_overfitting_wait}/{self.phase2_config['overfitting_patience']})")
+            
+            if status_parts:
+                print(f"⏳ Phase 2 ES: {' + '.join(status_parts)}")
+        
+        return False
+    
+    def _check_phase2_metric_stagnation(self, current_score: float, metric_type: str) -> bool:
+        """Check if F1 or mAP has stagnated"""
+        if metric_type == 'f1':
+            best_score = self.phase2_best_f1
+            wait_counter = self.phase2_f1_wait
+            patience = self.phase2_config['f1_patience']
+        else:  # map
+            best_score = self.phase2_best_map
+            wait_counter = self.phase2_map_wait
+            patience = self.phase2_config['map_patience']
+        
+        min_improvement = self.phase2_config['min_improvement']
+        
+        if best_score is None or current_score > (best_score + min_improvement):
+            # Improvement detected
+            if metric_type == 'f1':
+                self.phase2_best_f1 = current_score
+                self.phase2_f1_wait = 0
+            else:
+                self.phase2_best_map = current_score
+                self.phase2_map_wait = 0
+            return False
+        else:
+            # No improvement
+            if metric_type == 'f1':
+                self.phase2_f1_wait += 1
+                return self.phase2_f1_wait >= patience
+            else:
+                self.phase2_map_wait += 1
+                return self.phase2_map_wait >= patience
+    
+    def _check_overfitting(self) -> bool:
+        """Check for overfitting berdasarkan train/val gap"""
+        if len(self.phase2_train_val_gaps) < 3:  # Need at least 3 epochs untuk trend
+            return False
+        
+        # Check recent gaps
+        recent_gaps = self.phase2_train_val_gaps[-3:]
+        avg_recent_gap = np.mean(recent_gaps)
+        
+        overfitting_threshold = self.phase2_config['overfitting_threshold']
+        
+        if avg_recent_gap > overfitting_threshold:
+            self.phase2_overfitting_wait += 1
+        else:
+            self.phase2_overfitting_wait = 0
+        
+        return self.phase2_overfitting_wait >= self.phase2_config['overfitting_patience']
+    
+    def get_status_summary(self) -> Dict[str, Any]:
+        """Get comprehensive status summary"""
+        return {
+            'current_phase': self.current_phase,
+            'should_stop': self.should_stop,
+            'stopped_epoch': self.stopped_epoch,
+            'stop_reason': self.stop_reason,
+            'phase1_status': {
+                'loss_wait': self.phase1_loss_wait,
+                'loss_patience': self.phase1_config['loss_patience'],
+                'metric_wait': self.phase1_metric_wait,
+                'metric_patience': self.phase1_config['metric_patience'],
+                'best_loss': self.phase1_best_loss,
+                'best_metric': self.phase1_best_metric
+            },
+            'phase2_status': {
+                'f1_wait': self.phase2_f1_wait,
+                'f1_patience': self.phase2_config['f1_patience'],
+                'map_wait': self.phase2_map_wait,
+                'map_patience': self.phase2_config['map_patience'],
+                'overfitting_wait': self.phase2_overfitting_wait,
+                'overfitting_patience': self.phase2_config['overfitting_patience'],
+                'best_f1': self.phase2_best_f1,
+                'best_map': self.phase2_best_map
+            }
+        }
+    
+    def reset(self) -> None:
+        """Reset all state untuk new training session"""
+        self.should_stop = False
+        self.stopped_epoch = 0
+        self.stop_reason = ""
+        
+        # Reset Phase 1 state
+        self.phase1_loss_history = []
+        self.phase1_metric_history = []
+        self.phase1_loss_wait = 0
+        self.phase1_metric_wait = 0
+        self.phase1_best_loss = None
+        self.phase1_best_metric = None
+        
+        # Reset Phase 2 state
+        self.phase2_f1_history = []
+        self.phase2_map_history = []
+        self.phase2_train_val_gaps = []
+        self.phase2_f1_wait = 0
+        self.phase2_map_wait = 0
+        self.phase2_overfitting_wait = 0
+        self.phase2_best_f1 = None
+        self.phase2_best_map = None
+        
+        if self.verbose:
+            print("🔄 Phase-specific early stopping state reset")
+
 # Convenience functions
 def create_early_stopping(config: Dict[str, Any], save_best_path: Optional[str] = None) -> EarlyStopping:
     """Factory function untuk create early stopping dari config"""
@@ -476,4 +840,82 @@ def create_adaptive_early_stopping(config: Dict[str, Any]) -> AdaptiveEarlyStopp
         min_delta=es_config.get('min_delta', 0.001),
         metric=es_config.get('metric', 'val_accuracy'),
         mode=es_config.get('mode', 'max')
+    )
+
+def create_phase_specific_early_stopping(config: Dict[str, Any]) -> PhaseSpecificEarlyStopping:
+    """Create phase-specific early stopping dari config dengan SmartCash training criteria"""
+    es_config = config.get('training', {}).get('early_stopping', {})
+    training_config = config.get('training', {})
+    
+    # Determine if phase-specific early stopping is enabled
+    if not es_config.get('enabled', True) or not es_config.get('phase_specific', False):
+        # Return disabled early stopping
+        class DisabledPhaseEarlyStopping:
+            def __init__(self):
+                self.current_phase = 1
+                self.should_stop = False
+                
+            def set_phase(self, phase): 
+                self.current_phase = phase
+                
+            def __call__(self, metrics, model=None, epoch=0): 
+                return False
+                
+            def get_status_summary(self): 
+                return {'should_stop': False}
+                
+            def reset(self): 
+                pass
+        
+        return DisabledPhaseEarlyStopping()
+    
+    # Phase 1 configuration dari config dengan smart defaults
+    phase1_defaults = {
+        'loss_patience': 8,
+        'loss_min_delta': 0.01,
+        'metric_patience': 6,
+        'metric_min_delta': 0.005,
+        'metric_name': 'val_accuracy',  # atau 'f1' tergantung preference
+        'stability_threshold': 0.002
+    }
+    
+    phase1_config = es_config.get('phase1', {})
+    for key, default_value in phase1_defaults.items():
+        phase1_config.setdefault(key, default_value)
+    
+    # Phase 2 configuration dari config dengan smart defaults
+    phase2_defaults = {
+        'f1_patience': 10,
+        'map_patience': 10,
+        'min_improvement': 0.01,
+        'overfitting_threshold': 0.05,
+        'overfitting_patience': 5,
+        'combo_mode': 'both'  # atau 'any' untuk less strict
+    }
+    
+    phase2_config = es_config.get('phase2', {})
+    for key, default_value in phase2_defaults.items():
+        phase2_config.setdefault(key, default_value)
+    
+    # Apply global patience setting if specified (allows --patience to influence phase-specific early stopping)
+    if 'patience' in es_config and es_config['patience'] != 15:  # 15 is the default, so only override if user specified different value
+        user_patience = es_config['patience']
+        # Scale the phase-specific patience values proportionally
+        phase1_config['loss_patience'] = max(int(user_patience * 0.5), 3)  # At least 3 epochs
+        phase1_config['metric_patience'] = max(int(user_patience * 0.4), 3)  # At least 3 epochs
+        phase2_config['f1_patience'] = max(int(user_patience * 0.7), 5)  # At least 5 epochs
+        phase2_config['map_patience'] = max(int(user_patience * 0.7), 5)  # At least 5 epochs
+        phase2_config['overfitting_patience'] = max(int(user_patience * 0.3), 3)  # At least 3 epochs
+    
+    # Adjust based on training mode
+    training_mode = training_config.get('training_mode', 'two_phase')
+    if training_mode == 'single_phase':
+        # Only Phase 1 will be used - use full patience value
+        phase1_config['loss_patience'] = es_config.get('patience', 15)
+        phase1_config['metric_patience'] = es_config.get('patience', 15)
+    
+    return PhaseSpecificEarlyStopping(
+        phase1_config=phase1_config,
+        phase2_config=phase2_config,
+        verbose=es_config.get('verbose', True)
     )

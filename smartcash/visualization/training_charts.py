@@ -73,7 +73,7 @@ class TrainingChartsVisualizer:
     
     def create_loss_charts(self, save: bool = True) -> Dict[str, Any]:
         """
-        Create loss progression charts per phase.
+        Create enhanced loss progression charts per phase with improved scaling.
         
         Args:
             save: Whether to save charts to disk
@@ -85,11 +85,16 @@ class TrainingChartsVisualizer:
             logger.warning("No metrics data available")
             return {}
         
+        # Create contextual title
+        contextual_title = self._get_contextual_title()
+        
         # Create figure with subplots for each phase
         num_phases = len(self.phase_data)
-        fig, axes = plt.subplots(1, num_phases, figsize=(6*num_phases, 5))
+        fig, axes = plt.subplots(1, num_phases, figsize=(8*num_phases, 6))
         if num_phases == 1:
             axes = [axes]
+        
+        fig.suptitle(contextual_title, fontsize=16, fontweight='bold')
         
         chart_data = {}
         
@@ -101,32 +106,15 @@ class TrainingChartsVisualizer:
             train_losses = [record['train_loss'] for record in data]
             val_losses = [record['val_loss'] for record in data]
             
-            # Plot losses
-            ax.plot(epochs, train_losses, 'b-', label='Train Loss', linewidth=2, marker='o', markersize=3)
-            ax.plot(epochs, val_losses, 'r-', label='Validation Loss', linewidth=2, marker='s', markersize=3)
-            
-            # Styling
-            ax.set_title(f'Phase {phase} - Loss Progression', fontsize=14, fontweight='bold')
-            ax.set_xlabel('Epoch', fontsize=12)
-            ax.set_ylabel('Loss', fontsize=12)
-            ax.legend()
-            ax.grid(True, alpha=0.3)
-            
-            # Add annotations for best values
-            best_val_epoch = np.argmin(val_losses)
-            best_val_loss = min(val_losses)
-            ax.annotate(f'Best: {best_val_loss:.4f}', 
-                       xy=(epochs[best_val_epoch], best_val_loss),
-                       xytext=(10, 10), textcoords='offset points',
-                       bbox=dict(boxstyle='round,pad=0.3', facecolor='yellow', alpha=0.7),
-                       arrowprops=dict(arrowstyle='->', connectionstyle='arc3,rad=0'))
+            # Enhanced loss plotting with better scaling
+            self._plot_enhanced_loss_curves(ax, epochs, train_losses, val_losses, phase)
             
             chart_data[f'phase_{phase}'] = {
                 'epochs': epochs,
                 'train_loss': train_losses,
                 'val_loss': val_losses,
-                'best_val_loss': best_val_loss,
-                'best_val_epoch': epochs[best_val_epoch]
+                'best_val_loss': min(val_losses),
+                'best_val_epoch': epochs[np.argmin(val_losses)]
             }
         
         plt.tight_layout()
@@ -134,8 +122,8 @@ class TrainingChartsVisualizer:
         # Save chart
         if save:
             chart_path = self.output_dir / 'loss_progression.png'
-            plt.savefig(chart_path, dpi=300, bbox_inches='tight')
-            logger.info(f"Loss chart saved to: {chart_path}")
+            plt.savefig(chart_path, dpi=300, bbox_inches='tight', facecolor='white', edgecolor='none')
+            logger.info(f"Enhanced loss chart saved to: {chart_path}")
             chart_data['file_path'] = str(chart_path)
         
         plt.show()
@@ -443,6 +431,228 @@ class TrainingChartsVisualizer:
         }
         
         logger.info(f"Generated {results['summary']['charts_generated']} charts in {self.output_dir}")
+        return results
+    
+    def _get_contextual_title(self) -> str:
+        """Generate contextual chart title based on training data."""
+        if not self.metrics_data:
+            return "SmartCash Training Progress"
+        
+        # Extract training context
+        first_record = self.metrics_data[0]
+        last_record = self.metrics_data[-1]
+        
+        # Try to determine backbone and configuration
+        backbone = "Unknown Backbone"
+        total_epochs = len(self.metrics_data)
+        
+        # Determine phase information
+        phases_used = set(record['phase'] for record in self.metrics_data)
+        
+        if len(phases_used) > 1:
+            phase_info = f"Two-Phase Training ({min(phases_used)} → {max(phases_used)})"
+        elif phases_used:
+            phase_info = f"Single-Phase Training (Phase {list(phases_used)[0]})"
+        else:
+            phase_info = "Training Progress"
+        
+        return f"SmartCash {backbone} - {phase_info} ({total_epochs} epochs)"
+    
+    def _plot_enhanced_loss_curves(self, ax, epochs, train_losses, val_losses, phase):
+        """Plot loss curves with enhanced scaling for small decreasing values."""
+        # Plot losses with enhanced styling
+        ax.plot(epochs, train_losses, 'b-', label='Training Loss', linewidth=2.5, marker='o', markersize=4, alpha=0.8)
+        ax.plot(epochs, val_losses, 'r-', label='Validation Loss', linewidth=2.5, marker='s', markersize=4, alpha=0.8)
+        
+        # Enhanced scaling for small decreasing values
+        all_losses = train_losses + val_losses
+        if all_losses:
+            min_loss = min(all_losses)
+            max_loss = max(all_losses)
+            loss_range = max_loss - min_loss
+            
+            # If loss range is very small (< 0.1), use linear scale with padding
+            if loss_range < 0.1:
+                # Small decreasing losses - add padding to show curve clearly
+                padding = loss_range * 0.15 if loss_range > 0 else 0.01
+                ax.set_ylim(min_loss - padding, max_loss + padding)
+            elif min_loss > 0 and max_loss / min_loss > 10:
+                # Large range - use log scale
+                ax.set_yscale('log')
+        
+        # Enhanced styling
+        ax.set_title(f'Phase {phase} - Loss Progression', fontsize=14, fontweight='bold')
+        ax.set_xlabel('Epoch', fontsize=12)
+        ax.set_ylabel('Loss', fontsize=12)
+        ax.legend(loc='upper right')
+        ax.grid(True, alpha=0.3)
+        
+        # Add best validation loss annotation
+        best_val_epoch = np.argmin(val_losses)
+        best_val_loss = min(val_losses)
+        ax.annotate(f'Best Val: {best_val_loss:.4f}@{epochs[best_val_epoch]}', 
+                   xy=(epochs[best_val_epoch], best_val_loss),
+                   xytext=(10, 10), textcoords='offset points',
+                   bbox=dict(boxstyle='round,pad=0.3', facecolor='yellow', alpha=0.7),
+                   arrowprops=dict(arrowstyle='->', connectionstyle='arc3,rad=0'),
+                   fontsize=10)
+    
+    def create_loss_breakdown_charts(self, save: bool = True) -> Dict[str, Any]:
+        """
+        Create detailed loss breakdown charts showing individual loss components.
+        
+        Args:
+            save: Whether to save charts to disk
+            
+        Returns:
+            Dictionary with chart data and file paths
+        """
+        if not self.metrics_data:
+            logger.warning("No metrics data available")
+            return {}
+        
+        # Extract loss breakdown components
+        loss_components = self._extract_loss_breakdown_data()
+        if not loss_components:
+            logger.warning("No loss breakdown data found")
+            return {}
+        
+        # Create figure for loss breakdown
+        num_phases = len(self.phase_data)
+        fig, axes = plt.subplots(num_phases, 1, figsize=(12, 6*num_phases))
+        if num_phases == 1:
+            axes = [axes]
+        
+        fig.suptitle('Loss Breakdown Analysis', fontsize=16, fontweight='bold')
+        
+        chart_data = {}
+        
+        for i, (phase, data) in enumerate(self.phase_data.items()):
+            ax = axes[i]
+            
+            # Extract epochs for this phase
+            epochs = [record['epoch'] for record in data]
+            
+            # Plot loss components for this phase
+            colors = plt.cm.Set3(np.linspace(0, 1, len(loss_components)))
+            
+            for (component, values), color in zip(loss_components.items(), colors):
+                if len(values) >= len(epochs):
+                    phase_values = values[:len(epochs)]
+                    ax.plot(epochs, phase_values, label=self._format_loss_component_name(component), 
+                           linewidth=2, marker='o', markersize=3, color=color, alpha=0.8)
+            
+            ax.set_title(f'Phase {phase} - Loss Components', fontsize=14, fontweight='bold')
+            ax.set_xlabel('Epoch', fontsize=12)
+            ax.set_ylabel('Loss Value', fontsize=12)
+            ax.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
+            ax.grid(True, alpha=0.3)
+            
+            chart_data[f'phase_{phase}_breakdown'] = {
+                'epochs': epochs,
+                'components': {comp: values[:len(epochs)] for comp, values in loss_components.items()}
+            }
+        
+        plt.tight_layout()
+        
+        # Save chart
+        if save:
+            chart_path = self.output_dir / 'loss_breakdown.png'
+            plt.savefig(chart_path, dpi=300, bbox_inches='tight', facecolor='white', edgecolor='none')
+            logger.info(f"Loss breakdown chart saved to: {chart_path}")
+            chart_data['file_path'] = str(chart_path)
+        
+        plt.show()
+        return chart_data
+    
+    def _extract_loss_breakdown_data(self) -> Dict[str, List[float]]:
+        """Extract loss breakdown data from metrics records."""
+        loss_components = {}
+        
+        for record in self.metrics_data:
+            for key, value in record.items():
+                if ('loss' in key.lower() and key not in ['train_loss', 'val_loss'] and 
+                    isinstance(value, (int, float))):
+                    if key not in loss_components:
+                        loss_components[key] = []
+                    loss_components[key].append(value)
+        
+        return loss_components
+    
+    def _format_loss_component_name(self, component_name: str) -> str:
+        """Format loss component names for display."""
+        # Remove common prefixes and format nicely
+        name = component_name.replace('train_', '').replace('val_', '')
+        name = name.replace('_loss', '').replace('loss', '')
+        name = name.replace('_', ' ').title()
+        
+        # Handle special cases
+        replacements = {
+            'Box': 'Box Loss',
+            'Obj': 'Objectness',
+            'Cls': 'Classification', 
+            'Bbox': 'Bounding Box',
+            'Total': 'Total Loss'
+        }
+        
+        for old, new in replacements.items():
+            if old in name:
+                name = name.replace(old, new)
+        
+        return name
+    
+    def create_all_charts(self, save: bool = True) -> Dict[str, Any]:
+        """
+        Create all available enhanced charts and return comprehensive results.
+        
+        Args:
+            save: Whether to save charts to disk
+            
+        Returns:
+            Dictionary with all chart data and file paths
+        """
+        results = {}
+        
+        # 1. Enhanced loss progression charts
+        loss_results = self.create_loss_charts(save)
+        if loss_results:
+            results['loss_charts'] = loss_results
+        
+        # 2. New: Loss breakdown charts
+        breakdown_results = self.create_loss_breakdown_charts(save)
+        if breakdown_results:
+            results['loss_breakdown_charts'] = breakdown_results
+        
+        # 3. mAP progression charts
+        map_results = self.create_map_charts(save)
+        if map_results:
+            results['map_charts'] = map_results
+        
+        # 4. Learning rate schedule
+        lr_results = self.create_learning_rate_chart(save)
+        if lr_results:
+            results['learning_rate_chart'] = lr_results
+        
+        # 5. Comprehensive training dashboard
+        dashboard_results = self.create_training_dashboard(save)
+        if dashboard_results:
+            results['training_dashboard'] = dashboard_results
+        
+        # Summary
+        results['summary'] = {
+            'total_epochs': len(self.metrics_data),
+            'phases': list(self.phase_data.keys()),
+            'charts_generated': len([r for r in results.values() if r and 'file_path' in r]),
+            'output_directory': str(self.output_dir),
+            'enhancements': [
+                'Enhanced loss scaling for small decreasing values',
+                'Contextual chart titles based on training configuration', 
+                'New loss breakdown component charts',
+                'Merged research metrics visualization'
+            ]
+        }
+        
+        logger.info(f"Generated {results['summary']['charts_generated']} enhanced charts in {self.output_dir}")
         return results
 
 

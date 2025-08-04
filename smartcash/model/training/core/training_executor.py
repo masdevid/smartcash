@@ -33,9 +33,10 @@ class TrainingExecutor:
         self.progress_tracker = progress_tracker
         self.prediction_processor = PredictionProcessor(config, model)
         
-        # State for metrics calculation
-        self._last_predictions = None
-        self._last_targets = None
+        # State for metrics calculation - accumulate all batches
+        self._accumulated_predictions = {}
+        self._accumulated_targets = {}
+        self._batch_count = 0
     
     def train_epoch(self, train_loader, optimizer, loss_manager, scaler, 
                    epoch: int, total_epochs: int, phase_num: int, display_epoch: int = None) -> Dict[str, float]:
@@ -59,12 +60,11 @@ class TrainingExecutor:
         running_loss = 0.0
         num_batches = len(train_loader)
         
-        # Store last batch for metrics (memory efficient)
-        last_predictions = None
-        last_targets = None
+        # Reset accumulated metrics for new epoch
+        self._reset_accumulated_metrics()
         
         # Progress update frequency for performance (reduced from 20 to 10 updates per epoch)
-        update_freq = max(1, num_batches // 10)  # Update 10 times per epoch max for better performance
+        update_freq = max(1, num_batches // 32)  # Update 10 times per epoch max for better performance
         
         # Calculate display epoch if not provided
         if display_epoch is None:
@@ -98,17 +98,9 @@ class TrainingExecutor:
                 images, targets, loss_manager, batch_idx, num_batches, phase_num
             )
             
-            # Store only last batch for metrics (memory efficient)
-            if batch_idx == num_batches - 1:
-                last_predictions = processed_predictions
-                last_targets = processed_targets
-                
-                # Debug: Log what predictions are being stored for layer metrics
-                if processed_predictions:
-                    logger.info(f"🔍 Training executor storing predictions for layer metrics: {list(processed_predictions.keys()) if isinstance(processed_predictions, dict) else type(processed_predictions)}")
-                    if isinstance(processed_predictions, dict):
-                        for layer_name in processed_predictions.keys():
-                            logger.info(f"    • {layer_name}: {type(processed_predictions[layer_name])}")
+            # Accumulate predictions and targets from all batches for layer metrics
+            if processed_predictions and processed_targets:
+                self._accumulate_batch_metrics(processed_predictions, processed_targets, batch_idx)
             
             # Backward pass
             self._backward_pass(loss, optimizer, scaler)
@@ -127,10 +119,14 @@ class TrainingExecutor:
                     epoch=display_epoch
                 )
         
-        # Store for final metrics calculation
-        if last_predictions and last_targets:
-            self._last_predictions = last_predictions
-            self._last_targets = last_targets
+        # Log final accumulated metrics summary
+        if self._batch_count > 0:
+            logger.info(f"📊 Training epoch completed: accumulated metrics from {self._batch_count} batches")
+            if isinstance(self._accumulated_predictions, dict):
+                for layer_name in self._accumulated_predictions.keys():
+                    pred_count = len(self._accumulated_predictions[layer_name]) if self._accumulated_predictions[layer_name] is not None else 0
+                    target_count = len(self._accumulated_targets.get(layer_name, [])) if self._accumulated_targets.get(layer_name) is not None else 0
+                    logger.info(f"    • {layer_name}: {pred_count} predictions, {target_count} targets")
         
         # Complete batch tracking
         self.progress_tracker.complete_batch_tracking()
@@ -162,10 +158,10 @@ class TrainingExecutor:
                 predictions, phase_num, batch_idx
             )
             
-            # Process predictions for metrics (only last batch - skip during most training)
+            # Process predictions for metrics from all batches (sample to manage memory)
             processed_predictions = None
             processed_targets = None
-            if batch_idx == num_batches - 1:
+            if self._should_process_batch_for_metrics(batch_idx, num_batches):
                 # Choose processing method based on phase and predictions format
                 if self._should_use_full_metrics_processing(predictions, phase_num):
                     # Use full processing for Phase 2 multi-layer metrics
@@ -182,6 +178,36 @@ class TrainingExecutor:
             loss, loss_breakdown = loss_manager.compute_loss(predictions, targets, images.shape[-1])
         
         return loss, loss_breakdown, predictions, processed_predictions, processed_targets
+    
+    def _should_process_batch_for_metrics(self, batch_idx: int, num_batches: int) -> bool:
+        """
+        Determine if this batch should be processed for metrics to manage memory usage.
+        
+        Strategy: Process every Nth batch and always process the last batch to get
+        a representative sample across the epoch.
+        
+        Args:
+            batch_idx: Current batch index
+            num_batches: Total number of batches in epoch
+            
+        Returns:
+            True if batch should be processed for metrics
+        """
+        # Always process the last batch
+        if batch_idx == num_batches - 1:
+            return True
+        
+        # For smaller datasets (<=10 batches), process all batches
+        if num_batches <= 10:
+            return True
+        
+        # For medium datasets (11-50 batches), process every 3rd batch
+        elif num_batches <= 50:
+            return batch_idx % 3 == 0
+        
+        # For large datasets (>50 batches), process every 5th batch
+        else:
+            return batch_idx % 5 == 0
     
     def _should_use_full_metrics_processing(self, predictions: Dict, phase_num: int) -> bool:
         """
@@ -219,15 +245,110 @@ class TrainingExecutor:
             loss.backward()
             optimizer.step()
     
+    def _reset_accumulated_metrics(self):
+        """Reset accumulated metrics for a new epoch."""
+        self._accumulated_predictions = {}
+        self._accumulated_targets = {}
+        self._batch_count = 0
+    
+    def _accumulate_batch_metrics(self, processed_predictions, processed_targets, batch_idx: int):
+        """
+        Accumulate predictions and targets from current batch.
+        
+        Args:
+            processed_predictions: Processed predictions from current batch
+            processed_targets: Processed targets from current batch 
+            batch_idx: Current batch index
+        """
+        try:
+            self._batch_count += 1
+            
+            # Handle dict-based predictions (multi-layer)
+            if isinstance(processed_predictions, dict) and isinstance(processed_targets, dict):
+                for layer_name in processed_predictions.keys():
+                    if layer_name in processed_targets:
+                        # Initialize layer if not exists
+                        if layer_name not in self._accumulated_predictions:
+                            self._accumulated_predictions[layer_name] = []
+                            self._accumulated_targets[layer_name] = []
+                        
+                        # Accumulate predictions and targets for this layer
+                        pred_tensor = processed_predictions[layer_name]
+                        target_tensor = processed_targets[layer_name]
+                        
+                        if pred_tensor is not None and target_tensor is not None:
+                            # Convert to CPU and detach to avoid memory issues
+                            if isinstance(pred_tensor, torch.Tensor):
+                                pred_tensor = pred_tensor.detach().cpu()
+                            if isinstance(target_tensor, torch.Tensor):
+                                target_tensor = target_tensor.detach().cpu()
+                            
+                            self._accumulated_predictions[layer_name].append(pred_tensor)
+                            self._accumulated_targets[layer_name].append(target_tensor)
+            
+            # Handle tensor-based predictions (single layer)
+            elif isinstance(processed_predictions, torch.Tensor) and isinstance(processed_targets, torch.Tensor):
+                layer_name = 'layer_1'  # Default to layer_1 for single tensor predictions
+                
+                if layer_name not in self._accumulated_predictions:
+                    self._accumulated_predictions[layer_name] = []
+                    self._accumulated_targets[layer_name] = []
+                
+                # Convert to CPU and detach
+                pred_tensor = processed_predictions.detach().cpu()
+                target_tensor = processed_targets.detach().cpu()
+                
+                self._accumulated_predictions[layer_name].append(pred_tensor)
+                self._accumulated_targets[layer_name].append(target_tensor)
+            
+            # Log every 10 batches for debugging
+            if batch_idx % 10 == 0:
+                logger.debug(f"📊 Accumulated metrics from batch {batch_idx}: {self._batch_count} total batches processed")
+                
+        except Exception as e:
+            logger.warning(f"Failed to accumulate batch metrics for batch {batch_idx}: {e}")
+    
+    def _get_concatenated_metrics(self) -> tuple:
+        """
+        Concatenate accumulated predictions and targets for metrics calculation.
+        
+        Returns:
+            Tuple of (concatenated_predictions, concatenated_targets)
+        """
+        if not self._accumulated_predictions or not self._accumulated_targets:
+            return {}, {}
+        
+        concatenated_predictions = {}
+        concatenated_targets = {}
+        
+        for layer_name in self._accumulated_predictions.keys():
+            if layer_name in self._accumulated_targets:
+                pred_list = self._accumulated_predictions[layer_name]
+                target_list = self._accumulated_targets[layer_name]
+                
+                if pred_list and target_list:
+                    try:
+                        # Concatenate tensors
+                        concatenated_predictions[layer_name] = torch.cat(pred_list, dim=0)
+                        concatenated_targets[layer_name] = torch.cat(target_list, dim=0)
+                        
+                        logger.debug(f"Concatenated {layer_name}: {concatenated_predictions[layer_name].shape} predictions, {concatenated_targets[layer_name].shape} targets")
+                    except Exception as e:
+                        logger.warning(f"Failed to concatenate {layer_name} metrics: {e}")
+        
+        return concatenated_predictions, concatenated_targets
+    
     @property
     def last_predictions(self):
-        """Get last batch predictions for metrics calculation."""
-        return self._last_predictions
+        """Get accumulated predictions for metrics calculation."""
+        concatenated_predictions, _ = self._get_concatenated_metrics()
+        return concatenated_predictions
     
     @property
     def last_targets(self):
-        """Get last batch targets for metrics calculation."""
-        return self._last_targets
+        """Get accumulated targets for metrics calculation."""
+        _, concatenated_targets = self._get_concatenated_metrics()
+        return concatenated_targets
     
     @property
     def last_loss_breakdown(self):

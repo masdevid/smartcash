@@ -267,6 +267,29 @@ def apply_training_overrides(config: Dict[str, Any], **kwargs) -> Dict[str, Any]
         config['training']['early_stopping']['patience'] = kwargs['patience']
         logger.debug(f"🎯 Early stopping patience override: {kwargs['patience']}")
     
+    # Phase-specific early stopping override
+    if 'phase_specific_early_stopping' in kwargs and kwargs['phase_specific_early_stopping']:
+        if 'training' not in config:
+            config['training'] = {}
+        if 'early_stopping' not in config['training']:
+            config['training']['early_stopping'] = {}
+        config['training']['early_stopping']['phase_specific'] = True
+        logger.debug(f"🎯 Phase-specific early stopping enabled")
+        
+        # Set some sensible defaults for phase-specific early stopping
+        if 'phase1' not in config['training']['early_stopping']:
+            config['training']['early_stopping']['phase1'] = {
+                'loss_patience': 8,
+                'metric_patience': 6,
+                'metric_name': 'val_accuracy'
+            }
+        if 'phase2' not in config['training']['early_stopping']:
+            config['training']['early_stopping']['phase2'] = {
+                'f1_patience': 10,
+                'map_patience': 10,
+                'combo_mode': 'both'
+            }
+    
     # Phase-specific epoch overrides
     if 'phase1_epochs' in kwargs and kwargs['phase1_epochs'] is not None:
         if 'training_phases' not in config:

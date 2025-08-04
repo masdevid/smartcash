@@ -353,16 +353,19 @@ class PipelineExecutor:
                     )
                     
                     if not phase1_result.get('success', False):
+                        # Check if this is an early shutdown - should not continue to Phase 2
+                        if phase1_result.get('early_shutdown', False):
+                            logger.info("🛑 Phase 1 early shutdown detected - stopping training pipeline")
                         return phase1_result
                     
-                    # Clone best model from Phase 1 with _phase1 suffix before starting Phase 2
-                    phase1_backup_path = self._create_phase_backup(phase1_result.get('best_checkpoint'), 1)
+                    # Phase 1 backup is now created automatically by CheckpointManager when best model is saved
+                    # phase1_backup_path = self._create_phase_backup(phase1_result.get('best_checkpoint'), 1)
                     
                     # Transition to Phase 2
                     phase2_result = self._transition_to_phase2_and_train(phase_manager, config, phase1_result)
                     
-                    # Clone best model from Phase 2 with _phase2 suffix when completed
-                    self._create_phase_backup(phase2_result.get('best_checkpoint'), 2)
+                    # Phase 2 backup is now created automatically by CheckpointManager when best model is saved
+                    # self._create_phase_backup(phase2_result.get('best_checkpoint'), 2)
                     
                     return phase2_result
                     
@@ -402,8 +405,8 @@ class PipelineExecutor:
                     # Jump directly to Phase 2 training (always uses standard best.pt)
                     phase2_result = self._run_phase2_only(phase_manager, config)
                     
-                    # Clone best model from Phase 2 with _phase2 suffix when completed
-                    self._create_phase_backup(phase2_result.get('best_checkpoint'), 2)
+                    # Phase 2 backup is now created automatically by CheckpointManager when best model is saved
+                    # self._create_phase_backup(phase2_result.get('best_checkpoint'), 2)
                     
                     return phase2_result
             else:
@@ -462,18 +465,21 @@ class PipelineExecutor:
                     )
                     
                     if not phase1_result.get('success', False):
+                        # Check if this is an early shutdown - should not continue to Phase 2
+                        if phase1_result.get('early_shutdown', False):
+                            logger.info("🛑 Phase 1 resume early shutdown detected - stopping training pipeline")
                         phase1_result['completed_phase'] = 1
                         phase1_result['training_mode'] = 'two_phase'
                         return phase1_result
                     
-                    # Create Phase 1 backup model
-                    self._create_phase_backup(phase1_result.get('best_checkpoint'), 1)
+                    # Phase 1 backup is now created automatically by CheckpointManager when best model is saved
+                    # self._create_phase_backup(phase1_result.get('best_checkpoint'), 1)
                     
                     # Transition to Phase 2
                     phase2_result = self._transition_to_phase2_and_train(phase_manager, config, phase1_result)
                     
-                    # Create Phase 2 backup model
-                    self._create_phase_backup(phase2_result.get('best_checkpoint'), 2)
+                    # Phase 2 backup is now created automatically by CheckpointManager when best model is saved
+                    # self._create_phase_backup(phase2_result.get('best_checkpoint'), 2)
                     
                     # Add phase information for finalization
                     phase2_result['completed_phase'] = 2
@@ -510,8 +516,8 @@ class PipelineExecutor:
                         start_epoch=resume_epoch - 1  # Convert to 0-based
                     )
                     
-                    # Create Phase 2 backup model
-                    self._create_phase_backup(phase2_result.get('best_checkpoint'), 2)
+                    # Phase 2 backup is now created automatically by CheckpointManager when best model is saved
+                    # self._create_phase_backup(phase2_result.get('best_checkpoint'), 2)
                     
                     # Add phase information for finalization
                     phase2_result['completed_phase'] = 2

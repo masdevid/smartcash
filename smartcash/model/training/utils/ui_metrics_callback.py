@@ -25,7 +25,7 @@ class UIMetricsCallback:
     def __init__(self, verbose: bool = True, console_scheme: ColorScheme = ColorScheme.EMOJI, 
                  training_logs_dir: str = "logs/training"):
         """
-        Initialize the UI metrics callback.
+        Initialize the UI metrics callback. 
         
         Args:
             verbose: Whether to print verbose output
@@ -50,12 +50,12 @@ class UIMetricsCallback:
         # Optional UI callback function
         self.ui_callback: Optional[Callable] = None
     
-    def set_ui_callback(self, callback: Callable[[str, int, Dict, Dict], None]):
+    def set_ui_callback(self, callback: Callable[[str, int, Dict, Dict, Dict], None]):
         """
-        Set a UI callback function that will receive metrics data.
+        Set a UI callback function that will receive metrics data. 
         
         Args:
-            callback: Function that receives (phase, epoch, metrics, colored_metrics)
+            callback: Function that receives (phase, epoch, metrics, colored_metrics, loss_breakdown)
         """
         self.ui_callback = callback
     
@@ -94,8 +94,9 @@ class UIMetricsCallback:
         colored_metrics = get_metrics_with_colors(metrics, epoch, max_epochs, phase_num)
         self.latest_colored_metrics = colored_metrics
         
-        # Extract loss breakdown from kwargs
+        # Extract loss breakdown from kwargs and store for access in print methods
         loss_breakdown = kwargs.get('loss_breakdown', {})
+        self._current_loss_breakdown = loss_breakdown
         
         # Debug: Log loss breakdown reception
         if loss_breakdown:
@@ -110,10 +111,11 @@ class UIMetricsCallback:
             if loss_breakdown:
                 self._print_loss_breakdown(loss_breakdown)
         
-        # Call UI callback if registered
+        # Call UI callback if registered (pass loss breakdown too)
         if self.ui_callback:
             try:
-                self.ui_callback(phase, epoch, metrics, colored_metrics)
+                # Enhanced UI callback with loss breakdown
+                self.ui_callback(phase, epoch, metrics, colored_metrics, loss_breakdown)
             except Exception as e:
                 print(f"Warning: UI callback failed: {e}")
         
@@ -124,11 +126,13 @@ class UIMetricsCallback:
             'loss_breakdown': loss_breakdown,
             'phase': phase,
             'epoch': epoch,
-            'max_epochs': max_epochs
+            'max_epochs': max_epochs,
+            'train_loss_available': 'train_loss' in metrics,
+            'train_loss_value': metrics.get('train_loss', 'N/A')
         }
     
     def _print_console_metrics(self, phase: str, epoch: int, metrics: Dict[str, Any], 
-                             colored_metrics: Dict[str, Dict]):
+                             colored_metrics: Dict[str, Dict], **kwargs):
         """Print formatted metrics to console."""
         print(f"📊 METRICS [{phase.upper()}] Epoch {epoch}:")
         
@@ -146,14 +150,19 @@ class UIMetricsCallback:
             if metric_name in metrics:
                 self._print_metric(metric_name, metrics[metric_name], colored_metrics)
         
+        # Always show loss breakdown if available (regardless of filtering)
+        loss_breakdown = getattr(self, '_current_loss_breakdown', {})
+        if loss_breakdown:
+            self._print_loss_breakdown_summary(loss_breakdown)
+        
         # Print layer-specific metrics
         layer_metrics = self._filter_layer_metrics(metrics, show_layers, filter_zeros)
         for metric_name, value in layer_metrics.items():
             self._print_metric(metric_name, value, colored_metrics)
         
-        # Print AP metrics
+        # Print AP metrics (don't filter by value - show all available)
         ap_metrics = {k: v for k, v in metrics.items() 
-                     if k.startswith('val_ap_') and isinstance(v, (int, float)) and v > 0.0001}
+                     if k.startswith('val_ap_') and isinstance(v, (int, float))}
         for metric_name, value in ap_metrics.items():
             self._print_metric(metric_name, value, colored_metrics)
         
@@ -267,6 +276,39 @@ class UIMetricsCallback:
         
         print()  # Empty line for spacing
     
+    def _print_loss_breakdown_summary(self, loss_breakdown: Dict[str, Any]):
+        """Print a concise loss breakdown summary for console output."""
+        if not loss_breakdown:
+            return
+            
+        print("  📊 Loss Summary:", end=" ")
+        
+        # Show key loss components in a single line
+        key_losses = []
+        
+        # Check for total/train loss
+        for loss_key in ['train_loss', 'total_loss', 'loss']:
+            if loss_key in loss_breakdown:
+                value = loss_breakdown[loss_key]
+                if hasattr(value, 'item'):
+                    value = value.item()
+                key_losses.append(f"Total: {value:.4f}")
+                break
+        
+        # Show main loss components if available
+        for component in ['box_loss', 'obj_loss', 'cls_loss']:
+            if component in loss_breakdown:
+                value = loss_breakdown[component]
+                if hasattr(value, 'item'):
+                    value = value.item()
+                component_name = component.replace('_loss', '').title()
+                key_losses.append(f"{component_name}: {value:.4f}")
+        
+        if key_losses:
+            print(" | ".join(key_losses))
+        else:
+            print("Available in detailed view")
+    
     def _print_metric(self, metric_name: str, value: Any, colored_metrics: Dict[str, Dict]):
         """Print a single metric with color coding."""
         if isinstance(value, (int, float)) and metric_name in colored_metrics:
@@ -297,20 +339,22 @@ class UIMetricsCallback:
                 'train_loss', 'val_loss', 'learning_rate', 'epoch',
                 'val_precision', 'val_recall', 'val_f1', 'val_accuracy'
             ]
-            # mAP metrics disabled for performance - focusing on classification metrics
-            # Note: to re-enable, uncomment the line below:
-            # if 'val_map50' in metrics:
-            #     core_metrics.insert(2, 'val_map50')  # Add after val_loss
         else:
-            # Phase 2: Focus on core training metrics (mAP disabled for performance)
+            # Phase 2: Focus on core training metrics
             core_metrics = [
                 'train_loss', 'val_loss', 'learning_rate', 'epoch',
-                'val_precision', 'val_recall', 'val_f1', 'val_accuracy'
+                'val_accuracy', 'val_precision', 'val_recall', 'val_f1', 'val_map50'
             ]
             # No additional metrics needed - keep it clean
         
-        # Filter to only include metrics that actually exist
-        return [metric for metric in core_metrics if metric in metrics]
+        # Filter to only include metrics that actually exist and handle special cases
+        available_metrics = []
+        for metric in core_metrics:
+            if metric in metrics:
+                # Don't filter out metrics with zero values - they may be legitimate
+                available_metrics.append(metric)
+        
+        return available_metrics
     
     def _extract_phase_number(self, phase: str, metrics: Dict[str, Any]) -> int:
         """
@@ -356,34 +400,17 @@ class UIMetricsCallback:
         - Phase 2: Multi-task loss - show all layers with meaningful data
         - Auto-detect based on actual metrics and loss type
         """
-        # Use the same phase detection logic
         phase_num = self._extract_phase_number(phase, metrics)
-        
+
         if phase_num == 1:
-            # Phase 1: Simple YOLO loss training
-            # Focus on layer_1 since that's what simple YOLO optimizes
-            # Filter zeros to show only meaningful metrics
             return ['layer_1'], True
-        else:
-            # Phase 2: Multi-task loss training
-            # Show all layers that have meaningful data
-            active_layers = []
-            for layer in ['layer_1', 'layer_2', 'layer_3']:
-                # Check for any meaningful metrics for this layer
-                has_activity = any(
-                    metrics.get(f'{layer}_{metric}', 0) > 0.0001 or 
-                    metrics.get(f'val_{layer}_{metric}', 0) > 0.0001
-                    for metric in ['accuracy', 'precision', 'recall', 'f1']
-                )
-                if has_activity:
-                    active_layers.append(layer)
-            
-            # If no layers detected as active, default to all layers
-            if not active_layers:
-                active_layers = ['layer_1', 'layer_2', 'layer_3']
-            
-            # Don't filter zeros in Phase 2 - we want to see all multi-task metrics
-            return active_layers, False
+
+        active_layers = ['layer_1']  # Always include layer_1
+        for layer in ['layer_2', 'layer_3']:
+            if any(metrics.get(f'{p}{layer}_{m}', 0) > 0 for m in ['accuracy', 'precision'] for p in ['', 'val_']):
+                active_layers.append(layer)
+
+        return active_layers, False
     
     def _filter_layer_metrics(self, metrics: Dict[str, Any], show_layers: list, filter_zeros: bool) -> Dict[str, Any]:
         """
@@ -402,7 +429,10 @@ class UIMetricsCallback:
                 if (metric_name.startswith(f'{layer}_') or metric_name.startswith(f'val_{layer}_')):
                     # Apply zero filtering if specified (for cleaner output in single-layer modes)
                     if filter_zeros:
-                        if isinstance(value, (int, float)) and value > 0.0001:  # Show only meaningful values
+                        # Don't filter loss metrics - they can legitimately be zero or small
+                        if 'loss' in metric_name.lower():
+                            layer_metrics[metric_name] = value
+                        elif isinstance(value, (int, float)) and value > 0.0001:  # Show only meaningful values for non-loss metrics
                             layer_metrics[metric_name] = value
                     else:
                         # Show all metrics for this layer (multi-layer modes)
@@ -424,7 +454,8 @@ class UIMetricsCallback:
         remaining = {}
         for metric_name, value in metrics.items():
             # Skip if already categorized
-            if (metric_name in core_metrics or 
+            if (
+                metric_name in core_metrics or 
                 metric_name in layer_metrics or
                 metric_name in ap_metrics):
                 continue
@@ -435,7 +466,8 @@ class UIMetricsCallback:
                 continue
                 
             # Skip layer metrics for inactive layers
-            if (metric_name.startswith('layer_') or 
+            if (
+                metric_name.startswith('layer_') or 
                 metric_name.startswith('val_layer_') or
                 metric_name.startswith('val_ap_')):
                 continue
@@ -734,15 +766,16 @@ def create_ui_metrics_callback(verbose: bool = True,
 
 
 # Example UI callback function
-def example_ui_callback(phase: str, epoch: int, _metrics: Dict[str, Any], colored_metrics: Dict[str, Dict]):
+def example_ui_callback(phase: str, epoch: int, _metrics: Dict[str, Any], colored_metrics: Dict[str, Dict], loss_breakdown: Dict[str, Any] = None):
     """
-    Example UI callback function showing how to handle the color data.
+    Example UI callback function showing how to handle the color data and loss breakdown. 
     
     Args:
         phase: Training phase name
         epoch: Current epoch
         metrics: Original metrics dictionary
         colored_metrics: Enhanced metrics with color information
+        loss_breakdown: Detailed loss breakdown information
     """
     print(f"\n🎨 UI CALLBACK - {phase} Epoch {epoch}")
     print("Color data available for each metric:")
@@ -755,6 +788,14 @@ def example_ui_callback(phase: str, epoch: int, _metrics: Dict[str, Any], colore
             emoji = color_data['colors']['emoji']
             
             print(f"  {metric_name}: {value:.4f} (status: {status}) [HTML: {html_color}] {emoji}")
+    
+    # Show loss breakdown if available
+    if loss_breakdown:
+        print(f"\n📊 Loss Breakdown ({len(loss_breakdown)} components):")
+        for loss_name, loss_value in loss_breakdown.items():
+            if hasattr(loss_value, 'item'):
+                loss_value = loss_value.item()
+            print(f"  {loss_name}: {loss_value:.6f}")
 
 
 if __name__ == "__main__":

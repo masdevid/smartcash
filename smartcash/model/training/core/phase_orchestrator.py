@@ -15,7 +15,7 @@ from smartcash.model.training.data_loader_factory import DataLoaderFactory
 from smartcash.model.training.utils.metrics_history import create_metrics_recorder
 from smartcash.model.training.optimizer_factory import OptimizerFactory
 from smartcash.model.training.loss_manager import LossManager
-from smartcash.model.training.utils.early_stopping import create_early_stopping
+from smartcash.model.training.utils.early_stopping import create_early_stopping, create_phase_specific_early_stopping
 
 logger = get_logger(__name__)
 
@@ -223,38 +223,56 @@ class PhaseOrchestrator:
         logger.info(f"🔍 Early stopping config: {es_config}")
         
         # Check if phase-specific early stopping is enabled
-        phase_1_enabled = es_config.get('phase_1_enabled', False)  # Default disabled for Phase 1
-        phase_2_enabled = es_config.get('phase_2_enabled', True)   # Default enabled for Phase 2
+        use_phase_specific = es_config.get('phase_specific', False)
         
-        # For two-phase mode, apply phase-specific early stopping logic
-        if self.config.get('training_mode', 'two_phase') == 'two_phase':
+        if use_phase_specific:
+            logger.info(f"🎯 Using phase-specific early stopping for Phase {phase_num}")
+            # Create phase-specific early stopping with custom criteria
+            early_stopping = create_phase_specific_early_stopping(self.config)
+            
+            # Set the current phase
+            early_stopping.set_phase(phase_num)
+            
+            logger.info(f"🔍 Phase-specific early stopping initialized:")
             if phase_num == 1:
-                if phase_1_enabled:
-                    logger.info(f"✅ Early stopping enabled for Phase {phase_num}")
-                else:
-                    logger.info(f"🚫 Early stopping disabled for Phase {phase_num}")
-                    return None  # Return None to disable early stopping
-            else:  # phase_num == 2
-                if phase_2_enabled:
-                    logger.info(f"✅ Early stopping enabled for Phase {phase_num}")
-                else:
-                    logger.info(f"🚫 Early stopping disabled for Phase {phase_num}")
-                    return None  # Return None to disable early stopping
-        else:
-            # For single-phase mode, use the general early stopping setting
-            if es_config.get('enabled', True):
-                logger.info(f"✅ Early stopping enabled for Phase {phase_num}")
+                logger.info(f"   Phase 1 criteria: Loss plateau + {es_config.get('phase1', {}).get('metric_name', 'val_accuracy')} stability")
             else:
-                logger.info(f"🚫 Early stopping disabled for Phase {phase_num}")
-                return None  # Return None to disable early stopping
-        
-        # Create early stopping instance with configuration
-        from smartcash.model.training.utils.early_stopping import create_early_stopping
-        early_stopping = create_early_stopping(self.config, save_best_path=save_best_path)
-        
-        logger.info(f"🔍 Early stopping object type: {type(early_stopping).__name__} | Config enabled: {es_config.get('enabled', True)} | Patience: {es_config.get('patience', 'N/A')}")
-        
-        return early_stopping
+                logger.info(f"   Phase 2 criteria: F1/mAP improvement + overfitting detection")
+            
+            return early_stopping
+        else:
+            # Use legacy early stopping logic for backward compatibility
+            phase_1_enabled = es_config.get('phase_1_enabled', True)  # Default disabled for Phase 1
+            phase_2_enabled = es_config.get('phase_2_enabled', True)   # Default enabled for Phase 2
+            
+            # For two-phase mode, apply phase-specific early stopping logic
+            if self.config.get('training_mode', 'two_phase') == 'two_phase':
+                if phase_num == 1:
+                    if phase_1_enabled:
+                        logger.info(f"✅ Legacy early stopping enabled for Phase {phase_num}")
+                    else:
+                        logger.info(f"🚫 Early stopping disabled for Phase {phase_num}")
+                        return None  # Return None to disable early stopping
+                else:  # phase_num == 2
+                    if phase_2_enabled:
+                        logger.info(f"✅ Legacy early stopping enabled for Phase {phase_num}")
+                    else:
+                        logger.info(f"🚫 Early stopping disabled for Phase {phase_num}")
+                        return None  # Return None to disable early stopping
+            else:
+                # For single-phase mode, use the general early stopping setting
+                if es_config.get('enabled', True):
+                    logger.info(f"✅ Legacy early stopping enabled for Phase {phase_num}")
+                else:
+                    logger.info(f"🚫 Early stopping disabled for Phase {phase_num}")
+                    return None  # Return None to disable early stopping
+            
+            # Create standard early stopping instance with configuration
+            early_stopping = create_early_stopping(self.config, save_best_path=save_best_path)
+            
+            logger.info(f"🔍 Legacy early stopping object type: {type(early_stopping).__name__} | Config enabled: {es_config.get('enabled', True)} | Patience: {es_config.get('patience', 'N/A')}")
+            
+            return early_stopping
     
     def _set_model_phase(self, phase_num: int):
         """Set current phase on model for layer mode control, handling nested YOLOv5 structure.
@@ -376,13 +394,13 @@ class PhaseOrchestrator:
             # Get current config batch size
             current_batch_size = self.config.get('training', {}).get('batch_size', 16)
             
-            logger.info(f"🧠 Memory Optimization Analysis:")
-            logger.info(f"   • Current Batch Size: {current_batch_size}")
-            logger.info(f"   • Recommended Batch Size: {optimal_config.get('batch_size', 'N/A')}")
-            logger.info(f"   • Effective Batch Size: {optimal_config.get('effective_batch_size', 'N/A')}")
-            logger.info(f"   • Gradient Accumulation Steps: {optimal_config.get('gradient_accumulation_steps', 'N/A')}")
-            logger.info(f"   • Device: {memory_optimizer.device}")
-            logger.info(f"   • Platform: {'Apple Silicon' if memory_optimizer.platform_info.get('is_apple_silicon') else 'CUDA' if memory_optimizer.platform_info.get('is_cuda_workstation') else 'CPU'}")
+            logger.debug(f"🧠 Memory Optimization Analysis:")
+            logger.debug(f"   • Current Batch Size: {current_batch_size}")
+            logger.debug(f"   • Recommended Batch Size: {optimal_config.get('batch_size', 'N/A')}")
+            logger.debug(f"   • Effective Batch Size: {optimal_config.get('effective_batch_size', 'N/A')}")
+            logger.debug(f"   • Gradient Accumulation Steps: {optimal_config.get('gradient_accumulation_steps', 'N/A')}")
+            logger.debug(f"   • Device: {memory_optimizer.device}")
+            logger.debug(f"   • Platform: {'Apple Silicon' if memory_optimizer.platform_info.get('is_apple_silicon') else 'CUDA' if memory_optimizer.platform_info.get('is_cuda_workstation') else 'CPU'}")
             
             # Warning if batch sizes don't match
             if current_batch_size != optimal_config.get('batch_size'):

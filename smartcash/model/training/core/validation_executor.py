@@ -51,16 +51,6 @@ class ValidationExecutor:
         num_classes = config.get('model', {}).get('num_classes', 7)
         debug_map = config.get('debug_map', False)
         
-        # Enhanced debug logging for troubleshooting
-        if debug_map:
-            logger.info(f"🐛 ValidationExecutor: Creating mAP calculator with debug_map=True (config={debug_map})")
-            
-            # Create debug log directory immediately to ensure it exists
-            from pathlib import Path
-            debug_log_dir = Path("logs/validation_metrics")
-            debug_log_dir.mkdir(parents=True, exist_ok=True)
-            logger.info(f"🐛 ValidationExecutor: Debug log directory created/verified: {debug_log_dir}")
-        
         # Extract training context from config for debug logging
         training_context = {
             'backbone': config.get('backbone', 'unknown'),
@@ -80,24 +70,6 @@ class ValidationExecutor:
             training_context=training_context
         )
         
-        # Verify debug setup completed successfully
-        if debug_map:
-            map_calc_debug = getattr(self.map_calculator, 'debug', False)
-            debug_logger_exists = hasattr(self.map_calculator, 'debug_logger') and self.map_calculator.debug_logger is not None
-            logger.info(f"🐛 ValidationExecutor: mAP calculator debug={map_calc_debug}, debug_logger_exists={debug_logger_exists}")
-            
-            # Force creation of an initial debug entry to ensure files are created
-            if debug_logger_exists:
-                self.map_calculator._debug_log("\n🐛 ValidationExecutor created successfully with debug enabled")
-                self.map_calculator._debug_log(f"Configuration verification: num_classes={num_classes}, debug_map={debug_map}")
-                logger.info(f"🐛 ValidationExecutor: Forced initial debug log entry written")
-            
-            # Final verification - check if debug files exist
-            debug_files = list(debug_log_dir.glob("*.log")) if debug_log_dir.exists() else []
-            logger.info(f"🐛 ValidationExecutor: {len(debug_files)} debug files exist after initialization")
-            if debug_files:
-                latest_file = max(debug_files, key=lambda f: f.stat().st_mtime)
-                logger.info(f"🐛 ValidationExecutor: Latest debug file: {latest_file}")
         
         # Initialize SRP components
         self.batch_processor = ValidationBatchProcessor(model, config, self.prediction_processor)
@@ -108,13 +80,10 @@ class ValidationExecutor:
         logger.info(f"Validation metrics configuration:")
         logger.info(f"  • YOLOv5 mAP calculator: {num_classes} classes")
         logger.info(f"  • Using hierarchical validation (YOLOv5 + per-layer metrics)")
-        if debug_map:
-            logger.info(f"  • 🐛 DEBUG MODE ENABLED - Debug files will be created in logs/validation_metrics/")
         
         if not self.map_calculator.yolov5_available:
             logger.warning("YOLOv5 not available - using fallback metrics")
-        elif debug_map:
-            logger.info(f"✅ YOLOv5 available and debug mode active")
+        
     
     def validate_epoch(self, val_loader, loss_manager, 
                       epoch: int, phase_num: int, display_epoch: int = None) -> Dict[str, float]:

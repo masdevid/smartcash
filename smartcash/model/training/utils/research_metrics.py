@@ -27,19 +27,25 @@ class ResearchMetricsManager:
         """Initialize simplified metrics manager focused on standard YOLO metrics."""
         # Simplified metrics - focus on standard YOLO training metrics
         self.phase_1_focus_metrics = [
+            'train_loss',
+            'val_loss',
+            'loss_breakdown',
             'accuracy',  # Standard classification accuracy
             'precision', 
             'recall',
-            'f1'
-            # 'map50'      # Object detection mAP - disabled for performance
+            'f1',
+            'map50'     
         ]
         
         self.phase_2_focus_metrics = [
+            'train_loss',
+            'val_loss',
+            'loss_breakdown',
             'accuracy',       # Standard classification accuracy
             'precision', 
             'recall',
-            'f1'
-            # 'map50'          # Object detection mAP - disabled for performance
+            'f1',
+            'map50'          
         ]
     
     def standardize_metric_names(self, raw_metrics: Dict[str, float], phase_num: int, 
@@ -55,67 +61,83 @@ class ResearchMetricsManager:
         Returns:
             Dictionary with standardized metric names
         """
-        standardized = {}
         prefix = "val_" if is_validation else "train_"
+        standardized = {}
         
-        # Simple approach: Just use the standard metrics from raw_metrics
-        # Focus on core YOLO metrics: loss, accuracy, precision, recall, f1, map50
-        
-        # Loss (always included)
-        standardized[f"{prefix}loss"] = raw_metrics.get('loss', raw_metrics.get('train_loss', raw_metrics.get('val_loss', 0.0)))
-        
-        # Classification metrics - use layer_1 if available, otherwise use generic
-        if 'layer_1_accuracy' in raw_metrics:
-            # Use layer_1 metrics (preferred for both Phase 1 and 2)
-            standardized[f"{prefix}accuracy"] = raw_metrics.get('layer_1_accuracy', 0.0)
-            standardized[f"{prefix}precision"] = raw_metrics.get('layer_1_precision', 0.0)
-            standardized[f"{prefix}recall"] = raw_metrics.get('layer_1_recall', 0.0)
-            standardized[f"{prefix}f1"] = raw_metrics.get('layer_1_f1', 0.0)
-        else:
-            # Use generic metrics as fallback
-            standardized[f"{prefix}accuracy"] = raw_metrics.get('accuracy', 0.0)
-            standardized[f"{prefix}precision"] = raw_metrics.get('precision', 0.0)
-            standardized[f"{prefix}recall"] = raw_metrics.get('recall', 0.0)
-            standardized[f"{prefix}f1"] = raw_metrics.get('f1', 0.0)
-        
-        # mAP metrics from YOLOv5 calculator
-        if 'map50' in raw_metrics:
-            standardized[f"{prefix}map50"] = raw_metrics.get('map50', 0.0)
-        if 'map50_95' in raw_metrics:
-            standardized[f"{prefix}map50_95"] = raw_metrics.get('map50_95', 0.0)
-        
-        # mAP-specific precision, recall, F1 (from mAP computation)
-        if 'map_precision' in raw_metrics:
-            standardized[f"{prefix}map50_precision"] = raw_metrics.get('map_precision', 0.0)
-        if 'map_recall' in raw_metrics:
-            standardized[f"{prefix}map50_recall"] = raw_metrics.get('map_recall', 0.0)
-        if 'map_f1' in raw_metrics:
-            standardized[f"{prefix}map50_f1"] = raw_metrics.get('map_f1', 0.0)
-        
-        # For validation metrics, also provide backward compatibility names
+        # Handle loss metrics correctly - don't default to 0.0 if it might be legitimately missing
         if is_validation:
-            # Ensure we have the expected validation metric names
-            if f"{prefix}accuracy" in standardized:
-                standardized["val_accuracy"] = standardized[f"{prefix}accuracy"]
-            if f"{prefix}precision" in standardized:
-                standardized["val_precision"] = standardized[f"{prefix}precision"]
-            if f"{prefix}recall" in standardized:
-                standardized["val_recall"] = standardized[f"{prefix}recall"]
-            if f"{prefix}f1" in standardized:
-                standardized["val_f1"] = standardized[f"{prefix}f1"]
-            # mAP metrics for validation
-            if f"{prefix}map50" in standardized:
-                standardized["val_map50"] = standardized[f"{prefix}map50"]
-            if f"{prefix}map50_95" in standardized:
-                standardized["val_map50_95"] = standardized[f"{prefix}map50_95"]
-            # mAP-specific metrics for validation
-            if f"{prefix}map50_precision" in standardized:
-                standardized["val_map50_precision"] = standardized[f"{prefix}map50_precision"]
-            if f"{prefix}map50_recall" in standardized:
-                standardized["val_map50_recall"] = standardized[f"{prefix}map50_recall"]
-            if f"{prefix}map50_f1" in standardized:
-                standardized["val_map50_f1"] = standardized[f"{prefix}map50_f1"]
+            # For validation metrics, convert 'loss' to 'val_loss'
+            if 'loss' in raw_metrics:
+                standardized["val_loss"] = raw_metrics['loss']
+            elif 'val_loss' in raw_metrics:
+                standardized["val_loss"] = raw_metrics['val_loss']
+        else:
+            # For training metrics, handle train_loss
+            if 'train_loss' in raw_metrics:
+                standardized["train_loss"] = raw_metrics['train_loss']
+            else:
+                # Only set default for training metrics if we're processing training data
+                standardized["train_loss"] = raw_metrics.get('train_loss', 0.0)
+        # Phase-aware handling of primary metrics (accuracy, precision, recall, f1)
+        # Don't default to 0.0 - preserve original values or absence
+        if phase_num == 1:
+            # In Phase 1, primary metrics are sourced directly from Layer 1.
+            if 'layer_1_accuracy' in raw_metrics:
+                standardized[f"{prefix}accuracy"] = raw_metrics['layer_1_accuracy']
+            if 'layer_1_precision' in raw_metrics:
+                standardized[f"{prefix}precision"] = raw_metrics['layer_1_precision']
+            if 'layer_1_recall' in raw_metrics:
+                standardized[f"{prefix}recall"] = raw_metrics['layer_1_recall']
+            if 'layer_1_f1' in raw_metrics:
+                standardized[f"{prefix}f1"] = raw_metrics['layer_1_f1']
+            logger.debug("Phase 1: Standardized primary metrics from Layer 1.")
+        else:
+            # In Phase 2 (and others), use the top-level hierarchical metrics.
+            if 'accuracy' in raw_metrics:
+                standardized[f"{prefix}accuracy"] = raw_metrics['accuracy']
+            if 'precision' in raw_metrics:
+                standardized[f"{prefix}precision"] = raw_metrics['precision']
+            if 'recall' in raw_metrics:
+                standardized[f"{prefix}recall"] = raw_metrics['recall']
+            if 'f1' in raw_metrics:
+                standardized[f"{prefix}f1"] = raw_metrics['f1']
+            logger.debug(f"Phase {phase_num}: Standardized primary metrics from top-level.")
+
+        # Add mAP-related metrics if they exist
+        map_keys = ['map50', 'map50_95', 'map_precision', 'map_recall', 'map_f1']
+        for key in map_keys:
+            if key in raw_metrics:
+                standardized[f"{prefix}{key}"] = raw_metrics[key]
         
+        # Add all per-layer metrics for detailed analysis (preserve all values)
+        for key, value in raw_metrics.items():
+            if key.startswith('layer_'):
+                standardized[f"{prefix}{key}"] = value
+
+        # For validation, ensure standard names like val_accuracy are present
+        # This ensures that val_* metrics are always consistent regardless of phase
+        if is_validation:
+            # In Phase 1, val_* should be the same as layer_1_* (only if available)
+            if phase_num == 1:
+                if 'layer_1_accuracy' in raw_metrics:
+                    standardized["val_accuracy"] = raw_metrics['layer_1_accuracy']
+                if 'layer_1_precision' in raw_metrics:
+                    standardized["val_precision"] = raw_metrics['layer_1_precision']
+                if 'layer_1_recall' in raw_metrics:
+                    standardized["val_recall"] = raw_metrics['layer_1_recall']
+                if 'layer_1_f1' in raw_metrics:
+                    standardized["val_f1"] = raw_metrics['layer_1_f1']
+            # In Phase 2, val_* should be the same as the top-level metrics (only if available)
+            else:
+                if 'accuracy' in raw_metrics:
+                    standardized["val_accuracy"] = raw_metrics['accuracy']
+                if 'precision' in raw_metrics:
+                    standardized["val_precision"] = raw_metrics['precision']
+                if 'recall' in raw_metrics:
+                    standardized["val_recall"] = raw_metrics['recall']
+                if 'f1' in raw_metrics:
+                    standardized["val_f1"] = raw_metrics['f1']
+
         return standardized
     
     def get_best_model_criteria(self, phase_num: int) -> Dict[str, Any]:

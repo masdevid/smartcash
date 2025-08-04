@@ -284,71 +284,48 @@ class ComprehensiveMetricsTracker:
             return {}
     
     def _generate_training_curves(self, session_dir: Path) -> Optional[str]:
-        """Generate training and validation loss curves."""
+        """Generate enhanced training curves with improved loss scaling and loss breakdown."""
         try:
             if not self.train_losses and not self.val_losses:
                 return None
             
-            fig, axes = plt.subplots(2, 2, figsize=(15, 10))
-            fig.suptitle('Training Progress Curves', fontsize=16, fontweight='bold')
+            # Create contextual chart title based on training configuration
+            contextual_title = self._get_contextual_chart_title()
+            
+            fig, axes = plt.subplots(2, 2, figsize=(16, 12))
+            fig.suptitle(contextual_title, fontsize=16, fontweight='bold')
             
             epochs = range(1, len(self.train_losses) + 1)
             
-            # Loss curves
-            if self.train_losses:
-                axes[0, 0].plot(epochs, self.train_losses, 'b-', label='Training Loss', linewidth=2)
-            if self.val_losses:
-                axes[0, 0].plot(epochs[:len(self.val_losses)], self.val_losses, 'r-', label='Validation Loss', linewidth=2)
-            axes[0, 0].set_title('Loss Curves')
-            axes[0, 0].set_xlabel('Epoch')
-            axes[0, 0].set_ylabel('Loss')
-            axes[0, 0].legend()
-            axes[0, 0].grid(True, alpha=0.3)
+            # Enhanced Loss curves with proper scaling
+            self._plot_enhanced_loss_curves(axes[0, 0], epochs)
             
             # Learning rate schedule
             if self.learning_rates:
-                axes[0, 1].plot(epochs[:len(self.learning_rates)], self.learning_rates, 'g-', linewidth=2)
+                axes[0, 1].plot(epochs[:len(self.learning_rates)], self.learning_rates, 'g-', linewidth=2, marker='o', markersize=3)
                 axes[0, 1].set_title('Learning Rate Schedule')
                 axes[0, 1].set_xlabel('Epoch')
                 axes[0, 1].set_ylabel('Learning Rate')
                 axes[0, 1].set_yscale('log')
                 axes[0, 1].grid(True, alpha=0.3)
+                
+                # Add phase transitions to learning rate chart
+                for transition in self.phase_transitions:
+                    axes[0, 1].axvline(x=transition['epoch'], color='orange', linestyle='--', alpha=0.7, 
+                                     label=f'Phase {transition["phase"]} Start' if transition == self.phase_transitions[0] else '')
+                if self.phase_transitions:
+                    axes[0, 1].legend()
             
-            # Phase transitions
-            for transition in self.phase_transitions:
-                for ax in axes.flat:
-                    ax.axvline(x=transition['epoch'], color='orange', linestyle='--', alpha=0.7)
+            # Loss breakdown chart (replaces empty chart)
+            self._plot_loss_breakdown_chart(axes[1, 0], epochs)
             
-            # Research-focused accuracy trends - adapt based on available metrics
-            research_accuracy_data = self._extract_research_accuracy_trends()
-            if research_accuracy_data:
-                for metric_name, values in research_accuracy_data.items():
-                    if values:
-                        axes[1, 0].plot(epochs[:len(values)], values, linewidth=2, 
-                                      label=self._get_metric_display_name(metric_name))
-                axes[1, 0].set_title('Research Accuracy Trends')
-                axes[1, 0].set_xlabel('Epoch')
-                axes[1, 0].set_ylabel('Accuracy')
-                axes[1, 0].legend()
-                axes[1, 0].grid(True, alpha=0.3)
-            
-            # Phase-appropriate secondary metrics
-            secondary_data = self._extract_secondary_metrics_trends()
-            if secondary_data:
-                for metric_name, values in secondary_data.items():
-                    if values:
-                        axes[1, 1].plot(epochs[:len(values)], values, linewidth=2,
-                                      label=self._get_metric_display_name(metric_name))
-                axes[1, 1].set_title('Secondary Research Metrics')
-                axes[1, 1].set_xlabel('Epoch')
-                axes[1, 1].set_ylabel('Value')
-                axes[1, 1].legend()
-                axes[1, 1].grid(True, alpha=0.3)
+            # Merged research accuracy and secondary metrics
+            self._plot_merged_research_metrics(axes[1, 1], epochs)
             
             plt.tight_layout()
             
             chart_path = session_dir / 'training_curves.png'
-            plt.savefig(chart_path, dpi=300, bbox_inches='tight')
+            plt.savefig(chart_path, dpi=300, bbox_inches='tight', facecolor='white', edgecolor='none')
             plt.close()
             
             return str(chart_path)
@@ -971,6 +948,203 @@ class ComprehensiveMetricsTracker:
         """
         phase_name = f"phase_{phase_num}"
         self.update_metrics(epoch, phase_name, metrics, predictions, ground_truth, phase_num)
+    
+    def _get_contextual_chart_title(self) -> str:
+        """Generate contextual chart title based on training configuration."""
+        # Determine backbone and phase info
+        backbone = "Unknown Backbone"
+        total_epochs = len(self.epoch_metrics)
+        
+        # Try to extract backbone from saved metrics
+        if self.epoch_metrics:
+            # Look for backbone info in metrics or derive from class configuration
+            for record in self.epoch_metrics:
+                if 'backbone' in record:
+                    backbone = record['backbone'].upper()
+                    break
+        
+        # Determine phase information
+        phases_used = set()
+        for record in self.epoch_metrics:
+            if 'phase_num' in record:
+                phases_used.add(record['phase_num'])
+        
+        if len(phases_used) > 1:
+            phase_info = f"Two-Phase Training ({min(phases_used)} → {max(phases_used)})"
+        elif phases_used:
+            phase_info = f"Single-Phase Training (Phase {list(phases_used)[0]})"
+        else:
+            phase_info = "Training Progress"
+        
+        return f"SmartCash {backbone} - {phase_info} ({total_epochs} epochs)"
+    
+    def _plot_enhanced_loss_curves(self, ax, epochs):
+        """Plot loss curves with enhanced scaling for small decreasing values."""
+        has_data = False
+        
+        if self.train_losses:
+            ax.plot(epochs, self.train_losses, 'b-', label='Training Loss', linewidth=2.5, marker='o', markersize=4, alpha=0.8)
+            has_data = True
+            
+        if self.val_losses:
+            ax.plot(epochs[:len(self.val_losses)], self.val_losses, 'r-', label='Validation Loss', linewidth=2.5, marker='s', markersize=4, alpha=0.8)
+            has_data = True
+        
+        if not has_data:
+            ax.text(0.5, 0.5, 'No Loss Data Available', transform=ax.transAxes, ha='center', va='center', fontsize=12)
+            return
+            
+        # Enhanced scaling for small decreasing values
+        all_losses = []
+        if self.train_losses:
+            all_losses.extend(self.train_losses)
+        if self.val_losses:
+            all_losses.extend(self.val_losses)
+        
+        if all_losses:
+            min_loss = min(all_losses)
+            max_loss = max(all_losses)
+            loss_range = max_loss - min_loss
+            
+            # If loss range is very small (< 0.1), use linear scale with padding
+            # If loss range is moderate, use linear scale
+            # If loss range is large, consider log scale
+            if loss_range < 0.1:
+                # Small decreasing losses - add padding to show curve clearly
+                padding = loss_range * 0.1 if loss_range > 0 else 0.01
+                ax.set_ylim(min_loss - padding, max_loss + padding)
+            elif min_loss > 0 and max_loss / min_loss > 10:
+                # Large range - use log scale
+                ax.set_yscale('log')
+        
+        # Styling
+        ax.set_title('Training & Validation Loss', fontsize=14, fontweight='bold')
+        ax.set_xlabel('Epoch', fontsize=12)
+        ax.set_ylabel('Loss', fontsize=12)
+        ax.legend(loc='upper right')
+        ax.grid(True, alpha=0.3)
+        
+        # Add best loss annotations
+        if self.val_losses:
+            best_val_epoch = np.argmin(self.val_losses) + 1
+            best_val_loss = min(self.val_losses)
+            ax.annotate(f'Best Val: {best_val_loss:.4f}@{best_val_epoch}', 
+                       xy=(best_val_epoch, best_val_loss),
+                       xytext=(10, 10), textcoords='offset points',
+                       bbox=dict(boxstyle='round,pad=0.3', facecolor='yellow', alpha=0.7),
+                       arrowprops=dict(arrowstyle='->', connectionstyle='arc3,rad=0'),
+                       fontsize=10)
+    
+    def _plot_loss_breakdown_chart(self, ax, epochs):
+        """Plot detailed loss breakdown components."""
+        # Extract loss breakdown data from epoch metrics
+        loss_components = {}
+        
+        for record in self.epoch_metrics:
+            for key, value in record.items():
+                if 'loss' in key.lower() and key not in ['train_loss', 'val_loss'] and isinstance(value, (int, float)):
+                    if key not in loss_components:
+                        loss_components[key] = []
+                    loss_components[key].append(value)
+        
+        if not loss_components:
+            ax.text(0.5, 0.5, 'No Loss Breakdown Data\nAvailable', transform=ax.transAxes, 
+                   ha='center', va='center', fontsize=12, 
+                   bbox=dict(boxstyle='round', facecolor='lightgray', alpha=0.7))
+            ax.set_title('Loss Breakdown Components', fontsize=14, fontweight='bold')
+            return
+        
+        # Plot each loss component
+        colors = plt.cm.Set3(np.linspace(0, 1, len(loss_components)))
+        
+        for (component, values), color in zip(loss_components.items(), colors):
+            if len(values) > 0:
+                # Ensure we have epochs for this component
+                component_epochs = epochs[:len(values)]
+                ax.plot(component_epochs, values, label=self._format_loss_component_name(component), 
+                       linewidth=2, marker='o', markersize=3, color=color, alpha=0.8)
+        
+        ax.set_title('Loss Breakdown Components', fontsize=14, fontweight='bold')
+        ax.set_xlabel('Epoch', fontsize=12)
+        ax.set_ylabel('Loss Value', fontsize=12)
+        ax.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
+        ax.grid(True, alpha=0.3)
+    
+    def _plot_merged_research_metrics(self, ax, epochs):
+        """Plot merged research accuracy trends and secondary metrics."""
+        # Merge accuracy trends and secondary metrics
+        research_data = self._extract_research_accuracy_trends()
+        secondary_data = self._extract_secondary_metrics_trends()
+        
+        all_metrics = {}
+        all_metrics.update(research_data)
+        all_metrics.update(secondary_data)
+        
+        if not all_metrics:
+            ax.text(0.5, 0.5, 'No Research Metrics\nData Available', transform=ax.transAxes, 
+                   ha='center', va='center', fontsize=12, 
+                   bbox=dict(boxstyle='round', facecolor='lightgray', alpha=0.7))
+            ax.set_title('Research Metrics Trends', fontsize=14, fontweight='bold')
+            return
+        
+        # Plot metrics with different styles for accuracy vs other metrics
+        colors = plt.cm.tab10(np.linspace(0, 1, len(all_metrics)))
+        
+        for (metric_name, values), color in zip(all_metrics.items(), colors):
+            if values and len(values) > 0:
+                metric_epochs = epochs[:len(values)]
+                
+                # Use different styles for different metric types
+                if 'accuracy' in metric_name.lower():
+                    linestyle = '-'
+                    marker = 'o'
+                    linewidth = 2.5
+                elif 'precision' in metric_name.lower() or 'recall' in metric_name.lower():
+                    linestyle = '--'
+                    marker = 's'
+                    linewidth = 2
+                elif 'f1' in metric_name.lower():
+                    linestyle = '-.'
+                    marker = 'D'
+                    linewidth = 2
+                else:
+                    linestyle = ':'
+                    marker = '^'
+                    linewidth = 1.5
+                
+                ax.plot(metric_epochs, values, 
+                       label=self._get_metric_display_name(metric_name),
+                       linestyle=linestyle, marker=marker, markersize=3,
+                       linewidth=linewidth, color=color, alpha=0.8)
+        
+        ax.set_title('Research Metrics Trends', fontsize=14, fontweight='bold')
+        ax.set_xlabel('Epoch', fontsize=12)
+        ax.set_ylabel('Metric Value', fontsize=12)
+        ax.set_ylim(0, 1.05)  # Most research metrics are 0-1
+        ax.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
+        ax.grid(True, alpha=0.3)
+    
+    def _format_loss_component_name(self, component_name: str) -> str:
+        """Format loss component names for display."""
+        # Remove common prefixes and format nicely
+        name = component_name.replace('train_', '').replace('val_', '')
+        name = name.replace('_loss', '').replace('loss', '')
+        name = name.replace('_', ' ').title()
+        
+        # Handle special cases
+        replacements = {
+            'Box': 'Box Loss',
+            'Obj': 'Objectness',
+            'Cls': 'Classification', 
+            'Bbox': 'Bounding Box',
+            'Total': 'Total Loss'
+        }
+        
+        for old, new in replacements.items():
+            if old in name:
+                name = name.replace(old, new)
+        
+        return name
 
 
 def create_visualization_manager(num_classes_per_layer: Dict[str, int], 

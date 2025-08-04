@@ -53,24 +53,11 @@ class TrainingPhaseManager:
         
         # Enhanced debug logging for validation executor creation
         debug_map_flag = config.get('debug_map', False)
-        if debug_map_flag:
-            logger.info(f"🐛 TrainingPhaseManager: Creating ValidationExecutor with debug_map=True")
-        
+       
         self.validation_executor = ValidationExecutor(model, config, progress_tracker)
         
-        # Verify debug logging was properly initialized
-        if debug_map_flag:
-            map_calc_debug = getattr(self.validation_executor.map_calculator, 'debug', False)
-            debug_logger_exists = hasattr(self.validation_executor.map_calculator, 'debug_logger') and self.validation_executor.map_calculator.debug_logger is not None
-            logger.info(f"🐛 ValidationExecutor created: map_calc_debug={map_calc_debug}, debug_logger_exists={debug_logger_exists}")
         self.checkpoint_manager = create_checkpoint_manager(config)
         
-        # Final debug verification
-        if debug_map_flag:
-            from pathlib import Path
-            log_dir = Path("logs/validation_metrics")
-            debug_files = list(log_dir.glob("*.log")) if log_dir.exists() else []
-            logger.info(f"🐛 TrainingPhaseManager initialized: {len(debug_files)} debug files exist")
         self.progress_manager = ProgressManager(
             progress_tracker, emit_metrics_callback, 
             emit_live_chart_callback, visualization_manager
@@ -716,7 +703,7 @@ class TrainingPhaseManager:
             )
         
         return {
-            'success': True,
+            'success': False,  # Changed from True to False to prevent Phase 2 continuation
             'epochs_completed': epoch,
             'best_metrics': best_metrics,
             'best_checkpoint': best_checkpoint_path,

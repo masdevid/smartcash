@@ -397,8 +397,6 @@ class MemoryOptimizedProcessor:
         
         # Periodic cleanup based on configuration
         if self._batch_count % self.config.cleanup_frequency == 0:
-            if self.debug:
-                logger.debug(f"🧹 Performing memory cleanup after batch {self._batch_count}")
             self.memory_optimizer.cleanup_memory()
     
     def emergency_cleanup(self):

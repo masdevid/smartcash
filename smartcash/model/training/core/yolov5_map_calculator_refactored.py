@@ -73,16 +73,18 @@ class YOLOv5MapCalculator:
         self.iou_thres = iou_thres
         self.debug = debug
         self.training_context = training_context or {}
+        self.current_epoch = 0  # Initialize current_epoch
         
         # Initialize device and memory management first
         self.memory_optimizer = get_memory_optimizer()
         self.device = self.memory_optimizer.device
         
         # Initialize debug file logging if enabled (after device is set)
+        # Debug logger will be setup dynamically when epoch is known
         self.debug_logger = None
+        self._current_debug_epoch = -1  # Track which epoch debug logger is configured for
         if debug:
-            self._setup_debug_logging()
-            logger.info(f"🐛 YOLOv5MapCalculator DEBUG MODE ENABLED - Writing to debug log file")
+            logger.info(f"🐛 YOLOv5MapCalculator DEBUG MODE ENABLED - Debug logging will be setup per epoch")
         
         # Initialize specialized processors
         self._init_processors()
@@ -100,21 +102,21 @@ class YOLOv5MapCalculator:
         import logging
         from datetime import datetime
         
-        # Create debug log directory
-        debug_log_dir = Path("logs/validation_metrics")
-        debug_log_dir.mkdir(parents=True, exist_ok=True)
-        
+      
         # Extract context information for filename
         backbone = self.training_context.get('backbone', 'unknown')
         phase = self.training_context.get('current_phase', 'unknown')
         training_mode = self.training_context.get('training_mode', 'unknown')
         
+        # Create debug log directory
+        debug_log_dir = Path(f"logs/validation_metrics/{backbone}")
+        debug_log_dir.mkdir(parents=True, exist_ok=True)
+
         # Create timestamped debug log file with context
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        debug_log_file = debug_log_dir / f"map_debug_{backbone}_{training_mode}_phase{phase}_{timestamp}.log"
+        debug_log_file = debug_log_dir / f"map_debug_phase{phase}_epoch{self.current_epoch}.log"
         
         # Set up dedicated debug logger
-        self.debug_logger = logging.getLogger(f"map_debug_{timestamp}")
+        self.debug_logger = logging.getLogger(f"map_debug_phase{phase}_epoch{self.current_epoch}")
         self.debug_logger.setLevel(logging.DEBUG)
         
         # Remove existing handlers to avoid duplicates
@@ -235,7 +237,7 @@ class YOLOv5MapCalculator:
             self._debug_log("🧹 Memory cleaned, ready for new validation epoch")
         self.memory_optimizer.cleanup_memory()
     
-    def update(self, predictions: torch.Tensor, targets: torch.Tensor):
+    def update(self, predictions: torch.Tensor, targets: torch.Tensor, epoch: int = 0):
         """
         Update mAP statistics with batch predictions and targets.
         
@@ -244,10 +246,18 @@ class YOLOv5MapCalculator:
                         where each detection is [x, y, w, h, conf, class]
             targets: Ground truth targets [num_targets, 6] 
                     where each target is [batch_idx, class, x, y, w, h]
+            epoch: The current epoch number.
                     
         Time Complexity: O(P*T) for IoU + O(P log P) for sorting
         Space Complexity: O(P*T) for IoU matrix
         """
+        self.current_epoch = epoch
+        
+        # Setup or update debug logging for current epoch
+        if self.debug and self._current_debug_epoch != epoch:
+            self._setup_debug_logging()
+            self._current_debug_epoch = epoch
+        
         # Check YOLOv5 availability
         if not self._ensure_yolov5_available() or predictions is None or targets is None:
             if self.debug:
@@ -275,7 +285,7 @@ class YOLOv5MapCalculator:
         try:
             # Apply hierarchical filtering for Phase 2 multi-layer architecture
             processed_predictions, processed_targets = self.hierarchical_processor.process_hierarchical_predictions(
-                predictions, targets
+                predictions, targets, epoch=self.current_epoch
             )
             
             # Optimize tensor device management
@@ -747,7 +757,6 @@ class YOLOv5MapCalculator:
         Time Complexity: O(N log N) for AP computation
         Space Complexity: O(N) for intermediate arrays
         """
-        logger.info("🧮 Computing mAP metrics (this may take a moment)...")
         
         if self.debug:
             # Write to debug file instead of console

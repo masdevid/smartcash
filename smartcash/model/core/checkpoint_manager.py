@@ -68,6 +68,13 @@ class CheckpointManager:
             log_message = f"✅ {'Best' if is_best else 'Last'} checkpoint saved successfully at {checkpoint_path}"
             self.logger.info(log_message)
             
+            # Create phase backup immediately if this is a best model
+            if is_best:
+                phase_num = kwargs.get('phase', 1)  # Default to phase 1 if not specified
+                backup_path = self._create_phase_backup_immediate(str(checkpoint_path), phase_num)
+                if backup_path:
+                    self.logger.info(f"📦 Phase {phase_num} backup created: {Path(backup_path).name}")
+            
             # Cleanup old checkpoints
             if self.auto_cleanup:
                 self._cleanup_old_checkpoints()
@@ -342,6 +349,38 @@ class CheckpointManager:
         except Exception as e:
             self.logger.error(f"❌ Failed to delete checkpoint: {str(e)}")
             return False
+    
+    def _create_phase_backup_immediate(self, checkpoint_path: str, phase_num: int) -> Optional[str]:
+        """📦 Create phase-specific backup immediately when best model is saved"""
+        if not checkpoint_path:
+            return None
+            
+        try:
+            import shutil
+            
+            best_checkpoint_path = Path(checkpoint_path)
+            
+            # Generate phase-specific backup filename
+            # Convert: best_cspdarknet_two_phase_multi_unfrozen_pretrained_20250804.pt
+            # To: best_cspdarknet_two_phase_multi_unfrozen_pretrained_20250804_phase1.pt
+            backup_checkpoint_path = best_checkpoint_path.parent / (
+                best_checkpoint_path.stem + f'_phase{phase_num}' + best_checkpoint_path.suffix
+            )
+            
+            # Remove existing backup if it exists (avoid accumulation)
+            if backup_checkpoint_path.exists():
+                backup_checkpoint_path.unlink()
+                self.logger.debug(f"🗑️ Removed existing phase {phase_num} backup: {backup_checkpoint_path.name}")
+            
+            # Copy the best checkpoint to phase backup
+            shutil.copy2(best_checkpoint_path, backup_checkpoint_path)
+            
+            self.logger.debug(f"✅ Created Phase {phase_num} backup: {backup_checkpoint_path.name}")
+            return str(backup_checkpoint_path)
+            
+        except Exception as e:
+            self.logger.warning(f"⚠️ Failed to create Phase {phase_num} backup: {e}")
+            return None
 
 
 # Factory function

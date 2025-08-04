@@ -249,7 +249,7 @@ class ProgressManager:
         Handle early stopping logic with phase-aware behavior.
         
         Args:
-            early_stopping: Early stopping instance
+            early_stopping: Early stopping instance (legacy or phase-specific)
             final_metrics: Final metrics dictionary
             epoch: Current epoch number
             phase_num: Current phase number - used to determine if early stopping should run
@@ -259,33 +259,52 @@ class ProgressManager:
         """
         if not early_stopping:
             return False
+        
+        # Check if this is phase-specific early stopping
+        if hasattr(early_stopping, 'set_phase'):
+            # Phase-specific early stopping - uses multiple metrics and criteria
+            logger.debug(f"Phase {phase_num}: Using phase-specific early stopping")
             
-        # Early stopping can now be active in both phases using val_accuracy
-        # Phase 1: val_accuracy is meaningful for classification performance
-        # Phase 2: val_accuracy continues to be meaningful for overall performance
-        if phase_num == 1:
-            logger.debug(f"Phase 1: Early stopping enabled using val_accuracy")
+            # Ensure phase is set correctly
+            early_stopping.set_phase(phase_num)
+            
+            # Pass all metrics to phase-specific early stopping
+            should_stop = early_stopping(final_metrics, None, epoch)
+            
+            if should_stop:
+                status = early_stopping.get_status_summary()
+                logger.info(f"🛑 Phase-specific early stopping triggered at epoch {epoch + 1}")
+                logger.info(f"   Reason: {status['stop_reason']}")
+                
+                # Add early stopping info to final metrics
+                final_metrics['early_stopped'] = True
+                final_metrics['early_stop_epoch'] = epoch + 1
+                final_metrics['early_stop_reason'] = status['stop_reason']
+                final_metrics['early_stop_phase'] = phase_num
+            
+            return should_stop
         else:
-            logger.debug(f"Phase 2: Early stopping enabled using val_accuracy")
-        
-        # Log early stopping configuration
-        logger.debug(f"Early stopping config: patience={early_stopping.patience}, metric={early_stopping.metric}, mode={early_stopping.mode}")
-        
-        # Use val_accuracy for early stopping (more reliable than val_map50)
-        monitor_metric = final_metrics.get('val_accuracy', 0)
-        should_stop = early_stopping(monitor_metric, None, epoch)  # Don't pass model for saving
-        
-        if should_stop:
-            logger.info(f"🛑 Early stopping triggered at epoch {epoch + 1}")
-            logger.info(f"   Monitoring val_accuracy: no improvement for {early_stopping.patience} epochs")
-            logger.info(f"   Best val_accuracy: {early_stopping.best_score:.6f} at epoch {early_stopping.best_epoch + 1}")
+            # Legacy early stopping logic
+            logger.debug(f"Phase {phase_num}: Using legacy early stopping")
             
-            # Add early stopping info to final metrics
-            final_metrics['early_stopped'] = True
-            final_metrics['early_stop_epoch'] = epoch + 1
-            final_metrics['early_stop_reason'] = f"No improvement in {early_stopping.metric} for {early_stopping.patience} epochs"
-        
-        return should_stop
+            # Log early stopping configuration
+            logger.debug(f"Early stopping config: patience={early_stopping.patience}, metric={early_stopping.metric}, mode={early_stopping.mode}")
+            
+            # Use val_accuracy for early stopping (more reliable than val_map50)
+            monitor_metric = final_metrics.get('val_accuracy', 0)
+            should_stop = early_stopping(monitor_metric, None, epoch)  # Don't pass model for saving
+            
+            if should_stop:
+                logger.info(f"🛑 Legacy early stopping triggered at epoch {epoch + 1}")
+                logger.info(f"   Monitoring val_accuracy: no improvement for {early_stopping.patience} epochs")
+                logger.info(f"   Best val_accuracy: {early_stopping.best_score:.6f} at epoch {early_stopping.best_epoch + 1}")
+                
+                # Add early stopping info to final metrics
+                final_metrics['early_stopped'] = True
+                final_metrics['early_stop_epoch'] = epoch + 1
+                final_metrics['early_stop_reason'] = f"No improvement in {early_stopping.metric} for {early_stopping.patience} epochs"
+            
+            return should_stop
     
     def cleanup(self):
         """Clean up progress manager resources."""

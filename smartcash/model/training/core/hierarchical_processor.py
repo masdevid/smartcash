@@ -62,9 +62,13 @@ class HierarchicalProcessor:
         self.layer_3_classes = range(14, 17) # Classes 14-16
         
         # Initialize debug file logging if enabled (after layer configuration)
+        # Debug logger will be setup dynamically when epoch is known
         self.debug_logger = None
-        if debug:
-            self._setup_hierarchical_debug_logging()
+        self.current_epoch = 0  # Initialize current epoch
+        self._current_debug_epoch = -1  # Track which epoch debug logger is configured for
+        
+        # Hierarchical processor only uses file logging to reduce console verbosity
+        
     
     def _setup_hierarchical_debug_logging(self):
         """
@@ -75,22 +79,20 @@ class HierarchicalProcessor:
         from pathlib import Path
         import logging
         from datetime import datetime
-        
-        # Create debug log directory
-        debug_log_dir = Path("logs/validation_metrics")
-        debug_log_dir.mkdir(parents=True, exist_ok=True)
-        
-        # Extract context information for filename
+         # Extract context information for filename
         backbone = self.training_context.get('backbone', 'unknown')
         phase = self.training_context.get('current_phase', 'unknown')
         training_mode = self.training_context.get('training_mode', 'unknown')
         
+        # Create debug log directory
+        debug_log_dir = Path(f"logs/validation_metrics/{backbone}")
+        debug_log_dir.mkdir(parents=True, exist_ok=True)
+        
         # Create timestamped debug log file with context
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        debug_log_file = debug_log_dir / f"hierarchical_debug_{backbone}_{training_mode}_phase{phase}_{timestamp}.log"
+        debug_log_file = debug_log_dir / f"hierarchical_debug_phase{phase}_epoch{self.current_epoch}.log"
         
         # Set up dedicated debug logger
-        self.debug_logger = logging.getLogger(f"hierarchical_debug_{timestamp}")
+        self.debug_logger = logging.getLogger(f"hierarchical_debug_phase{phase}_epoch{self.current_epoch}")
         self.debug_logger.setLevel(logging.DEBUG)
         
         # Remove existing handlers to avoid duplicates
@@ -156,7 +158,8 @@ class HierarchicalProcessor:
     def process_hierarchical_predictions(
         self, 
         predictions: torch.Tensor, 
-        targets: torch.Tensor
+        targets: torch.Tensor,
+        epoch: int = 0
     ) -> Tuple[torch.Tensor, torch.Tensor]:
         """
         Apply hierarchical filtering and confidence modulation.
@@ -164,6 +167,7 @@ class HierarchicalProcessor:
         Args:
             predictions: Raw predictions tensor
             targets: Target tensor
+            epoch: The current epoch number.
             
         Returns:
             Tuple of (filtered_predictions, filtered_targets)
@@ -171,6 +175,13 @@ class HierarchicalProcessor:
         Time Complexity: O(P) for filtering + O(P₁ * P₂) for modulation
         Space Complexity: O(P) for storing processed predictions
         """
+        self.current_epoch = epoch
+        
+        # Setup or update debug logging for current epoch
+        if self.debug and self._current_debug_epoch != epoch:
+            self._setup_hierarchical_debug_logging()
+            self._current_debug_epoch = epoch
+        
         try:
             # Input validation
             if predictions is None or targets is None:
@@ -190,22 +201,21 @@ class HierarchicalProcessor:
                 self._hierarchical_debug_log(f"  • predictions: {predictions.shape}")
                 self._hierarchical_debug_log(f"  • targets: {targets.shape}")
             
-            if phase == 1:
+            if self.debug and phase == 1:
                 # Phase 1: Standard single-layer processing
-                if self.debug:
-                    logger.debug("🔹 PHASE 1: Standard single-layer processing")
-                    self._hierarchical_debug_log("🔹 PHASE 1 DETECTED: Standard single-layer processing")
-                    self._hierarchical_debug_log("  • Hierarchical processing SKIPPED")
-                    self._hierarchical_debug_log("  • Returning original predictions and targets unchanged")
-                return predictions, targets
+                self._hierarchical_debug_log("🔹 PHASE 1 DETECTED: Standard single-layer processing")
+                self._hierarchical_debug_log("  • Hierarchical processing SKIPPED")
+                self._hierarchical_debug_log("  • Returning original predictions and targets unchanged")
             
             # Phase 2: Multi-layer hierarchical processing
-            if self.debug:
-                logger.debug("🔹 PHASE 2: Hierarchical multi-layer processing")
+            if self.debug and phase == 2:
                 self._hierarchical_debug_log("🔹 PHASE 2 DETECTED: Hierarchical multi-layer processing")
                 self._hierarchical_debug_log("  • Applying hierarchical filtering and confidence modulation")
-                
-            return self._process_phase2_predictions(predictions, targets)
+            
+            if phase == 2:
+                return self._process_phase2_predictions(predictions, targets)
+            
+            return predictions, targets
             
         except Exception as e:
             logger.warning(f"Error in hierarchical processing: {e}")
@@ -216,18 +226,40 @@ class HierarchicalProcessor:
     
     def _detect_processing_phase(self, predictions: torch.Tensor) -> int:
         """
-        Detect whether we're in Phase 1 or Phase 2 based on prediction classes.
+        Detect whether we're in Phase 1 or Phase 2 based on training context.
         
         Args:
-            predictions: Predictions tensor
+            predictions: Predictions tensor (used for fallback only)
             
         Returns:
             int: 1 for Phase 1, 2 for Phase 2
             
-        Time Complexity: O(P) where P is number of predictions
+        Time Complexity: O(1) for context check, O(P) for fallback prediction analysis
         """
         try:
-            # Extract unique classes from predictions
+            # Primary: Use training context if available
+            if self.training_context:
+                current_phase = self.training_context.get('current_phase', '')
+                
+                # Handle both string and integer phase values
+                phase_str = str(current_phase).lower() if current_phase else ''
+                
+                # Parse phase information
+                if 'phase1' in phase_str or phase_str == '1' or current_phase == 1:
+                    return 1
+                elif 'phase2' in phase_str or phase_str == '2' or current_phase == 2:
+                    return 2
+                
+                # Check training mode for phase indication
+                training_mode = self.training_context.get('training_mode', '')
+                training_mode_str = str(training_mode).lower() if training_mode else ''
+                
+                if 'single_phase' in training_mode_str or 'one_phase' in training_mode_str:
+                    return 1
+                elif 'two_phase' in training_mode_str and ('phase2' in phase_str or current_phase == 2):
+                    return 2
+            
+            # Fallback: Analyze predictions (but with better logic)
             if predictions.dim() == 3:
                 # [batch, detections, features] -> flatten to check classes
                 flat_predictions = predictions.view(-1, predictions.shape[-1])
@@ -239,10 +271,14 @@ class HierarchicalProcessor:
                 logger.warning(f"Unexpected prediction tensor shape: {predictions.shape}")
                 return 1
                 
-            max_class = unique_classes.max().item() if len(unique_classes) > 0 else 0
+            # Conservative fallback: Only assume Phase 2 if >80% of predictions are classes > 6
+            if len(unique_classes) > 0:
+                high_classes = unique_classes[unique_classes >= 7]
+                if len(high_classes) > 0 and len(high_classes) > len(unique_classes) * 0.8:
+                    return 2
             
-            # Phase 1: classes 0-6 only, Phase 2: classes > 6
-            return 1 if max_class < 7 else 2
+            # Default to Phase 1 (safer assumption)
+            return 1
             
         except Exception as e:
             logger.warning(f"Error detecting phase: {e}")
@@ -267,11 +303,10 @@ class HierarchicalProcessor:
         """
         if self.debug:
             unique_classes = self._get_unique_classes(predictions)
-            logger.debug(f"  • Original prediction classes: {unique_classes}")
-            logger.debug(f"  • Prediction tensor shape: {predictions.shape}")
             
             self._hierarchical_debug_log("\n📊 PHASE 2 PREDICTION ANALYSIS:")
             self._hierarchical_debug_log(f"  • Original prediction classes detected: {unique_classes}")
+            self._hierarchical_debug_log(f"  • Prediction tensor shape: {predictions.shape}")
             self._hierarchical_debug_log(f"  • Total predictions: {predictions.numel() // predictions.shape[-1] if predictions.numel() > 0 else 0}")
             self._hierarchical_debug_log(f"  • Layer breakdown by class ranges:")
             
@@ -301,18 +336,15 @@ class HierarchicalProcessor:
         layer_1_targets = targets[targets[..., 1] < 7] if targets.numel() > 0 else targets
         
         if self.debug:
-            logger.debug(f"  • Filtered Layer 1 predictions: {len(filtered_predictions)}")
-            logger.debug(f"  • Filtered targets: {len(layer_1_targets)} (Layer 1 only)")
-            if len(filtered_predictions) > 0:
-                filtered_classes = torch.unique(filtered_predictions[:, 5].long())
-                logger.debug(f"  • Final prediction classes: {filtered_classes.tolist()}")
-            
             # Detailed hierarchical processing summary
             self._hierarchical_debug_log("\n🎯 HIERARCHICAL PROCESSING RESULTS:")
             self._hierarchical_debug_log(f"  • Layer 1 predictions after filtering: {len(filtered_predictions)}")
             self._hierarchical_debug_log(f"  • Layer 1 targets after filtering: {len(layer_1_targets)}")
             
             if len(filtered_predictions) > 0:
+                filtered_classes = torch.unique(filtered_predictions[:, 5].long())
+                self._hierarchical_debug_log(f"  • Final prediction classes: {filtered_classes.tolist()}")
+                
                 # Confidence analysis
                 confidences = filtered_predictions[:, 4]
                 original_conf_sum = confidences.sum().item()
@@ -326,12 +358,8 @@ class HierarchicalProcessor:
                 self._hierarchical_debug_log(f"    - Max: {max_confidence:.4f}")
                 self._hierarchical_debug_log(f"    - Total confidence sum: {original_conf_sum:.4f}")
                 
-                # Final class distribution
-                final_classes = torch.unique(filtered_predictions[:, 5].long())
-                self._hierarchical_debug_log(f"  • Final prediction classes: {final_classes.tolist()}")
-                
                 # Class count breakdown
-                for cls in final_classes:
+                for cls in filtered_classes:
                     cls_count = (filtered_predictions[:, 5] == cls).sum().item()
                     cls_avg_conf = filtered_predictions[filtered_predictions[:, 5] == cls, 4].mean().item()
                     self._hierarchical_debug_log(f"    - Class {cls}: {cls_count} predictions, avg_conf={cls_avg_conf:.4f}")
@@ -415,7 +443,7 @@ class HierarchicalProcessor:
             # Memory safety check - use chunked processing for large datasets
             if len(layer_1_predictions) > self.max_predictions_per_chunk:
                 if self.debug:
-                    logger.debug(f"Large prediction set ({len(layer_1_predictions)}), using chunked processing")
+                    self._hierarchical_debug_log(f"Large prediction set ({len(layer_1_predictions)}), using chunked processing")
                 return self._chunked_confidence_modulation(all_predictions, layer_1_predictions)
             
             # Ensure we're working with 2D tensors
@@ -434,14 +462,14 @@ class HierarchicalProcessor:
             total_combinations = len(layer_1_predictions) * max(len(layer_2_preds), len(layer_3_preds))
             if total_combinations > self.max_matrix_combinations:
                 if self.debug:
-                    logger.debug(f"Memory-intensive operation detected ({total_combinations:,} combinations), using fallback")
+                    self._hierarchical_debug_log(f"Memory-intensive operation detected ({total_combinations:,} combinations), using fallback")
                 return layer_1_predictions  # Return unmodified to avoid OOM
             
             if self.debug:
-                logger.debug(f"  • Layer 1 predictions: {len(layer_1_predictions)}")
-                logger.debug(f"  • Layer 2 predictions: {len(layer_2_preds)}")
-                logger.debug(f"  • Layer 3 predictions: {len(layer_3_preds)}")
-                logger.debug(f"  • Memory estimate: {total_combinations:,} combinations")
+                self._hierarchical_debug_log(f"  • Layer 1 predictions: {len(layer_1_predictions)}")
+                self._hierarchical_debug_log(f"  • Layer 2 predictions: {len(layer_2_preds)}")
+                self._hierarchical_debug_log(f"  • Layer 3 predictions: {len(layer_3_preds)}")
+                self._hierarchical_debug_log(f"  • Memory estimate: {total_combinations:,} combinations")
             
             # Apply confidence modulation
             modified_predictions = layer_1_predictions.clone()
@@ -471,9 +499,9 @@ class HierarchicalProcessor:
             modified_predictions[:, 4] = hierarchical_conf
             
             if self.debug and len(layer_1_predictions) > 0:
-                # Log first few predictions for debugging
+                # Log first few predictions for debugging to file only
                 for i in range(min(3, len(layer_1_predictions))):
-                    logger.debug(f"  • Pred {i}: class={layer_1_predictions[i, 5].int().item()}, "
+                    self._hierarchical_debug_log(f"  • Pred {i}: class={layer_1_predictions[i, 5].int().item()}, "
                                f"conf={original_conf[i]:.3f}→{hierarchical_conf[i]:.3f}, "
                                f"L2={layer_2_conf[i]:.3f}, L3={layer_3_conf[i]:.3f}")
                 
@@ -677,7 +705,7 @@ class HierarchicalProcessor:
                         
                         # Only log once per class per session to avoid spam
                         if layer_2_class.item() not in self._logged_large_matrix:
-                            logger.debug(f"Memory optimization: Class {layer_2_class} has {matrix_size:,} prediction pairs, using average confidence instead of IoU computation")
+                            self._hierarchical_debug_log(f"Memory optimization: Class {layer_2_class} has {matrix_size:,} prediction pairs, using average confidence instead of IoU computation")
                             self._logged_large_matrix.add(layer_2_class.item())
                         
                         if len(matching_l2_preds) > 0:

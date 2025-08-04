@@ -53,8 +53,8 @@ class YOLOv5MapCalculator:
     def __init__(
         self, 
         num_classes: int = 7, 
-        conf_thres: float = 0.005, 
-        iou_thres: float = 0.03, 
+        conf_thres: float = 0.1, 
+        iou_thres: float = 0.5, 
         debug: bool = True,
         training_context: dict = None
     ):
@@ -406,7 +406,8 @@ class YOLOv5MapCalculator:
                         'map50_95': 0.0,
                         'precision': 0.0,
                         'recall': 0.0,
-                        'f1': 0.0
+                        'f1': 0.0,
+                        'accuracy': 0.0
                     }
             else:
                 # Malformed statistics
@@ -418,7 +419,8 @@ class YOLOv5MapCalculator:
                     'map50_95': 0.0,
                     'precision': 0.0,
                     'recall': 0.0,
-                    'f1': 0.0
+                    'f1': 0.0,
+                    'accuracy': 0.0
                 }
             
         except Exception as e:
@@ -740,7 +742,8 @@ class YOLOv5MapCalculator:
             'map50_95': 0.0,
             'precision': float(approx_precision),
             'recall': float(approx_recall),
-            'f1': float(approx_f1)
+            'f1': float(approx_f1),
+            'accuracy': float(approx_recall)  # Use recall as accuracy approximation for small datasets
         }
     
     def _compute_full_map(self, stats: list, data_size: int) -> Dict[str, float]:
@@ -812,7 +815,8 @@ class YOLOv5MapCalculator:
             'map50_95': 0.0,  # Not computed for performance
             'precision': float(precision),
             'recall': float(recall),
-            'f1': float(f1_score)
+            'f1': float(f1_score),
+            'accuracy': float(recall)  # Use recall as accuracy for detection tasks
         }
     
     def get_processing_stats(self) -> Dict[str, any]:
@@ -842,8 +846,8 @@ class YOLOv5MapCalculator:
 
 def create_yolov5_map_calculator(
     num_classes: int = 7, 
-    conf_thres: float = 0.005, 
-    iou_thres: float = 0.03, 
+    conf_thres: float = 0.1, 
+    iou_thres: float = 0.5, 
     debug: bool = False,
     training_context: dict = None
 ) -> YOLOv5MapCalculator:

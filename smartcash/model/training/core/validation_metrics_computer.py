@@ -53,10 +53,7 @@ class ValidationMetricsComputer:
             raw_metrics.update(computed_metrics)
             logger.debug(f"Computed per-layer metrics: {list(computed_metrics.keys())}")
 
-        # Update primary metrics (accuracy, precision, etc.) based on the current phase
-        self._update_with_classification_metrics(raw_metrics, computed_metrics, phase_num)
-
-        # Compute and add YOLOv5 mAP metrics
+        # Compute and add YOLOv5 mAP metrics FIRST (so they don't override layer metrics)
         try:
             logger.debug("Computing YOLOv5 mAP metrics...")
             if self._cached_map_results is None:
@@ -65,9 +62,10 @@ class ValidationMetricsComputer:
             map_metrics = {
                 'map50': self._cached_map_results.get('map50', 0.0),
                 'map50_95': self._cached_map_results.get('map50_95', 0.0),
-                'map_precision': self._cached_map_results.get('precision', 0.0),
-                'map_recall': self._cached_map_results.get('recall', 0.0),
-                'map_f1': self._cached_map_results.get('f1', 0.0)
+                'map50_precision': self._cached_map_results.get('precision', 0.0),
+                'map50_recall': self._cached_map_results.get('recall', 0.0),
+                'map50_f1': self._cached_map_results.get('f1', 0.0),
+                'map50_accuracy': self._cached_map_results.get('accuracy', 0.0)
             }
             raw_metrics.update(map_metrics)
             logger.debug("YOLOv5 mAP metrics computed and cached.")
@@ -76,9 +74,23 @@ class ValidationMetricsComputer:
             logger.warning(f"Error computing YOLOv5 mAP metrics: {e}")
             # Set fallback mAP values
             raw_metrics.update({
-                'map50': 0.0, 'map50_95': 0.0, 'map_precision': 0.0, 
-                'map_recall': 0.0, 'map_f1': 0.0
+                'map50': 0.0, 'map50_95': 0.0, 'map50_precision': 0.0, 
+                'map50_recall': 0.0, 'map50_f1': 0.0, 'map50_accuracy': 0.0
             })
+
+        # Update primary metrics (accuracy, precision, etc.) based on the current phase
+        # This MUST come after YOLOv5 metrics to ensure layer metrics take precedence
+        logger.debug(f"Before layer metrics update - raw_metrics keys: {list(raw_metrics.keys())}")
+        if phase_num == 1:
+            logger.debug(f"Phase 1 - Before update: val_accuracy={raw_metrics.get('accuracy', 'missing')}, layer_1_accuracy={computed_metrics.get('layer_1_accuracy', 'missing')}")
+        
+        self._update_with_classification_metrics(raw_metrics, computed_metrics, phase_num)
+        
+        if phase_num == 1:
+            logger.debug(f"Phase 1 - After update: val_accuracy={raw_metrics.get('accuracy', 'missing')}, layer_1_accuracy={computed_metrics.get('layer_1_accuracy', 'missing')}")
+            # Verify they match
+            if abs(raw_metrics.get('accuracy', 0) - computed_metrics.get('layer_1_accuracy', 0)) > 0.0001:
+                logger.warning(f"⚠️ Phase 1 metrics mismatch: val_accuracy={raw_metrics.get('accuracy')} vs layer_1_accuracy={computed_metrics.get('layer_1_accuracy')}")
 
         # Standardize metric names for research and logging
         research_metrics_manager = get_research_metrics_manager()
@@ -125,6 +137,9 @@ class ValidationMetricsComputer:
             if final_predictions and final_targets:
                 computed_metrics = calculate_multilayer_metrics(final_predictions, final_targets)
                 logger.info(f"Computed validation metrics for {len(final_predictions)} layers")
+                logger.debug(f"Layer metrics computed: {list(computed_metrics.keys())}")
+                if 'layer_1_accuracy' in computed_metrics:
+                    logger.debug(f"layer_1_accuracy = {computed_metrics['layer_1_accuracy']:.6f}")
         
         return computed_metrics
     

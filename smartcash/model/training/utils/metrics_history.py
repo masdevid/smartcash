@@ -39,6 +39,7 @@ class EpochMetrics:
     val_map50_precision: Optional[float] = None
     val_map50_recall: Optional[float] = None
     val_map50_f1: Optional[float] = None
+    val_map50_accuracy: Optional[float] = None
     
     # Multi-task metrics (Phase 2)
     total_loss: Optional[float] = None
@@ -291,7 +292,7 @@ class MetricsHistoryRecorder:
             yolo_metrics = [
                 'val_map50', 'val_map50_95', 'val_precision', 
                 'val_recall', 'val_f1', 'val_accuracy',
-                'val_map50_precision', 'val_map50_recall', 'val_map50_f1'
+                'val_map50_precision', 'val_map50_recall', 'val_map50_f1', 'val_map50_accuracy'
             ]
             for metric in yolo_metrics:
                 if metric in metrics:

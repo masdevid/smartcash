@@ -93,7 +93,7 @@ class ResearchMetricsManager:
         logger.debug(f"Phase {phase_num}: Standardized primary metrics from top-level (already phase-aware).")
 
         # Add mAP-related metrics if they exist
-        map_keys = ['map50', 'map50_95', 'map_precision', 'map_recall', 'map_f1']
+        map_keys = ['map50', 'map50_95', 'map50_precision', 'map50_recall', 'map50_f1', 'map50_accuracy']
         for key in map_keys:
             if key in raw_metrics:
                 standardized[f"{prefix}{key}"] = raw_metrics[key]
@@ -109,6 +109,9 @@ class ResearchMetricsManager:
             # val_* should always use the correctly calculated top-level metrics
             # (validation_metrics_computer already handled phase-aware logic)
             if 'accuracy' in raw_metrics:
+                if phase_num == 1:
+                    layer_1_acc = raw_metrics.get('layer_1_accuracy', 'missing')
+                    logger.debug(f"Phase 1 research metrics: Setting val_accuracy={raw_metrics['accuracy']}, layer_1_accuracy={layer_1_acc}")
                 standardized["val_accuracy"] = raw_metrics['accuracy']
             if 'precision' in raw_metrics:
                 standardized["val_precision"] = raw_metrics['precision']

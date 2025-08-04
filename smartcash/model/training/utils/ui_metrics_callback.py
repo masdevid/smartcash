@@ -337,13 +337,20 @@ class UIMetricsCallback:
             # Phase 1: Focus on core training metrics only
             core_metrics = [
                 'train_loss', 'val_loss', 'learning_rate', 'epoch',
-                'val_precision', 'val_recall', 'val_f1', 'val_accuracy'
+                'val_precision', 'val_recall', 'val_f1', 'val_accuracy',
+                # Loss breakdown components
+                'train_box_loss', 'train_obj_loss', 'train_cls_loss',
+                'val_box_loss', 'val_obj_loss', 'val_cls_loss'
             ]
         else:
             # Phase 2: Focus on core training metrics
             core_metrics = [
                 'train_loss', 'val_loss', 'learning_rate', 'epoch',
-                'val_accuracy', 'val_precision', 'val_recall', 'val_f1', 'val_map50'
+                'val_accuracy', 'val_precision', 'val_recall', 'val_f1', 
+                'val_map50', 'val_map50_precision', 'val_map50_recall', 'val_map50_f1', 'val_map50_accuracy',
+                # Loss breakdown components
+                'train_box_loss', 'train_obj_loss', 'train_cls_loss',
+                'val_box_loss', 'val_obj_loss', 'val_cls_loss'
             ]
             # No additional metrics needed - keep it clean
         
@@ -448,7 +455,7 @@ class UIMetricsCallback:
         exclude_patterns = [
             'hierarchical_accuracy', 'research_primary_metric', 'denomination_accuracy',
             'multi_layer_benefit', '_contribution', 'layer_2_', 'layer_3_',
-            'map50_95', 'map75', 'ap_', 'map50', 'val_map50', 'train_map50'  # mAP metrics disabled
+            'map50_95', 'map75', 'ap_', 'train_map50'  # Some mAP metrics disabled, but allow val_map50_*
         ]
         
         remaining = {}
@@ -555,16 +562,39 @@ class UIMetricsCallback:
         
         # Extract mAP metrics
         map_metrics = {}
-        for key in ['val_map50', 'val_map50_95', 'val_precision', 'val_recall', 'val_f1']:
+        for key in ['val_map50', 'val_map50_95', 'val_precision', 'val_recall', 'val_f1', 
+                   'val_map50_precision', 'val_map50_recall', 'val_map50_f1', 'val_map50_accuracy']:
             if latest_epoch.get(key) is not None:
                 map_metrics[key] = latest_epoch[key]
         
-        # Extract loss breakdown from additional_metrics if available
+        # Extract loss breakdown from multiple sources
         loss_breakdown = {}
+        
+        # Standard YOLO loss components (both training and validation)
+        standard_loss_components = [
+            'train_box_loss', 'train_obj_loss', 'train_cls_loss',
+            'val_box_loss', 'val_obj_loss', 'val_cls_loss',
+            'box_loss', 'obj_loss', 'cls_loss'
+        ]
+        
+        # Extract from main metrics first
+        for key in standard_loss_components:
+            if latest_epoch.get(key) is not None:
+                loss_breakdown[key] = latest_epoch[key]
+        
+        # Extract from additional_metrics if available
         if latest_epoch.get('additional_metrics'):
             for key, value in latest_epoch['additional_metrics'].items():
                 if 'loss' in key.lower():
                     loss_breakdown[key] = value
+                    
+        # Also check for layer-specific loss components
+        layer_loss_patterns = ['layer_1_', 'layer_2_', 'layer_3_']
+        for layer_prefix in layer_loss_patterns:
+            for suffix in ['box_loss', 'obj_loss', 'cls_loss', 'total_loss', 'weighted_loss']:
+                key = f'{layer_prefix}{suffix}'
+                if latest_epoch.get(key) is not None:
+                    loss_breakdown[key] = latest_epoch[key]
         
         result = {
             'epoch': latest_epoch['epoch'],
@@ -620,11 +650,24 @@ class UIMetricsCallback:
                 'train_loss': [record['train_loss'] for record in phase_data],
                 'val_loss': [record['val_loss'] for record in phase_data]
             },
+            'loss_breakdown': {
+                'epochs': epochs,
+                'train_box_loss': [record.get('train_box_loss', 0) for record in phase_data],
+                'train_obj_loss': [record.get('train_obj_loss', 0) for record in phase_data],
+                'train_cls_loss': [record.get('train_cls_loss', 0) for record in phase_data],
+                'val_box_loss': [record.get('val_box_loss', 0) for record in phase_data],
+                'val_obj_loss': [record.get('val_obj_loss', 0) for record in phase_data],
+                'val_cls_loss': [record.get('val_cls_loss', 0) for record in phase_data]
+            },
             'map_metrics': {
                 'epochs': epochs,
                 'val_map50': [record.get('val_map50', 0) for record in phase_data],
                 'val_precision': [record.get('val_precision', 0) for record in phase_data],
-                'val_recall': [record.get('val_recall', 0) for record in phase_data]
+                'val_recall': [record.get('val_recall', 0) for record in phase_data],
+                'val_map50_precision': [record.get('val_map50_precision', 0) for record in phase_data],
+                'val_map50_recall': [record.get('val_map50_recall', 0) for record in phase_data],
+                'val_map50_f1': [record.get('val_map50_f1', 0) for record in phase_data],
+                'val_map50_accuracy': [record.get('val_map50_accuracy', 0) for record in phase_data]
             },
             'learning_rate': {
                 'epochs': epochs,
@@ -653,6 +696,11 @@ class UIMetricsCallback:
             'total_epochs': len(phase_data),
             'best_val_loss': min(record['val_loss'] for record in phase_data),
             'best_map50': max(record.get('val_map50', 0) for record in phase_data),
+            'best_map50_precision': max(record.get('val_map50_precision', 0) for record in phase_data),
+            'best_map50_accuracy': max(record.get('val_map50_accuracy', 0) for record in phase_data),
+            # Loss breakdown minimums (lower is better for loss components)
+            'min_train_box_loss': min(record.get('train_box_loss', float('inf')) for record in phase_data if record.get('train_box_loss') is not None),
+            'min_val_box_loss': min(record.get('val_box_loss', float('inf')) for record in phase_data if record.get('val_box_loss') is not None),
             'series': series
         }
     
@@ -815,10 +863,21 @@ if __name__ == "__main__":
         "train_loss": 0.7245,
         "val_loss": 2.3381,
         "val_accuracy": 0.25,
-        # "val_map50": 0.0,  # mAP metrics disabled for performance
+        "val_map50": 0.15,
+        "val_map50_precision": 0.32,
+        "val_map50_recall": 0.28,
+        "val_map50_f1": 0.30,
+        "val_map50_accuracy": 0.25,
         "layer_1_accuracy": 0.83,
         "layer_1_precision": 0.75,
-        "layer_1_f1": 0.82
+        "layer_1_f1": 0.82,
+        # Loss breakdown components
+        "train_box_loss": 0.245,
+        "train_obj_loss": 0.198,
+        "train_cls_loss": 0.281,
+        "val_box_loss": 0.892,
+        "val_obj_loss": 0.736,
+        "val_cls_loss": 0.710
     }
     
     # Test the callback

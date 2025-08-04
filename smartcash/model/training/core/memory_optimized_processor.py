@@ -286,20 +286,19 @@ class MemoryOptimizedProcessor:
             chunk_pred_idx = sorted_pred_idx[chunk_start:chunk_end]
             chunk_target_idx = sorted_target_idx[chunk_start:chunk_end]
             
-            # Parallel availability check for entire chunk
-            pred_available = ~used_predictions[chunk_pred_idx]
-            target_available = ~used_targets[chunk_target_idx]
-            valid_matches = pred_available & target_available
-            
-            # Apply matches in parallel
-            if valid_matches.any():
-                valid_pred_idx = chunk_pred_idx[valid_matches]
-                valid_target_idx = chunk_target_idx[valid_matches]
+            # FIXED: Proper pair-wise availability check to maintain pred-target correspondence
+            # We need to check each (prediction, target) pair individually to maintain
+            # the IoU-sorted correspondence from the greedy matching algorithm
+            for i in range(len(chunk_pred_idx)):
+                pred_idx = chunk_pred_idx[i].item()
+                target_idx = chunk_target_idx[i].item()
                 
-                # Parallel assignment - O(chunk_size)
-                tp[valid_pred_idx, 0] = True
-                used_targets[valid_target_idx] = True
-                used_predictions[valid_pred_idx] = True
+                # Check if both prediction and target are still available
+                if not used_predictions[pred_idx] and not used_targets[target_idx]:
+                    # Valid match - assign this specific prediction to this specific target
+                    tp[pred_idx, 0] = True
+                    used_targets[target_idx] = True
+                    used_predictions[pred_idx] = True
         
         return tp
     

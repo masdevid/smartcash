@@ -483,8 +483,9 @@ class TrainingPhaseManager:
         
         filtered = {}
         for key, value in metrics.items():
-            # Always preserve loss_breakdown and its components
-            if key == 'loss_breakdown' or any(loss_comp in key for loss_comp in ['box_loss', 'obj_loss', 'cls_loss']):
+            # Always preserve loss_breakdown, its components, and new map50_* metrics
+            preserve_patterns = ['box_loss', 'obj_loss', 'cls_loss', 'map50_precision', 'map50_recall', 'map50_f1', 'map50_accuracy']
+            if key == 'loss_breakdown' or any(pattern in key for pattern in preserve_patterns):
                 filtered[key] = value
                 continue
                 

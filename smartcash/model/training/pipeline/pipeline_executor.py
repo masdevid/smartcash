@@ -939,6 +939,10 @@ class PipelineExecutor:
             # Only override the freeze_backbone setting for Phase 2
             phase2_config['model']['freeze_backbone'] = False
             
+            # CRITICAL: Disable pretrained weights for Phase 2 model rebuild since we'll load Phase 1 weights
+            phase2_config['model']['pretrained'] = False
+            logger.info("🚫 Disabled pretrained weights for Phase 2 rebuild - will load Phase 1 trained weights instead")
+            
             # Log the preserved configuration
             model_config = phase2_config['model']
             logger.info("🔥 Phase 2 model config: freeze_backbone = False")

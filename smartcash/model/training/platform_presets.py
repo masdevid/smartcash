@@ -249,7 +249,8 @@ class PlatformPresets:
             'backbone': backbone,
             'pretrained': False,           # Use non-pretrained models for training from scratch
             'feature_optimization': True,  # Always enable
-            'layer_mode': 'multi',
+            # Note: Removed hardcoded layer_mode to allow phase-specific configuration
+            # The configuration builder will set appropriate layer_mode based on training phase
             'detection_layers': ['layer_1', 'layer_2', 'layer_3'],
             'multi_layer_heads': True,
             'num_classes': {

@@ -74,7 +74,14 @@ def calculate_multilayer_metrics(predictions: Dict[str, torch.Tensor],
                 # Binary: use threshold
                 pred_classes = (pred_np.flatten() > 0.5).astype(int)
             
-            target_classes = target_np.flatten().astype(int)
+            # Handle target format - check if one-hot encoded or class indices
+            if target_np.ndim > 1 and target_np.shape[-1] > 1:
+                # One-hot encoded targets: convert to class indices
+                target_classes = np.argmax(target_np, axis=-1).flatten()
+                logger.debug(f"Layer {layer_name}: Converting one-hot targets to class indices")
+            else:
+                # Already class indices
+                target_classes = target_np.flatten().astype(int)
             
             # Ensure same shape
             min_len = min(len(pred_classes), len(target_classes))
@@ -163,6 +170,15 @@ def filter_phase_relevant_metrics(metrics: Dict[str, float], phase_num: int) -> 
         for key, value in metrics.items():
             if key.startswith('layer_1_') and isinstance(value, (int, float)) and value > 0.0001:
                 relevant_metrics[key] = value
+        
+        # Include loss breakdown components for visualization charts
+        loss_breakdown_metrics = [
+            'train_box_loss', 'train_obj_loss', 'train_cls_loss',
+            'val_box_loss', 'val_obj_loss', 'val_cls_loss'
+        ]
+        for metric in loss_breakdown_metrics:
+            if metric in metrics and isinstance(metrics[metric], (int, float)):
+                relevant_metrics[metric] = metrics[metric]
         
         # Skip multi-task loss components in Phase 1 (they shouldn't exist with simple YOLO loss)
         # Only include if they appear (for debugging purposes)

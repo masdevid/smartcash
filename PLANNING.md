@@ -333,6 +333,101 @@ Layer-Specific Weights:
 - **Multi-Task Optimization**: Improved multi-task learning through uncertainty-based weighting
 - **Self-Regulating**: Learnable σ parameters adapt during training to optimal values
 - **Mathematical Foundation**: Based on principled uncertainty estimation in multi-task learning
+
+## 🔄 Critical Two-Phase Training Weight Transfer Flow
+
+### Phase 1 → Phase 2 Transition Process
+This is one of the most critical aspects of the two-phase training system, ensuring Phase 1 learning is preserved when transitioning to Phase 2.
+
+#### **Step-by-Step Weight Transfer Flow:**
+```
+1. Phase 1 Training Completion
+   ├── Model: Frozen backbone + trained detection head
+   ├── Checkpoint: Save best Phase 1 model (frozen state)
+   └── Architecture: Single task optimized (backbone frozen)
+
+2. Phase 2 Transition Preparation
+   ├── Load Phase 1 checkpoint data into memory
+   ├── Extract model configuration from checkpoint
+   ├── Validate config matches actual model architecture
+   └── Detect/correct any config mismatches via inference
+
+3. Phase 2 Model Rebuilding
+   ├── Build new model: same architecture + unfrozen backbone
+   ├── CRITICAL: Set pretrained=False (don't load YOLOv5s weights)
+   ├── Ensure exact architectural match (classes, layers, backbone)
+   └── Result: Fresh Phase 2 model ready for weight loading
+
+4. Weight Transfer Execution
+   ├── Load Phase 1 state_dict into Phase 2 model
+   ├── Use strict=False to handle minor mismatches
+   ├── Log missing/unexpected keys for debugging
+   └── Fallback: Use fresh weights if transfer fails
+
+5. Phase 2 Training Continuation
+   ├── Model: Unfrozen backbone + Phase 1 trained weights
+   ├── Training: Fine-tune entire model (backbone + heads)
+   └── Optimization: All parameters now trainable
+```
+
+#### **Critical Configuration Validation:**
+The system performs intelligent validation to ensure weight transfer compatibility:
+
+```python
+# Architecture Validation Logic
+saved_config = checkpoint['model_config']
+actual_output_channels = state_dict['detection_head'].shape[0]
+
+# Example: 66 output channels = 17 classes (multi-layer)
+# But saved config shows num_classes=7 → MISMATCH DETECTED
+if actual_output_channels == 66 and saved_config['num_classes'] != 17:
+    # Trigger intelligent config inference
+    inferred_config = infer_from_architecture(checkpoint, checkpoint_path)
+    # Use inferred config: backbone='efficientnet_b4', num_classes=17
+```
+
+#### **Weight Transfer Scenarios & Handling:**
+
+**✅ Successful Transfer:**
+```
+Phase 1 Model (frozen) → Phase 2 Model (unfrozen)
+├── Backbone weights: Transferred successfully  
+├── Detection head: Transferred successfully
+├── Training state: Preserved and continued
+└── Result: Phase 1 learning preserved in Phase 2
+```
+
+**⚠️ Architecture Mismatch (Fixed):**
+```
+Problem: Saved config mismatch (7 vs 17 classes)
+├── Detection: Config validation detects mismatch
+├── Solution: Intelligent inference from architecture
+├── Action: Rebuild with correct configuration
+└── Result: Successful weight transfer with correct config
+```
+
+**❌ Transfer Failure (Fallback):**
+```
+Critical mismatch preventing weight loading
+├── Fallback: Phase 2 starts with fresh initialization
+├── Loss: Phase 1 training progress is lost
+├── Mitigation: Improved config validation prevents this
+└── Logs: Clear error messages for debugging
+```
+
+#### **Key Implementation Files:**
+- `pipeline_executor.py`: `_transition_to_phase2_and_train()` - Main transition logic
+- `pipeline_executor.py`: `_rebuild_model_for_phase2()` - Model rebuilding with config validation
+- `pipeline_executor.py`: `_infer_model_config_from_checkpoint()` - Intelligent config inference
+- `checkpoint_manager.py`: Enhanced config saving and extraction
+
+#### **Recent Critical Fixes (Aug 2024):**
+1. **Config Validation**: Detect saved config vs actual architecture mismatches
+2. **Intelligent Inference**: Extract correct config from checkpoint structure and filename
+3. **Pretrained Weight Prevention**: Disable pretrained weights during Phase 2 rebuild
+4. **Enhanced Error Handling**: Better logging and fallback strategies
+
+This ensures Phase 1 → Phase 2 transition preserves training progress and maintains model performance continuity.
 ## 🧪 Testing Strategy
 
 ### UIModule Testing Approach

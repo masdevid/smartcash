@@ -14,6 +14,8 @@ from smartcash.model.training.utils.resume_utils import handle_resume_training_p
 from smartcash.model.training.utils.setup_utils import prepare_training_environment
 from smartcash.model.training.utils.summary_utils import generate_markdown_summary
 from smartcash.model.training.training_phase_manager import TrainingPhaseManager
+from smartcash.model.training.utils.weight_transfer import create_weight_transfer_manager
+from smartcash.model.training.pipeline.configuration_builder import ConfigurationBuilder
 # Delayed import to avoid circular dependency - imported where used
 from smartcash.model.utils.memory_optimizer import get_memory_optimizer
 import torch
@@ -216,23 +218,43 @@ class PipelineExecutor:
             }
     
     def _phase_build_model(self) -> Dict[str, Any]:
-        """Phase 2: Model building."""
+        """Phase 2: Model building with phase-specific configuration."""
         try:
             self.progress_tracker.update_phase(1, 4, "🔧 Initializing model API...")
             
             # Create SmartCash API with YOLOv5 integration
             # Delayed import to avoid circular dependency
             from smartcash.model.api.core import create_api
+            
+            # DEBUG: Check what config is being passed to create_api
+            logger.info(f"🔍 DEBUG: self.config for API creation: {self.config.get('model', {})}")
+            
             self.model_api = create_api(
                 config=self.config,
                 use_yolov5_integration=self.use_yolov5_integration
             )
             
-            model_config = self.config.get('model', {})
+            # CRITICAL: Use phase-specific model configuration for Phase 1
+            if self.config.get('training_mode') == 'two_phase':
+                # For two-phase training, build Phase 1 model with single-layer configuration
+                session_id = self.config.get('session_id', 'default')
+                config_builder = ConfigurationBuilder(session_id)
+                model_config = config_builder.get_phase_specific_model_config(self.config, phase_num=1)
+                logger.info("🔧 Building Phase 1 model with single-layer configuration")
+                logger.info(f"📊 Phase 1 model config: {model_config}")
+            else:
+                # For single-phase training, use the base model configuration
+                model_config = self.config.get('model', {})
+                logger.info("🔧 Building single-phase model with base configuration")
+                logger.info(f"📊 Single-phase model config: {model_config}")
+            
+            # DEBUG: Log what we're actually passing to build_model
+            logger.info(f"🔍 DEBUG: model_config being passed to build_model: {model_config}")
+            logger.info(f"🔍 DEBUG: Expected to produce {'36 channels (single-layer)' if model_config.get('layer_mode') == 'single' else '66 channels (multi-layer)'}")
             
             self.progress_tracker.update_phase(2, 4, f"🏗️ Building yolov5 model...")
             
-            # Build model
+            # Build model with phase-specific configuration
             build_result = self.model_api.build_model(
                 model_config=model_config
             )
@@ -241,6 +263,24 @@ class PipelineExecutor:
                 return build_result
             
             self.model = build_result['model']
+            
+            # DEBUG: Check actual model output channels
+            try:
+                state_dict = self.model.state_dict()
+                detection_keys = [k for k in state_dict.keys() if '.m.0.weight' in k and ('head' in k or 'model.24' in k)]
+                if detection_keys:
+                    actual_channels = state_dict[detection_keys[0]].shape[0]
+                    logger.info(f"🔍 DEBUG: Actual model output channels: {actual_channels}")
+                    if model_config.get('layer_mode') == 'single' and actual_channels != 36:
+                        logger.warning(f"⚠️ MISMATCH: Expected 36 channels for single-layer, got {actual_channels}")
+                    elif model_config.get('layer_mode') == 'multi' and actual_channels != 66:
+                        logger.warning(f"⚠️ MISMATCH: Expected 66 channels for multi-layer, got {actual_channels}")
+                    else:
+                        logger.info(f"✅ Channel count matches expectation for {model_config.get('layer_mode', 'unknown')} mode")
+                else:
+                    logger.warning("⚠️ Could not find detection head layers for channel verification")
+            except Exception as e:
+                logger.debug(f"Debug channel check failed: {e}")
             
             self.progress_tracker.update_phase(3, 4, "🔧 Setting up training components...")
             
@@ -785,11 +825,25 @@ class PipelineExecutor:
                 logger.error(f"❌ Failed to load Phase 1 checkpoint: {e}")
                 # Continue anyway - Phase 2 will start from current model state
         
-        # 2. Rebuild model with unfrozen backbone configuration for Phase 2
-        logger.info("🏗️ Rebuilding model with unfrozen backbone configuration for Phase 2")
+        # 2. Determine Phase 2 model configuration using phase-specific logic
+        logger.info("🔧 Determining Phase 2 model configuration for single→multi transition")
+        
+        # Get phase-specific configuration for Phase 2 (multi-layer)
+        session_id = config.get('session_id', 'default')
+        config_builder = ConfigurationBuilder(session_id)
+        phase2_model_config = config_builder.get_phase_specific_model_config(config, phase_num=2)
+        
+        # Update the config for Phase 2 rebuild
+        config = config.copy()
+        config['model'] = phase2_model_config
+        
+        logger.info(f"🔧 Phase 2 model config: {phase2_model_config}")
+        
+        # 3. Rebuild model with Phase 2 configuration (multi-layer, unfrozen backbone)
+        logger.info("🏗️ Rebuilding model with Phase 2 configuration (multi-layer, unfrozen backbone)")
         phase2_model = self._rebuild_model_for_phase2(config)
         
-        # 3. Load Phase 1 weights into the rebuilt model
+        # 4. Handle weight transfer from Phase 1 (single-layer) to Phase 2 (multi-layer)
         if phase1_checkpoint_data and 'model_state_dict' in phase1_checkpoint_data:
             # CRITICAL FIX: Extract model configuration from checkpoint if available
             checkpoint_model_config = None
@@ -846,28 +900,41 @@ class PipelineExecutor:
                 corrected_model = self._rebuild_model_for_phase2(config)
                 phase2_model = corrected_model
             
-            try:
-                # Attempt to load state dict with strict=False to handle minor mismatches
-                missing_keys, unexpected_keys = phase2_model.load_state_dict(phase1_checkpoint_data['model_state_dict'], strict=False)
+            # Use WeightTransferManager for intelligent single→multi weight transfer
+            logger.info("🔄 Using WeightTransferManager for single→multi architecture transition")
+            
+            weight_transfer_manager = create_weight_transfer_manager()
+            
+            # First validate compatibility
+            compatibility = weight_transfer_manager.validate_transfer_compatibility(
+                phase1_checkpoint_data, phase2_model
+            )
+            
+            logger.info(f"🔍 Weight transfer compatibility: {compatibility}")
+            
+            if compatibility['compatible']:
+                # Perform the weight transfer
+                transfer_success, transfer_info = weight_transfer_manager.transfer_single_to_multi_weights(
+                    phase1_checkpoint_data, 
+                    phase2_model,
+                    transfer_mode=compatibility.get('transfer_strategy', 'expand')
+                )
                 
-                if missing_keys or unexpected_keys:
-                    logger.warning(f"⚠️ Partial weight loading - Missing keys: {len(missing_keys)}, Unexpected keys: {len(unexpected_keys)}")
-                    if missing_keys:
-                        logger.debug(f"Missing keys: {missing_keys[:5]}...")  # Show first 5
-                    if unexpected_keys:
-                        logger.debug(f"Unexpected keys: {unexpected_keys[:5]}...")  # Show first 5
-                    logger.info("✅ Phase 1 weights loaded with some architecture differences (non-critical layers skipped)")
+                if transfer_success:
+                    logger.info("✅ Single→Multi weight transfer completed successfully")
+                    logger.info(f"📊 Transfer details:")
+                    logger.info(f"   • Mode: {transfer_info.get('transfer_mode')}")
+                    logger.info(f"   • Transferred layers: {len(transfer_info.get('transferred_layers', []))}")
+                    logger.info(f"   • Initialized layers: {len(transfer_info.get('initialized_layers', []))}")
+                    logger.info(f"   • Single-layer info: {transfer_info.get('single_info', {})}")
+                    logger.info(f"   • Multi-layer info: {transfer_info.get('multi_info', {})}")
                 else:
-                    logger.info("✅ Phase 1 weights loaded completely into rebuilt Phase 2 model")
-                    
-            except Exception as e:
-                logger.warning(f"⚠️ Failed to load Phase 1 weights into rebuilt model: {e}")
+                    logger.warning(f"⚠️ Weight transfer failed: {transfer_info}")
+                    logger.info("🔄 Phase 2 will use newly initialized model weights")
+            else:
+                logger.warning(f"⚠️ Weight transfer not compatible: {compatibility}")
                 logger.info("🔄 Phase 2 will use newly initialized model weights")
-                
-                # Additional debugging information
-                if "size mismatch" in str(e):
-                    logger.info("🔍 Architecture mismatch detected - this may indicate configuration preservation issue")
-                    logger.info("🔍 Recommendation: Check if multi-layer configuration was properly preserved during rebuild")
+                logger.info("🔍 Recommendation: Check if multi-layer configuration was properly preserved during rebuild")
         
         # 4. Replace the current model with the rebuilt Phase 2 model
         self.model = phase2_model

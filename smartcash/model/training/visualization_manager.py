@@ -145,6 +145,9 @@ class ComprehensiveMetricsTracker:
             epoch_data['phase_num'] = phase_num
             epoch_data['research_context'] = self._get_research_context(phase_num)
             
+            # Extract layer metrics from the metrics dictionary
+            self._extract_layer_metrics_from_epoch_data(metrics, epoch)
+            
             # Calculate confusion matrices for each layer
             if predictions is not None and ground_truth is not None:
                 for layer in self.num_classes_per_layer.keys():
@@ -164,6 +167,72 @@ class ComprehensiveMetricsTracker:
         except Exception as e:
             if self.verbose:
                 self.logger.warning(f"⚠️ Error updating metrics: {str(e)}")
+    
+    def _extract_layer_metrics_from_epoch_data(self, metrics: Dict[str, Any], epoch: int):
+        """
+        Extract layer-specific metrics from epoch metrics data.
+        
+        Args:
+            metrics: Dictionary of epoch metrics
+            epoch: Current epoch number
+        """
+        try:
+            # Look for layer-specific metrics patterns
+            layer_patterns = {
+                'layer_1': ['layer_1_accuracy', 'layer_1_precision', 'layer_1_recall', 'layer_1_f1'],
+                'layer_2': ['layer_2_accuracy', 'layer_2_precision', 'layer_2_recall', 'layer_2_f1'],
+                'layer_3': ['layer_3_accuracy', 'layer_3_precision', 'layer_3_recall', 'layer_3_f1']
+            }
+            
+            for layer, metric_names in layer_patterns.items():
+                if layer not in self.layer_metrics:
+                    continue
+                    
+                for metric_name in metric_names:
+                    if metric_name in metrics and isinstance(metrics[metric_name], (int, float)):
+                        # Extract the metric type (accuracy, precision, recall, f1)
+                        metric_type = metric_name.split('_', 2)[-1]  # Get the last part after layer_X_
+                        
+                        # Map metric names to internal storage keys
+                        metric_key_map = {
+                            'accuracy': 'accuracy',
+                            'precision': 'precision', 
+                            'recall': 'recall',
+                            'f1': 'f1_score'
+                        }
+                        
+                        if metric_type in metric_key_map:
+                            storage_key = metric_key_map[metric_type]
+                            self.layer_metrics[layer][storage_key].append(metrics[metric_name])
+            
+            # Also look for global validation metrics that can be used as fallback
+            global_metrics = ['val_accuracy', 'val_precision', 'val_recall', 'val_f1']
+            global_values = {}
+            for metric in global_metrics:
+                if metric in metrics and isinstance(metrics[metric], (int, float)):
+                    metric_type = metric.replace('val_', '')
+                    if metric_type == 'f1':
+                        metric_type = 'f1_score'
+                    global_values[metric_type] = metrics[metric]
+            
+            # If no layer-specific metrics found, use global metrics as fallback for all layers
+            if global_values:
+                layers_with_data = any(
+                    any(len(self.layer_metrics[layer][metric_type]) > 0 
+                        for metric_type in ['accuracy', 'precision', 'recall', 'f1_score'])
+                    for layer in self.layer_metrics.keys()
+                )
+                
+                # Only use global fallback if no layer-specific data exists yet
+                if not layers_with_data:
+                    for layer in self.layer_metrics.keys():
+                        for metric_type, value in global_values.items():
+                            if metric_type in self.layer_metrics[layer]:
+                                self.layer_metrics[layer][metric_type].append(value)
+            
+        except Exception as e:
+            if self.verbose:
+                self.logger.warning(f"⚠️ Error extracting layer metrics from epoch data: {str(e)}")
     
     def _calculate_layer_confusion_matrix(self, layer: str, predictions: np.ndarray, ground_truth: np.ndarray, epoch: int):
         """
@@ -389,14 +458,35 @@ class ComprehensiveMetricsTracker:
             metrics_to_plot = ['accuracy', 'precision', 'recall', 'f1_score']
             metric_titles = ['Accuracy', 'Precision', 'Recall', 'F1 Score']
             
+            # Check if we're using global fallback (all layers have identical values)
+            using_global_fallback = self._check_if_using_global_fallback()
+            
             for idx, (metric, title) in enumerate(zip(metrics_to_plot, metric_titles)):
                 ax = axes[idx // 2, idx % 2]
                 
+                # Define different line styles and markers for better visibility when overlapping
+                layer_styles = {
+                    'layer_1': {'color': '#1f77b4', 'linestyle': '-', 'marker': 'o'},
+                    'layer_2': {'color': '#ff7f0e', 'linestyle': '--', 'marker': 's'}, 
+                    'layer_3': {'color': '#2ca02c', 'linestyle': '-.', 'marker': '^'}
+                }
+                
+                lines_plotted = 0
                 for layer, layer_data in self.layer_metrics.items():
                     metric_values = layer_data.get(metric, [])
                     if metric_values:
                         epochs = range(1, len(metric_values) + 1)
-                        ax.plot(epochs, metric_values, label=layer, linewidth=2, marker='o', markersize=4)
+                        style = layer_styles.get(layer, {'color': 'black', 'linestyle': '-', 'marker': 'o'})
+                        
+                        ax.plot(epochs, metric_values, 
+                               label=layer, 
+                               linewidth=2.5 if using_global_fallback else 2,
+                               linestyle=style['linestyle'],
+                               marker=style['marker'], 
+                               markersize=6 if using_global_fallback else 4,
+                               color=style['color'],
+                               alpha=0.8)
+                        lines_plotted += 1
                 
                 ax.set_title(title)
                 ax.set_xlabel('Epoch')
@@ -404,6 +494,12 @@ class ComprehensiveMetricsTracker:
                 ax.legend()
                 ax.grid(True, alpha=0.3)
                 ax.set_ylim(0, 1)
+                
+                # Add note for global fallback
+                if using_global_fallback and lines_plotted > 0:
+                    ax.text(0.02, 0.98, 'Note: Using global metrics\n(lines may overlap)', 
+                           transform=ax.transAxes, fontsize=8, verticalalignment='top',
+                           bbox=dict(boxstyle='round,pad=0.3', facecolor='yellow', alpha=0.7))
             
             plt.tight_layout()
             
@@ -417,6 +513,55 @@ class ComprehensiveMetricsTracker:
             if self.verbose:
                 self.logger.warning(f"⚠️ Error generating layer metrics chart: {str(e)}")
             return None
+    
+    def _check_if_using_global_fallback(self) -> bool:
+        """
+        Check if we're using global fallback metrics (all layers have identical values).
+        
+        Returns:
+            True if all layers have identical metric values, False otherwise
+        """
+        try:
+            if not self.layer_metrics:
+                return False
+            
+            # Get all layers and check if they have identical values for each metric type
+            layers = list(self.layer_metrics.keys())
+            if len(layers) <= 1:
+                return False
+            
+            metric_types = ['accuracy', 'precision', 'recall', 'f1_score']
+            
+            for metric_type in metric_types:
+                # Get values for each layer
+                layer_values = []
+                for layer in layers:
+                    values = self.layer_metrics[layer].get(metric_type, [])
+                    if values:
+                        layer_values.append(values)
+                
+                # If we have values from multiple layers, check if they're identical
+                if len(layer_values) > 1:
+                    first_values = layer_values[0]
+                    for other_values in layer_values[1:]:
+                        if len(first_values) != len(other_values):
+                            return False
+                        # Check if values are approximately equal (within small tolerance)
+                        for v1, v2 in zip(first_values, other_values):
+                            if abs(v1 - v2) > 1e-6:  # Not identical
+                                return False
+                    
+                    # If we reach here, this metric type has identical values across layers
+                    # Continue checking other metric types
+                    continue
+            
+            # If we've checked all metric types and found identical values, it's global fallback
+            return True
+            
+        except Exception as e:
+            if self.verbose:
+                self.logger.debug(f"Error checking global fallback: {e}")
+            return False
     
     def _generate_phase_analysis_chart(self, session_dir: Path) -> Optional[str]:
         """Generate phase transition analysis chart."""
@@ -1040,9 +1185,22 @@ class ComprehensiveMetricsTracker:
         # Extract loss breakdown data from epoch metrics
         loss_components = {}
         
+        # Look for loss breakdown components with correct field names
+        loss_breakdown_fields = [
+            'train_box_loss', 'train_obj_loss', 'train_cls_loss',
+            'val_box_loss', 'val_obj_loss', 'val_cls_loss'
+        ]
+        
         for record in self.epoch_metrics:
+            for field in loss_breakdown_fields:
+                if field in record and isinstance(record[field], (int, float)) and record[field] is not None:
+                    if field not in loss_components:
+                        loss_components[field] = []
+                    loss_components[field].append(record[field])
+            
+            # Also check for legacy loss breakdown fields as fallback
             for key, value in record.items():
-                if 'loss' in key.lower() and key not in ['train_loss', 'val_loss'] and isinstance(value, (int, float)):
+                if 'loss' in key.lower() and key not in ['train_loss', 'val_loss', 'total_loss'] and isinstance(value, (int, float)) and value is not None:
                     if key not in loss_components:
                         loss_components[key] = []
                     loss_components[key].append(value)
@@ -1059,8 +1217,9 @@ class ComprehensiveMetricsTracker:
         
         for (component, values), color in zip(loss_components.items(), colors):
             if len(values) > 0:
-                # Ensure we have epochs for this component
-                component_epochs = epochs[:len(values)]
+                # Ensure we have correct epochs for this component
+                # Use only the number of epochs that match the values length
+                component_epochs = list(range(1, len(values) + 1))
                 ax.plot(component_epochs, values, label=self._format_loss_component_name(component), 
                        linewidth=2, marker='o', markersize=3, color=color, alpha=0.8)
         
@@ -1126,7 +1285,24 @@ class ComprehensiveMetricsTracker:
     
     def _format_loss_component_name(self, component_name: str) -> str:
         """Format loss component names for display."""
-        # Remove common prefixes and format nicely
+        # Map component names to display names
+        display_names = {
+            'train_box_loss': 'Train Box Loss',
+            'train_obj_loss': 'Train Objectness',
+            'train_cls_loss': 'Train Classification',
+            'val_box_loss': 'Val Box Loss',
+            'val_obj_loss': 'Val Objectness',
+            'val_cls_loss': 'Val Classification',
+            # Legacy support
+            'train_bbox_loss': 'Train Bounding Box',
+            'val_bbox_loss': 'Val Bounding Box'
+        }
+        
+        # Use direct mapping if available
+        if component_name in display_names:
+            return display_names[component_name]
+        
+        # Fallback to generic formatting
         name = component_name.replace('train_', '').replace('val_', '')
         name = name.replace('_loss', '').replace('loss', '')
         name = name.replace('_', ' ').title()

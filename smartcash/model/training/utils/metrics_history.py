@@ -46,11 +46,11 @@ class EpochMetrics:
     layer_2_uncertainty: Optional[float] = None
     layer_3_uncertainty: Optional[float] = None
     
-    # Loss breakdown components
-    train_bbox_loss: Optional[float] = None
+    # Loss breakdown components (matching training system output)
+    train_box_loss: Optional[float] = None
     train_obj_loss: Optional[float] = None
     train_cls_loss: Optional[float] = None
-    val_bbox_loss: Optional[float] = None
+    val_box_loss: Optional[float] = None
     val_obj_loss: Optional[float] = None
     val_cls_loss: Optional[float] = None
     
@@ -305,10 +305,10 @@ class MetricsHistoryRecorder:
                 if metric in metrics:
                     setattr(epoch_record, metric, metrics[metric])
             
-            # Fill loss breakdown components
+            # Fill loss breakdown components (matching training system output)
             loss_breakdown_metrics = [
-                'train_bbox_loss', 'train_obj_loss', 'train_cls_loss',
-                'val_bbox_loss', 'val_obj_loss', 'val_cls_loss'
+                'train_box_loss', 'train_obj_loss', 'train_cls_loss',
+                'val_box_loss', 'val_obj_loss', 'val_cls_loss'
             ]
             for metric in loss_breakdown_metrics:
                 if metric in metrics:

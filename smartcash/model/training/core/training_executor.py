@@ -98,6 +98,10 @@ class TrainingExecutor:
                 images, targets, loss_manager, batch_idx, num_batches, phase_num
             )
             
+            # Store the loss breakdown from the last batch for metrics reporting
+            if loss_breakdown:
+                self._last_loss_breakdown = loss_breakdown
+            
             # Accumulate predictions and targets from all batches for layer metrics
             if processed_predictions and processed_targets:
                 self._accumulate_batch_metrics(processed_predictions, processed_targets, batch_idx)
@@ -131,8 +135,9 @@ class TrainingExecutor:
         # Complete batch tracking
         self.progress_tracker.complete_batch_tracking()
         
-        # Store last loss breakdown for metrics callback
-        self._last_loss_breakdown = getattr(self, '_last_loss_breakdown', loss_breakdown if 'loss_breakdown' in locals() else {})
+        # Ensure we have a loss breakdown (fallback to empty dict if none stored)
+        if not hasattr(self, '_last_loss_breakdown'):
+            self._last_loss_breakdown = {}
         
         return {'train_loss': running_loss / num_batches}
     

@@ -87,15 +87,66 @@ class ConfigurationBuilder:
         logger.info(f"🔧 Training configuration built: {config['backbone']} | yolov5")
         return config
     
+    def get_phase_specific_model_config(self, base_config: Dict[str, Any], phase_num: int) -> Dict[str, Any]:
+        """
+        Get model configuration specific to a training phase.
+        
+        Args:
+            base_config: Base training configuration
+            phase_num: Phase number (1 or 2)
+            
+        Returns:
+            Phase-specific model configuration
+        """
+        model_config = base_config['model'].copy()
+        training_mode = base_config.get('training_mode', 'two_phase')
+        
+        if training_mode == 'two_phase':
+            if phase_num == 1:
+                # Phase 1: Single-layer, denomination detection only (classes 0-6)
+                model_config.update({
+                    'layer_mode': 'single',
+                    'detection_layers': ['layer_1'],
+                    'num_classes': 7,
+                    'freeze_backbone': True
+                })
+                logger.info("🔧 Phase 1 model config: single-layer, 7 classes, frozen backbone")
+            elif phase_num == 2:
+                # Phase 2: Multi-layer, all detection tasks (classes 0-16)
+                model_config.update({
+                    'layer_mode': 'multi', 
+                    'detection_layers': ['layer_1', 'layer_2', 'layer_3'],
+                    'num_classes': 17,
+                    'freeze_backbone': False
+                })
+                logger.info("🔧 Phase 2 model config: multi-layer, 17 classes, unfrozen backbone")
+        
+        return model_config
+    
     def _build_model_config(self, model_config: Dict[str, Any], base_config: Dict[str, Any]) -> Dict[str, Any]:
         """Build model-specific configuration."""
+        # CRITICAL: Phase-aware model configuration for single→multi approach
+        training_mode = base_config.get('training_mode', 'two_phase')
+        
+        if training_mode == 'two_phase':
+            # For two-phase training: Use default phase-aware configuration
+            # Phase-specific configs will be applied during phase setup
+            default_layer_mode = 'single'  # Phase 1 default
+            default_detection_layers = ['layer_1']  # Phase 1 default 
+            default_num_classes = 7  # Phase 1 default (Layer 1 only)
+        else:
+            # For single-phase training: Use multi-layer configuration
+            default_layer_mode = 'multi'
+            default_detection_layers = ['layer_1', 'layer_2', 'layer_3']
+            default_num_classes = 17  # All layers
+            
         return {
             'model_name': model_config.get('model_name', 'smartcash_yolov5_integrated'),
             'backbone': base_config['backbone'],
             'pretrained': base_config['pretrained'],
-            'layer_mode': model_config.get('layer_mode', 'multi'),
-            'detection_layers': model_config.get('detection_layers', ['layer_1', 'layer_2', 'layer_3']),
-            'num_classes': model_config.get('num_classes', 7),
+            'layer_mode': model_config.get('layer_mode', default_layer_mode),
+            'detection_layers': model_config.get('detection_layers', default_detection_layers),
+            'num_classes': model_config.get('num_classes', default_num_classes),
             'img_size': model_config.get('img_size', 640),
             'feature_optimization': model_config.get('feature_optimization', {'enabled': True})
         }

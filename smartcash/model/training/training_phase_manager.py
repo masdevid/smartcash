@@ -310,23 +310,48 @@ class TrainingPhaseManager:
             if train_loss_breakdown:
                 # Add individual training loss components directly to final_metrics
                 for key, value in train_loss_breakdown.items():
-                    final_metrics[f'train_{key}'] = value
+                    # Convert tensor values to scalars for checkpoint compatibility
+                    if hasattr(value, 'item'):
+                        final_metrics[f'train_{key}'] = value.item()
+                    elif hasattr(value, 'cpu'):
+                        final_metrics[f'train_{key}'] = float(value.cpu().numpy())
+                    else:
+                        final_metrics[f'train_{key}'] = value
                 
                 # Combine with validation loss breakdown if both exist
                 if 'loss_breakdown' in final_metrics:
                     val_loss_breakdown = final_metrics['loss_breakdown']
                     # Add validation loss breakdown components
                     for key, value in val_loss_breakdown.items():
-                        final_metrics[f'val_{key}'] = value
+                        # Convert tensor values to scalars for checkpoint compatibility
+                        if hasattr(value, 'item'):
+                            final_metrics[f'val_{key}'] = value.item()
+                        elif hasattr(value, 'cpu'):
+                            final_metrics[f'val_{key}'] = float(value.cpu().numpy())
+                        else:
+                            final_metrics[f'val_{key}'] = value
                     logger.debug(f"Added validation loss breakdown: {len(val_loss_breakdown)} components")
                 
                 # Also preserve combined loss_breakdown for compatibility
                 combined_loss_breakdown = {}
                 for key, value in train_loss_breakdown.items():
-                    combined_loss_breakdown[f'train_{key}'] = value
+                    # Convert tensor values to scalars for checkpoint compatibility
+                    if hasattr(value, 'item'):
+                        combined_loss_breakdown[f'train_{key}'] = value.item()
+                    elif hasattr(value, 'cpu'):
+                        combined_loss_breakdown[f'train_{key}'] = float(value.cpu().numpy())
+                    else:
+                        combined_loss_breakdown[f'train_{key}'] = value
+                        
                 if 'loss_breakdown' in final_metrics and isinstance(final_metrics['loss_breakdown'], dict):
                     for key, value in final_metrics['loss_breakdown'].items():
-                        combined_loss_breakdown[f'val_{key}'] = value
+                        # Convert tensor values to scalars for checkpoint compatibility
+                        if hasattr(value, 'item'):
+                            combined_loss_breakdown[f'val_{key}'] = value.item()
+                        elif hasattr(value, 'cpu'):
+                            combined_loss_breakdown[f'val_{key}'] = float(value.cpu().numpy())
+                        else:
+                            combined_loss_breakdown[f'val_{key}'] = value
                 
                 final_metrics['loss_breakdown'] = combined_loss_breakdown
                 logger.debug(f"Added training loss breakdown: {len(train_loss_breakdown)} components")

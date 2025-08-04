@@ -78,30 +78,19 @@ class ResearchMetricsManager:
             else:
                 # Only set default for training metrics if we're processing training data
                 standardized["train_loss"] = raw_metrics.get('train_loss', 0.0)
-        # Phase-aware handling of primary metrics (accuracy, precision, recall, f1)
-        # Don't default to 0.0 - preserve original values or absence
-        if phase_num == 1:
-            # In Phase 1, primary metrics are sourced directly from Layer 1.
-            if 'layer_1_accuracy' in raw_metrics:
-                standardized[f"{prefix}accuracy"] = raw_metrics['layer_1_accuracy']
-            if 'layer_1_precision' in raw_metrics:
-                standardized[f"{prefix}precision"] = raw_metrics['layer_1_precision']
-            if 'layer_1_recall' in raw_metrics:
-                standardized[f"{prefix}recall"] = raw_metrics['layer_1_recall']
-            if 'layer_1_f1' in raw_metrics:
-                standardized[f"{prefix}f1"] = raw_metrics['layer_1_f1']
-            logger.debug("Phase 1: Standardized primary metrics from Layer 1.")
-        else:
-            # In Phase 2 (and others), use the top-level hierarchical metrics.
-            if 'accuracy' in raw_metrics:
-                standardized[f"{prefix}accuracy"] = raw_metrics['accuracy']
-            if 'precision' in raw_metrics:
-                standardized[f"{prefix}precision"] = raw_metrics['precision']
-            if 'recall' in raw_metrics:
-                standardized[f"{prefix}recall"] = raw_metrics['recall']
-            if 'f1' in raw_metrics:
-                standardized[f"{prefix}f1"] = raw_metrics['f1']
-            logger.debug(f"Phase {phase_num}: Standardized primary metrics from top-level.")
+        # Use top-level metrics that were correctly calculated by validation_metrics_computer
+        # The validation_metrics_computer already handles phase-aware logic and sets the correct
+        # top-level accuracy, precision, recall, f1 values based on the current phase.
+        # We should not re-interpret or recalculate - just standardize the naming.
+        if 'accuracy' in raw_metrics:
+            standardized[f"{prefix}accuracy"] = raw_metrics['accuracy']
+        if 'precision' in raw_metrics:
+            standardized[f"{prefix}precision"] = raw_metrics['precision']
+        if 'recall' in raw_metrics:
+            standardized[f"{prefix}recall"] = raw_metrics['recall']
+        if 'f1' in raw_metrics:
+            standardized[f"{prefix}f1"] = raw_metrics['f1']
+        logger.debug(f"Phase {phase_num}: Standardized primary metrics from top-level (already phase-aware).")
 
         # Add mAP-related metrics if they exist
         map_keys = ['map50', 'map50_95', 'map_precision', 'map_recall', 'map_f1']
@@ -115,28 +104,18 @@ class ResearchMetricsManager:
                 standardized[f"{prefix}{key}"] = value
 
         # For validation, ensure standard names like val_accuracy are present
-        # This ensures that val_* metrics are always consistent regardless of phase
+        # Use the same correctly calculated top-level metrics for val_* naming consistency
         if is_validation:
-            # In Phase 1, val_* should be the same as layer_1_* (only if available)
-            if phase_num == 1:
-                if 'layer_1_accuracy' in raw_metrics:
-                    standardized["val_accuracy"] = raw_metrics['layer_1_accuracy']
-                if 'layer_1_precision' in raw_metrics:
-                    standardized["val_precision"] = raw_metrics['layer_1_precision']
-                if 'layer_1_recall' in raw_metrics:
-                    standardized["val_recall"] = raw_metrics['layer_1_recall']
-                if 'layer_1_f1' in raw_metrics:
-                    standardized["val_f1"] = raw_metrics['layer_1_f1']
-            # In Phase 2, val_* should be the same as the top-level metrics (only if available)
-            else:
-                if 'accuracy' in raw_metrics:
-                    standardized["val_accuracy"] = raw_metrics['accuracy']
-                if 'precision' in raw_metrics:
-                    standardized["val_precision"] = raw_metrics['precision']
-                if 'recall' in raw_metrics:
-                    standardized["val_recall"] = raw_metrics['recall']
-                if 'f1' in raw_metrics:
-                    standardized["val_f1"] = raw_metrics['f1']
+            # val_* should always use the correctly calculated top-level metrics
+            # (validation_metrics_computer already handled phase-aware logic)
+            if 'accuracy' in raw_metrics:
+                standardized["val_accuracy"] = raw_metrics['accuracy']
+            if 'precision' in raw_metrics:
+                standardized["val_precision"] = raw_metrics['precision']
+            if 'recall' in raw_metrics:
+                standardized["val_recall"] = raw_metrics['recall']
+            if 'f1' in raw_metrics:
+                standardized["val_f1"] = raw_metrics['f1']
 
         return standardized
     
@@ -151,6 +130,8 @@ class ResearchMetricsManager:
             Dictionary with metric name and mode
         """
         # Use accuracy as primary metric for all phases
+        # Note: phase_num is provided for future customization but currently all phases use same criteria
+        _ = phase_num  # Acknowledge parameter 
         return {
             'metric': 'val_accuracy',
             'mode': 'max',

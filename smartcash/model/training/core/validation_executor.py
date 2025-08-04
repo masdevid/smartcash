@@ -48,7 +48,28 @@ class ValidationExecutor:
         self.prediction_processor = PredictionProcessor(config, model)
         
         # Initialize YOLOv5-based mAP calculator with enhanced debug verification
-        num_classes = config.get('model', {}).get('num_classes', 7)
+        # Handle both single-value and multi-layer num_classes formats
+        model_config = config.get('model', {})
+        raw_num_classes = model_config.get('num_classes', 7)
+        current_phase = getattr(model, 'current_phase', None) or 1
+        
+        # Extract phase-appropriate num_classes
+        if isinstance(raw_num_classes, dict):
+            # Multi-layer format: {'layer_1': 7, 'layer_2': 7, 'layer_3': 3}
+            if current_phase == 1:
+                # Phase 1: Only layer_1 (single layer training)
+                num_classes = raw_num_classes.get('layer_1', 7)
+                layer_info = f"layer_1: {num_classes}"
+            else:
+                # Phase 2: All layers (calculate total classes)
+                total_classes = sum(raw_num_classes.values())
+                num_classes = total_classes
+                layer_info = str(raw_num_classes)
+        else:
+            # Single-value format: just use the value
+            num_classes = raw_num_classes
+            layer_info = str(num_classes)
+        
         debug_map = config.get('debug_map', False)
         
         # Extract training context from config for debug logging
@@ -78,7 +99,7 @@ class ValidationExecutor:
         self.map_processor = ValidationMapProcessor(self.map_calculator)
         
         logger.info(f"Validation metrics configuration:")
-        logger.info(f"  • YOLOv5 mAP calculator: {num_classes} classes")
+        logger.info(f"  • YOLOv5 mAP calculator: {layer_info} classes")
         logger.info(f"  • Using hierarchical validation (YOLOv5 + per-layer metrics)")
         
         if not self.map_calculator.yolov5_available:

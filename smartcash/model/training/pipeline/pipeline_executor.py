@@ -359,7 +359,16 @@ class PipelineExecutor:
         try:
             # Create visualization manager for comprehensive training charts
             from smartcash.model.training.visualization_manager import create_visualization_manager
-            num_classes_per_layer = {'layer_1': 7, 'layer_2': 7, 'layer_3': 3}
+            
+            # Use phase-aware layer configuration based on training mode
+            training_mode = config.get('training_mode', 'two_phase')
+            if training_mode == 'two_phase':
+                # Phase 1 starts with single-layer (layer_1 only)
+                num_classes_per_layer = {'layer_1': 7}
+            else:
+                # Single-phase uses all layers
+                num_classes_per_layer = {'layer_1': 7, 'layer_2': 7, 'layer_3': 3}
+            
             visualization_manager = create_visualization_manager(
                 num_classes_per_layer=num_classes_per_layer,
                 save_dir="data/visualization",
@@ -474,7 +483,16 @@ class PipelineExecutor:
         try:
             # Create visualization manager for comprehensive training charts
             from smartcash.model.training.visualization_manager import create_visualization_manager
-            num_classes_per_layer = {'layer_1': 7, 'layer_2': 7, 'layer_3': 3}
+            
+            # Use phase-aware layer configuration based on training mode
+            training_mode = config.get('training_mode', 'two_phase')
+            if training_mode == 'two_phase':
+                # Phase 1 starts with single-layer (layer_1 only)
+                num_classes_per_layer = {'layer_1': 7}
+            else:
+                # Single-phase uses all layers
+                num_classes_per_layer = {'layer_1': 7, 'layer_2': 7, 'layer_3': 3}
+            
             visualization_manager = create_visualization_manager(
                 num_classes_per_layer=num_classes_per_layer,
                 save_dir="data/visualization",

@@ -40,10 +40,13 @@ class CheckpointManager:
             
             checkpoint_path = self.save_dir / checkpoint_name
             
+            # CRITICAL FIX: Get model configuration from proper source
+            model_config = self._get_model_config_for_checkpoint(model, **kwargs)
+            
             # Prepare checkpoint data
             checkpoint_data = {
                 'model_state_dict': model.state_dict(),
-                'model_config': getattr(model, 'config', {}),
+                'model_config': model_config,
                 'metrics': metrics or {},
                 'timestamp': datetime.now().isoformat(),
                 'torch_version': torch.__version__,
@@ -313,6 +316,53 @@ class CheckpointManager:
                 except Exception as e:
                     self.logger.warning(f"⚠️ Failed to remove {old_checkpoint.name}: {str(e)}")
     
+    def _get_model_config_for_checkpoint(self, model: torch.nn.Module, **kwargs) -> Dict[str, Any]:
+        """🔧 Get model configuration for checkpoint saving"""
+        try:
+            # Method 1: Try to get from model_api if passed in kwargs (MOST ACCURATE)
+            if 'model_api' in kwargs:
+                model_api = kwargs['model_api']
+                if hasattr(model_api, 'config'):
+                    api_config = getattr(model_api, 'config', {})
+                    api_model_config = api_config.get('model', {})
+                    if api_model_config:
+                        self.logger.debug("✅ Got model config from model_api")
+                        return api_model_config
+            
+            # Method 2: Check if model has a get_model_config method
+            if hasattr(model, 'get_model_config'):
+                try:
+                    model_config = model.get_model_config()
+                    if model_config:
+                        self.logger.debug("✅ Got model config from model.get_model_config()")
+                        return model_config
+                except Exception as e:
+                    self.logger.debug(f"Failed to get config from model method: {e}")
+            
+            # Method 3: Check if model has a config attribute
+            if hasattr(model, 'config') and model.config:
+                self.logger.debug("✅ Got model config from model.config attribute")
+                return model.config
+            
+            # Method 4: Use the CheckpointManager's own config as fallback
+            model_config = self.config.get('model', {})
+            if model_config:
+                self.logger.debug("✅ Got model config from CheckpointManager config")
+                return model_config
+            
+            # Method 5: Try to extract basic config from model structure
+            if hasattr(model, 'multi_layer_config') and model.multi_layer_config:
+                self.logger.debug("✅ Got model config from model.multi_layer_config")
+                return model.multi_layer_config
+            
+            self.logger.warning("⚠️ No model configuration found, saving empty config")
+            return {}
+            
+        except Exception as e:
+            self.logger.error(f"❌ Error getting model config for checkpoint: {e}")
+            # Return configuration from CheckpointManager as fallback
+            return self.config.get('model', {})
+
     def _get_model_info(self, model: torch.nn.Module) -> Dict[str, Any]:
         """ℹ️ Extract model information untuk checkpoint metadata"""
         
@@ -327,7 +377,7 @@ class CheckpointManager:
                 'architecture': model.__class__.__name__
             }
             
-            # Add model config jika tersedia
+            # Add model config jika tersedia  
             if hasattr(model, 'config'):
                 model_info['model_config'] = model.config
             

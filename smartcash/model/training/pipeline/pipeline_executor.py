@@ -791,6 +791,32 @@ class PipelineExecutor:
         
         # 3. Load Phase 1 weights into the rebuilt model
         if phase1_checkpoint_data and 'model_state_dict' in phase1_checkpoint_data:
+            # CRITICAL FIX: Extract model configuration from checkpoint if available
+            checkpoint_model_config = None
+            if 'model_config' in phase1_checkpoint_data and phase1_checkpoint_data['model_config']:
+                checkpoint_model_config = phase1_checkpoint_data['model_config']
+                logger.info(f"🔧 Found model config in checkpoint: {checkpoint_model_config}")
+            else:
+                # Infer configuration from checkpoint state dict structure
+                logger.info("🔍 Model config empty in checkpoint, inferring from state dict structure")
+                # Pass checkpoint path context for better backbone inference
+                checkpoint_path = phase1_result.get('best_checkpoint', '')
+                checkpoint_model_config = self._infer_model_config_from_checkpoint(phase1_checkpoint_data, checkpoint_path)
+                if checkpoint_model_config:
+                    logger.info(f"🔧 Inferred model config: {checkpoint_model_config}")
+            
+            if checkpoint_model_config:
+                # Update the config used for Phase 2 rebuild with checkpoint config
+                if 'model' not in config:
+                    config['model'] = {}
+                config['model'].update(checkpoint_model_config)
+                logger.info("✅ Updated Phase 2 config with checkpoint model configuration")
+                
+                # Rebuild model again with correct configuration from checkpoint
+                logger.info("🔄 Rebuilding model with correct checkpoint configuration")
+                corrected_model = self._rebuild_model_for_phase2(config)
+                phase2_model = corrected_model
+            
             try:
                 # Attempt to load state dict with strict=False to handle minor mismatches
                 missing_keys, unexpected_keys = phase2_model.load_state_dict(phase1_checkpoint_data['model_state_dict'], strict=False)
@@ -837,6 +863,42 @@ class PipelineExecutor:
             # CRITICAL: Preserve the multi-layer configuration from Phase 1
             # The original model config must be preserved to maintain architecture compatibility
             original_model_config = config.get('model', {})
+            
+            # CRITICAL FIX: If model config is empty, extract configuration from current model
+            if not original_model_config or len(original_model_config) == 0:
+                logger.warning("⚠️ Original model config is empty, extracting from current model")
+                if self.model and hasattr(self.model, 'get_model_config'):
+                    try:
+                        extracted_config = self.model.get_model_config()
+                        logger.info(f"🔧 Extracted model config: {extracted_config}")
+                        original_model_config = extracted_config
+                    except Exception as e:
+                        logger.warning(f"⚠️ Failed to extract model config: {e}")
+                
+                # If still empty, infer from the current model API config
+                if (not original_model_config or len(original_model_config) == 0) and self.model_api:
+                    try:
+                        api_config = getattr(self.model_api, 'config', {})
+                        api_model_config = api_config.get('model', {})
+                        if api_model_config:
+                            logger.info(f"🔧 Using model API config: {api_model_config}")
+                            original_model_config = api_model_config
+                    except Exception as e:
+                        logger.warning(f"⚠️ Failed to get API model config: {e}")
+                
+                # Final fallback: infer from top-level config
+                if not original_model_config or len(original_model_config) == 0:
+                    logger.warning("⚠️ Using top-level config as fallback for model config")
+                    # Build minimal model config from top-level config
+                    original_model_config = {
+                        'backbone': config.get('backbone', 'cspdarknet'),
+                        'num_classes': config.get('num_classes', 17), 
+                        'layer_mode': config.get('layer_mode', 'multi'),
+                        'detection_layers': config.get('detection_layers', ['layer_1', 'layer_2', 'layer_3']),
+                        'pretrained': config.get('pretrained', False),
+                        'img_size': config.get('img_size', 640)
+                    }
+                    logger.info(f"🔧 Fallback model config: {original_model_config}")
             
             # Update model config to ensure backbone is unfrozen while preserving multi-layer setup
             if 'model' not in phase2_config:
@@ -925,6 +987,30 @@ class PipelineExecutor:
         
         # Load standard best model weights into the rebuilt model
         if standard_checkpoint_data and 'model_state_dict' in standard_checkpoint_data:
+            # CRITICAL FIX: Extract model configuration from checkpoint if available
+            checkpoint_model_config = None
+            if 'model_config' in standard_checkpoint_data and standard_checkpoint_data['model_config']:
+                checkpoint_model_config = standard_checkpoint_data['model_config']
+                logger.info(f"🔧 Found model config in standard checkpoint: {checkpoint_model_config}")
+            else:
+                # Infer configuration from checkpoint state dict structure
+                logger.info("🔍 Model config empty in standard checkpoint, inferring from state dict structure")
+                checkpoint_model_config = self._infer_model_config_from_checkpoint(standard_checkpoint_data, standard_best_path)
+                if checkpoint_model_config:
+                    logger.info(f"🔧 Inferred model config: {checkpoint_model_config}")
+            
+            if checkpoint_model_config:
+                # Update the config used for Phase 2 rebuild with checkpoint config
+                if 'model' not in config:
+                    config['model'] = {}
+                config['model'].update(checkpoint_model_config)
+                logger.info("✅ Updated Phase 2 config with standard checkpoint model configuration")
+                
+                # Rebuild model again with correct configuration from checkpoint
+                logger.info("🔄 Rebuilding model with correct checkpoint configuration")
+                corrected_model = self._rebuild_model_for_phase2(config)
+                phase2_model = corrected_model
+            
             try:
                 # Attempt to load state dict with strict=False to handle minor mismatches
                 missing_keys, unexpected_keys = phase2_model.load_state_dict(standard_checkpoint_data['model_state_dict'], strict=False)
@@ -1033,6 +1119,102 @@ class PipelineExecutor:
         except Exception as e:
             logger.error(f"❌ Failed to load standard best model: {e}")
     
+    def _infer_model_config_from_checkpoint(self, checkpoint_data: Dict[str, Any], checkpoint_path: str = '') -> Dict[str, Any]:
+        """Infer model configuration from checkpoint state dict structure."""
+        try:
+            state_dict = checkpoint_data.get('model_state_dict', {})
+            if not state_dict:
+                return {}
+            
+            # Analyze detection head output size to infer configuration
+            detection_head_keys = [k for k in state_dict.keys() if '.m.0.weight' in k and ('head' in k or 'model.24' in k)]
+            
+            if detection_head_keys:
+                # Get output channels from first detection head layer
+                first_head_key = detection_head_keys[0]
+                output_channels = state_dict[first_head_key].shape[0]
+                logger.info(f"🔍 Detected output channels: {output_channels}")
+                
+                # Infer configuration based on output channels
+                inferred_config = {}
+                
+                # Map output channels to known configurations
+                if output_channels == 36:  # 6 classes * 6 anchors
+                    inferred_config = {
+                        'num_classes': 6,
+                        'layer_mode': 'single',
+                        'detection_layers': ['layer_1']
+                    }
+                elif output_channels == 42:  # 7 classes * 6 anchors  
+                    inferred_config = {
+                        'num_classes': 7,
+                        'layer_mode': 'single',
+                        'detection_layers': ['layer_1']
+                    }
+                elif output_channels == 66:  # 11 classes * 6 anchors OR multi-layer (7+7+3) 
+                    # Check if this is multi-layer by looking for hierarchical structure clues
+                    inferred_config = {
+                        'num_classes': 17,  # 7+7+3 multi-layer configuration
+                        'layer_mode': 'multi',
+                        'detection_layers': ['layer_1', 'layer_2', 'layer_3']
+                    }
+                elif output_channels == 102:  # 17 classes * 6 anchors
+                    inferred_config = {
+                        'num_classes': 17,
+                        'layer_mode': 'single',
+                        'detection_layers': ['layer_1']
+                    }
+                else:
+                    # Generic inference based on output channels
+                    num_classes = output_channels // 6  # Assume 6 anchors per class
+                    inferred_config = {
+                        'num_classes': num_classes,
+                        'layer_mode': 'multi',  # Default to multi
+                        'detection_layers': ['layer_1', 'layer_2', 'layer_3']
+                    }
+                
+                # Try to infer backbone from parameter structure and checkpoint context
+                backbone_keys = [k for k in state_dict.keys() if 'backbone' in k.lower() or 'model.0' in k or 'model.1' in k]
+                if any('efficientnet' in k.lower() for k in backbone_keys):
+                    inferred_config['backbone'] = 'efficientnet_b4'
+                elif any('resnet' in k.lower() for k in backbone_keys):
+                    inferred_config['backbone'] = 'resnet50'
+                else:
+                    # Try to infer from checkpoint filename if available
+                    if checkpoint_path and ('efficientnet_b4' in checkpoint_path.lower()):
+                        inferred_config['backbone'] = 'efficientnet_b4'
+                    elif checkpoint_path and ('efficientnet_b0' in checkpoint_path.lower()):
+                        inferred_config['backbone'] = 'efficientnet_b0'
+                    elif checkpoint_path and ('resnet50' in checkpoint_path.lower()):
+                        inferred_config['backbone'] = 'resnet50'
+                    else:
+                        inferred_config['backbone'] = 'cspdarknet'  # Default
+                
+                # Additional metadata if available
+                if 'model_info' in checkpoint_data:
+                    model_info = checkpoint_data['model_info']
+                    if isinstance(model_info, dict):
+                        if 'backbone' in model_info:
+                            inferred_config['backbone'] = model_info['backbone']
+                        if 'layer_mode' in model_info:
+                            inferred_config['layer_mode'] = model_info['layer_mode']
+                        if 'detection_layers' in model_info:
+                            inferred_config['detection_layers'] = model_info['detection_layers']
+                
+                # Set defaults
+                inferred_config.setdefault('pretrained', True)
+                inferred_config.setdefault('img_size', 640)
+                
+                logger.info(f"🔍 Inferred model configuration from checkpoint structure: {inferred_config}")
+                return inferred_config
+            else:
+                logger.warning("⚠️ Could not find detection head keys in checkpoint")
+                return {}
+                
+        except Exception as e:
+            logger.error(f"❌ Failed to infer model config from checkpoint: {e}")
+            return {}
+
     def _unfreeze_backbone_for_phase2(self):
         """Unfreeze backbone parameters for Phase 2 training."""
         try:

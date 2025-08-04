@@ -119,6 +119,11 @@ class SmartCashModelAPI:
             # Override with kwargs
             model_config.update(kwargs)
             
+            # CRITICAL FIX: Update API's internal config with the actual model config being used
+            if 'model' not in self.config:
+                self.config['model'] = {}
+            self.config['model'].update(model_config)
+            
             # Set defaults
             backbone = model_config.get('backbone', 'cspdarknet')
             
@@ -361,7 +366,8 @@ class SmartCashModelAPI:
                 phase=phase,
                 is_best=is_best,
                 config=config,
-                session_id=session_id
+                session_id=session_id,
+                model_api=self  # CRITICAL FIX: Pass model API for proper config extraction
             )
             
             return checkpoint_path

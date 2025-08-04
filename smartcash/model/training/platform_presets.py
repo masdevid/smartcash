@@ -261,10 +261,8 @@ class PlatformPresets:
         }
         
         # Platform-specific model optimizations
-        if self.platform_info['is_m1_mac']:
-            # M1 Mac: smaller input size for memory efficiency
-            if backbone == 'efficientnet_b4':
-                config['img_size'] = 512  # Reduce for memory
+        # Note: Removed img_size override for M1 Mac + EfficientNet-B4 
+        # to allow user configuration to take precedence (640 is standard for YOLO)
         
         return config
     

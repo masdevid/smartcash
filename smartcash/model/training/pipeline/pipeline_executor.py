@@ -235,7 +235,10 @@ class PipelineExecutor:
             )
             
             # CRITICAL: Use phase-specific model configuration for Phase 1
-            if self.config.get('training_mode') == 'two_phase':
+            training_mode = self.config.get('training_mode', 'two_phase')  # Default to two_phase
+            logger.info(f"🔍 DEBUG: Detected training_mode = '{training_mode}'")
+            
+            if training_mode == 'two_phase':
                 # For two-phase training, build Phase 1 model with single-layer configuration
                 session_id = self.config.get('session_id', 'default')
                 config_builder = ConfigurationBuilder(session_id)

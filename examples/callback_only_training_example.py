@@ -522,13 +522,15 @@ def main():
         
         # Set model configuration using arguments from args
         # Use enhanced model builder with YOLOv5 integration
+        # IMPORTANT: For two_phase training, the pipeline executor handles phase-specific configs
+        # We provide the base configuration here and let the pipeline manage phase transitions
         training_kwargs['model'] = {
             'model_name': 'smartcash_yolov5_integrated',
             'backbone': args.backbone,
             'pretrained': args.pretrained,
-            'layer_mode': 'multi' if args.training_mode == 'two_phase' else args.single_layer_mode,
+            'layer_mode': args.single_layer_mode if args.training_mode == 'single_phase' else 'multi',
             'detection_layers': ['layer_1', 'layer_2', 'layer_3'],
-            'num_classes': 7,  # Fixed for banknote detection
+            'num_classes': {'layer_1': 7, 'layer_2': 7, 'layer_3': 3} if args.training_mode == 'two_phase' else 7,
             'img_size': 640,   # Standard size for YOLO models
             'feature_optimization': {'enabled': True},
         }

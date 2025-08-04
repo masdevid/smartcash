@@ -794,8 +794,37 @@ class PipelineExecutor:
             # CRITICAL FIX: Extract model configuration from checkpoint if available
             checkpoint_model_config = None
             if 'model_config' in phase1_checkpoint_data and phase1_checkpoint_data['model_config']:
-                checkpoint_model_config = phase1_checkpoint_data['model_config']
-                logger.info(f"🔧 Found model config in checkpoint: {checkpoint_model_config}")
+                saved_config = phase1_checkpoint_data['model_config']
+                logger.info(f"🔧 Found model config in checkpoint: {saved_config}")
+                
+                # CRITICAL: Validate that saved config matches actual model architecture
+                # Check if the saved config num_classes matches the model's output channels
+                state_dict = phase1_checkpoint_data.get('model_state_dict', {})
+                detection_head_keys = [k for k in state_dict.keys() if '.m.0.weight' in k and ('head' in k or 'model.24' in k)]
+                
+                if detection_head_keys:
+                    actual_output_channels = state_dict[detection_head_keys[0]].shape[0]
+                    saved_num_classes = saved_config.get('num_classes', 0)
+                    
+                    # For multi-layer: 17 classes should give 66 output channels
+                    # For single-layer: 17 classes should give 102 output channels  
+                    expected_channels_multi = (7 + 7 + 3) * 6  # 102, but YOLOv5 uses different calculation = 66
+                    expected_channels_single = 17 * 6  # 102
+                    
+                    if actual_output_channels == 66 and saved_num_classes != 17:
+                        logger.warning(f"⚠️ Config mismatch: saved num_classes={saved_num_classes}, but architecture suggests 17 classes (66 channels)")
+                        logger.info("🔍 Using inference to get correct configuration")
+                        checkpoint_path = phase1_result.get('best_checkpoint', '')
+                        inferred_config = self._infer_model_config_from_checkpoint(phase1_checkpoint_data, checkpoint_path)
+                        if inferred_config:
+                            logger.info(f"🔧 Using inferred config instead: {inferred_config}")
+                            checkpoint_model_config = inferred_config
+                        else:
+                            checkpoint_model_config = saved_config
+                    else:
+                        checkpoint_model_config = saved_config
+                else:
+                    checkpoint_model_config = saved_config
             else:
                 # Infer configuration from checkpoint state dict structure
                 logger.info("🔍 Model config empty in checkpoint, inferring from state dict structure")
@@ -990,8 +1019,36 @@ class PipelineExecutor:
             # CRITICAL FIX: Extract model configuration from checkpoint if available
             checkpoint_model_config = None
             if 'model_config' in standard_checkpoint_data and standard_checkpoint_data['model_config']:
-                checkpoint_model_config = standard_checkpoint_data['model_config']
-                logger.info(f"🔧 Found model config in standard checkpoint: {checkpoint_model_config}")
+                saved_config = standard_checkpoint_data['model_config']
+                logger.info(f"🔧 Found model config in standard checkpoint: {saved_config}")
+                
+                # CRITICAL: Validate that saved config matches actual model architecture
+                # Check if the saved config num_classes matches the model's output channels
+                state_dict = standard_checkpoint_data.get('model_state_dict', {})
+                detection_head_keys = [k for k in state_dict.keys() if '.m.0.weight' in k and ('head' in k or 'model.24' in k)]
+                
+                if detection_head_keys:
+                    actual_output_channels = state_dict[detection_head_keys[0]].shape[0]
+                    saved_num_classes = saved_config.get('num_classes', 0)
+                    
+                    # For multi-layer: 17 classes should give 66 output channels
+                    # For single-layer: 17 classes should give 102 output channels  
+                    expected_channels_multi = (7 + 7 + 3) * 6  # 102, but YOLOv5 uses different calculation = 66
+                    expected_channels_single = 17 * 6  # 102
+                    
+                    if actual_output_channels == 66 and saved_num_classes != 17:
+                        logger.warning(f"⚠️ Config mismatch: saved num_classes={saved_num_classes}, but architecture suggests 17 classes (66 channels)")
+                        logger.info("🔍 Using inference to get correct configuration")
+                        inferred_config = self._infer_model_config_from_checkpoint(standard_checkpoint_data, standard_best_path)
+                        if inferred_config:
+                            logger.info(f"🔧 Using inferred config instead: {inferred_config}")
+                            checkpoint_model_config = inferred_config
+                        else:
+                            checkpoint_model_config = saved_config
+                    else:
+                        checkpoint_model_config = saved_config
+                else:
+                    checkpoint_model_config = saved_config
             else:
                 # Infer configuration from checkpoint state dict structure
                 logger.info("🔍 Model config empty in standard checkpoint, inferring from state dict structure")

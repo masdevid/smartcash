@@ -65,7 +65,9 @@ class ConfidenceModulator:
         # Memory safety thresholds
         self.max_matrix_combinations = 50_000_000  # 50M = ~400MB for IoU matrix
         self.max_class_matrix_size = 100_000       # 100K = ~800KB per class
-        self.spatial_iou_threshold = 0.1           # IoU threshold for spatial overlap
+        # TASK.md: More lenient thresholds for rotated images where Layer 2/3 may be partially outside Layer 1
+        self.spatial_iou_threshold = 0.05          # Reduced IoU threshold for spatial overlap (was 0.1)
+        self.intersection_threshold = 0.02         # Minimum intersection area for rotated images
         self.money_validation_threshold = 0.1      # Layer 3 confidence threshold
         
         # Track large matrix operations to avoid spam logging
@@ -128,26 +130,38 @@ class ConfidenceModulator:
             layer_3_conf = self.compute_spatial_confidence(layer_1_predictions, layer_3_preds)
             layer_2_conf = self.compute_denomination_confidence(layer_1_predictions, layer_2_preds)
             
-            # Hierarchical confidence modulation with money validation
-            money_mask = layer_3_conf > self.money_validation_threshold  # Money validation threshold
+            # TASK.md compliant hierarchical confidence modulation
+            money_mask = layer_3_conf > self.money_validation_threshold if len(layer_3_preds) > 0 else torch.ones_like(original_conf, dtype=torch.bool)
             
-            # Check if we have any layer_2 or layer_3 predictions available
-            has_layer_predictions = (len(layer_2_preds) > 0 or len(layer_3_preds) > 0)
+            # Check availability of each layer
+            has_layer_2 = len(layer_2_preds) > 0
+            has_layer_3 = len(layer_3_preds) > 0
             
-            if has_layer_predictions:
-                # Apply hierarchical modulation only when we have multi-layer predictions
+            # TASK.md: Layer 1 and 2 are equal confidence score (OR logic)
+            # If both exist, boost confidence by small number
+            if has_layer_2:
+                # Apply OR logic: max of layer_1 original confidence and layer_2 boost
+                layer_12_confidence = torch.clamp(original_conf + layer_2_conf * 0.1, max=1.0)  # Small boost
+            else:
+                layer_12_confidence = original_conf
+            
+            # TASK.md: Layer 3 non-existence shouldn't penalize layer 1 and 2
+            # It just decreases confidence score by small number
+            if has_layer_3:
+                # Layer 3 exists: apply money validation logic
                 hierarchical_conf = torch.where(
                     money_mask,
-                    torch.clamp(original_conf * (1.0 + layer_2_conf * layer_3_conf), max=1.0),
-                    original_conf * 0.1  # Reduce confidence if Layer 3 disagrees
+                    torch.clamp(layer_12_confidence + layer_3_conf * 0.05, max=1.0),  # Small boost for money validation
+                    layer_12_confidence * 0.95  # Small penalty (5% reduction) if Layer 3 disagrees - much gentler than 0.1
                 )
             else:
-                # No layer_2 or layer_3 predictions available - keep original confidence unchanged
-                hierarchical_conf = original_conf
+                # TASK.md: Layer 3 non-existence - small decrease only
+                hierarchical_conf = layer_12_confidence * 0.98  # Very small penalty (2% reduction) for Layer 3 absence
             
             modified_predictions[:, 4] = hierarchical_conf
             
             if self.debug and len(layer_1_predictions) > 0:
+                has_layer_predictions = has_layer_2 or has_layer_3
                 self._log_modulation_sample(layer_1_predictions, original_conf, hierarchical_conf, 
                                           layer_2_conf, layer_3_conf, has_layer_predictions)
             
@@ -191,14 +205,20 @@ class ConfidenceModulator:
             return self._chunked_spatial_confidence(layer_1_preds, layer_3_preds)
         
         try:
+            # TASK.md: Convert from xywh to xyxy format for YOLOv5 IoU calculation
+            layer_1_xyxy = self._xywh_to_xyxy(layer_1_preds[:, :4])
+            layer_3_xyxy = self._xywh_to_xyxy(layer_3_preds[:, :4])
+            
             # Compute IoU matrix between all Layer 1 and Layer 3 predictions
-            iou_matrix = get_box_iou()(layer_1_preds[:, :4], layer_3_preds[:, :4])
+            iou_matrix = get_box_iou()(layer_1_xyxy, layer_3_xyxy)
             
             # For each Layer 1 prediction, find best overlapping Layer 3 prediction
             max_ious, max_indices = torch.max(iou_matrix, dim=1)
             
-            # Apply IoU threshold and get corresponding confidences
-            valid_mask = max_ious > self.spatial_iou_threshold
+            # TASK.md: Apply more lenient spatial validation for rotated images
+            valid_mask = self._validate_spatial_overlap(
+                layer_1_preds, layer_3_preds, max_ious, max_indices, iou_matrix
+            )
             layer_3_conf = torch.zeros(len(layer_1_preds), device=self.device)
             layer_3_conf[valid_mask] = layer_3_preds[max_indices[valid_mask], 4]
             
@@ -283,12 +303,16 @@ class ConfidenceModulator:
             chunk = layer_1_preds[i:end_idx]
             
             try:
+                # TASK.md: Convert from xywh to xyxy format for YOLOv5 IoU calculation
+                chunk_xyxy = self._xywh_to_xyxy(chunk[:, :4])
+                layer_3_xyxy = self._xywh_to_xyxy(layer_3_preds[:, :4])
+                
                 # Compute IoU for this chunk only
-                iou_matrix = get_box_iou()(chunk[:, :4], layer_3_preds[:, :4])
+                iou_matrix = get_box_iou()(chunk_xyxy, layer_3_xyxy)
                 max_ious, max_indices = torch.max(iou_matrix, dim=1)
                 
-                # Apply threshold and assign confidences
-                valid_mask = max_ious > self.spatial_iou_threshold
+                # TASK.md: Apply more lenient spatial validation for rotated images
+                valid_mask = self._validate_spatial_overlap_simple(max_ious)
                 layer_3_conf[i:end_idx][valid_mask] = layer_3_preds[max_indices[valid_mask], 4]
                 
             except Exception as e:
@@ -297,6 +321,134 @@ class ConfidenceModulator:
                 continue
         
         return layer_3_conf
+    
+    def _validate_spatial_overlap(
+        self,
+        layer_1_preds: torch.Tensor,
+        layer_3_preds: torch.Tensor,
+        max_ious: torch.Tensor,
+        max_indices: torch.Tensor,
+        iou_matrix: torch.Tensor
+    ) -> torch.Tensor:
+        """
+        TASK.md: Validate spatial overlap for rotated images with lenient criteria.
+        
+        In rotated images, Layer 2/3 might have small portions outside Layer 1 boxes.
+        This method uses both IoU and intersection area to be more permissive.
+        
+        Args:
+            layer_1_preds: Layer 1 predictions
+            layer_3_preds: Layer 3 predictions  
+            max_ious: Maximum IoU values per Layer 1 prediction
+            max_indices: Indices of best matching Layer 3 predictions
+            iou_matrix: Full IoU matrix
+            
+        Returns:
+            Boolean mask of valid spatial overlaps
+        """
+        # Basic IoU threshold (more lenient than before)  
+        iou_valid = max_ious > self.spatial_iou_threshold
+        
+        # Additional intersection-based validation for rotated images
+        intersection_valid = self._compute_intersection_validation(
+            layer_1_preds, layer_3_preds, max_indices, max_ious
+        )
+        
+        # Accept if either IoU or intersection criteria are met (OR logic)
+        # This handles rotated images where IoU might be low but intersection is meaningful
+        valid_mask = iou_valid | intersection_valid
+        
+        return valid_mask
+    
+    def _validate_spatial_overlap_simple(self, max_ious: torch.Tensor) -> torch.Tensor:
+        """
+        TASK.md: Simple spatial overlap validation with reduced threshold for rotated images.
+        
+        Args:
+            max_ious: Maximum IoU values
+            
+        Returns:
+            Boolean mask of valid overlaps
+        """
+        return max_ious > self.spatial_iou_threshold
+    
+    def _compute_intersection_validation(
+        self,
+        layer_1_preds: torch.Tensor,
+        layer_3_preds: torch.Tensor,
+        max_indices: torch.Tensor,
+        max_ious: torch.Tensor
+    ) -> torch.Tensor:
+        """
+        TASK.md: Compute intersection-based validation for rotated images.
+        
+        This validates based on absolute intersection area rather than IoU ratio,
+        which is more permissive for cases where Layer 2/3 extends outside Layer 1.
+        
+        Args:
+            layer_1_preds: Layer 1 predictions
+            layer_3_preds: Layer 3 predictions
+            max_indices: Indices of best matching predictions
+            max_ious: Maximum IoU values
+            
+        Returns:  
+            Boolean mask of valid intersections
+        """
+        try:
+            # Get matched pairs
+            l1_boxes = layer_1_preds[:, :4]  # [x, y, w, h]
+            l3_boxes = layer_3_preds[max_indices, :4]  # Best matching L3 boxes
+            
+            # Convert to [x1, y1, x2, y2] format for intersection calculation
+            l1_x1 = l1_boxes[:, 0] - l1_boxes[:, 2] / 2
+            l1_y1 = l1_boxes[:, 1] - l1_boxes[:, 3] / 2  
+            l1_x2 = l1_boxes[:, 0] + l1_boxes[:, 2] / 2
+            l1_y2 = l1_boxes[:, 1] + l1_boxes[:, 3] / 2
+            
+            l3_x1 = l3_boxes[:, 0] - l3_boxes[:, 2] / 2
+            l3_y1 = l3_boxes[:, 1] - l3_boxes[:, 3] / 2
+            l3_x2 = l3_boxes[:, 0] + l3_boxes[:, 2] / 2
+            l3_y2 = l3_boxes[:, 1] + l3_boxes[:, 3] / 2
+            
+            # Compute intersection area
+            inter_x1 = torch.max(l1_x1, l3_x1)
+            inter_y1 = torch.max(l1_y1, l3_y1)
+            inter_x2 = torch.min(l1_x2, l3_x2)
+            inter_y2 = torch.min(l1_y2, l3_y2)
+            
+            # Calculate intersection area (0 if no overlap)
+            inter_w = (inter_x2 - inter_x1).clamp(min=0)
+            inter_h = (inter_y2 - inter_y1).clamp(min=0)
+            intersection_area = inter_w * inter_h
+            
+            # Normalize by image area (assuming 640x640 for now)
+            normalized_intersection = intersection_area / (640.0 * 640.0)
+            
+            # Accept if intersection area is above threshold
+            intersection_valid = normalized_intersection > self.intersection_threshold
+            
+            return intersection_valid
+            
+        except Exception as e:
+            logger.warning(f"Error in intersection validation: {e}")
+            return torch.zeros(len(layer_1_preds), dtype=torch.bool, device=self.device)
+    
+    def _xywh_to_xyxy(self, boxes: torch.Tensor) -> torch.Tensor:
+        """
+        Convert boxes from [x_center, y_center, width, height] to [x1, y1, x2, y2] format.
+        
+        Args:
+            boxes: Tensor of shape [N, 4] in xywh format
+            
+        Returns:
+            Tensor of shape [N, 4] in xyxy format
+        """
+        xyxy = boxes.clone()
+        xyxy[:, 0] = boxes[:, 0] - boxes[:, 2] / 2  # x1 = x_center - width/2
+        xyxy[:, 1] = boxes[:, 1] - boxes[:, 3] / 2  # y1 = y_center - height/2
+        xyxy[:, 2] = boxes[:, 0] + boxes[:, 2] / 2  # x2 = x_center + width/2
+        xyxy[:, 3] = boxes[:, 1] + boxes[:, 3] / 2  # y2 = y_center + height/2
+        return xyxy
     
     def _process_class_confidence(
         self,
@@ -340,9 +492,14 @@ class ConfidenceModulator:
         
         # Safe IoU computation for reasonable matrix sizes
         try:
-            iou_matrix = get_box_iou()(matching_l1_preds[:, :4], matching_l2_preds[:, :4])
+            # TASK.md: Convert from xywh to xyxy format for YOLOv5 IoU calculation
+            l1_xyxy = self._xywh_to_xyxy(matching_l1_preds[:, :4])
+            l2_xyxy = self._xywh_to_xyxy(matching_l2_preds[:, :4])
+            
+            iou_matrix = get_box_iou()(l1_xyxy, l2_xyxy)
             max_ious, max_indices = torch.max(iou_matrix, dim=1)
-            valid_mask = max_ious > self.spatial_iou_threshold
+            # TASK.md: Apply more lenient spatial validation for rotated images  
+            valid_mask = self._validate_spatial_overlap_simple(max_ious)
             
             # Assign confidences
             l1_indices = torch.where(l1_mask)[0]

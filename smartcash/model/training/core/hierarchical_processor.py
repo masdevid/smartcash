@@ -46,7 +46,7 @@ class HierarchicalProcessor:
     Space Complexity: O(P) where P is the number of predictions
     """
     
-    def __init__(self, device: Optional[torch.device] = None, debug: bool = False, training_context: dict = None):
+    def __init__(self, device: Optional[torch.device] = None, debug: bool = False, training_context: dict = None, use_standard_map: bool = False):
         """
         Initialize hierarchical processor with extracted modules.
         
@@ -54,10 +54,12 @@ class HierarchicalProcessor:
             device: Torch device for computations
             debug: Enable debug logging
             training_context: Training context information (backbone, phase, etc.)
+            use_standard_map: Enable standard (non-hierarchical) mAP calculation for all classes
         """
         self.device = device or torch.device('cpu')
         self.debug = debug
         self.training_context = training_context or {}
+        self.use_standard_map = use_standard_map  # TASK.md: Enable standard mAP calculation for all classes
         self.memory_optimizer = get_memory_optimizer()
         
         # Memory safety thresholds
@@ -227,7 +229,8 @@ class HierarchicalProcessor:
                 self._hierarchical_debug_log("  • Applying hierarchical filtering and confidence modulation")
             elif self.debug and phase == 1:
                 # Phase 1: Just log basic info to console, no file logging
-                logger.debug("Phase 1: Hierarchical processing skipped (single-layer mode)")
+                # logger.debug("Phase 1: Hierarchical processing skipped (single-layer mode)")
+                return predictions, targets
             
             # Phase 2: Multi-layer hierarchical processing logging handled above
             
@@ -351,14 +354,24 @@ class HierarchicalProcessor:
             logger.warning(f"Unsupported prediction tensor dimensions: {predictions.dim()}")
             return predictions, targets
         
-        # Filter targets to Layer 1 only (classes 0-6)
-        layer_1_targets = targets[targets[..., 1] < 7] if targets.numel() > 0 else targets
+        # TASK.md: Apply target filtering based on mAP calculation mode
+        if self.use_standard_map:
+            # Standard mAP: Use all targets (all 17 classes: 0-16)
+            filtered_targets = targets
+            if self.debug:
+                self._hierarchical_debug_log("🎯 TASK.md: Using standard mAP - keeping all targets (classes 0-16)")
+        else:
+            # Hierarchical mAP: Filter targets to Layer 1 only (classes 0-6)
+            filtered_targets = targets[targets[..., 1] < 7] if targets.numel() > 0 else targets
+            if self.debug:
+                self._hierarchical_debug_log("🎯 Using hierarchical mAP - filtering to Layer 1 targets (classes 0-6)")
         
         if self.debug:
-            # Detailed hierarchical processing summary
-            self._hierarchical_debug_log("\n🎯 HIERARCHICAL PROCESSING RESULTS:")
-            self._hierarchical_debug_log(f"  • Layer 1 predictions after filtering: {len(filtered_predictions)}")
-            self._hierarchical_debug_log(f"  • Layer 1 targets after filtering: {len(layer_1_targets)}")
+            # Detailed processing summary
+            processing_mode = "STANDARD" if self.use_standard_map else "HIERARCHICAL"
+            self._hierarchical_debug_log(f"\n🎯 {processing_mode} PROCESSING RESULTS:")
+            self._hierarchical_debug_log(f"  • Predictions after filtering: {len(filtered_predictions)}")
+            self._hierarchical_debug_log(f"  • Targets after filtering: {len(filtered_targets)}")
             
             if len(filtered_predictions) > 0:
                 filtered_classes = torch.unique(filtered_predictions[:, 5].long())
@@ -383,12 +396,12 @@ class HierarchicalProcessor:
                     cls_avg_conf = filtered_predictions[filtered_predictions[:, 5] == cls, 4].mean().item()
                     self._hierarchical_debug_log(f"    - Class {cls}: {cls_count} predictions, avg_conf={cls_avg_conf:.4f}")
             else:
-                self._hierarchical_debug_log("  ⚠️  NO LAYER 1 PREDICTIONS after filtering!")
+                self._hierarchical_debug_log("  ⚠️  NO PREDICTIONS after filtering!")
                 
-            if len(layer_1_targets) == 0:
-                self._hierarchical_debug_log("  ⚠️  NO LAYER 1 TARGETS after filtering!")
+            if len(filtered_targets) == 0:
+                self._hierarchical_debug_log("  ⚠️  NO TARGETS after filtering!")
         
-        return filtered_predictions, layer_1_targets
+        return filtered_predictions, filtered_targets
     
     def _process_3d_predictions(self, predictions: torch.Tensor) -> torch.Tensor:
         """
@@ -405,15 +418,30 @@ class HierarchicalProcessor:
         _, _, num_features = predictions.shape
         flat_predictions = predictions.view(-1, num_features)
         
-        # Filter to Layer 1 classes (0-6) only
-        layer_1_mask = flat_predictions[:, 5] < 7
-        layer_1_predictions = flat_predictions[layer_1_mask]
+        # TASK.md: Apply prediction filtering based on mAP calculation mode
+        if self.use_standard_map:
+            # Standard mAP: Use all predictions (all 17 classes: 0-16)
+            filtered_predictions = flat_predictions
+            if self.debug:
+                self._hierarchical_debug_log("📊 TASK.md: Using standard mAP - keeping all predictions (classes 0-16)")
+        else:
+            # Hierarchical mAP: Filter to Layer 1 classes (0-6) only
+            layer_1_mask = flat_predictions[:, 5] < 7
+            filtered_predictions = flat_predictions[layer_1_mask]
+            if self.debug:
+                self._hierarchical_debug_log("📊 Using hierarchical mAP - filtering to Layer 1 predictions (classes 0-6)")
         
-        if len(layer_1_predictions) == 0:
+        if len(filtered_predictions) == 0:
             return torch.empty((0, num_features), device=predictions.device)
         
-        # Apply hierarchical confidence modulation using extracted module
-        return self._apply_confidence_modulation(flat_predictions, layer_1_predictions)
+        # Apply confidence modulation based on mode
+        if self.use_standard_map:
+            # Standard mAP: No hierarchical confidence modulation, return as-is
+            return filtered_predictions
+        else:
+            # Hierarchical mAP: Apply hierarchical confidence modulation using extracted module
+            layer_1_predictions = flat_predictions[flat_predictions[:, 5] < 7]
+            return self._apply_confidence_modulation(flat_predictions, layer_1_predictions)
     
     def _process_2d_predictions(self, predictions: torch.Tensor) -> torch.Tensor:
         """
@@ -427,15 +455,30 @@ class HierarchicalProcessor:
             
         Time Complexity: O(P) where P is number of predictions
         """
-        # Filter to Layer 1 classes (0-6) only
-        layer_1_mask = predictions[:, 5] < 7
-        layer_1_predictions = predictions[layer_1_mask]
+        # TASK.md: Apply prediction filtering based on mAP calculation mode
+        if self.use_standard_map:
+            # Standard mAP: Use all predictions (all 17 classes: 0-16)
+            filtered_predictions = predictions
+            if self.debug:
+                self._hierarchical_debug_log("📊 TASK.md: Using standard mAP - keeping all predictions (classes 0-16)")
+        else:
+            # Hierarchical mAP: Filter to Layer 1 classes (0-6) only
+            layer_1_mask = predictions[:, 5] < 7
+            filtered_predictions = predictions[layer_1_mask]
+            if self.debug:
+                self._hierarchical_debug_log("📊 Using hierarchical mAP - filtering to Layer 1 predictions (classes 0-6)")
         
-        if len(layer_1_predictions) == 0:
+        if len(filtered_predictions) == 0:
             return torch.empty((0, predictions.shape[1]), device=predictions.device)
         
-        # Apply hierarchical confidence modulation using extracted module
-        return self._apply_confidence_modulation(predictions, layer_1_predictions)
+        # Apply confidence modulation based on mode
+        if self.use_standard_map:
+            # Standard mAP: No hierarchical confidence modulation, return as-is
+            return filtered_predictions
+        else:
+            # Hierarchical mAP: Apply hierarchical confidence modulation using extracted module
+            layer_1_predictions = predictions[predictions[:, 5] < 7]
+            return self._apply_confidence_modulation(predictions, layer_1_predictions)
     
     def _apply_confidence_modulation(
         self, 

@@ -71,12 +71,13 @@ class TrainingChartsVisualizer:
             self.metrics_data = []
             self.phase_data = {}
     
-    def create_loss_charts(self, save: bool = True) -> Dict[str, Any]:
+    def create_loss_charts(self, save: bool = True, phase1_fallback_note: bool = False) -> Dict[str, Any]:
         """
         Create enhanced loss progression charts per phase with improved scaling.
         
         Args:
             save: Whether to save charts to disk
+            phase1_fallback_note: Whether to add Phase 1 fallback note
             
         Returns:
             Dictionary with chart data and file paths
@@ -85,8 +86,10 @@ class TrainingChartsVisualizer:
             logger.warning("No metrics data available")
             return {}
         
-        # Create contextual title
+        # Create contextual title with fallback note if needed
         contextual_title = self._get_contextual_title()
+        if phase1_fallback_note:
+            contextual_title += "\n⚠️ Using Phase 1 metrics (Phase 2 not available)"
         
         # Create figure with subplots for each phase
         num_phases = len(self.phase_data)
@@ -129,12 +132,13 @@ class TrainingChartsVisualizer:
         plt.show()
         return chart_data
     
-    def create_map_charts(self, save: bool = True) -> Dict[str, Any]:
+    def create_map_charts(self, save: bool = True, phase1_fallback_note: bool = False) -> Dict[str, Any]:
         """
         Create mAP progression charts per phase.
         
         Args:
             save: Whether to save charts to disk
+            phase1_fallback_note: Whether to add Phase 1 fallback note
             
         Returns:
             Dictionary with chart data and file paths
@@ -226,12 +230,13 @@ class TrainingChartsVisualizer:
         plt.show()
         return chart_data
     
-    def create_learning_rate_chart(self, save: bool = True) -> Dict[str, Any]:
+    def create_learning_rate_chart(self, save: bool = True, phase1_fallback_note: bool = False) -> Dict[str, Any]:
         """
         Create learning rate progression chart across all phases.
         
         Args:
             save: Whether to save chart to disk
+            phase1_fallback_note: Whether to add Phase 1 fallback note
             
         Returns:
             Dictionary with chart data and file path
@@ -284,12 +289,13 @@ class TrainingChartsVisualizer:
         plt.show()
         return chart_data
     
-    def create_phase_comparison(self, save: bool = True) -> Dict[str, Any]:
+    def create_phase_comparison(self, save: bool = True, phase1_fallback_note: bool = False) -> Dict[str, Any]:
         """
         Create comprehensive phase comparison dashboard.
         
         Args:
             save: Whether to save chart to disk
+            phase1_fallback_note: Whether to add Phase 1 fallback note
             
         Returns:
             Dictionary with comparison data and file path
@@ -399,12 +405,13 @@ class TrainingChartsVisualizer:
         plt.show()
         return comparison_data
     
-    def generate_all_charts(self, save: bool = True) -> Dict[str, Any]:
+    def generate_all_charts(self, save: bool = True, phase1_fallback_note: bool = False) -> Dict[str, Any]:
         """
         Generate all available charts and return summary.
         
         Args:
             save: Whether to save charts to disk
+            phase1_fallback_note: Whether to add a note indicating Phase 1 fallback usage
             
         Returns:
             Dictionary with all chart data and file paths
@@ -413,14 +420,14 @@ class TrainingChartsVisualizer:
         
         results = {}
         
-        # Generate individual charts
-        results['loss_charts'] = self.create_loss_charts(save)
-        results['map_charts'] = self.create_map_charts(save)
-        results['learning_rate_chart'] = self.create_learning_rate_chart(save)
+        # Generate individual charts with fallback note
+        results['loss_charts'] = self.create_loss_charts(save, phase1_fallback_note)
+        results['map_charts'] = self.create_map_charts(save, phase1_fallback_note)
+        results['learning_rate_chart'] = self.create_learning_rate_chart(save, phase1_fallback_note)
         
         # Generate comparison if multiple phases
         if len(self.phase_data) > 1:
-            results['phase_comparison'] = self.create_phase_comparison(save)
+            results['phase_comparison'] = self.create_phase_comparison(save, phase1_fallback_note)
         
         # Create summary
         results['summary'] = {
@@ -429,6 +436,11 @@ class TrainingChartsVisualizer:
             'charts_generated': len([r for r in results.values() if r and 'file_path' in r]),
             'output_directory': str(self.output_dir)
         }
+        
+        # Add fallback note to summary
+        if phase1_fallback_note:
+            results['summary']['phase1_fallback'] = True
+            results['summary']['note'] = "Charts generated using Phase 1 metrics (Phase 2 not available)"
         
         logger.info(f"Generated {results['summary']['charts_generated']} charts in {self.output_dir}")
         return results
@@ -670,13 +682,14 @@ def create_training_visualizer(metrics_file: str, output_dir: str = "charts") ->
     return TrainingChartsVisualizer(metrics_file, output_dir)
 
 
-def visualize_latest_training(training_logs_dir: str = "logs/training", 
+def visualize_latest_training(training_logs_dir: str = "outputs", 
                             output_dir: str = "charts") -> Optional[Dict[str, Any]]:
     """
     Automatically visualize the latest training session.
+    Prioritizes Phase 2 metrics over Phase 1 as per TASK.md requirements.
     
     Args:
-        training_logs_dir: Directory containing training logs
+        training_logs_dir: Directory containing training logs (updated to "outputs")
         output_dir: Directory to save charts
         
     Returns:
@@ -688,28 +701,79 @@ def visualize_latest_training(training_logs_dir: str = "logs/training",
             logger.error(f"Training logs directory not found: {logs_path}")
             return None
         
-        # Find latest metrics file
-        latest_file = logs_path / "latest_metrics.json"
-        if latest_file.exists():
-            with open(latest_file, 'r') as f:
-                latest_data = json.load(f)
-                metrics_file = latest_data['file_paths']['metrics']
-        else:
-            # Fallback: find most recent metrics file
-            metrics_files = list(logs_path.glob("metrics_history_*.json"))
-            if not metrics_files:
-                logger.error("No metrics files found")
-                return None
-            metrics_file = max(metrics_files, key=lambda f: f.stat().st_mtime)
+        # TASK.md requirement: Prioritize Phase 2 metrics over Phase 1
+        metrics_file, using_phase1_fallback = _find_best_metrics_file(logs_path)
+        
+        if not metrics_file:
+            logger.error("No metrics files found")
+            return None
         
         logger.info(f"Visualizing metrics from: {metrics_file}")
+        if using_phase1_fallback:
+            logger.info("⚠️ Using Phase 1 metrics as fallback (no Phase 2 metrics found)")
         
         # Create visualizer and generate charts
         visualizer = create_training_visualizer(str(metrics_file), output_dir)
-        results = visualizer.generate_all_charts(save=True)
+        
+        # Pass fallback information to charts for note display
+        results = visualizer.generate_all_charts(
+            save=True, 
+            phase1_fallback_note=using_phase1_fallback
+        )
         
         return results
         
     except Exception as e:
         logger.error(f"Failed to visualize latest training: {e}")
         return None
+
+
+def _find_best_metrics_file(logs_path: Path) -> Tuple[Optional[Path], bool]:
+    """
+    Find the best metrics file following TASK.md priority: Phase 2 > Phase 1.
+    
+    Args:
+        logs_path: Path to logs directory
+        
+    Returns:
+        Tuple of (metrics_file_path, using_phase1_fallback)
+    """
+    # First, try to use latest_metrics.json if available
+    latest_file = logs_path / "latest_metrics.json"
+    if latest_file.exists():
+        try:
+            with open(latest_file, 'r') as f:
+                latest_data = json.load(f)
+                metrics_file = Path(latest_data['file_paths']['metrics'])
+                if metrics_file.exists():
+                    # Determine if this is Phase 1 or Phase 2
+                    is_phase1 = 'phase1' in metrics_file.name
+                    return metrics_file, is_phase1
+        except Exception as e:
+            logger.warning(f"Failed to parse latest_metrics.json: {e}")
+    
+    # TASK.md Priority: Look for Phase 2 metrics first
+    phase2_files = list(logs_path.glob("metrics_history_*_phase2.json"))
+    if phase2_files:
+        # Use most recent Phase 2 file
+        best_phase2 = max(phase2_files, key=lambda f: f.stat().st_mtime)
+        logger.info(f"Found Phase 2 metrics: {best_phase2}")
+        return best_phase2, False  # Not using Phase 1 fallback
+    
+    # Fallback: Look for Phase 1 metrics
+    phase1_files = list(logs_path.glob("metrics_history_*_phase1.json"))
+    if phase1_files:
+        # Use most recent Phase 1 file
+        best_phase1 = max(phase1_files, key=lambda f: f.stat().st_mtime)
+        logger.info(f"Using Phase 1 metrics as fallback: {best_phase1}")
+        return best_phase1, True  # Using Phase 1 fallback
+    
+    # Final fallback: Any metrics file
+    all_metrics_files = list(logs_path.glob("metrics_history_*.json"))
+    if all_metrics_files:
+        best_file = max(all_metrics_files, key=lambda f: f.stat().st_mtime)
+        # Assume it's Phase 1 fallback if no specific phase in name
+        is_fallback = 'phase2' not in best_file.name
+        return best_file, is_fallback
+    
+    return None, False

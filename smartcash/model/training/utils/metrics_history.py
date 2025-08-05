@@ -71,7 +71,7 @@ class MetricsHistoryRecorder:
     and visualization manager access.
     """
     
-    def __init__(self, output_dir: str = "logs/training", session_id: Optional[str] = None, 
+    def __init__(self, output_dir: str = "outputs", session_id: Optional[str] = None, 
                  backbone: Optional[str] = None, data_name: Optional[str] = None, 
                  phase_num: Optional[int] = None, resume_mode: bool = False):
         """
@@ -513,7 +513,7 @@ class MetricsHistoryRecorder:
             logger.error(f"Failed to save latest metrics: {e}")
 
 
-def create_metrics_recorder(output_dir: str = "logs/training", 
+def create_metrics_recorder(output_dir: str = "outputs", 
                            session_id: Optional[str] = None,
                            backbone: Optional[str] = None,
                            data_name: Optional[str] = None,

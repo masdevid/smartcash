@@ -79,7 +79,8 @@ class YOLOv5MapCalculator:
         iou_thres: float = 0.5, 
         debug: bool = True,
         training_context: dict = None,
-        use_progressive_thresholds: bool = True
+        use_progressive_thresholds: bool = True,
+        use_standard_map: bool = False
     ):
         """
         Initialize YOLOv5 mAP calculator with modular architecture.
@@ -91,11 +92,13 @@ class YOLOv5MapCalculator:
             debug: Enable hierarchical debug logging
             training_context: Training context information (backbone, phase, etc.)
             use_progressive_thresholds: Enable progressive threshold scheduling based on epoch
+            use_standard_map: Enable standard (non-hierarchical) mAP calculation for all classes
         """
         self.num_classes = num_classes
         self.base_conf_thres = conf_thres  # Store base threshold
         self.base_iou_thres = iou_thres    # Store base threshold
         self.use_progressive_thresholds = use_progressive_thresholds
+        self.use_standard_map = use_standard_map  # TASK.md: Enable standard mAP calculation for all classes
         self.conf_thres = conf_thres
         self.iou_thres = iou_thres
         self.debug = debug
@@ -193,7 +196,8 @@ class YOLOv5MapCalculator:
         self.hierarchical_processor = HierarchicalProcessor(
             device=self.device, 
             debug=self.debug,
-            training_context=self.training_context
+            training_context=self.training_context,
+            use_standard_map=self.use_standard_map  # TASK.md: Pass standard mAP flag
         )
         
         # Memory-optimized processor for platform-aware operations
@@ -496,7 +500,8 @@ def create_yolov5_map_calculator(
     iou_thres: float = 0.5, 
     debug: bool = False,
     training_context: dict = None,
-    use_progressive_thresholds: bool = True
+    use_progressive_thresholds: bool = True,
+    use_standard_map: bool = False
 ) -> YOLOv5MapCalculator:
     """
     Factory function to create YOLOv5 mAP calculator with modular architecture.
@@ -508,13 +513,14 @@ def create_yolov5_map_calculator(
         debug: Enable hierarchical debug logging
         training_context: Training context information (backbone, phase, etc.)
         use_progressive_thresholds: Enable progressive threshold scheduling based on epoch
+        use_standard_map: Enable standard (non-hierarchical) mAP calculation for all classes
         
     Returns:
         YOLOv5MapCalculator instance with SRP-compliant architecture
         
     Time Complexity: O(1) - simple object creation
     """
-    return YOLOv5MapCalculator(num_classes, conf_thres, iou_thres, debug, training_context, use_progressive_thresholds)
+    return YOLOv5MapCalculator(num_classes, conf_thres, iou_thres, debug, training_context, use_progressive_thresholds, use_standard_map)
 
 
 # Re-export all public symbols to maintain API compatibility

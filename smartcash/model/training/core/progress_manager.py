@@ -228,14 +228,20 @@ class ProgressManager:
         """Complete epoch tracking due to early stopping."""
         self.progress_tracker.complete_epoch_early_stopping(epoch, message)
     
-    def handle_scheduler_step(self, scheduler, final_metrics: dict):
+    def handle_scheduler_step(self, scheduler, final_metrics: dict, optimizer=None):
         """
-        Handle learning rate scheduler step.
+        Handle learning rate scheduler step and capture current learning rate.
         
         Args:
             scheduler: Learning rate scheduler
             final_metrics: Final metrics dictionary
+            optimizer: Optimizer to get learning rate from
+            
+        Returns:
+            Current learning rate (float) or None if not available
         """
+        current_lr = None
+        
         if scheduler:
             if hasattr(scheduler, 'step'):
                 if 'ReduceLROnPlateau' in str(type(scheduler)):
@@ -243,6 +249,23 @@ class ProgressManager:
                     scheduler.step(monitor_metric)
                 else:
                     scheduler.step()
+            
+            # Capture current learning rate after scheduler step
+            if optimizer:
+                try:
+                    # Get learning rate from first parameter group
+                    current_lr = optimizer.param_groups[0]['lr']
+                except (IndexError, KeyError):
+                    current_lr = 0.0
+            elif hasattr(scheduler, 'get_last_lr'):
+                try:
+                    # Try to get from scheduler
+                    last_lrs = scheduler.get_last_lr()
+                    current_lr = last_lrs[0] if last_lrs else 0.0
+                except:
+                    current_lr = 0.0
+        
+        return current_lr
     
     def handle_early_stopping(self, early_stopping, final_metrics: dict, epoch: int, phase_num: int) -> bool:
         """
@@ -271,8 +294,32 @@ class ProgressManager:
             # Pass all metrics to phase-specific early stopping
             should_stop = early_stopping(final_metrics, None, epoch)
             
+            # Show early stopping status for visibility (even when not stopping)
+            if not should_stop:
+                status = early_stopping.get_status_summary()
+                # Show current early stopping status without overwhelming output
+                if hasattr(early_stopping, 'phase1_loss_wait') or hasattr(early_stopping, 'phase2_f1_wait'):
+                    if phase_num == 1:
+                        loss_wait = getattr(early_stopping, 'phase1_loss_wait', 0)
+                        metric_wait = getattr(early_stopping, 'phase1_metric_wait', 0)
+                        loss_patience = early_stopping.phase1_config.get('loss_patience', 8)
+                        metric_patience = early_stopping.phase1_config.get('metric_patience', 6)
+                        if loss_wait > 0 or metric_wait > 0:
+                            print(f"⏳ Early stopping: Phase 1 - Loss ({loss_wait}/{loss_patience}), Metric ({metric_wait}/{metric_patience})")
+                    elif phase_num == 2:
+                        f1_wait = getattr(early_stopping, 'phase2_f1_wait', 0)
+                        map_wait = getattr(early_stopping, 'phase2_map_wait', 0)
+                        f1_patience = early_stopping.phase2_config.get('f1_patience', 10)
+                        map_patience = early_stopping.phase2_config.get('map_patience', 10)
+                        if f1_wait > 0 or map_wait > 0:
+                            print(f"⏳ Early stopping: Phase 2 - F1 ({f1_wait}/{f1_patience}), mAP ({map_wait}/{map_patience})")
+            
             if should_stop:
                 status = early_stopping.get_status_summary()
+                # Use print for immediate console feedback (visible to user)
+                print(f"🛑 Phase-specific early stopping triggered at epoch {epoch + 1}")
+                print(f"   Reason: {status['stop_reason']}")
+                # Also log for debugging
                 logger.info(f"🛑 Phase-specific early stopping triggered at epoch {epoch + 1}")
                 logger.info(f"   Reason: {status['stop_reason']}")
                 
@@ -294,7 +341,16 @@ class ProgressManager:
             monitor_metric = final_metrics.get('val_accuracy', 0)
             should_stop = early_stopping(monitor_metric, None, epoch)  # Don't pass model for saving
             
+            # Show legacy early stopping status for visibility (even when not stopping)
+            if not should_stop and hasattr(early_stopping, 'wait') and early_stopping.wait > 0:
+                print(f"⏳ Early stopping: {early_stopping.metric} ({early_stopping.wait}/{early_stopping.patience}) - Best: {early_stopping.best_score:.6f}")
+            
             if should_stop:
+                # Use print for immediate console feedback (visible to user)
+                print(f"🛑 Legacy early stopping triggered at epoch {epoch + 1}")
+                print(f"   Monitoring val_accuracy: no improvement for {early_stopping.patience} epochs")
+                print(f"   Best val_accuracy: {early_stopping.best_score:.6f} at epoch {early_stopping.best_epoch + 1}")
+                # Also log for debugging
                 logger.info(f"🛑 Legacy early stopping triggered at epoch {epoch + 1}")
                 logger.info(f"   Monitoring val_accuracy: no improvement for {early_stopping.patience} epochs")
                 logger.info(f"   Best val_accuracy: {early_stopping.best_score:.6f} at epoch {early_stopping.best_epoch + 1}")

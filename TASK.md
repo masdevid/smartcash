@@ -20,8 +20,50 @@ Updated 04 August 2025, 03:10:
   - Labels as .txt files
 
 # CURRENT ISSUES:
-- None currently identified - all major issues resolved
+- Phase specific early stopping doesn't work, it shows no feedbacks
+- Metrics history issues:
+  - Learning Rate each epoch not recorded
+  - Phase 2 missing object loss, box loss, cls loss, and total loss
+-  UI Metrics Callback display and order:
+  - train_loss (no need metric color/indicator)
+  - val_loss (no need metric color/indicator)
+  - val_accuracy
+  - val_precision
+  - val_recall
+  - val_f1
+  - val_map50
+  - layer_*_accuracy
+  - layer_*_precision
+  - layer_*_recall
+  - layer_*_f1
+  - val_layer_*_box_loss (no need metric color/indicator)
+  - val_layer_*_obj_loss (no need metric color/indicator)
+  - val_layer_*_cls_loss (no need metric color/indicator)
 
+- Charts should use metrics history from phase 2, fallback to phase 1. Give a small note to the chart if using phase 1 metrics history.
+- Confidence modulator:
+  - Layer 3 inexsistence shouldn't penalize layer 1 and layer 2. It just decrease confidence score by small number.
+  - Layer 1 and 2 is equal confidence score (OR logic). If both exist, it boost confidence score by small number.
+- Spatial calculation:
+  - Layer 2 and 3 doesn't have to inside Layer 1, because in rotated image, small portion of layer 2 and layer 3 class be outside of layer 1 box (intersection)
+- MAP Calculation:
+  - Use standard map calculation (without hierarchical) on all classes, in which on phase 2 it uses all 17 classes and on phase 1 it uses layer_1 classes only
+- Loss calculation in multi layer:
+  - Apply Uncertainty-Weighted Multi-Task Learning (UW-MTL)
+  - Implement each layer loss in a ModuleDict (you already do this)
+  - Make σ parameters learnable using torch.nn.Parameter
+  - Use log trick to prevent NaN (like in original UW-MTL paper)
+```python
+loss_total = (
+    (1/sigma1**2) * (box_loss1 + obj_loss1 + cls_loss1) + log(sigma1) +
+    (1/sigma2**2) * (box_loss2 + obj_loss2 + cls_loss2) + log(sigma2) +
+    (1/sigma3**2) * (box_loss3 + obj_loss3 + cls_loss3) + log(sigma3)
+)
+
+box_loss1 = total bounding box loss for all classes predicted by Layer 1
+obj_loss1 = total objectness loss for all predictions from Layer 1
+cls_loss1 = total classification loss for all predictions in Layer 1 (across all its classes)
+```
 # RESOLVED ISSUES:
 - [✅] **high priority** Scenario augmentation system producing identical results - Fixed critical bug where both position_variation and lighting_variation scenarios used the same copied test files without augmentation. Implemented built-in PIL-based augmentation with position transforms (rotation, scaling, flipping) and lighting transforms (brightness, contrast, gamma). Now shows different results: position_variation achieves 21.9% mAP (harder due to geometric changes) vs lighting_variation 30.7% mAP (similar to original), properly testing model robustness (08/04/2025)
 - [✅] **high priority** Denomination classification metrics data leakage - Fixed critical bug where perfect 100% accuracy was caused by excluding missed detections from metrics calculation. Now includes all 761 ground truth samples showing true performance: 0.3% accuracy (2 detected out of 761 samples), 100% precision on detected samples, revealing model's extremely conservative detection behavior (08/04/2025)

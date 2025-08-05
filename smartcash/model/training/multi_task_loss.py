@@ -16,12 +16,17 @@ from smartcash.model.training.utils.tensor_format_converter import convert_for_y
 
 class UncertaintyMultiTaskLoss(nn.Module):
     """
-    Uncertainty-based multi-task loss implementation following Kendall et al.
+    TASK.md: Uncertainty-based multi-task loss implementation with learnable sigma parameters.
     
-    Formula for task i with loss Li and learnable log-variance σi²:
-    Li_weighted = (1 / (2 * σi²)) * Li + log(σi)
+    Formula per TASK.md specification:
+    loss_total = (1/sigma1**2) * (box_loss1 + obj_loss1 + cls_loss1) + log(sigma1) +
+                 (1/sigma2**2) * (box_loss2 + obj_loss2 + cls_loss2) + log(sigma2) +
+                 (1/sigma3**2) * (box_loss3 + obj_loss3 + cls_loss3) + log(sigma3)
     
-    Total loss: Σ [(1 / (2 * σi²)) * Li + log(σi)]
+    Where:
+    - σ parameters are learnable using torch.nn.Parameter
+    - Uses log trick to prevent NaN (store log(σ) instead of σ)
+    - Each layer loss includes: box_loss + obj_loss + cls_loss
     """
     
     def __init__(self, layer_config: Dict[str, Any], loss_config: Dict[str, Any] = None,
@@ -43,10 +48,10 @@ class UncertaintyMultiTaskLoss(nn.Module):
         self.layer_names = list(layer_config.keys())
         self.num_layers = len(self.layer_names)
         
-        # Initialize learnable uncertainty parameters (log variance)
+        # TASK.md: Initialize learnable uncertainty parameters (log sigma, not log variance)
         self.log_vars = nn.ParameterDict()
         for layer_name in self.layer_names:
-            # Initialize with small positive values
+            # Initialize log(σ) = 0.0, so σ = 1.0 initially (TASK.md: Use log trick to prevent NaN)
             self.log_vars[layer_name] = nn.Parameter(torch.tensor(0.0))
         
         # Initialize individual YOLO loss functions for each layer
@@ -201,18 +206,18 @@ class UncertaintyMultiTaskLoss(nn.Module):
             
             for layer_name in self.layer_names:
                 if layer_name in layer_losses:
-                    # Get learnable variance parameter
-                    log_var = self.log_vars[layer_name]
+                    # Get learnable log-sigma parameter (TASK.md: Use log trick to prevent NaN)
+                    log_sigma = self.log_vars[layer_name]
                     
-                    # Clamp variance to reasonable range
-                    variance = torch.exp(log_var).clamp(self.min_variance, self.max_variance)
-                    sigma_squared = variance
+                    # Clamp log_sigma to reasonable range to prevent extreme values
+                    log_sigma_clamped = log_sigma.clamp(-5.0, 5.0)  # sigma between e^-5 and e^5
+                    sigma_squared = torch.exp(2 * log_sigma_clamped)  # σ² = exp(2 * log(σ))
                     
-                    # Uncertainty-weighted loss: (1 / (2 * σ²)) * L + log(σ)
+                    # TASK.md: loss_total = (1/sigma**2) * (box_loss + obj_loss + cls_loss) + log(sigma)
                     layer_loss = layer_losses[layer_name]
-                    precision = 1.0 / (2.0 * sigma_squared)
+                    precision = 1.0 / sigma_squared  # 1/σ²
                     weighted_loss = precision * layer_loss
-                    regularization = 0.5 * log_var  # log(σ) = 0.5 * log(σ²)
+                    regularization = log_sigma_clamped  # log(σ)
                     
                     weighted_losses[layer_name] = weighted_loss
                     regularization_terms[layer_name] = regularization
@@ -243,22 +248,23 @@ class UncertaintyMultiTaskLoss(nn.Module):
         return total_loss, loss_breakdown
     
     def get_uncertainty_weights(self) -> Dict[str, float]:
-        """Get current uncertainty weights for each layer"""
+        """Get current uncertainty weights for each layer (TASK.md: weights = 1/σ²)"""
         weights = {}
         for layer_name in self.layer_names:
-            log_var = self.log_vars[layer_name]
-            variance = torch.exp(log_var).clamp(self.min_variance, self.max_variance)
-            precision = 1.0 / (2.0 * variance)
-            weights[layer_name] = precision.item()
+            log_sigma = self.log_vars[layer_name]
+            log_sigma_clamped = log_sigma.clamp(-5.0, 5.0)
+            sigma_squared = torch.exp(2 * log_sigma_clamped)
+            weights[layer_name] = (1.0 / sigma_squared).item()
         return weights
     
     def get_uncertainty_values(self) -> Dict[str, float]:
-        """Get current uncertainty (variance) values for each layer"""
+        """Get current uncertainty (σ²) values for each layer"""
         uncertainties = {}
         for layer_name in self.layer_names:
-            log_var = self.log_vars[layer_name]
-            variance = torch.exp(log_var).clamp(self.min_variance, self.max_variance)
-            uncertainties[layer_name] = variance.item()
+            log_sigma = self.log_vars[layer_name]
+            log_sigma_clamped = log_sigma.clamp(-5.0, 5.0)
+            sigma_squared = torch.exp(2 * log_sigma_clamped)
+            uncertainties[layer_name] = sigma_squared.item()
         return uncertainties
     
     def update_loss_config(self, new_config: Dict[str, Any]) -> None:

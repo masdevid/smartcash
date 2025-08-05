@@ -245,6 +245,9 @@ class LossCoordinator:
                         metrics[k] = v
                     elif k in ['box_loss', 'obj_loss', 'cls_loss']:
                         metrics[k] = v
+                    elif any(k.endswith(suffix) for suffix in ['_box_loss', '_obj_loss', '_cls_loss', '_total_loss']):
+                        # Include layer-specific loss components (e.g., layer_1_box_loss, layer_2_obj_loss)
+                        metrics[k] = v
             
             # Calculate overall metrics if not provided
             if 'val_map50' not in metrics:

@@ -308,13 +308,31 @@ class UIMetricsCallback:
             print("Available in detailed view")
     
     def _print_metric(self, metric_name: str, value: Any, colored_metrics: Dict[str, Dict]):
-        """Print a single metric with color coding."""
-        if isinstance(value, (int, float)) and metric_name in colored_metrics:
+        """Print a single metric with color coding, respecting TASK.md no-indicator requirements."""
+        # TASK.md specifies these metrics should have no color/indicator
+        no_indicator_metrics = [
+            'train_loss', 'val_loss',  # Core losses
+            # Loss component patterns (will be checked with endswith)
+            '_box_loss', '_obj_loss', '_cls_loss'
+        ]
+        
+        # Check if this metric should have no color indicator
+        should_suppress_color = (
+            metric_name in no_indicator_metrics or
+            any(metric_name.endswith(pattern) for pattern in no_indicator_metrics if pattern.startswith('_'))
+        )
+        
+        if should_suppress_color:
+            # Print without color indicator as per TASK.md
+            print(f"    {metric_name}: {value:.4f}" if isinstance(value, (int, float)) else f"    {metric_name}: {value}")
+        elif isinstance(value, (int, float)) and metric_name in colored_metrics:
+            # Print with color indicator for performance metrics
             color_info = colored_metrics[metric_name]
             status_indicator = color_info['colors'][self.console_scheme.value]
             status_text = color_info['status']
             print(f"    {metric_name}: {status_indicator} {value:.4f} ({status_text})")
         else:
+            # Print plain for other metrics
             print(f"    {metric_name}: {value}")
     
     def _get_phase_appropriate_core_metrics(self, phase: str, metrics: Dict[str, Any]) -> list:
@@ -331,26 +349,23 @@ class UIMetricsCallback:
         # Extract phase number for proper logic
         phase_num = self._extract_phase_number(phase, metrics)
         
-        if phase_num == 1:
-            # Phase 1: Focus on core training metrics including mAP metrics
-            core_metrics = [
-                'train_loss', 'val_loss', 'learning_rate', 'epoch',
-                'val_precision', 'val_recall', 'val_f1', 'val_accuracy', 'val_map50',
-                # Loss breakdown components
-                'train_box_loss', 'train_obj_loss', 'train_cls_loss',
-                'val_box_loss', 'val_obj_loss', 'val_cls_loss'
-            ]
-        else:
-            # Phase 2: Focus on core training metrics
-            core_metrics = [
-                'train_loss', 'val_loss', 'learning_rate', 'epoch',
-                'val_accuracy', 'val_precision', 'val_recall', 'val_f1', 
-                'val_map50', 'val_map50_precision', 'val_map50_recall', 'val_map50_f1', 'val_map50_accuracy',
-                # Loss breakdown components
-                'train_box_loss', 'train_obj_loss', 'train_cls_loss',
-                'val_box_loss', 'val_obj_loss', 'val_cls_loss'
-            ]
-            # No additional metrics needed - keep it clean
+        # Use consistent ordering as specified in TASK.md for both phases
+        core_metrics = [
+            # Core losses (no color/indicator needed as per TASK.md)
+            'train_loss', 'val_loss', 
+            # Core validation metrics (in TASK.md specified order)
+            'val_accuracy', 'val_precision', 'val_recall', 'val_f1', 'val_map50',
+            # Additional context metrics (not in TASK.md but useful)
+            'learning_rate', 'epoch'
+        ]
+        
+        # Phase-specific additions
+        if phase_num == 2:
+            # Phase 2: Add mAP-specific metrics after val_map50
+            extended_metrics = core_metrics[:5]  # train_loss through val_map50
+            extended_metrics.extend(['val_map50_precision', 'val_map50_recall', 'val_map50_f1', 'val_map50_accuracy'])
+            extended_metrics.extend(core_metrics[5:])  # learning_rate, epoch
+            core_metrics = extended_metrics
         
         # Filter to only include metrics that actually exist and handle special cases
         available_metrics = []
@@ -420,32 +435,53 @@ class UIMetricsCallback:
     
     def _filter_layer_metrics(self, metrics: Dict[str, Any], show_layers: list, filter_zeros: bool) -> Dict[str, Any]:
         """
-        Filter layer-specific metrics based on intelligent display rules.
+        Filter and order layer-specific metrics according to TASK.md specification.
         
         Args:
             metrics: All available metrics
             show_layers: Which layers to display (from phase-aware logic)
             filter_zeros: Whether to filter out zero/near-zero values for cleaner output
+            
+        Returns:
+            Ordered dictionary of layer metrics following TASK.md order:
+            - layer_*_accuracy, layer_*_precision, layer_*_recall, layer_*_f1
+            - val_layer_*_box_loss, val_layer_*_obj_loss, val_layer_*_cls_loss
         """
-        layer_metrics = {}
+        # TASK.md specified order for layer metrics
+        layer_metric_types = [
+            'accuracy', 'precision', 'recall', 'f1',  # Performance metrics first
+            'box_loss', 'obj_loss', 'cls_loss'       # Loss components last (no color indicators)
+        ]
         
-        for metric_name, value in metrics.items():
-            # Check if this is a layer metric and if we should show it
-            for layer in show_layers:
-                if (metric_name.startswith(f'{layer}_') or metric_name.startswith(f'val_{layer}_')):
-                    # Apply zero filtering if specified (for cleaner output in single-layer modes)
-                    if filter_zeros:
-                        # Don't filter loss metrics - they can legitimately be zero or small
-                        if 'loss' in metric_name.lower():
-                            layer_metrics[metric_name] = value
-                        elif isinstance(value, (int, float)) and value > 0.0001:  # Show only meaningful values for non-loss metrics
-                            layer_metrics[metric_name] = value
-                    else:
-                        # Show all metrics for this layer (multi-layer modes)
-                        layer_metrics[metric_name] = value
-                    break
+        ordered_layer_metrics = {}
         
-        return layer_metrics
+        # Process each layer in order
+        for layer in show_layers:
+            # Process each metric type in the specified order
+            for metric_type in layer_metric_types:
+                # Check for both layer_X_metric and val_layer_X_metric formats
+                possible_names = [
+                    f'{layer}_{metric_type}',           # e.g., layer_1_accuracy
+                    f'val_{layer}_{metric_type}'        # e.g., val_layer_1_box_loss
+                ]
+                
+                for metric_name in possible_names:
+                    if metric_name in metrics:
+                        value = metrics[metric_name]
+                        
+                        # Apply filtering if requested
+                        should_include = True
+                        if filter_zeros:
+                            # Don't filter loss metrics - they can legitimately be zero or small
+                            if 'loss' in metric_name.lower():
+                                should_include = True
+                            elif isinstance(value, (int, float)) and value <= 0.0001:
+                                should_include = False  # Skip very small performance metrics
+                        
+                        if should_include:
+                            ordered_layer_metrics[metric_name] = value
+        
+        return ordered_layer_metrics
     
     def _get_remaining_metrics(self, metrics: Dict[str, Any], core_metrics: list, 
                              layer_metrics: Dict[str, Any], ap_metrics: Dict[str, Any]) -> Dict[str, Any]:

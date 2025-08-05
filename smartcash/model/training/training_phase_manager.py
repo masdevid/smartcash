@@ -291,8 +291,19 @@ class TrainingPhaseManager:
                     else:
                         logger.debug(f"🔍 Not best model - Phase 2 val_map50 {final_metrics.get('val_map50', 'N/A')} not better than previous")
                 
-                # Handle scheduler and early stopping
-                self.progress_manager.handle_scheduler_step(components['scheduler'], final_metrics)
+                # Handle scheduler and early stopping - capture learning rate
+                current_lr = self.progress_manager.handle_scheduler_step(
+                    components['scheduler'], final_metrics, components['optimizer']
+                )
+                
+                # Store learning rate in orchestrator and final_metrics for recording
+                if current_lr is not None:
+                    if hasattr(self, 'orchestrator'):
+                        self.orchestrator._last_lr = current_lr
+                    
+                    # Add learning rate to final metrics for immediate recording
+                    final_metrics['learning_rate'] = current_lr
+                    logger.debug(f"📈 Captured learning rate: {current_lr:.2e}")
                 
                 should_stop = self.progress_manager.handle_early_stopping(
                     components['early_stopping'], final_metrics, epoch, phase_num

@@ -135,7 +135,7 @@ class PhaseOrchestrator:
                 logger.debug(f"Config object - resume: {resume_value}, resume_checkpoint: {resume_checkpoint_value}, final resume_mode: {resume_mode}")
             
             metrics_recorder = create_metrics_recorder(
-                output_dir="logs/training",
+                output_dir="outputs",
                 backbone=backbone,
                 data_name=data_name, 
                 phase_num=phase_num,

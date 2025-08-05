@@ -53,18 +53,17 @@ class ValidationExecutor:
         raw_num_classes = model_config.get('num_classes', 7)
         current_phase = getattr(model, 'current_phase', None) or 1
         
-        # Extract phase-appropriate num_classes
+        # TASK.md: Extract phase-appropriate num_classes for standard mAP calculation
         if isinstance(raw_num_classes, dict):
             # Multi-layer format: {'layer_1': 7, 'layer_2': 7, 'layer_3': 3}
             if current_phase == 1:
-                # Phase 1: Only layer_1 (single layer training)
+                # Phase 1: Only layer_1 classes (classes 0-6) for standard mAP
                 num_classes = raw_num_classes.get('layer_1', 7)
                 layer_info = f"layer_1: {num_classes}"
             else:
-                # Phase 2: All layers (calculate total classes)
-                total_classes = sum(raw_num_classes.values())
-                num_classes = total_classes
-                layer_info = str(raw_num_classes)
+                # Phase 2: All 17 classes (0-16) for standard mAP calculation
+                num_classes = 17  # TASK.md: Fixed total classes for SmartCash (Layer 1: 0-6, Layer 2: 7-13, Layer 3: 14-16)
+                layer_info = f"all_classes: {num_classes} (standard mAP)"
         else:
             # Single-value format: just use the value
             num_classes = raw_num_classes
@@ -83,12 +82,18 @@ class ValidationExecutor:
             'detection_layers': config.get('model', {}).get('detection_layers', 'N/A')
         }
         
+        # TASK.md: Use standard mAP calculation for both phases
+        # Phase 1: Use layer_1 classes only (classes 0-6) with standard mAP
+        # Phase 2: Use all 17 classes (0-16) with standard mAP calculation
+        use_standard_map = True  # Enable standard mAP for both Phase 1 and Phase 2
+        
         self.map_calculator = create_yolov5_map_calculator(
             num_classes=num_classes,
             conf_thres=0.01,  # Very low threshold for early training with new anchors
             iou_thres=0.5,   # AGGRESSIVE: Very low threshold for scale learning phase
             debug=debug_map,
-            training_context=training_context
+            training_context=training_context,
+            use_standard_map=use_standard_map  # TASK.md: Enable standard mAP for Phase 2
         )
         
         
@@ -100,7 +105,11 @@ class ValidationExecutor:
         
         logger.info(f"Validation metrics configuration:")
         logger.info(f"  • YOLOv5 mAP calculator: {layer_info} classes")
-        logger.info(f"  • Using hierarchical validation (YOLOv5 + per-layer metrics)")
+        logger.info(f"  • mAP calculation mode: {'Standard (non-hierarchical)' if use_standard_map else 'Hierarchical'}")
+        if use_standard_map:
+            logger.info(f"  • TASK.md: Phase 2 using standard mAP for all 17 classes")
+        else:
+            logger.info(f"  • Using hierarchical validation (YOLOv5 + per-layer metrics)")
         
         if not self.map_calculator.yolov5_available:
             logger.warning("YOLOv5 not available - using fallback metrics")

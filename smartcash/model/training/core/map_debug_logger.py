@@ -300,6 +300,36 @@ class MapDebugLogger:
         else:
             return np.array(tensor)
     
+    def _xyxy_to_xywh(self, boxes: torch.Tensor) -> torch.Tensor:
+        """
+        Convert boxes from [x1, y1, x2, y2] to [x_center, y_center, width, height] format.
+        
+        TASK.md: Coordinate format consistency - convert back to xywh for readable display
+        in debug logs, matching the conversion logic used in confidence_modulator.py.
+        
+        Args:
+            boxes: Tensor of shape [4] in xyxy format
+            
+        Returns:
+            Tensor of shape [4] in xywh format
+        """
+        if boxes.dim() == 1:
+            # Single box case
+            xywh = boxes.clone()
+            xywh[0] = (boxes[0] + boxes[2]) / 2  # x_center = (x1 + x2) / 2
+            xywh[1] = (boxes[1] + boxes[3]) / 2  # y_center = (y1 + y2) / 2
+            xywh[2] = boxes[2] - boxes[0]        # width = x2 - x1
+            xywh[3] = boxes[3] - boxes[1]        # height = y2 - y1
+            return xywh
+        else:
+            # Batch case
+            xywh = boxes.clone()
+            xywh[:, 0] = (boxes[:, 0] + boxes[:, 2]) / 2  # x_center = (x1 + x2) / 2
+            xywh[:, 1] = (boxes[:, 1] + boxes[:, 3]) / 2  # y_center = (y1 + y2) / 2
+            xywh[:, 2] = boxes[:, 2] - boxes[:, 0]        # width = x2 - x1
+            xywh[:, 3] = boxes[:, 3] - boxes[:, 1]        # height = y2 - y1
+            return xywh
+    
     def _log_overall_statistics(self, tp_np: np.ndarray, conf_np: np.ndarray, 
                               pred_cls_np: np.ndarray, target_cls_np: np.ndarray) -> None:
         """
@@ -638,9 +668,12 @@ class MapDebugLogger:
         """
         Log detailed coordinate format analysis for debugging bbox alignment issues.
         
+        TASK.md: Coordinate format consistency - analyze coordinate formats to detect 
+        xywh vs xyxy mismatches that can cause zero IoU values.
+        
         Args:
-            predictions: Prediction tensor
-            targets: Target tensor
+            predictions: Prediction tensor (format depends on source)
+            targets: Target tensor (format depends on source)
         """
         try:
             self.write_debug_log(f"\n🔍 COORDINATE FORMAT ANALYSIS")
@@ -648,25 +681,26 @@ class MapDebugLogger:
             
             if predictions.numel() > 0 and targets.numel() > 0:
                 # Analyze prediction coordinate ranges
-                pred_coords = predictions[:, :, :4]  # x, y, w, h
+                pred_coords = predictions[:, :, :4]  # First 4 coordinates
                 pred_ranges = {
-                    'x': (pred_coords[:, :, 0].min().item(), pred_coords[:, :, 0].max().item()),
-                    'y': (pred_coords[:, :, 1].min().item(), pred_coords[:, :, 1].max().item()),
-                    'w': (pred_coords[:, :, 2].min().item(), pred_coords[:, :, 2].max().item()),
-                    'h': (pred_coords[:, :, 3].min().item(), pred_coords[:, :, 3].max().item())
+                    'coord_0': (pred_coords[:, :, 0].min().item(), pred_coords[:, :, 0].max().item()),
+                    'coord_1': (pred_coords[:, :, 1].min().item(), pred_coords[:, :, 1].max().item()),
+                    'coord_2': (pred_coords[:, :, 2].min().item(), pred_coords[:, :, 2].max().item()),
+                    'coord_3': (pred_coords[:, :, 3].min().item(), pred_coords[:, :, 3].max().item())
                 }
                 
                 # Analyze target coordinate ranges
-                target_coords = targets[:, 2:6]  # x, y, w, h (skip batch_idx, class)
+                target_coords = targets[:, 2:6]  # Skip batch_idx, class
                 target_ranges = {
-                    'x': (target_coords[:, 0].min().item(), target_coords[:, 0].max().item()),
-                    'y': (target_coords[:, 1].min().item(), target_coords[:, 1].max().item()),
-                    'w': (target_coords[:, 2].min().item(), target_coords[:, 2].max().item()),
-                    'h': (target_coords[:, 3].min().item(), target_coords[:, 3].max().item())
+                    'coord_0': (target_coords[:, 0].min().item(), target_coords[:, 0].max().item()),
+                    'coord_1': (target_coords[:, 1].min().item(), target_coords[:, 1].max().item()),
+                    'coord_2': (target_coords[:, 2].min().item(), target_coords[:, 2].max().item()),
+                    'coord_3': (target_coords[:, 3].min().item(), target_coords[:, 3].max().item())
                 }
                 
                 self.write_debug_log(f"📊 COORDINATE RANGES:")
-                for coord in ['x', 'y', 'w', 'h']:
+                coord_names = ['coord_0', 'coord_1', 'coord_2', 'coord_3']
+                for coord in coord_names:
                     pred_min, pred_max = pred_ranges[coord]
                     tgt_min, tgt_max = target_ranges[coord]
                     self.write_debug_log(f"   {coord.upper()}: Pred[{pred_min:.4f}, {pred_max:.4f}] vs Target[{tgt_min:.4f}, {tgt_max:.4f}]")
@@ -675,17 +709,30 @@ class MapDebugLogger:
                 pred_normalized = all(v[1] <= 1.0 for v in pred_ranges.values())
                 target_normalized = all(v[1] <= 1.0 for v in target_ranges.values())
                 
-                self.write_debug_log(f"\n🔍 NORMALIZATION STATUS:")
+                # TASK.md: Detect coordinate format (xywh vs xyxy) based on value ranges
+                # In xywh: coord_2 and coord_3 are width/height (typically small, <= 1.0 for normalized)
+                # In xyxy: coord_2 and coord_3 are x2/y2 (typically similar to coord_0/coord_1)
+                pred_format = self._detect_coordinate_format(pred_ranges)
+                target_format = self._detect_coordinate_format(target_ranges)
+                
+                self.write_debug_log(f"\n🔍 COORDINATE FORMAT DETECTION:")
+                self.write_debug_log(f"   • Predictions format: {pred_format}")
+                self.write_debug_log(f"   • Targets format: {target_format}")
                 self.write_debug_log(f"   • Predictions normalized (0-1): {pred_normalized}")
                 self.write_debug_log(f"   • Targets normalized (0-1): {target_normalized}")
                 
-                if pred_normalized != target_normalized:
-                    self.write_debug_log(f"   ❌ COORDINATE MISMATCH DETECTED!")
+                if pred_format != target_format:
+                    self.write_debug_log(f"   ❌ COORDINATE FORMAT MISMATCH DETECTED!")
+                    self.write_debug_log(f"      This WILL cause zero IoU values!")
+                    self.write_debug_log(f"      Predictions: {pred_format}, Targets: {target_format}")
+                    self.write_debug_log(f"      Fix: Ensure both use same format before IoU computation")
+                elif pred_normalized != target_normalized:
+                    self.write_debug_log(f"   ❌ COORDINATE SCALE MISMATCH DETECTED!")
                     self.write_debug_log(f"      This is likely the cause of zero IoU/TP!")
                     self.write_debug_log(f"      Predictions: {'normalized' if pred_normalized else 'pixel coordinates'}")
                     self.write_debug_log(f"      Targets: {'normalized' if target_normalized else 'pixel coordinates'}")
                 else:
-                    self.write_debug_log(f"   ✅ Coordinate systems match")
+                    self.write_debug_log(f"   ✅ Coordinate formats and scales match ({pred_format})")
                 
                 # Sample coordinate analysis
                 self.write_debug_log(f"\n🔍 SAMPLE COORDINATES:")
@@ -693,11 +740,11 @@ class MapDebugLogger:
                 for i in range(sample_size):
                     if i < predictions.shape[1]:
                         pred_box = predictions[0, i, :4]
-                        self.write_debug_log(f"   Pred {i}: [{pred_box[0]:.4f}, {pred_box[1]:.4f}, {pred_box[2]:.4f}, {pred_box[3]:.4f}]")
+                        self.write_debug_log(f"   Pred {i} ({pred_format}): [{pred_box[0]:.4f}, {pred_box[1]:.4f}, {pred_box[2]:.4f}, {pred_box[3]:.4f}]")
                     
                     if i < targets.shape[0]:
                         tgt_box = targets[i, 2:6]
-                        self.write_debug_log(f"   Target {i}: [{tgt_box[0]:.4f}, {tgt_box[1]:.4f}, {tgt_box[2]:.4f}, {tgt_box[3]:.4f}]")
+                        self.write_debug_log(f"   Target {i} ({target_format}): [{tgt_box[0]:.4f}, {tgt_box[1]:.4f}, {tgt_box[2]:.4f}, {tgt_box[3]:.4f}]")
                 
             else:
                 self.write_debug_log(f"❌ Cannot analyze coordinates: empty tensors")
@@ -705,14 +752,57 @@ class MapDebugLogger:
         except Exception as e:
             self.write_debug_log(f"❌ Error in coordinate analysis: {e}")
     
+    def _detect_coordinate_format(self, coord_ranges: dict) -> str:
+        """
+        Detect coordinate format based on value ranges.
+        
+        TASK.md: Coordinate format consistency - detect xywh vs xyxy format
+        based on coordinate value patterns.
+        
+        Args:
+            coord_ranges: Dictionary with coordinate ranges
+            
+        Returns:
+            'xywh', 'xyxy', or 'unknown'
+        """
+        try:
+            coord_2_min, coord_2_max = coord_ranges['coord_2']
+            coord_3_min, coord_3_max = coord_ranges['coord_3']
+            coord_0_min, coord_0_max = coord_ranges['coord_0']
+            coord_1_min, coord_1_max = coord_ranges['coord_1']
+            
+            # In xywh format: coord_2 and coord_3 are width/height (typically small, positive)
+            # In xyxy format: coord_2 and coord_3 are x2/y2 (typically similar range to x1/y1)
+            
+            # Check if coord_2/coord_3 look like width/height (small positive values)
+            width_height_like = (coord_2_min >= 0 and coord_2_max <= 1.0 and 
+                               coord_3_min >= 0 and coord_3_max <= 1.0)
+            
+            # Check if coord_2/coord_3 have similar ranges to coord_0/coord_1 (x2/y2 like x1/y1)
+            x2_y2_like = (abs(coord_2_max - coord_0_max) < 0.5 and 
+                         abs(coord_3_max - coord_1_max) < 0.5)
+            
+            if width_height_like and not x2_y2_like:
+                return 'xywh'
+            elif x2_y2_like and not width_height_like:
+                return 'xyxy'
+            else:
+                return 'unknown'
+                
+        except Exception:
+            return 'unknown'
+    
     def log_iou_distribution_analysis(self, iou_matrix: torch.Tensor, predictions: torch.Tensor, targets: torch.Tensor):
         """
         Log detailed IoU distribution analysis for debugging matching issues.
         
+        TASK.md: Coordinate format consistency - assumes predictions and targets are in xyxy format
+        (as converted by YOLOv5 IoU functions) for consistent coordinate system handling.
+        
         Args:
             iou_matrix: IoU matrix between predictions and targets
-            predictions: Prediction tensor  
-            targets: Target tensor
+            predictions: Prediction tensor in xyxy format (already converted from xywh)
+            targets: Target tensor in xyxy format (already converted from xywh)
         """
         try:
             self.write_debug_log(f"\n🔍 IoU DISTRIBUTION ANALYSIS")
@@ -742,7 +832,7 @@ class MapDebugLogger:
                     percentage = (count / len(max_ious)) * 100
                     self.write_debug_log(f"   • IoU > {thresh}: {count}/{len(max_ious)} ({percentage:.1f}%)")
                 
-                # Show best matches
+                # Show best matches with coordinate format awareness
                 if len(valid_ious) > 0:
                     top_k = min(5, len(max_ious))
                     top_ious, top_indices = torch.topk(max_ious, top_k)
@@ -752,11 +842,19 @@ class MapDebugLogger:
                         self.write_debug_log(f"   • Match {i+1}: IoU={iou_val:.4f}, pred_idx={pred_idx.item()}, target_idx={target_idx}")
                         
                         # Show coordinate details for top matches
+                        # TASK.md: Handle coordinate format consistency - convert xyxy back to xywh for readable display
                         if iou_val > 0 and pred_idx < predictions.shape[1] and target_idx < targets.shape[0]:
-                            pred_box = predictions[0, pred_idx, :4]
-                            target_box = targets[target_idx, 2:6]
-                            self.write_debug_log(f"     Pred box:   [{pred_box[0]:.4f}, {pred_box[1]:.4f}, {pred_box[2]:.4f}, {pred_box[3]:.4f}]")
-                            self.write_debug_log(f"     Target box: [{target_box[0]:.4f}, {target_box[1]:.4f}, {target_box[2]:.4f}, {target_box[3]:.4f}]")
+                            pred_box_xyxy = predictions[0, pred_idx, :4]
+                            target_box_xyxy = targets[target_idx, 2:6]
+                            
+                            # Convert xyxy to xywh for more readable center/size display
+                            pred_box_xywh = self._xyxy_to_xywh(pred_box_xyxy)
+                            target_box_xywh = self._xyxy_to_xywh(target_box_xyxy)
+                            
+                            self.write_debug_log(f"     Pred box (xyxy):  [{pred_box_xyxy[0]:.4f}, {pred_box_xyxy[1]:.4f}, {pred_box_xyxy[2]:.4f}, {pred_box_xyxy[3]:.4f}]")
+                            self.write_debug_log(f"     Pred box (xywh):  [{pred_box_xywh[0]:.4f}, {pred_box_xywh[1]:.4f}, {pred_box_xywh[2]:.4f}, {pred_box_xywh[3]:.4f}]")
+                            self.write_debug_log(f"     Target box (xyxy): [{target_box_xyxy[0]:.4f}, {target_box_xyxy[1]:.4f}, {target_box_xyxy[2]:.4f}, {target_box_xyxy[3]:.4f}]")
+                            self.write_debug_log(f"     Target box (xywh): [{target_box_xywh[0]:.4f}, {target_box_xywh[1]:.4f}, {target_box_xywh[2]:.4f}, {target_box_xywh[3]:.4f}]")
                 
             else:
                 self.write_debug_log(f"❌ Cannot analyze IoU: invalid matrix")

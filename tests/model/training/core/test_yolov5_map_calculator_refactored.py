@@ -30,7 +30,7 @@ from smartcash.model.training.core.memory_optimized_processor import (
     ProcessingConfig
 )
 from smartcash.model.training.core.batch_processor import BatchProcessor
-from smartcash.model.training.core.yolov5_map_calculator_refactored import (
+from smartcash.model.training.core.yolov5_map_calculator import (
     YOLOv5MapCalculator,
     create_yolov5_map_calculator
 )
@@ -253,11 +253,11 @@ class TestBatchProcessor:
     def test_processor_initialization(self):
         """Test processor initializes correctly."""
         processor = BatchProcessor(
-            conf_threshold=0.1,
+            conf_threshold=0.01,
             iou_threshold=0.5,
             debug=True
         )
-        assert processor.conf_threshold == 0.1
+        assert processor.conf_threshold == 0.01
         assert processor.iou_threshold == 0.5
         assert processor.debug
     
@@ -447,7 +447,7 @@ class TestBackwardCompatibility:
         """Test class is accessible from both locations."""
         # Should be able to import from both locations
         from smartcash.model.training.core.yolov5_map_calculator import YOLOv5MapCalculator as Legacy
-        from smartcash.model.training.core.yolov5_map_calculator_refactored import YOLOv5MapCalculator as Refactored
+        from smartcash.model.training.core.yolov5_map_calculator import YOLOv5MapCalculator as Refactored
         
         # Both should be the same class
         assert Legacy is Refactored

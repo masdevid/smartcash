@@ -134,7 +134,7 @@ class ValidationMapProcessor:
                 # Filter out predictions with low confidence
                 if num_features >= 5:  # Has confidence score
                     conf_scores = layer_1_preds[:, :, 4]  # Objectness/confidence at index 4
-                    conf_threshold = 0.005  # Extra low threshold for early training with new anchors
+                    conf_threshold = 0.01  # Extra low threshold for early training with new anchors
                     
                     # Keep detections above threshold per batch
                     valid_detections = []

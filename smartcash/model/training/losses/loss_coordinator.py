@@ -65,8 +65,14 @@ class LossCoordinator:
         # Check if we should use uncertainty-based multi-task loss
         loss_type = self.config.get('training', {}).get('loss', {}).get('type', 'uncertainty_multi_task')
         
-        # Use multi-task loss for ALL phases with dynamic weighting
-        should_use_multitask = (loss_type == 'uncertainty_multi_task' and self._is_multilayer_mode())
+        # Phase-specific loss selection as per TASK.md:
+        # Phase 1: Use default YOLOv5 loss for stable single-layer training
+        # Phase 2: Use uncertainty-weighted multi-task loss for multi-layer optimization
+        should_use_multitask = (
+            loss_type == 'uncertainty_multi_task' and 
+            self._is_multilayer_mode() and 
+            self.current_phase == 2  # Only use multi-task loss in Phase 2
+        )
         
         if should_use_multitask:
             # Use MODEL_ARC.md compliant uncertainty-based multi-task loss with phase-specific configuration
@@ -78,7 +84,7 @@ class LossCoordinator:
                 layer_config = {
                     'layer_1': {'description': 'Full banknote detection', 'num_classes': 7}
                 }
-                self.logger.debug(f"Phase {self.current_phase}: Using uncertainty multi-task loss (1 layer)")
+                self.logger.info(f"🔧 Phase {self.current_phase}: This shouldn't happen - multi-task loss only for Phase 2")
             else:
                 # Phase 2: All layers active with uncertainty-based weighting
                 layer_config = {
@@ -86,7 +92,7 @@ class LossCoordinator:
                     'layer_2': {'description': 'Denomination-specific features', 'num_classes': 7}, 
                     'layer_3': {'description': 'Common features', 'num_classes': 3}
                 }
-                self.logger.debug(f"Phase {self.current_phase}: Using uncertainty multi-task loss (3 layers)")
+                self.logger.info(f"🔧 Phase {self.current_phase}: Using uncertainty multi-task loss (3 layers)")
             
             loss_config = {
                 'box_weight': self.box_weight,
@@ -109,7 +115,10 @@ class LossCoordinator:
             # Use individual YOLO losses for backward compatibility
             self.use_multi_task_loss = False
             self._setup_individual_losses()
-            self.logger.debug(f"Phase {self.current_phase}: Using individual YOLO losses (fallback)")
+            if self.current_phase == 1:
+                self.logger.info(f"🔧 Phase {self.current_phase}: Using default YOLOv5 loss (as per TASK.md)")
+            else:
+                self.logger.info(f"🔧 Phase {self.current_phase}: Using individual YOLO losses (fallback)")
     
     def _setup_individual_losses(self) -> None:
         """Setup individual YOLO loss functions for each layer"""

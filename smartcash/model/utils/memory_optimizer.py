@@ -200,7 +200,6 @@ class MemoryOptimizer:
     
     def emergency_memory_cleanup(self) -> None:
         """Emergency memory cleanup for out-of-memory situations."""
-        logger.warning("🚨 Emergency memory cleanup initiated...")
         
         # Multiple garbage collection passes
         for _ in range(5):

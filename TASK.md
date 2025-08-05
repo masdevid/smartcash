@@ -20,6 +20,7 @@ Updated 04 August 2025, 03:10:
   - Labels as .txt files
 
 # CURRENT ISSUES:
+- None currently identified - all major issues resolved
 
 # RESOLVED ISSUES:
 - [✅] **high priority** Scenario augmentation system producing identical results - Fixed critical bug where both position_variation and lighting_variation scenarios used the same copied test files without augmentation. Implemented built-in PIL-based augmentation with position transforms (rotation, scaling, flipping) and lighting transforms (brightness, contrast, gamma). Now shows different results: position_variation achieves 21.9% mAP (harder due to geometric changes) vs lighting_variation 30.7% mAP (similar to original), properly testing model robustness (08/04/2025)
@@ -55,3 +56,8 @@ Updated 04 August 2025, 03:10:
 - [✅] Model history reset when starting fresh training - Fixed MetricsHistoryRecorder to properly clear existing history files when resume_mode=False. Fresh training now removes existing metrics, phase summary, and latest files (08/03/2025)
 - [✅] Model history epoch handling for resume mode - Fixed duplicate epoch handling by treating (phase, epoch) as composite primary key. Resume mode now updates existing epoch records instead of appending duplicates (08/03/2025) 
 - [✅] **high priority** Efficient metrics discrepancy in Phase 1 - Fixed discrepancy between val_accuracy and layer_1_accuracy in Phase 1 by ensuring proper metric standardization in research_metrics.py (08/04/2025)
+- [✅] **high priority** Metrics history using wrong reference causing val_* vs layer_1_* discrepancy - Fixed critical bug where training-based layer metrics were overriding validation-based layer metrics in Phase 1. Eliminated computation of training layer metrics in Phase 1 since validation already provides correct layer metrics, ensuring val_accuracy exactly matches layer_1_accuracy (08/05/2025)
+- [✅] **medium priority** Streamline validation_metrics and remove research_metrics.py - Successfully removed research_metrics.py and moved metric standardization logic directly into validation_metrics_computer.py. Simplified best model criteria to use val_accuracy as primary metric, eliminating redundant abstraction layer (08/05/2025)
+- [✅] **medium priority** Implement progressive confidence and IoU thresholds during training - Added epoch-aware progressive threshold scheduling to YOLOv5MapCalculator: epochs 0-4 (conf=0.01, iou=0.1), 5-9 (0.03, 0.3), 10-19 (0.05, 0.5), 20+ (0.1, 0.5). Reduces false positives in early training while maintaining strict evaluation in later epochs (08/05/2025)
+- [✅] **low priority** Use default YOLOv5 Loss for phase 1, then multi-task for phase 2 - Updated LossCoordinator to use phase-specific loss selection: Phase 1 uses standard YOLOv5 loss for stable single-layer training, Phase 2 uses uncertainty-weighted multi-task loss for multi-layer optimization. Includes dynamic phase switching capability (08/05/2025)
+- [✅] **low priority** Consolidate yolov5_map_calculator_refactored.py into main yolov5_map_calculator.py - Successfully merged all refactored functionality including progressive thresholds, comprehensive debug logging, platform-aware optimization, and modular architecture into the main file. Removed redundant refactored file and updated all import references across the codebase. Core functionality validated and working (08/05/2025)

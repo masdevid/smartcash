@@ -36,8 +36,7 @@ class ValidationMetricsComputer:
         # Both YOLOv5 hierarchical metrics and per-layer metrics are always used
     
     def compute_final_metrics(self, running_val_loss, num_batches, all_predictions, all_targets, phase_num: int = None):
-        """Compute final validation metrics with research-focused naming."""
-        from smartcash.model.training.utils.research_metrics import get_research_metrics_manager
+        """Compute final validation metrics with standardized naming."""
         
         # Start with loss
         raw_metrics = {
@@ -92,16 +91,49 @@ class ValidationMetricsComputer:
             if abs(raw_metrics.get('accuracy', 0) - computed_metrics.get('layer_1_accuracy', 0)) > 0.0001:
                 logger.warning(f"⚠️ Phase 1 metrics mismatch: val_accuracy={raw_metrics.get('accuracy')} vs layer_1_accuracy={computed_metrics.get('layer_1_accuracy')}")
 
-        # Standardize metric names for research and logging
-        research_metrics_manager = get_research_metrics_manager()
-        standardized_metrics = research_metrics_manager.standardize_metric_names(
-            raw_metrics, phase_num, is_validation=True
-        )
-
+        # Standardize metric names for validation (add val_ prefix)
+        standardized_metrics = self._standardize_validation_metrics(raw_metrics, computed_metrics, phase_num)
+        
         # Log a summary of the final, standardized metrics
-        research_metrics_manager.log_phase_appropriate_metrics(phase_num, standardized_metrics)
+        self._log_validation_summary(phase_num, standardized_metrics)
 
         return standardized_metrics
+    
+    def _standardize_validation_metrics(self, raw_metrics: dict, computed_metrics: dict, phase_num: int) -> dict:
+        """Standardize validation metrics with val_ prefix and layer metrics."""
+        standardized = {}
+        
+        # Add validation loss
+        if 'loss' in raw_metrics:
+            standardized['val_loss'] = raw_metrics['loss']
+        
+        # Add primary validation metrics (already phase-aware from _update_with_classification_metrics)
+        for metric in ['accuracy', 'precision', 'recall', 'f1']:
+            if metric in raw_metrics:
+                standardized[f'val_{metric}'] = raw_metrics[metric]
+        
+        # Add mAP metrics with val_ prefix
+        for metric in ['map50', 'map50_95', 'map50_precision', 'map50_recall', 'map50_f1', 'map50_accuracy']:
+            if metric in raw_metrics:
+                standardized[f'val_{metric}'] = raw_metrics[metric]
+        
+        # Add all layer-specific metrics with val_ prefix
+        for key, value in computed_metrics.items():
+            if key.startswith('layer_'):
+                standardized[f'val_{key}'] = value
+        
+        return standardized
+    
+    def _log_validation_summary(self, phase_num: int, metrics: dict):
+        """Log essential validation metrics summary."""
+        val_loss = metrics.get('val_loss', 0.0)
+        val_map50 = metrics.get('val_map50', 0.0)
+        val_accuracy = metrics.get('val_accuracy', 0.0)
+        
+        if val_map50 > 0:
+            logger.info(f"📊 Phase {phase_num}: Val Loss={val_loss:.4f}, mAP@0.5={val_map50:.4f}, Accuracy={val_accuracy:.4f}")
+        else:
+            logger.info(f"📊 Phase {phase_num}: Val Loss={val_loss:.4f}, Accuracy={val_accuracy:.4f}")
     
     def _compute_classification_metrics(self, all_predictions, all_targets):
         """Compute classification metrics from collected predictions and targets."""

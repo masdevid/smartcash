@@ -167,16 +167,46 @@ class TrainingPhaseManager:
                     epoch, phase_num, display_epoch
                 )
                 
+                # DEBUG: Check validation metrics before processing
+                if phase_num == 1:
+                    logger.debug(f"🔍 Phase 1 validation metrics BEFORE processing:")
+                    for key in ['val_accuracy', 'val_precision', 'val_recall', 'val_f1', 
+                               'val_layer_1_accuracy', 'val_layer_1_precision', 'val_layer_1_recall', 'val_layer_1_f1']:
+                        if key in val_metrics:
+                            logger.debug(f"  {key}: {val_metrics[key]:.6f}")
+                
                 # Combine and process metrics
                 final_metrics = self._process_epoch_metrics(
                     train_metrics, val_metrics, components['metrics_recorder'], epoch
                 )
                 
+                # DEBUG: Check final metrics after processing
+                if phase_num == 1:
+                    logger.debug(f"🔍 Phase 1 final metrics AFTER _process_epoch_metrics:")
+                    for key in ['val_accuracy', 'val_precision', 'val_recall', 'val_f1', 
+                               'val_layer_1_accuracy', 'val_layer_1_precision', 'val_layer_1_recall', 'val_layer_1_f1']:
+                        if key in final_metrics:
+                            logger.debug(f"  {key}: {final_metrics[key]:.6f}")
+                
                 # Add layer metrics from training executor's last predictions
-                layer_metrics = self._compute_layer_metrics(phase_num)
+                # CRITICAL FIX: In Phase 1, don't compute additional layer metrics from training data
+                # since validation already provides the correct layer metrics
+                if phase_num == 1:
+                    layer_metrics = {}  # Don't add training-based layer metrics in Phase 1
+                    logger.debug("Phase 1: Skipping training layer metrics to preserve validation metrics alignment")
+                else:
+                    layer_metrics = self._compute_layer_metrics(phase_num)
                 
                 # Convert training metrics to research-focused format
                 final_metrics = self._apply_research_metrics_format(final_metrics, layer_metrics, phase_num)
+                
+                # DEBUG: Check final metrics after research format
+                if phase_num == 1:
+                    logger.debug(f"🔍 Phase 1 final metrics AFTER _apply_research_metrics_format:")
+                    for key in ['val_accuracy', 'val_precision', 'val_recall', 'val_f1', 
+                               'val_layer_1_accuracy', 'val_layer_1_precision', 'val_layer_1_recall', 'val_layer_1_f1']:
+                        if key in final_metrics:
+                            logger.debug(f"  {key}: {final_metrics[key]:.6f}")
                 
                 # Debug: Check metrics consistency
                 val_acc = final_metrics.get('val_accuracy', 0.0)
@@ -212,15 +242,11 @@ class TrainingPhaseManager:
                     model=self.model, metrics=final_metrics, epoch=epoch, phase=phase_num, is_best=False
                 )
                 
-                # Check for best model using research-focused criteria
-                from smartcash.model.training.utils.research_metrics import get_research_metrics_manager
-                research_metrics_manager = get_research_metrics_manager()
-                criteria = research_metrics_manager.get_best_model_criteria(phase_num)
-                
-                primary_metric = criteria['metric']
-                primary_mode = criteria['mode']
-                fallback_metric = criteria['fallback_metric']
-                fallback_mode = criteria['fallback_mode']
+                # Check for best model using validation accuracy as primary metric
+                primary_metric = 'val_accuracy'
+                primary_mode = 'max'
+                fallback_metric = 'val_f1'
+                fallback_mode = 'max'
                 
                 # Try primary metric first
                 if primary_metric in final_metrics and final_metrics[primary_metric] > 0.0:
@@ -298,11 +324,16 @@ class TrainingPhaseManager:
         final_metrics = {**train_metrics, **val_metrics}
         
         # Add layer-specific metrics if available
+        # CRITICAL FIX: In Phase 1, don't compute training-based layer metrics
         phase_num = getattr(self, '_current_phase_num', 1)
-        layer_metrics = self._compute_layer_metrics(phase_num)
-        if layer_metrics:
-            final_metrics.update(layer_metrics)
-            logger.debug(f"Added {len(layer_metrics)} layer metrics to final metrics")
+        if phase_num == 1:
+            # Phase 1: Skip training layer metrics to preserve validation metrics alignment
+            logger.debug("Phase 1: Skipping training layer metrics in _process_epoch_metrics")
+        else:
+            layer_metrics = self._compute_layer_metrics(phase_num)
+            if layer_metrics:
+                final_metrics.update(layer_metrics)
+                logger.debug(f"Added {len(layer_metrics)} layer metrics to final metrics")
         
         # Add loss breakdown from training executor if available
         if hasattr(self.training_executor, 'last_loss_breakdown'):
@@ -363,6 +394,15 @@ class TrainingPhaseManager:
             try:
                 # Determine current phase number
                 phase_num = getattr(self, '_current_phase_num', 1)
+                
+                # DEBUG: Check what's being recorded in metrics history
+                if phase_num == 1:
+                    logger.debug(f"🔍 Phase 1 metrics BEING RECORDED in history:")
+                    for key in ['val_accuracy', 'val_precision', 'val_recall', 'val_f1', 
+                               'val_layer_1_accuracy', 'val_layer_1_precision', 'val_layer_1_recall', 'val_layer_1_f1']:
+                        if key in final_metrics:
+                            logger.debug(f"  {key}: {final_metrics[key]:.6f}")
+                
                 metrics_recorder.record_epoch(epoch + 1, phase_num, final_metrics)
             except Exception as e:
                 logger.debug(f"Failed to record metrics: {e}")
@@ -413,8 +453,7 @@ class TrainingPhaseManager:
     
     def _apply_research_metrics_format(self, final_metrics: Dict[str, float], 
                                      layer_metrics: Dict[str, float], phase_num: int) -> Dict[str, float]:
-        """Apply research-focused metrics formatting to training results."""
-        from smartcash.model.training.utils.research_metrics import get_research_metrics_manager
+        """Apply streamlined metrics formatting to training results."""
         
         # Combine training metrics for processing
         combined_metrics = {**final_metrics}
@@ -442,16 +481,16 @@ class TrainingPhaseManager:
                 continue  # Skip validation metrics for training processing
             training_raw_metrics[key] = value
         
-        # Get research metrics manager
-        research_metrics_manager = get_research_metrics_manager()
-        
-        # Convert training metrics to research format
+        # Convert training metrics to standardized format (add train_ prefix)
         if training_raw_metrics:
-            training_research_metrics = research_metrics_manager.standardize_metric_names(
-                training_raw_metrics, phase_num, is_validation=False
-            )
+            training_standardized_metrics = {}
+            for key, value in training_raw_metrics.items():
+                if not key.startswith('train_'):
+                    training_standardized_metrics[f'train_{key}'] = value
+                else:
+                    training_standardized_metrics[key] = value
             # Add training metrics to final metrics
-            combined_metrics.update(training_research_metrics)
+            combined_metrics.update(training_standardized_metrics)
         
         # Keep validation metrics as they are (already processed by validation executor)
         # Filter out only truly unnecessary metrics, preserve loss_breakdown

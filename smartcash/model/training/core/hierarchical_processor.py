@@ -8,11 +8,17 @@ Handles Phase 2 multi-layer hierarchical system:
 - Layer 3: Money validation (classes 14-16)
 
 Provides optimized confidence modulation using spatial relationships between layers.
+Refactored to use extracted modules for better separation of concerns.
+
+Architecture:
+- ConfidenceModulator: Handles spatial and denomination confidence algorithms
+- ChunkedProcessor: Manages memory-safe processing for large datasets
+- HierarchicalProcessor: Core coordination and phase detection (this file)
 
 Algorithmic Complexity:
 - Filtering: O(P) where P is number of predictions
-- Confidence modulation: O(P₁ * P₂) where P₁, P₂ are layer prediction counts
-- Chunked processing: O(P₁) with controlled memory usage
+- Phase detection: O(1) for context check, O(P) for fallback analysis
+- Coordination: O(1) for module orchestration
 """
 
 import torch
@@ -20,7 +26,10 @@ from typing import Tuple, Optional
 
 from smartcash.common.logger import get_logger
 from smartcash.model.utils.memory_optimizer import get_memory_optimizer
-from .yolo_utils_manager import get_box_iou
+
+# Import extracted modules
+from .confidence_modulator import ConfidenceModulator
+from .chunked_processor import ChunkedProcessor
 
 logger = get_logger(__name__, level="DEBUG")
 
@@ -39,7 +48,7 @@ class HierarchicalProcessor:
     
     def __init__(self, device: Optional[torch.device] = None, debug: bool = False, training_context: dict = None):
         """
-        Initialize hierarchical processor.
+        Initialize hierarchical processor with extracted modules.
         
         Args:
             device: Torch device for computations
@@ -61,13 +70,14 @@ class HierarchicalProcessor:
         self.layer_2_classes = range(7, 14)  # Classes 7-13
         self.layer_3_classes = range(14, 17) # Classes 14-16
         
-        # Initialize debug file logging if enabled (after layer configuration)
-        # Debug logger will be setup dynamically when epoch is known
+        # Initialize debug file logging if enabled
         self.debug_logger = None
         self.current_epoch = 0  # Initialize current epoch
         self._current_debug_epoch = -1  # Track which epoch debug logger is configured for
         
-        # Hierarchical processor only uses file logging to reduce console verbosity
+        # Initialize extracted modules
+        self.confidence_modulator = ConfidenceModulator(device=self.device, debug=self.debug)
+        self.chunked_processor = ChunkedProcessor(device=self.device, debug=self.debug)
         
     
     def _setup_hierarchical_debug_logging(self):
@@ -78,7 +88,6 @@ class HierarchicalProcessor:
         """
         from pathlib import Path
         import logging
-        from datetime import datetime
          # Extract context information for filename
         backbone = self.training_context.get('backbone', 'unknown')
         phase = self.training_context.get('current_phase', 'unknown')
@@ -393,7 +402,7 @@ class HierarchicalProcessor:
         if len(layer_1_predictions) == 0:
             return torch.empty((0, num_features), device=predictions.device)
         
-        # Apply hierarchical confidence modulation
+        # Apply hierarchical confidence modulation using extracted module
         return self._apply_confidence_modulation(flat_predictions, layer_1_predictions)
     
     def _process_2d_predictions(self, predictions: torch.Tensor) -> torch.Tensor:
@@ -415,7 +424,7 @@ class HierarchicalProcessor:
         if len(layer_1_predictions) == 0:
             return torch.empty((0, predictions.shape[1]), device=predictions.device)
         
-        # Apply hierarchical confidence modulation
+        # Apply hierarchical confidence modulation using extracted module
         return self._apply_confidence_modulation(predictions, layer_1_predictions)
     
     def _apply_confidence_modulation(
@@ -424,7 +433,7 @@ class HierarchicalProcessor:
         layer_1_predictions: torch.Tensor
     ) -> torch.Tensor:
         """
-        Apply hierarchical confidence modulation using Layer 2 & 3 predictions.
+        Apply hierarchical confidence modulation using extracted modules.
         
         Args:
             all_predictions: All predictions including all layers
@@ -444,75 +453,10 @@ class HierarchicalProcessor:
             if len(layer_1_predictions) > self.max_predictions_per_chunk:
                 if self.debug:
                     self._hierarchical_debug_log(f"Large prediction set ({len(layer_1_predictions)}), using chunked processing")
-                return self._chunked_confidence_modulation(all_predictions, layer_1_predictions)
+                return self.chunked_processor.process_chunked_confidence(all_predictions, layer_1_predictions)
             
-            # Ensure we're working with 2D tensors
-            if all_predictions.dim() != 2 or layer_1_predictions.dim() != 2:
-                logger.warning(f"Expected 2D tensors, got all_pred: {all_predictions.shape}, layer_1: {layer_1_predictions.shape}")
-                return layer_1_predictions
-            
-            # Extract predictions by layer using optimized boolean masks
-            layer_2_mask = (all_predictions[:, 5] >= 7) & (all_predictions[:, 5] < 14)
-            layer_3_mask = all_predictions[:, 5] >= 14
-            
-            layer_2_preds = all_predictions[layer_2_mask]  # Classes 7-13
-            layer_3_preds = all_predictions[layer_3_mask]  # Classes 14-16
-            
-            # Memory safety check for total combinations
-            total_combinations = len(layer_1_predictions) * max(len(layer_2_preds), len(layer_3_preds))
-            if total_combinations > self.max_matrix_combinations:
-                if self.debug:
-                    self._hierarchical_debug_log(f"Memory-intensive operation detected ({total_combinations:,} combinations), using fallback")
-                return layer_1_predictions  # Return unmodified to avoid OOM
-            
-            if self.debug:
-                self._hierarchical_debug_log(f"  • Layer 1 predictions: {len(layer_1_predictions)}")
-                self._hierarchical_debug_log(f"  • Layer 2 predictions: {len(layer_2_preds)}")
-                self._hierarchical_debug_log(f"  • Layer 3 predictions: {len(layer_3_preds)}")
-                self._hierarchical_debug_log(f"  • Memory estimate: {total_combinations:,} combinations")
-            
-            # Apply confidence modulation
-            modified_predictions = layer_1_predictions.clone()
-            original_conf = modified_predictions[:, 4]
-            
-            # Vectorized confidence computation for both layers
-            layer_3_conf = self._compute_spatial_confidence(layer_1_predictions, layer_3_preds)
-            layer_2_conf = self._compute_denomination_confidence(layer_1_predictions, layer_2_preds)
-            
-            # Hierarchical confidence modulation with money validation
-            money_mask = layer_3_conf > 0.1  # Money validation threshold
-            
-            # Check if we have any layer_2 or layer_3 predictions available
-            has_layer_predictions = (len(layer_2_preds) > 0 or len(layer_3_preds) > 0)
-            
-            if has_layer_predictions:
-                # Apply hierarchical modulation only when we have multi-layer predictions
-                hierarchical_conf = torch.where(
-                    money_mask,
-                    torch.clamp(original_conf * (1.0 + layer_2_conf * layer_3_conf), max=1.0),
-                    original_conf * 0.1  # Reduce confidence if Layer 3 disagrees
-                )
-            else:
-                # No layer_2 or layer_3 predictions available - keep original confidence unchanged
-                hierarchical_conf = original_conf
-            
-            modified_predictions[:, 4] = hierarchical_conf
-            
-            if self.debug and len(layer_1_predictions) > 0:
-                # Log first few predictions for debugging to file only
-                for i in range(min(3, len(layer_1_predictions))):
-                    self._hierarchical_debug_log(f"  • Pred {i}: class={layer_1_predictions[i, 5].int().item()}, "
-                               f"conf={original_conf[i]:.3f}→{hierarchical_conf[i]:.3f}, "
-                               f"L2={layer_2_conf[i]:.3f}, L3={layer_3_conf[i]:.3f}")
-                
-                # Comprehensive confidence modulation analysis
-                self._log_confidence_modulation_analysis(
-                    layer_1_predictions, layer_2_preds, layer_3_preds,
-                    original_conf, hierarchical_conf, layer_2_conf, layer_3_conf, 
-                    has_layer_predictions
-                )
-            
-            return modified_predictions
+            # Use confidence modulator for standard processing
+            return self.confidence_modulator.apply_confidence_modulation(all_predictions, layer_1_predictions)
             
         except Exception as e:
             logger.warning(f"Error in confidence modulation: {e}")
@@ -520,215 +464,6 @@ class HierarchicalProcessor:
             self.memory_optimizer.emergency_memory_cleanup()
             return layer_1_predictions
     
-    def _chunked_confidence_modulation(
-        self, 
-        _: torch.Tensor, 
-        layer_1_predictions: torch.Tensor
-    ) -> torch.Tensor:
-        """
-        Process confidence modulation in memory-safe chunks.
-        
-        Args:
-            all_predictions: All predictions
-            layer_1_predictions: Layer 1 predictions
-            
-        Returns:
-            Modified predictions with updated confidence
-            
-        Time Complexity: O(P₁) with chunk-based processing
-        Space Complexity: O(chunk_size) per iteration
-        """
-        try:
-            chunk_size = self.max_predictions_per_chunk
-            
-            modified_predictions = layer_1_predictions.clone()
-            
-            # Process in chunks to avoid memory overflow
-            for i in range(0, len(layer_1_predictions), chunk_size):
-                end_idx = min(i + chunk_size, len(layer_1_predictions))
-                chunk = layer_1_predictions[i:end_idx]
-                
-                # Apply simplified confidence modulation to chunk
-                original_conf = chunk[:, 4] 
-                # Apply conservative boost for hierarchical validation
-                modified_conf = torch.clamp(original_conf * 1.1, max=1.0)
-                modified_predictions[i:end_idx, 4] = modified_conf
-                
-                # Clean memory after each chunk
-                if i % (chunk_size * 5) == 0:  # Every 5 chunks
-                    self.memory_optimizer.cleanup_memory()
-            
-            return modified_predictions
-            
-        except Exception as e:
-            logger.error(f"Error in chunked confidence modulation: {e}")
-            self.memory_optimizer.emergency_memory_cleanup()
-            return layer_1_predictions
-    
-    def _compute_spatial_confidence(
-        self, 
-        layer_1_preds: torch.Tensor, 
-        layer_3_preds: torch.Tensor
-    ) -> torch.Tensor:
-        """
-        Compute Layer 3 confidence based on spatial overlap with Layer 1.
-        
-        Args:
-            layer_1_preds: Layer 1 predictions
-            layer_3_preds: Layer 3 predictions
-            
-        Returns:
-            Confidence scores for each Layer 1 prediction
-            
-        Time Complexity: O(P₁ * P₃) for IoU matrix computation
-        Space Complexity: O(P₁ * P₃) for IoU matrix storage
-        """
-        if len(layer_3_preds) == 0:
-            return torch.zeros(len(layer_1_preds), device=self.device)
-        
-        # Memory safety check for IoU matrix size
-        matrix_size = len(layer_1_preds) * len(layer_3_preds)
-        max_matrix_size = 1_000_000  # 1M elements = ~8MB for float32
-        
-        if matrix_size > max_matrix_size:
-            return self._chunked_spatial_confidence(layer_1_preds, layer_3_preds)
-        
-        try:
-            # Compute IoU matrix between all Layer 1 and Layer 3 predictions
-            iou_matrix = get_box_iou()(layer_1_preds[:, :4], layer_3_preds[:, :4])
-            
-            # For each Layer 1 prediction, find best overlapping Layer 3 prediction
-            max_ious, max_indices = torch.max(iou_matrix, dim=1)
-            
-            # Apply IoU threshold and get corresponding confidences
-            valid_mask = max_ious > 0.1
-            layer_3_conf = torch.zeros(len(layer_1_preds), device=self.device)
-            layer_3_conf[valid_mask] = layer_3_preds[max_indices[valid_mask], 4]
-            
-            return layer_3_conf
-            
-        except Exception as e:
-            logger.warning(f"Error in spatial confidence computation: {e}, using fallback")
-            self.memory_optimizer.emergency_memory_cleanup()
-            return torch.zeros(len(layer_1_preds), device=self.device)
-    
-    def _chunked_spatial_confidence(
-        self, 
-        layer_1_preds: torch.Tensor, 
-        layer_3_preds: torch.Tensor, 
-        chunk_size: int = 500
-    ) -> torch.Tensor:
-        """
-        Process spatial confidence in memory-safe chunks.
-        
-        Args:
-            layer_1_preds: Layer 1 predictions
-            layer_3_preds: Layer 3 predictions
-            chunk_size: Size of each processing chunk
-            
-        Returns:
-            Confidence scores for each Layer 1 prediction
-            
-        Time Complexity: O(P₁ * P₃) total, processed in O(chunk_size * P₃) iterations
-        """
-        layer_3_conf = torch.zeros(len(layer_1_preds), device=self.device)
-        
-        for i in range(0, len(layer_1_preds), chunk_size):
-            end_idx = min(i + chunk_size, len(layer_1_preds))
-            chunk = layer_1_preds[i:end_idx]
-            
-            try:
-                # Compute IoU for this chunk only
-                iou_matrix = get_box_iou()(chunk[:, :4], layer_3_preds[:, :4])
-                max_ious, max_indices = torch.max(iou_matrix, dim=1)
-                
-                # Apply threshold and assign confidences
-                valid_mask = max_ious > 0.1
-                layer_3_conf[i:end_idx][valid_mask] = layer_3_preds[max_indices[valid_mask], 4]
-                
-            except Exception as e:
-                logger.warning(f"Error in chunk {i//chunk_size}: {e}")
-                # Skip this chunk to avoid total failure
-                continue
-        
-        return layer_3_conf
-    
-    def _compute_denomination_confidence(
-        self, 
-        layer_1_preds: torch.Tensor, 
-        layer_2_preds: torch.Tensor
-    ) -> torch.Tensor:
-        """
-        Compute Layer 2 confidence for specific denominations.
-        
-        Args:
-            layer_1_preds: Layer 1 predictions
-            layer_2_preds: Layer 2 predictions
-            
-        Returns:
-            Confidence scores for each Layer 1 prediction
-            
-        Time Complexity: O(C * P₁ * P₂) where C is number of unique classes
-        Space Complexity: O(P₁ * P₂) for IoU matrices per class
-        """
-        if len(layer_2_preds) == 0:
-            return torch.zeros(len(layer_1_preds), device=self.device)
-        
-        # Map Layer 1 classes to corresponding Layer 2 classes
-        layer_1_classes = layer_1_preds[:, 5].int()
-        layer_2_classes = layer_1_classes + 7  # Classes 7-13 correspond to 0-6
-        
-        layer_2_conf = torch.zeros(len(layer_1_preds), device=self.device)
-        
-        try:
-            unique_classes = torch.unique(layer_2_classes)
-            
-            if len(unique_classes) > 0:
-                # Process each class with memory safety
-                for layer_2_class in unique_classes:
-                    l1_mask = layer_2_classes == layer_2_class
-                    l2_mask = layer_2_preds[:, 5].int() == layer_2_class
-                    
-                    if not l1_mask.any() or not l2_mask.any():
-                        continue
-                        
-                    matching_l1_preds = layer_1_preds[l1_mask]
-                    matching_l2_preds = layer_2_preds[l2_mask]
-                    
-                    # Memory safety check
-                    matrix_size = len(matching_l1_preds) * len(matching_l2_preds)
-                    if matrix_size > self.max_class_matrix_size:
-                        # Use simplified confidence assignment instead of IoU computation for memory efficiency
-                        # This is normal behavior when there are many predictions for popular classes
-                        if not hasattr(self, '_logged_large_matrix'):
-                            self._logged_large_matrix = set()
-                        
-                        # Only log once per class per session to avoid spam
-                        if layer_2_class.item() not in self._logged_large_matrix:
-                            self._hierarchical_debug_log(f"Memory optimization: Class {layer_2_class} has {matrix_size:,} prediction pairs, using average confidence instead of IoU computation")
-                            self._logged_large_matrix.add(layer_2_class.item())
-                        
-                        if len(matching_l2_preds) > 0:
-                            avg_conf = matching_l2_preds[:, 4].mean()
-                            l1_indices = torch.where(l1_mask)[0]
-                            layer_2_conf[l1_indices] = avg_conf
-                        continue
-                    
-                    # Safe IoU computation for reasonable matrix sizes
-                    iou_matrix = get_box_iou()(matching_l1_preds[:, :4], matching_l2_preds[:, :4])
-                    max_ious, max_indices = torch.max(iou_matrix, dim=1)
-                    valid_mask = max_ious > 0.1
-                    
-                    # Assign confidences
-                    l1_indices = torch.where(l1_mask)[0]
-                    layer_2_conf[l1_indices[valid_mask]] = matching_l2_preds[max_indices[valid_mask], 4]
-            
-            return layer_2_conf
-            
-        except Exception as e:
-            logger.warning(f"Error in denomination confidence computation: {e}, using fallback")
-            self.memory_optimizer.emergency_memory_cleanup()
-            return torch.zeros(len(layer_1_preds), device=self.device)
     
     def _get_unique_classes(self, predictions: torch.Tensor) -> list:
         """
@@ -756,130 +491,3 @@ class HierarchicalProcessor:
         except Exception:
             return []
     
-    def _log_confidence_modulation_analysis(
-        self, 
-        layer_1_predictions: torch.Tensor,
-        layer_2_preds: torch.Tensor, 
-        layer_3_preds: torch.Tensor,
-        original_conf: torch.Tensor,
-        hierarchical_conf: torch.Tensor,
-        layer_2_conf: torch.Tensor,
-        layer_3_conf: torch.Tensor,
-        has_layer_predictions: bool
-    ):
-        """
-        Log comprehensive confidence modulation analysis to debug file.
-        
-        Args:
-            layer_1_predictions: Layer 1 predictions
-            layer_2_preds: Layer 2 predictions
-            layer_3_preds: Layer 3 predictions  
-            original_conf: Original confidence scores
-            hierarchical_conf: Modulated confidence scores
-            layer_2_conf: Layer 2 confidence contributions
-            layer_3_conf: Layer 3 confidence contributions
-            has_layer_predictions: Whether multi-layer predictions are available
-        """
-        if not self.debug_logger:
-            return
-            
-        self._hierarchical_debug_log("\n🔧 CONFIDENCE MODULATION DETAILED ANALYSIS:")
-        self._hierarchical_debug_log(f"{'='*60}")
-        
-        # Multi-layer availability analysis
-        self._hierarchical_debug_log(f"📊 MULTI-LAYER PREDICTION AVAILABILITY:")
-        self._hierarchical_debug_log(f"  • Layer 2 predictions available: {'Yes' if len(layer_2_preds) > 0 else 'No'} ({len(layer_2_preds)} predictions)")
-        self._hierarchical_debug_log(f"  • Layer 3 predictions available: {'Yes' if len(layer_3_preds) > 0 else 'No'} ({len(layer_3_preds)} predictions)")
-        self._hierarchical_debug_log(f"  • Has multi-layer predictions: {'Yes' if has_layer_predictions else 'No'}")
-        
-        if not has_layer_predictions:
-            self._hierarchical_debug_log("  ✅ CONFIDENCE UNCHANGED: No layer 2/3 predictions - original confidence preserved")
-            return
-            
-        # Confidence change analysis
-        confidence_changes = hierarchical_conf - original_conf
-        boosted_mask = confidence_changes > 1e-6  # Boosted if changed by more than a tiny epsilon
-        reduced_mask = confidence_changes < -1e-6  # Reduced if changed by more than a tiny epsilon
-        unchanged_mask = torch.abs(confidence_changes) <= 1e-6  # Unchanged if difference is negligible
-        
-        num_boosted = boosted_mask.sum().item()
-        num_reduced = reduced_mask.sum().item()
-        num_unchanged = unchanged_mask.sum().item()
-        
-        self._hierarchical_debug_log(f"\n🎚️  CONFIDENCE MODULATION SUMMARY:")
-        self._hierarchical_debug_log(f"  • Total Layer 1 predictions: {len(layer_1_predictions)}")
-        self._hierarchical_debug_log(f"  • Confidence BOOSTED: {num_boosted} predictions ({num_boosted/len(layer_1_predictions)*100:.1f}%)")
-        self._hierarchical_debug_log(f"  • Confidence REDUCED: {num_reduced} predictions ({num_reduced/len(layer_1_predictions)*100:.1f}%)")
-        self._hierarchical_debug_log(f"  • Confidence UNCHANGED: {num_unchanged} predictions ({num_unchanged/len(layer_1_predictions)*100:.1f}%)")
-        
-        # Statistical analysis
-        avg_original = original_conf.mean().item()
-        avg_hierarchical = hierarchical_conf.mean().item()
-        avg_change = confidence_changes.mean().item()
-        
-        self._hierarchical_debug_log(f"\n📈 CONFIDENCE STATISTICS:")
-        self._hierarchical_debug_log(f"  • Average original confidence: {avg_original:.4f}")
-        self._hierarchical_debug_log(f"  • Average hierarchical confidence: {avg_hierarchical:.4f}")
-        self._hierarchical_debug_log(f"  • Average confidence change: {avg_change:+.4f}")
-        
-        # Layer contribution analysis
-        layer_2_active = (layer_2_conf > 0.01).sum().item()
-        layer_3_active = (layer_3_conf > 0.1).sum().item()  # Money validation threshold
-        
-        self._hierarchical_debug_log(f"\n🎯 LAYER CONTRIBUTION ANALYSIS:")
-        self._hierarchical_debug_log(f"  • Layer 2 active contributions: {layer_2_active}/{len(layer_1_predictions)} ({layer_2_active/len(layer_1_predictions)*100:.1f}%)")
-        self._hierarchical_debug_log(f"  • Layer 3 active contributions: {layer_3_active}/{len(layer_1_predictions)} ({layer_3_active/len(layer_1_predictions)*100:.1f}%)")
-        
-        if layer_2_active > 0:
-            avg_layer_2_conf = layer_2_conf[layer_2_conf > 0.01].mean().item()
-            self._hierarchical_debug_log(f"  • Average Layer 2 confidence (when active): {avg_layer_2_conf:.4f}")
-            
-        if layer_3_active > 0:
-            avg_layer_3_conf = layer_3_conf[layer_3_conf > 0.1].mean().item()
-            self._hierarchical_debug_log(f"  • Average Layer 3 confidence (when active): {avg_layer_3_conf:.4f}")
-        
-        # Detailed per-class analysis
-        self._hierarchical_debug_log(f"\n🔍 PER-CLASS CONFIDENCE MODULATION:")
-        unique_classes = torch.unique(layer_1_predictions[:, 5].long())
-        
-        for cls in unique_classes:
-            cls_mask = layer_1_predictions[:, 5] == cls
-            cls_count = cls_mask.sum().item()
-            
-            if cls_count > 0:
-                cls_original = original_conf[cls_mask].mean().item()
-                cls_hierarchical = hierarchical_conf[cls_mask].mean().item()
-                cls_change = cls_hierarchical - cls_original
-                cls_l2_contrib = layer_2_conf[cls_mask].mean().item()
-                cls_l3_contrib = layer_3_conf[cls_mask].mean().item()
-                
-                self._hierarchical_debug_log(f"  Class {cls}: {cls_count} predictions")
-                self._hierarchical_debug_log(f"    • Confidence: {cls_original:.3f} → {cls_hierarchical:.3f} ({cls_change:+.3f})")
-                self._hierarchical_debug_log(f"    • Layer 2 contrib: {cls_l2_contrib:.3f}, Layer 3 contrib: {cls_l3_contrib:.3f}")
-        
-        # Sample predictions for detailed inspection
-        if len(layer_1_predictions) > 0:
-            self._hierarchical_debug_log(f"\n🔬 SAMPLE PREDICTION ANALYSIS (first 5):")
-            sample_size = min(5, len(layer_1_predictions))
-            
-            for i in range(sample_size):
-                cls = layer_1_predictions[i, 5].int().item()
-                orig_conf = original_conf[i].item()
-                hier_conf = hierarchical_conf[i].item()
-                l2_conf = layer_2_conf[i].item()
-                l3_conf = layer_3_conf[i].item()
-                change = hier_conf - orig_conf
-                
-                self._hierarchical_debug_log(f"  Prediction {i+1}: Class {cls}")
-                self._hierarchical_debug_log(f"    • Original confidence: {orig_conf:.4f}")
-                self._hierarchical_debug_log(f"    • Hierarchical confidence: {hier_conf:.4f} ({change:+.4f})")
-                self._hierarchical_debug_log(f"    • Layer 2 contribution: {l2_conf:.4f}")
-                self._hierarchical_debug_log(f"    • Layer 3 contribution: {l3_conf:.4f}")
-                
-                if l3_conf > 0.1:
-                    boost_factor = 1.0 + l2_conf * l3_conf
-                    self._hierarchical_debug_log(f"    • ✅ Money validated (L3>{0.1:.1f}) - boost factor: {boost_factor:.3f}")
-                else:
-                    self._hierarchical_debug_log(f"    • ❌ Money validation failed (L3≤{0.1:.1f}) - confidence reduced by 90%")
-        
-        self._hierarchical_debug_log(f"{'='*60}")

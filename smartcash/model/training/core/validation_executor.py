@@ -85,8 +85,8 @@ class ValidationExecutor:
         
         self.map_calculator = create_yolov5_map_calculator(
             num_classes=num_classes,
-            conf_thres=0.005,  # Very low threshold for early training with new anchors
-            iou_thres=0.03,   # AGGRESSIVE: Very low threshold for scale learning phase
+            conf_thres=0.01,  # Very low threshold for early training with new anchors
+            iou_thres=0.5,   # AGGRESSIVE: Very low threshold for scale learning phase
             debug=debug_map,
             training_context=training_context
         )
@@ -133,6 +133,10 @@ class ValidationExecutor:
         
         # Reset mAP calculator for new validation epoch
         self.map_calculator.reset()
+        
+        # Update mAP calculator with current epoch for progressive thresholds
+        if hasattr(self.map_calculator, 'update_epoch'):
+            self.map_calculator.update_epoch(epoch)
         
         # Clear cached mAP results in metrics computer to ensure fresh computation
         self.metrics_computer._cached_map_results = None

@@ -404,8 +404,6 @@ class MemoryOptimizedProcessor:
         
         Time Complexity: O(1) - immediate cleanup operations
         """
-        if self.debug:
-            logger.debug("🚨 Emergency memory cleanup triggered")
         self.memory_optimizer.emergency_memory_cleanup()
     
     def get_processing_stats(self) -> Dict[str, Any]:

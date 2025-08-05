@@ -12,7 +12,7 @@ from PIL import Image
 
 from smartcash.common.logger import get_logger
 from smartcash.model.evaluation.scenario_manager import ScenarioManager
-from smartcash.model.training.core.yolov5_map_calculator_refactored import YOLOv5MapCalculator
+from smartcash.model.training.core.yolov5_map_calculator import YOLOv5MapCalculator
 from smartcash.model.evaluation.checkpoint_selector import CheckpointSelector
 from smartcash.model.evaluation.utils.evaluation_progress_bridge import EvaluationProgressBridge
 from smartcash.model.evaluation.utils.inference_timer import InferenceTimer

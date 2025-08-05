@@ -891,6 +891,20 @@ class TrainingPhaseManager:
         old_phase = getattr(self, '_current_phase_num', 1)
         self._current_phase_num = new_phase_num
         
+        # CRITICAL FIX: Reset best metrics tracking for new phase
+        # This prevents Phase 2 from comparing against Phase 1's best metrics
+        if old_phase != new_phase_num:
+            logger.info(f"🔄 Resetting best metrics tracking for Phase {new_phase_num}")
+            logger.debug(f"   Previous best metrics (Phase {old_phase}): {dict(self._best_metrics)}")
+            self._best_metrics.clear()  # Clear all previous phase best metrics
+            
+            # Also reset manual best values if they exist
+            if hasattr(self, '_manual_best_values'):
+                logger.debug(f"   Previous manual best values: {dict(self._manual_best_values)}")
+                self._manual_best_values.clear()
+            
+            logger.info(f"✅ Best metrics tracking reset for Phase {new_phase_num} - fresh tracking enabled")
+        
         # Update metrics recorder if available
         metrics_recorder = components.get('metrics_recorder')
         if metrics_recorder and hasattr(metrics_recorder, 'update_phase'):

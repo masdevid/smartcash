@@ -117,10 +117,15 @@ class ValidationMetricsComputer:
             if metric in raw_metrics:
                 standardized[f'val_{metric}'] = raw_metrics[metric]
         
-        # Add all layer-specific metrics with val_ prefix
+        # Add all layer-specific metrics with val_ prefix (avoid double-prefixing)
         for key, value in computed_metrics.items():
             if key.startswith('layer_'):
+                # Add val_ prefix to layer metrics
                 standardized[f'val_{key}'] = value
+            elif key.startswith('val_layer_') or key.startswith('train_layer_'):
+                # These are already prefixed layer metrics - avoid double prefixing
+                # Skip them here to prevent val_val_ or val_train_ patterns
+                continue
         
         return standardized
     

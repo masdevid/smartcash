@@ -140,22 +140,37 @@ class YOLOv5MapCalculator:
         """
         Calculate progressive confidence and IoU thresholds based on training epoch.
         
+        Updated strategy based on mAP debug log analysis:
+        - More aggressive confidence filtering early to focus on higher-quality predictions
+        - Very lenient IoU thresholds for longer (banknote alignment is challenging)
+        - Special handling for size mismatch issues observed in logs
+        
         Args:
             epoch: Current training epoch (0-based)
             
         Returns:
             Tuple of (conf_thres, iou_thres)
         """
-        if epoch < 10:
-            return 0.01, 0.1   # Super lenient, encourage any matching
-        elif epoch < 20:
-            return 0.03, 0.2   # Slightly tighter, but still low IoU
-        elif epoch < 30:
-            return 0.05, 0.3   # Now encouraging better alignment
+        if epoch < 15:
+            # Early phase: Focus on building ANY positive matches
+            # Keep IoU super low due to size mismatch issues in logs
+            return 0.01, 0.05   # Even more lenient IoU (was 0.1)
+        elif epoch < 25:
+            # Mid-early: Start filtering confidence but keep IoU very low
+            # Logs show predictions are tiny compared to targets
+            return 0.05, 0.08   # Slight IoU increase but still very lenient
         elif epoch < 40:
-            return 0.07, 0.4   # Starting to demand real box quality
+            # Mid phase: Balance confidence and IoU improvements
+            # Based on logs, most batches struggle to get >0.1 IoU
+            return 0.08, 0.12   # More gradual IoU progression
+        elif epoch < 60:
+            # Late-mid phase: Tighten confidence more than IoU
+            # Logs show confidence range 0.05-0.55, focus on higher conf
+            return 0.15, 0.15   # Higher confidence threshold priority
         else:
-            return 0.1, 0.5    # Final target threshold
+            # Final phase: Balanced but realistic thresholds
+            # Based on log analysis, 0.5 IoU may be too aggressive for banknotes
+            return 0.25, 0.25   # More balanced, realistic for banknote detection
     
     def _init_storage(self):
         """Initialize storage for batch statistics."""
@@ -194,6 +209,10 @@ class YOLOv5MapCalculator:
             device=self.device,
             debug=self.debug
         )
+        
+        # Connect debug logger to batch processor for IoU analysis
+        if self.debug and self.debug_logger:
+            self.batch_processor.debug_logger = self.debug_logger
     
     def reset(self):
         """
@@ -229,7 +248,32 @@ class YOLOv5MapCalculator:
         
         # Setup or update debug logging for current epoch
         if self.debug and self.debug_logger:
+            # Update the current phase in debug logger before setting up logging
+            if hasattr(self, 'model') and self.model:
+                current_phase = getattr(self.model, 'current_phase', None)
+                if current_phase is None and self.training_context:
+                    # Try to infer from training context
+                    current_phase = self.training_context.get('phase', 1)
+                
+                if current_phase:
+                    # Update the debug logger's training context with current phase
+                    self.debug_logger.update_current_phase(current_phase)
+            
             self.debug_logger.setup_debug_logging(epoch)
+            
+            # Log Phase configuration on first batch of new epoch
+            if self._batch_count == 0 and hasattr(self, 'model') and self.model:
+                try:
+                    # Determine current phase from model or context
+                    current_phase = getattr(self.model, 'current_phase', None)
+                    if current_phase is None and self.training_context:
+                        # Try to infer from training context
+                        current_phase = self.training_context.get('phase', 1)
+                    
+                    if current_phase:
+                        self.debug_logger.log_phase_configuration(self.model, current_phase, detailed=True)
+                except Exception as e:
+                    self.debug_logger.write_debug_log(f"❌ Failed to log phase configuration: {e}")
         
         # Check YOLOv5 availability
         if not self._ensure_yolov5_available() or predictions is None or targets is None:
@@ -255,6 +299,10 @@ class YOLOv5MapCalculator:
                     self.debug_logger.write_debug_log(f"📊 Initial targets classes: unique={torch.unique(targets[:,1]).tolist()}")
                 else:
                     self.debug_logger.write_debug_log(f"📊 No targets in first batch - empty targets tensor")
+                    
+                # COORDINATE DEBUG LOGGING - Use MapDebugLogger methods
+                if predictions.numel() > 0 and targets.numel() > 0:
+                    self.debug_logger.log_coordinate_format_analysis(predictions, targets)
         
         try:
             # Apply hierarchical filtering for Phase 2 multi-layer architecture

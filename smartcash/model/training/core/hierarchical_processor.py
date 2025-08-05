@@ -90,15 +90,16 @@ class HierarchicalProcessor:
         import logging
          # Extract context information for filename
         backbone = self.training_context.get('backbone', 'unknown')
-        phase = self.training_context.get('current_phase', 'unknown')
+        # Try both 'current_phase' and 'phase' keys for phase detection
+        phase = self.training_context.get('current_phase') or self.training_context.get('phase', 'unknown')
         training_mode = self.training_context.get('training_mode', 'unknown')
         
         # Create debug log directory
-        debug_log_dir = Path(f"logs/validation_metrics/{backbone}")
+        debug_log_dir = Path(f"logs/validation_metrics/{backbone}/phase_{phase}")
         debug_log_dir.mkdir(parents=True, exist_ok=True)
         
         # Create timestamped debug log file with context
-        debug_log_file = debug_log_dir / f"hierarchical_debug_phase{phase}_epoch{self.current_epoch}.log"
+        debug_log_file = debug_log_dir / f"hierarchical_debug_epoch{self.current_epoch}.log"
         
         # Set up dedicated debug logger
         self.debug_logger = logging.getLogger(f"hierarchical_debug_phase{phase}_epoch{self.current_epoch}")
@@ -187,9 +188,21 @@ class HierarchicalProcessor:
         self.current_epoch = epoch
         
         # Setup or update debug logging for current epoch
+        # SKIP hierarchical debug logging in Phase 1 to reduce log noise
+        # Phase 1 only needs mAP debug logging (handled by YOLOv5MapCalculator)
         if self.debug and self._current_debug_epoch != epoch:
-            self._setup_hierarchical_debug_logging()
-            self._current_debug_epoch = epoch
+            # Detect current phase to determine if we should enable hierarchical debug logging
+            current_phase = self._detect_processing_phase(predictions)
+            
+            if current_phase == 1:
+                # Phase 1: Skip hierarchical debug logging, only mAP debug needed
+                logger.debug("Phase 1: Skipping hierarchical debug logging setup (mAP debug only)")
+                self._current_debug_epoch = epoch  # Mark epoch as processed but don't setup logging
+            else:
+                # Phase 2: Enable full hierarchical debug logging
+                logger.debug("Phase 2: Setting up hierarchical debug logging")
+                self._setup_hierarchical_debug_logging()
+                self._current_debug_epoch = epoch
         
         try:
             # Input validation
@@ -202,24 +215,21 @@ class HierarchicalProcessor:
             # Detect processing phase based on prediction classes
             phase = self._detect_processing_phase(predictions)
             
-            if self.debug:
+            # Only log hierarchical debug info in Phase 2
+            if self.debug and phase == 2:
                 self._hierarchical_debug_log(f"\n{'='*60}")
                 self._hierarchical_debug_log(f"🔍 HIERARCHICAL PROCESSING BATCH")
                 self._hierarchical_debug_log(f"{'='*60}")
                 self._hierarchical_debug_log(f"Input tensor shapes:")
                 self._hierarchical_debug_log(f"  • predictions: {predictions.shape}")
                 self._hierarchical_debug_log(f"  • targets: {targets.shape}")
-            
-            if self.debug and phase == 1:
-                # Phase 1: Standard single-layer processing
-                self._hierarchical_debug_log("🔹 PHASE 1 DETECTED: Standard single-layer processing")
-                self._hierarchical_debug_log("  • Hierarchical processing SKIPPED")
-                self._hierarchical_debug_log("  • Returning original predictions and targets unchanged")
-            
-            # Phase 2: Multi-layer hierarchical processing
-            if self.debug and phase == 2:
                 self._hierarchical_debug_log("🔹 PHASE 2 DETECTED: Hierarchical multi-layer processing")
                 self._hierarchical_debug_log("  • Applying hierarchical filtering and confidence modulation")
+            elif self.debug and phase == 1:
+                # Phase 1: Just log basic info to console, no file logging
+                logger.debug("Phase 1: Hierarchical processing skipped (single-layer mode)")
+            
+            # Phase 2: Multi-layer hierarchical processing logging handled above
             
             if phase == 2:
                 return self._process_phase2_predictions(predictions, targets)

@@ -333,20 +333,43 @@ class BatchProcessor:
         """
         Convert target format from [batch_idx, class, x, y, w, h] to [batch_idx, x1, y1, x2, y2, class].
         
+        UPDATED: Added filtering for empty/invalid targets based on mAP debug log analysis.
+        Many targets were [0.0000, 0.0000, 0.0000, 0.0000] causing invalid IoU calculations.
+        
         Args:
             targets: Targets tensor in original format
             
         Returns:
-            Converted targets tensor, or None if conversion fails
+            Converted targets tensor with empty targets filtered out, or None if conversion fails
             
         Time Complexity: O(T) where T is number of targets
         Space Complexity: O(T) for converted targets
         """
         try:
-            target_boxes = targets.clone()
+            # CRITICAL FIX: Filter out empty/invalid targets first
+            # Based on mAP debug logs, many targets are [0.0000, 0.0000, 0.0000, 0.0000]
+            # These cause false IoU matches and corrupt mAP calculations
+            
+            # Check for valid targets (non-zero area)
+            target_areas = targets[:, 4] * targets[:, 5]  # width * height
+            valid_mask = target_areas > 1e-6  # Filter out near-zero area targets
+            
+            if self.debug and valid_mask.sum() < len(targets):
+                removed_count = len(targets) - valid_mask.sum()
+                logger.debug(f"🧹 Filtered out {removed_count} empty/invalid targets (area ≤ 1e-6)")
+            
+            # Keep only valid targets
+            valid_targets = targets[valid_mask]
+            
+            if len(valid_targets) == 0:
+                if self.debug:
+                    logger.debug("⚠️ All targets filtered out - no valid targets remaining")
+                return torch.empty((0, 6), device=targets.device)
+            
+            target_boxes = valid_targets.clone()
             
             # Convert xywh to xyxy coordinates
-            target_boxes[:, 2:6] = get_xywh2xyxy()(targets[:, 2:6])
+            target_boxes[:, 2:6] = get_xywh2xyxy()(valid_targets[:, 2:6])
             
             # Reorder to [batch_idx, x1, y1, x2, y2, class]
             target_boxes = target_boxes[:, [0, 2, 3, 4, 5, 1]]
@@ -390,7 +413,41 @@ class BatchProcessor:
                 return self._compute_iou_matrix_chunked(pred_boxes, target_boxes_xyxy)
             
             # Direct computation for reasonable sizes
-            return get_box_iou()(pred_boxes, target_boxes_xyxy)
+            iou_matrix = get_box_iou()(pred_boxes, target_boxes_xyxy)
+            
+            # IoU DISTRIBUTION DEBUG LOGGING - Use MapDebugLogger if available
+            if self.debug and iou_matrix is not None and iou_matrix.numel() > 0:
+                # Check if we have access to the debug logger through a parent reference
+                debug_logger = getattr(self, 'debug_logger', None)
+                if debug_logger and hasattr(debug_logger, 'log_iou_distribution_analysis'):
+                    # Convert to expected format for the debug logger
+                    # Need to reconstruct predictions tensor from pred_boxes for debug logger
+                    try:
+                        # Create minimal predictions tensor with bbox coords for debugging
+                        batch_size = 1  # Assuming single batch
+                        num_preds = pred_boxes.shape[0]
+                        debug_predictions = torch.zeros(batch_size, num_preds, 6)  # x,y,w,h,conf,class
+                        debug_predictions[0, :, :4] = pred_boxes  # Copy bbox coordinates
+                        
+                        # Create minimal targets tensor with batch_idx and class info
+                        num_targets = target_boxes_xyxy.shape[0]
+                        debug_targets = torch.zeros(num_targets, 6)  # batch_idx, class, x, y, w, h
+                        debug_targets[:, 2:6] = target_boxes_xyxy  # Copy bbox coordinates
+                        
+                        debug_logger.log_iou_distribution_analysis(iou_matrix, debug_predictions, debug_targets)
+                    except Exception as e:
+                        logger.debug(f"Debug logger analysis failed: {e}")
+                        
+                # Fallback to basic logging if debug logger not available
+                else:
+                    max_ious, _ = torch.max(iou_matrix, dim=1)
+                    valid_ious = max_ious[max_ious > 0]
+                    if len(valid_ious) > 0:
+                        logger.debug(f"🔍 IoU DISTRIBUTION: Max={max_ious.max().item():.4f}, Mean={valid_ious.mean().item():.4f}")
+                    else:
+                        logger.debug(f"❌ IoU ANALYSIS: ALL IoUs are ZERO! Matrix shape: {iou_matrix.shape}")
+            
+            return iou_matrix
             
         except Exception as e:
             logger.error(f"Error computing IoU matrix: {e}")

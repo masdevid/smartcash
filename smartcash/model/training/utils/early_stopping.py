@@ -526,27 +526,30 @@ class PhaseSpecificEarlyStopping:
             
             return True
         
-        # Update wait counters and provide feedback
-        if self.verbose and (loss_plateaued or metric_stable):
-            status_parts = []
-            if loss_plateaued:
-                status_parts.append(f"Loss plateaued ({self.phase1_loss_wait}/{self.phase1_config['loss_patience']})")
-            if metric_stable:
-                status_parts.append(f"{metric_name} stable ({self.phase1_metric_wait}/{self.phase1_config['metric_patience']})")
-            
-            if status_parts:
-                print(f"⏳ Phase 1 ES: {' + '.join(status_parts)}")
+        # Note: Individual improvement/non-improvement logging is now handled in 
+        # _check_loss_plateau and _check_metric_stability methods
         
         return False
     
     def _check_loss_plateau(self, current_loss: float) -> bool:
         """Check if train loss has plateaued"""
         if self.phase1_best_loss is None or current_loss < (self.phase1_best_loss - self.phase1_config['loss_min_delta']):
+            # Loss improved
+            old_best = self.phase1_best_loss
             self.phase1_best_loss = current_loss
             self.phase1_loss_wait = 0
+            
+            if self.verbose and old_best is not None:
+                improvement = old_best - current_loss
+                print(f"📉 Phase 1: Train loss improved ↘️ {current_loss:.6f} (▼{improvement:.6f})")
+            
             return False
         else:
             self.phase1_loss_wait += 1
+            
+            if self.verbose:
+                print(f"⏳ Phase 1: Train loss plateau {current_loss:.6f} ({self.phase1_loss_wait}/{self.phase1_config['loss_patience']})")
+            
             return self.phase1_loss_wait >= self.phase1_config['loss_patience']
     
     def _check_metric_stability(self, current_metric: float) -> bool:
@@ -565,13 +568,28 @@ class PhaseSpecificEarlyStopping:
             # Significant improvement - reset wait
             self.phase1_best_metric = current_metric
             self.phase1_metric_wait = 0
+            
+            if self.verbose:
+                metric_name = self.phase1_config['metric_name']
+                print(f"📈 Phase 1: {metric_name} improved ↗️ {current_metric:.6f} (▲{improvement:.6f})")
+            
             return False
         elif improvement > stability_threshold:
             # Small improvement (naik pelan) - increment wait but slower
             self.phase1_metric_wait += 0.5
+            
+            if self.verbose:
+                metric_name = self.phase1_config['metric_name']
+                print(f"📊 Phase 1: {metric_name} small improvement ↗️ {current_metric:.6f} (▲{improvement:.6f}) - slow progress ({self.phase1_metric_wait:.1f}/{self.phase1_config['metric_patience']})")
+            
         else:
             # No improvement atau decline (stabil) - increment wait
             self.phase1_metric_wait += 1
+            
+            if self.verbose:
+                metric_name = self.phase1_config['metric_name']
+                decline_info = f"(▼{abs(improvement):.6f})" if improvement < 0 else "(stable)"
+                print(f"⏳ Phase 1: {metric_name} no improvement {current_metric:.6f} {decline_info} ({self.phase1_metric_wait}/{self.phase1_config['metric_patience']})")
         
         return self.phase1_metric_wait >= self.phase1_config['metric_patience']
     
@@ -643,18 +661,10 @@ class PhaseSpecificEarlyStopping:
             
             return True
         
-        # Provide progress feedback
-        if self.verbose and (f1_stagnant or map_stagnant or overfitting_detected):
-            status_parts = []
-            if f1_stagnant:
-                status_parts.append(f"F1 stagnant ({self.phase2_f1_wait}/{self.phase2_config['f1_patience']})")
-            if map_stagnant:
-                status_parts.append(f"mAP stagnant ({self.phase2_map_wait}/{self.phase2_config['map_patience']})")
-            if overfitting_detected:
-                status_parts.append(f"Overfitting risk ({self.phase2_overfitting_wait}/{self.phase2_config['overfitting_patience']})")
-            
-            if status_parts:
-                print(f"⏳ Phase 2 ES: {' + '.join(status_parts)}")
+        # Note: Individual improvement/non-improvement logging is now handled in 
+        # _check_phase2_metric_stagnation method. Only overfitting feedback here.
+        if self.verbose and overfitting_detected and not (f1_stagnant or map_stagnant):
+            print(f"⚠️ Phase 2: Overfitting risk detected ({self.phase2_overfitting_wait}/{self.phase2_config['overfitting_patience']})")
         
         return False
     
@@ -673,20 +683,37 @@ class PhaseSpecificEarlyStopping:
         
         if best_score is None or current_score > (best_score + min_improvement):
             # Improvement detected
+            old_best = best_score
             if metric_type == 'f1':
                 self.phase2_best_f1 = current_score
                 self.phase2_f1_wait = 0
             else:
                 self.phase2_best_map = current_score
                 self.phase2_map_wait = 0
+            
+            if self.verbose and old_best is not None:
+                improvement = current_score - old_best
+                metric_display = metric_type.upper()
+                print(f"📈 Phase 2: {metric_display} improved ↗️ {current_score:.6f} (▲{improvement:.6f})")
+            
             return False
         else:
             # No improvement
             if metric_type == 'f1':
                 self.phase2_f1_wait += 1
+                
+                if self.verbose:
+                    decline_info = f"(▼{abs(current_score - best_score):.6f})" if current_score < best_score else "(stable)"
+                    print(f"⏳ Phase 2: F1 no improvement {current_score:.6f} {decline_info} ({self.phase2_f1_wait}/{patience})")
+                
                 return self.phase2_f1_wait >= patience
             else:
                 self.phase2_map_wait += 1
+                
+                if self.verbose:
+                    decline_info = f"(▼{abs(current_score - best_score):.6f})" if current_score < best_score else "(stable)"
+                    print(f"⏳ Phase 2: mAP no improvement {current_score:.6f} {decline_info} ({self.phase2_map_wait}/{patience})")
+                
                 return self.phase2_map_wait >= patience
     
     def _check_overfitting(self) -> bool:
@@ -702,7 +729,14 @@ class PhaseSpecificEarlyStopping:
         
         if avg_recent_gap > overfitting_threshold:
             self.phase2_overfitting_wait += 1
+            
+            if self.verbose:
+                print(f"⚠️ Phase 2: Train/val gap high {avg_recent_gap:.6f} > {overfitting_threshold:.6f} ({self.phase2_overfitting_wait}/{self.phase2_config['overfitting_patience']})")
         else:
+            # Gap improved/normalized
+            if self.phase2_overfitting_wait > 0 and self.verbose:
+                print(f"✅ Phase 2: Train/val gap normalized {avg_recent_gap:.6f} ≤ {overfitting_threshold:.6f}")
+            
             self.phase2_overfitting_wait = 0
         
         return self.phase2_overfitting_wait >= self.phase2_config['overfitting_patience']

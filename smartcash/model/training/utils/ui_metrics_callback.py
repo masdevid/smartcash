@@ -107,9 +107,7 @@ class UIMetricsCallback:
         # Console output if verbose
         if self.verbose:
             self._print_console_metrics(phase, epoch, metrics, colored_metrics, **kwargs)
-            # Print loss breakdown if available
-            if loss_breakdown:
-                self._print_loss_breakdown(loss_breakdown)
+            # Loss breakdown is already printed within _print_console_metrics
         
         # Call UI callback if registered (pass loss breakdown too)
         if self.ui_callback:
@@ -150,10 +148,10 @@ class UIMetricsCallback:
             if metric_name in metrics:
                 self._print_metric(metric_name, metrics[metric_name], colored_metrics)
         
-        # Always show loss breakdown if available (regardless of filtering)
+        # Always show detailed loss breakdown if available (regardless of filtering)
         loss_breakdown = getattr(self, '_current_loss_breakdown', {})
         if loss_breakdown:
-            self._print_loss_breakdown_summary(loss_breakdown)
+            self._print_loss_breakdown(loss_breakdown)
         
         # Print layer-specific metrics
         layer_metrics = self._filter_layer_metrics(metrics, show_layers, filter_zeros)
@@ -334,10 +332,10 @@ class UIMetricsCallback:
         phase_num = self._extract_phase_number(phase, metrics)
         
         if phase_num == 1:
-            # Phase 1: Focus on core training metrics only
+            # Phase 1: Focus on core training metrics including mAP metrics
             core_metrics = [
                 'train_loss', 'val_loss', 'learning_rate', 'epoch',
-                'val_precision', 'val_recall', 'val_f1', 'val_accuracy',
+                'val_precision', 'val_recall', 'val_f1', 'val_accuracy', 'val_map50',
                 # Loss breakdown components
                 'train_box_loss', 'train_obj_loss', 'train_cls_loss',
                 'val_box_loss', 'val_obj_loss', 'val_cls_loss'
@@ -403,14 +401,15 @@ class UIMetricsCallback:
         Determine which layers to show and whether to filter zeros based on training phase.
         
         This implements intelligent phase-aware metrics logic aligned with new loss system:
-        - Phase 1: Simple YOLO loss - focus on layer_1, filter zeros for clean output
+        - Phase 1: Simple YOLO loss - show layer_1 metrics, but don't filter zeros to ensure visibility
         - Phase 2: Multi-task loss - show all layers with meaningful data
         - Auto-detect based on actual metrics and loss type
         """
         phase_num = self._extract_phase_number(phase, metrics)
 
         if phase_num == 1:
-            return ['layer_1'], True
+            # Phase 1: Show layer_1 metrics, but don't filter zeros to ensure all metrics are visible
+            return ['layer_1'], False
 
         active_layers = ['layer_1']  # Always include layer_1
         for layer in ['layer_2', 'layer_3']:

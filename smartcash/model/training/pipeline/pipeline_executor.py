@@ -570,6 +570,11 @@ class PipelineExecutor:
                     except Exception as e:
                         logger.warning(f"⚠️ Phase propagation failed (resume): {e}")
                     
+                    # CRITICAL FIX: Reset best metrics tracking for resumed Phase 2
+                    # This prevents Phase 2 from comparing against Phase 1's best metrics
+                    logger.info("🔄 Preparing for resumed Phase 2: resetting best metrics tracking")
+                    phase_manager.handle_phase_transition(2, {})
+                    
                     self.progress_tracker.start_phase('training_phase_2', 6)
                     phase2_result = phase_manager.run_training_phase(
                         phase_num=2, 
@@ -961,6 +966,11 @@ class PipelineExecutor:
         self.model = phase2_model
         logger.info("🔄 Model replaced with Phase 2 configuration")
         
+        # CRITICAL FIX: Reset best metrics tracking for Phase 2
+        # This prevents Phase 2 from comparing against Phase 1's best metrics
+        logger.info("🔄 Preparing for Phase 2: resetting best metrics tracking")
+        phase_manager.handle_phase_transition(2, {})
+        
         # Phase 2: Fine-tuning training
         self.progress_tracker.start_phase('training_phase_2', 6)
         return phase_manager.run_training_phase(
@@ -1203,6 +1213,11 @@ class PipelineExecutor:
                     logger.warning("⚠️ Model doesn't have current_phase attribute")
         except Exception as e:
             logger.warning(f"⚠️ Phase propagation failed: {e}")
+        
+        # CRITICAL FIX: Reset best metrics tracking for Phase 2
+        # This prevents Phase 2 from comparing against Phase 1's best metrics
+        logger.info("🔄 Preparing for Phase 2: resetting best metrics tracking")
+        phase_manager.handle_phase_transition(2, {})
         
         # Phase 2: Fine-tuning training
         self.progress_tracker.start_phase('training_phase_2', 6)

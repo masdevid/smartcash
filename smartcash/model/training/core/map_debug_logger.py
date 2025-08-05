@@ -61,6 +61,16 @@ class MapDebugLogger:
         # Debug configuration
         self.confidence_thresholds = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
     
+    def update_current_phase(self, phase_num: int):
+        """
+        Update the current phase in the training context.
+        
+        Args:
+            phase_num: Current phase number (1 or 2)
+        """
+        self.training_context['current_phase'] = phase_num
+        self.training_context['phase'] = phase_num  # Also set 'phase' key for compatibility
+    
     def setup_debug_logging(self, epoch: int) -> None:
         """
         Set up dedicated debug file logging for mAP analysis.
@@ -80,18 +90,19 @@ class MapDebugLogger:
             
         # Extract context information for filename
         backbone = self.training_context.get('backbone', 'unknown')
-        phase = self.training_context.get('current_phase', 'unknown')
+        # Try both 'current_phase' and 'phase' keys for phase detection
+        phase = self.training_context.get('current_phase') or self.training_context.get('phase', 'unknown')
         training_mode = self.training_context.get('training_mode', 'unknown')
         
         # Create debug log directory
-        debug_log_dir = Path(f"logs/validation_metrics/{backbone}")
+        debug_log_dir = Path(f"logs/validation_metrics/{backbone}/phase_{phase}")
         debug_log_dir.mkdir(parents=True, exist_ok=True)
 
         # Create timestamped debug log file with context
-        debug_log_file = debug_log_dir / f"map_debug_phase{phase}_epoch{epoch}.log"
+        debug_log_file = debug_log_dir / f"map_debug_epoch{epoch}.log"
         
         # Set up dedicated debug logger
-        logger_name = f"map_debug_phase{phase}_epoch{epoch}"
+        logger_name = f"map_debug_epoch{epoch}"
         self.debug_logger = logging.getLogger(logger_name)
         self.debug_logger.setLevel(logging.DEBUG)
         
@@ -257,7 +268,9 @@ class MapDebugLogger:
         self.write_debug_log("Training Context:")
         self.write_debug_log(f"  • Backbone: {self.training_context.get('backbone', 'unknown')}")
         self.write_debug_log(f"  • Training Mode: {self.training_context.get('training_mode', 'unknown')}")
-        self.write_debug_log(f"  • Current Phase: {self.training_context.get('current_phase', 'unknown')}")
+        # Try both phase keys for better compatibility
+        current_phase = self.training_context.get('current_phase') or self.training_context.get('phase', 'unknown')
+        self.write_debug_log(f"  • Current Phase: {current_phase}")
         self.write_debug_log(f"  • Session ID: {self.training_context.get('session_id', 'N/A')}")
         self.write_debug_log(f"  • Model Name: {self.training_context.get('model_name', 'N/A')}")
         self.write_debug_log(f"  • Layer Mode: {self.training_context.get('layer_mode', 'N/A')}")
@@ -472,6 +485,285 @@ class MapDebugLogger:
                 self.write_debug_log("   • Very low precision - likely IoU or class mismatch issues")
             elif overall_precision < 0.5:
                 self.write_debug_log("   • Low precision - model needs more training or threshold tuning")
+    
+    def log_phase_configuration(self, model, phase_num: int, detailed: bool = True):
+        """
+        Log detailed Phase configuration analysis for debugging.
+        
+        Args:
+            model: Training model instance
+            phase_num: Current training phase (1 or 2)
+            detailed: Whether to include detailed architecture analysis
+        """
+        try:
+            self.write_debug_log(f"\n" + "="*80)
+            self.write_debug_log(f"🔍 PHASE {phase_num} CONFIGURATION ANALYSIS")
+            self.write_debug_log(f"="*80)
+            
+            # Basic phase information
+            actual_phase = getattr(model, 'current_phase', None)
+            self.write_debug_log(f"📊 PHASE STATUS:")
+            self.write_debug_log(f"   • Expected phase: {phase_num}")
+            self.write_debug_log(f"   • Model current_phase: {actual_phase}")
+            self.write_debug_log(f"   • Phase match: {'✅' if actual_phase == phase_num else '❌'}")
+            
+            if phase_num == 1:
+                self.write_debug_log(f"\n🎯 PHASE 1 SPECIFIC CHECKS:")
+                self.write_debug_log(f"   Expected: Single-layer detection, frozen backbone, 7 classes")
+                
+                # Check backbone freezing
+                frozen_params = 0
+                trainable_params = 0
+                backbone_layers = []
+                
+                for name, param in model.named_parameters():
+                    if any(keyword in name.lower() for keyword in ['backbone', 'model.0', 'model.1', 'model.2', 'model.3', 'model.4']):
+                        backbone_layers.append(name)
+                        if param.requires_grad:
+                            trainable_params += 1
+                        else:
+                            frozen_params += 1
+                
+                self.write_debug_log(f"\n❄️ BACKBONE FREEZING STATUS:")
+                self.write_debug_log(f"   • Frozen parameters: {frozen_params}")
+                self.write_debug_log(f"   • Trainable parameters: {trainable_params}")
+                self.write_debug_log(f"   • Backbone properly frozen: {'✅' if trainable_params == 0 else '❌'}")
+                
+                if trainable_params > 0:
+                    self.write_debug_log(f"   ⚠️ WARNING: Phase 1 should have ALL backbone parameters frozen!")
+                    if detailed and len(backbone_layers) < 10:  # Only show if reasonable number
+                        trainable_layers = [name for name, param in model.named_parameters() 
+                                          if param.requires_grad and any(keyword in name.lower() 
+                                          for keyword in ['backbone', 'model.0', 'model.1', 'model.2', 'model.3', 'model.4'])]
+                        self.write_debug_log(f"   Trainable backbone layers: {trainable_layers[:5]}{'...' if len(trainable_layers) > 5 else ''}")
+                
+                # Check detection head configuration
+                if hasattr(model, 'yolov5_model') and hasattr(model.yolov5_model, 'model'):
+                    self.write_debug_log(f"\n🎯 DETECTION HEAD ANALYSIS:")
+                    yolo_model = model.yolov5_model.model
+                    
+                    if hasattr(yolo_model, 'model') and len(yolo_model.model) > 0:
+                        detection_head = yolo_model.model[-1]
+                        self.write_debug_log(f"   • Detection head type: {type(detection_head).__name__}")
+                        
+                        # Check multi-layer head
+                        if hasattr(detection_head, 'multi_layer_head'):
+                            ml_head = detection_head.multi_layer_head
+                            if ml_head:
+                                ml_phase = getattr(ml_head, 'current_phase', None)
+                                active_layers = getattr(ml_head, 'active_layers', None)
+                                layer_mode = getattr(ml_head, 'layer_mode', None)
+                                
+                                self.write_debug_log(f"   • Multi-layer head present: ✅")
+                                self.write_debug_log(f"   • ML head phase: {ml_phase}")
+                                self.write_debug_log(f"   • Active layers: {active_layers}")
+                                self.write_debug_log(f"   • Layer mode: {layer_mode}")
+                                
+                                # Phase 1 validation checks
+                                if phase_num == 1:
+                                    if active_layers != ['layer_1']:
+                                        self.write_debug_log(f"   ❌ ISSUE: Phase 1 should have active_layers=['layer_1'], got {active_layers}")
+                                    else:
+                                        self.write_debug_log(f"   ✅ Active layers correct for Phase 1")
+                                    
+                                    if layer_mode != 'single':
+                                        self.write_debug_log(f"   ❌ ISSUE: Phase 1 should have layer_mode='single', got {layer_mode}")
+                                    else:
+                                        self.write_debug_log(f"   ✅ Layer mode correct for Phase 1")
+                            else:
+                                self.write_debug_log(f"   ❌ Multi-layer head is None!")
+                        
+                        # Check detection head outputs
+                        if hasattr(detection_head, 'm') and detection_head.m:
+                            num_heads = len(detection_head.m)
+                            self.write_debug_log(f"\n🔢 DETECTION HEAD OUTPUTS:")
+                            self.write_debug_log(f"   • Number of detection heads: {num_heads}")
+                            
+                            for i, head in enumerate(detection_head.m):
+                                if hasattr(head, 'weight'):
+                                    output_size = head.weight.shape[0]
+                                    input_size = head.weight.shape[1]
+                                    self.write_debug_log(f"   • Head {i}: output_size={output_size}, input_size={input_size}")
+                                    
+                                    # Expected sizes for Phase 1 (7 classes)
+                                    # Standard YOLO: 3 anchors * (5 + 7 classes) = 36 per scale
+                                    expected_sizes = [36, 42, 84]  # Common configurations
+                                    if output_size not in expected_sizes:
+                                        self.write_debug_log(f"     ⚠️ Unusual output size for Phase 1 (expected one of {expected_sizes})")
+                
+                # Check loss configuration
+                self.write_debug_log(f"\n💔 LOSS CONFIGURATION:")
+                if hasattr(model, 'loss_coordinator'):
+                    loss_coord = model.loss_coordinator
+                    loss_phase = getattr(loss_coord, 'current_phase', None)
+                    self.write_debug_log(f"   • Loss coordinator phase: {loss_phase}")
+                    
+                    if hasattr(loss_coord, 'loss_config'):
+                        loss_type = loss_coord.loss_config.get('type', 'unknown')
+                        self.write_debug_log(f"   • Loss type: {loss_type}")
+                        
+                        if phase_num == 1 and loss_type != 'standard':
+                            self.write_debug_log(f"   ⚠️ WARNING: Phase 1 should use 'standard' YOLO loss, got '{loss_type}'")
+                
+            elif phase_num == 2:
+                self.write_debug_log(f"\n🎯 PHASE 2 SPECIFIC CHECKS:")
+                self.write_debug_log(f"   Expected: Multi-layer detection, unfrozen backbone, hierarchical classes")
+                
+                # Check backbone unfreezing
+                frozen_params = 0
+                trainable_params = 0
+                
+                for name, param in model.named_parameters():
+                    if any(keyword in name.lower() for keyword in ['backbone', 'model.0', 'model.1', 'model.2', 'model.3', 'model.4']):
+                        if param.requires_grad:
+                            trainable_params += 1
+                        else:
+                            frozen_params += 1
+                
+                self.write_debug_log(f"\n🔥 BACKBONE UNFREEZING STATUS:")
+                self.write_debug_log(f"   • Frozen parameters: {frozen_params}")
+                self.write_debug_log(f"   • Trainable parameters: {trainable_params}")
+                self.write_debug_log(f"   • Backbone properly unfrozen: {'✅' if trainable_params > 0 else '❌'}")
+                
+                if trainable_params == 0:
+                    self.write_debug_log(f"   ❌ WARNING: Phase 2 should have backbone parameters trainable!")
+            
+            self.write_debug_log(f"="*80)
+            
+        except Exception as e:
+            self.write_debug_log(f"❌ Error in phase configuration analysis: {e}")
+            logger.error(f"Phase configuration logging failed: {e}")
+    
+    def log_coordinate_format_analysis(self, predictions: torch.Tensor, targets: torch.Tensor):
+        """
+        Log detailed coordinate format analysis for debugging bbox alignment issues.
+        
+        Args:
+            predictions: Prediction tensor
+            targets: Target tensor
+        """
+        try:
+            self.write_debug_log(f"\n🔍 COORDINATE FORMAT ANALYSIS")
+            self.write_debug_log(f"="*50)
+            
+            if predictions.numel() > 0 and targets.numel() > 0:
+                # Analyze prediction coordinate ranges
+                pred_coords = predictions[:, :, :4]  # x, y, w, h
+                pred_ranges = {
+                    'x': (pred_coords[:, :, 0].min().item(), pred_coords[:, :, 0].max().item()),
+                    'y': (pred_coords[:, :, 1].min().item(), pred_coords[:, :, 1].max().item()),
+                    'w': (pred_coords[:, :, 2].min().item(), pred_coords[:, :, 2].max().item()),
+                    'h': (pred_coords[:, :, 3].min().item(), pred_coords[:, :, 3].max().item())
+                }
+                
+                # Analyze target coordinate ranges
+                target_coords = targets[:, 2:6]  # x, y, w, h (skip batch_idx, class)
+                target_ranges = {
+                    'x': (target_coords[:, 0].min().item(), target_coords[:, 0].max().item()),
+                    'y': (target_coords[:, 1].min().item(), target_coords[:, 1].max().item()),
+                    'w': (target_coords[:, 2].min().item(), target_coords[:, 2].max().item()),
+                    'h': (target_coords[:, 3].min().item(), target_coords[:, 3].max().item())
+                }
+                
+                self.write_debug_log(f"📊 COORDINATE RANGES:")
+                for coord in ['x', 'y', 'w', 'h']:
+                    pred_min, pred_max = pred_ranges[coord]
+                    tgt_min, tgt_max = target_ranges[coord]
+                    self.write_debug_log(f"   {coord.upper()}: Pred[{pred_min:.4f}, {pred_max:.4f}] vs Target[{tgt_min:.4f}, {tgt_max:.4f}]")
+                
+                # Check normalization
+                pred_normalized = all(v[1] <= 1.0 for v in pred_ranges.values())
+                target_normalized = all(v[1] <= 1.0 for v in target_ranges.values())
+                
+                self.write_debug_log(f"\n🔍 NORMALIZATION STATUS:")
+                self.write_debug_log(f"   • Predictions normalized (0-1): {pred_normalized}")
+                self.write_debug_log(f"   • Targets normalized (0-1): {target_normalized}")
+                
+                if pred_normalized != target_normalized:
+                    self.write_debug_log(f"   ❌ COORDINATE MISMATCH DETECTED!")
+                    self.write_debug_log(f"      This is likely the cause of zero IoU/TP!")
+                    self.write_debug_log(f"      Predictions: {'normalized' if pred_normalized else 'pixel coordinates'}")
+                    self.write_debug_log(f"      Targets: {'normalized' if target_normalized else 'pixel coordinates'}")
+                else:
+                    self.write_debug_log(f"   ✅ Coordinate systems match")
+                
+                # Sample coordinate analysis
+                self.write_debug_log(f"\n🔍 SAMPLE COORDINATES:")
+                sample_size = min(3, predictions.shape[1], targets.shape[0])
+                for i in range(sample_size):
+                    if i < predictions.shape[1]:
+                        pred_box = predictions[0, i, :4]
+                        self.write_debug_log(f"   Pred {i}: [{pred_box[0]:.4f}, {pred_box[1]:.4f}, {pred_box[2]:.4f}, {pred_box[3]:.4f}]")
+                    
+                    if i < targets.shape[0]:
+                        tgt_box = targets[i, 2:6]
+                        self.write_debug_log(f"   Target {i}: [{tgt_box[0]:.4f}, {tgt_box[1]:.4f}, {tgt_box[2]:.4f}, {tgt_box[3]:.4f}]")
+                
+            else:
+                self.write_debug_log(f"❌ Cannot analyze coordinates: empty tensors")
+                
+        except Exception as e:
+            self.write_debug_log(f"❌ Error in coordinate analysis: {e}")
+    
+    def log_iou_distribution_analysis(self, iou_matrix: torch.Tensor, predictions: torch.Tensor, targets: torch.Tensor):
+        """
+        Log detailed IoU distribution analysis for debugging matching issues.
+        
+        Args:
+            iou_matrix: IoU matrix between predictions and targets
+            predictions: Prediction tensor  
+            targets: Target tensor
+        """
+        try:
+            self.write_debug_log(f"\n🔍 IoU DISTRIBUTION ANALYSIS")
+            self.write_debug_log(f"="*50)
+            
+            if iou_matrix is not None and iou_matrix.numel() > 0:
+                # Overall IoU statistics
+                max_ious, best_target_idx = torch.max(iou_matrix, dim=1)
+                valid_ious = max_ious[max_ious > 0]
+                
+                self.write_debug_log(f"📊 IoU STATISTICS:")
+                self.write_debug_log(f"   • Matrix shape: {iou_matrix.shape}")
+                self.write_debug_log(f"   • Max IoU achieved: {max_ious.max().item():.4f}")
+                self.write_debug_log(f"   • Mean IoU (all): {max_ious.mean().item():.4f}")
+                
+                if len(valid_ious) > 0:
+                    self.write_debug_log(f"   • Mean IoU (non-zero): {valid_ious.mean().item():.4f}")
+                    self.write_debug_log(f"   • Non-zero IoUs: {len(valid_ious)}/{len(max_ious)}")
+                else:
+                    self.write_debug_log(f"   ❌ ALL IoUs are ZERO - complete bbox misalignment!")
+                
+                # IoU threshold analysis
+                self.write_debug_log(f"\n🎚️ IoU THRESHOLD ANALYSIS:")
+                thresholds = [0.1, 0.25, 0.5, 0.75]
+                for thresh in thresholds:
+                    count = (max_ious > thresh).sum().item()
+                    percentage = (count / len(max_ious)) * 100
+                    self.write_debug_log(f"   • IoU > {thresh}: {count}/{len(max_ious)} ({percentage:.1f}%)")
+                
+                # Show best matches
+                if len(valid_ious) > 0:
+                    top_k = min(5, len(max_ious))
+                    top_ious, top_indices = torch.topk(max_ious, top_k)
+                    self.write_debug_log(f"\n🏆 TOP {top_k} IoU MATCHES:")
+                    for i, (iou_val, pred_idx) in enumerate(zip(top_ious, top_indices)):
+                        target_idx = best_target_idx[pred_idx].item()
+                        self.write_debug_log(f"   • Match {i+1}: IoU={iou_val:.4f}, pred_idx={pred_idx.item()}, target_idx={target_idx}")
+                        
+                        # Show coordinate details for top matches
+                        if iou_val > 0 and pred_idx < predictions.shape[1] and target_idx < targets.shape[0]:
+                            pred_box = predictions[0, pred_idx, :4]
+                            target_box = targets[target_idx, 2:6]
+                            self.write_debug_log(f"     Pred box:   [{pred_box[0]:.4f}, {pred_box[1]:.4f}, {pred_box[2]:.4f}, {pred_box[3]:.4f}]")
+                            self.write_debug_log(f"     Target box: [{target_box[0]:.4f}, {target_box[1]:.4f}, {target_box[2]:.4f}, {target_box[3]:.4f}]")
+                
+            else:
+                self.write_debug_log(f"❌ Cannot analyze IoU: invalid matrix")
+                
+        except Exception as e:
+            self.write_debug_log(f"❌ Error in IoU analysis: {e}")
+    
 
 
 # Factory function for backward compatibility

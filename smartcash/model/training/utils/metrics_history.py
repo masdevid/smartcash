@@ -41,19 +41,9 @@ class EpochMetrics:
     val_map50_f1: Optional[float] = None
     val_map50_accuracy: Optional[float] = None
     
-    # Multi-task metrics (Phase 2)
-    total_loss: Optional[float] = None
-    layer_1_uncertainty: Optional[float] = None
-    layer_2_uncertainty: Optional[float] = None
-    layer_3_uncertainty: Optional[float] = None
-    
-    # Loss breakdown components (matching training system output)
-    train_box_loss: Optional[float] = None
-    train_obj_loss: Optional[float] = None
-    train_cls_loss: Optional[float] = None
-    val_box_loss: Optional[float] = None
-    val_obj_loss: Optional[float] = None
-    val_cls_loss: Optional[float] = None
+    # NOTE: Removed unused fields that were consistently null:
+    # - total_loss, layer_X_uncertainty (not implemented)
+    # - loss breakdown components (stored in additional_metrics instead)
     
     # Layer-specific metrics
     layer_1_accuracy: Optional[float] = None
@@ -298,40 +288,40 @@ class MetricsHistoryRecorder:
                 if metric in metrics:
                     setattr(epoch_record, metric, metrics[metric])
             
-            # Fill multi-task metrics (mainly Phase 2)
-            multitask_metrics = [
-                'total_loss', 'layer_1_uncertainty', 'layer_2_uncertainty', 'layer_3_uncertainty'
-            ]
-            for metric in multitask_metrics:
-                if metric in metrics:
-                    setattr(epoch_record, metric, metrics[metric])
-            
-            # Fill loss breakdown components (matching training system output)
-            loss_breakdown_metrics = [
-                'train_box_loss', 'train_obj_loss', 'train_cls_loss',
-                'val_box_loss', 'val_obj_loss', 'val_cls_loss'
-            ]
-            for metric in loss_breakdown_metrics:
-                if metric in metrics:
-                    setattr(epoch_record, metric, metrics[metric])
+            # NOTE: Removed multi-task and loss breakdown metrics processing
+            # These were consistently null and are now stored in additional_metrics
             
             # Fill layer-specific metrics
+            # Handle both formats: 'layer_1_accuracy' and 'val_layer_1_accuracy'
             layer_metrics = [
                 'layer_1_accuracy', 'layer_1_precision', 'layer_1_recall', 'layer_1_f1',
                 'layer_2_accuracy', 'layer_2_precision', 'layer_2_recall', 'layer_2_f1',
                 'layer_3_accuracy', 'layer_3_precision', 'layer_3_recall', 'layer_3_f1'
             ]
             for metric in layer_metrics:
+                # Try direct metric name first
                 if metric in metrics:
                     setattr(epoch_record, metric, metrics[metric])
+                # Try with val_ prefix (common format from validation)
+                elif f'val_{metric}' in metrics:
+                    setattr(epoch_record, metric, metrics[f'val_{metric}'])
             
             # Store additional metrics that don't fit standard schema
             additional = {}
-            standard_metrics = set(['epoch', 'phase'] + yolo_metrics + multitask_metrics + 
-                                   loss_breakdown_metrics + layer_metrics + 
+            # Include both layer_X_metric and val_layer_X_metric formats in standard metrics
+            val_layer_metrics = [f'val_{metric}' for metric in layer_metrics]
+            # Also include suspicious patterns to exclude them from additional_metrics
+            suspicious_patterns = ['train_val_', 'val_val_']
+            standard_metrics = set(['epoch', 'phase'] + yolo_metrics + layer_metrics + val_layer_metrics +
                                    ['train_loss', 'val_loss', 'learning_rate'])
+            
             for key, value in metrics.items():
-                if key not in standard_metrics and isinstance(value, (int, float)):
+                # Skip suspicious double-prefixed patterns
+                is_suspicious = any(key.startswith(pattern) for pattern in suspicious_patterns)
+                
+                if (key not in standard_metrics and 
+                    isinstance(value, (int, float)) and 
+                    not is_suspicious):
                     additional[key] = float(value)
             
             if additional:

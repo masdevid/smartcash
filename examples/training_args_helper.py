@@ -199,13 +199,16 @@ def print_training_configuration(args: Any) -> None:
     example_checkpoint_name = f"best_{args.backbone}_{args.training_mode}_{example_layer_mode}_{example_freeze_status}{example_pretrained}_YYYYMMDD.pt"
     print(f"   • Checkpoint naming: {example_checkpoint_name}")
     
+    # Learning Rate Configuration
+    print(f"\n📊 Learning Rate Configuration:")
+    print(f"   • Head LR-P1: {args.head_lr_p1}")
+    print(f"   • Head LR-P2: {args.head_lr_p2}")
+    print(f"   • Backbone LR: {args.backbone_lr}")
+    
     # Training parameters
     print(f"\n🎛️ Training Parameters:")
     training_params = [
         ("Loss type", args.loss_type),
-        ("Head LR (Phase 1)", args.head_lr_p1),
-        ("Head LR (Phase 2)", args.head_lr_p2),
-        ("Backbone LR", args.backbone_lr),
         ("Batch size", 'Auto-detected' if args.batch_size is None else args.batch_size),
         ("Verbose logging", 'Enabled' if args.verbose else 'Disabled'),
         ("Progress bars", 'Simple text' if args.no_tqdm else 'tqdm (visual)'),

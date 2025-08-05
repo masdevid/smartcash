@@ -290,6 +290,37 @@ def apply_training_overrides(config: Dict[str, Any], **kwargs) -> Dict[str, Any]
                 'combo_mode': 'both'
             }
     
+    # Learning rate overrides
+    if any(lr_key in kwargs for lr_key in ['head_lr_p1', 'head_lr_p2', 'backbone_lr']):
+        if 'training_phases' not in config:
+            config['training_phases'] = {}
+        
+        if 'head_lr_p1' in kwargs:
+            if 'phase_1' not in config['training_phases']:
+                config['training_phases']['phase_1'] = {}
+            if 'learning_rates' not in config['training_phases']['phase_1']:
+                config['training_phases']['phase_1']['learning_rates'] = {}
+            config['training_phases']['phase_1']['learning_rates']['head'] = kwargs['head_lr_p1']
+            logger.debug(f"🎯 Phase 1 head LR override: {kwargs['head_lr_p1']}")
+        
+        if 'head_lr_p2' in kwargs:
+            if 'phase_2' not in config['training_phases']:
+                config['training_phases']['phase_2'] = {}
+            if 'learning_rates' not in config['training_phases']['phase_2']:
+                config['training_phases']['phase_2']['learning_rates'] = {}
+            config['training_phases']['phase_2']['learning_rates']['head'] = kwargs['head_lr_p2']
+            logger.debug(f"🎯 Phase 2 head LR override: {kwargs['head_lr_p2']}")
+        
+        if 'backbone_lr' in kwargs:
+            # Apply backbone learning rate to both phases
+            for phase in ['phase_1', 'phase_2']:
+                if phase not in config['training_phases']:
+                    config['training_phases'][phase] = {}
+                if 'learning_rates' not in config['training_phases'][phase]:
+                    config['training_phases'][phase]['learning_rates'] = {}
+                config['training_phases'][phase]['learning_rates']['backbone'] = kwargs['backbone_lr']
+            logger.debug(f"🎯 Backbone LR override (both phases): {kwargs['backbone_lr']}")
+
     # Phase-specific epoch overrides
     if 'phase1_epochs' in kwargs and kwargs['phase1_epochs'] is not None:
         if 'training_phases' not in config:
@@ -327,6 +358,31 @@ def apply_training_overrides(config: Dict[str, Any], **kwargs) -> Dict[str, Any]
             config['model'] = {}
         config['model']['pretrained'] = kwargs['pretrained']
         logger.debug(f"🎯 Pretrained override: {kwargs['pretrained']}")
+    
+    # Optimizer and scheduler overrides
+    if 'optimizer' in kwargs and kwargs['optimizer']:
+        if 'training' not in config:
+            config['training'] = {}
+        config['training']['optimizer'] = kwargs['optimizer']
+        logger.debug(f"🎯 Optimizer override: {kwargs['optimizer']}")
+    
+    if 'scheduler' in kwargs and kwargs['scheduler']:
+        if 'training' not in config:
+            config['training'] = {}
+        config['training']['scheduler'] = kwargs['scheduler']
+        logger.debug(f"🎯 Scheduler override: {kwargs['scheduler']}")
+    
+    if 'weight_decay' in kwargs and kwargs['weight_decay'] is not None:
+        if 'training' not in config:
+            config['training'] = {}
+        config['training']['weight_decay'] = kwargs['weight_decay']
+        logger.debug(f"🎯 Weight decay override: {kwargs['weight_decay']}")
+    
+    if 'cosine_eta_min' in kwargs and kwargs['cosine_eta_min'] is not None:
+        if 'training' not in config:
+            config['training'] = {}
+        config['training']['cosine_eta_min'] = kwargs['cosine_eta_min']
+        logger.debug(f"🎯 Cosine eta min override: {kwargs['cosine_eta_min']}")
     
     # Verbose override
     if 'verbose' in kwargs and kwargs['verbose'] is not None:

@@ -80,6 +80,7 @@ def cleanup_memory(verbose: bool = False):
     Args:
         verbose: Whether to print memory cleanup details
     """
+    memory_before = 0
     if verbose:
         memory_before = get_memory_usage()
         print(f"🧹 MEMORY CLEANUP: Starting cleanup (Memory: {memory_before:.1f} MB)")
@@ -122,27 +123,17 @@ def setup_signal_handlers(verbose: bool = False):
     Args:
         verbose: Whether to print signal handler setup details
     """
-    def signal_handler(signum, _):
+    def signal_handler(_signum, _frame):
         """Handle interruption signals with memory cleanup."""
-        signal_name = signal.Signals(signum).name
-        print(f"\n🛑 TRAINING INTERRUPTED by {signal_name}")
-        print("🧹 Performing emergency memory cleanup...")
-        
         try:
-            cleanup_memory(verbose=verbose)
-            print("✅ Memory cleanup completed successfully")
-        except Exception as e:
-            print(f"⚠️ Memory cleanup error: {str(e)}")
-        
-        print("👋 Exiting gracefully...")
+            cleanup_memory(verbose=False)
+        except Exception:
+            pass
         sys.exit(1)
     
     # Register signal handlers for common interruption signals
     signal.signal(signal.SIGINT, signal_handler)   # Ctrl+C
     signal.signal(signal.SIGTERM, signal_handler)  # Termination request
-    
-    if verbose:
-        print("🛡️ Signal handlers registered for graceful interruption handling")
 
 
 def create_log_callback(verbose: bool = True):
@@ -431,57 +422,14 @@ def main():
     parser = create_training_arg_parser('SmartCash Callback-Only Training Example')
     args = parser.parse_args()
     
-    print("🚀 STARTING SmartCash Callback-Only Training")
-    print("=" * 60)
-    
     # Setup memory management and signal handlers
     setup_signal_handlers(verbose=args.verbose)
-    if args.verbose:
-        initial_memory = get_memory_usage()
-        print(f"💾 Initial memory usage: {initial_memory:.1f} MB")
-    
-    print("Only callback outputs will be shown below:")
-    print("=" * 60)
     
     try:
         # Create callbacks - these are the ONLY output sources
         log_callback = create_log_callback(args.verbose)
         metrics_callback = create_metrics_callback(args.verbose)
         progress_callback = create_progress_callback(args.verbose)
-        
-        # Show training configuration info
-        if args.training_mode == 'two_phase':
-            print("🎯 TWO-PHASE MODE: Early stopping disabled for Phase 1, enabled for Phase 2")
-        else:
-            print("🎯 SINGLE-PHASE MODE: Early stopping uses your configuration")
-        
-        # Show optimizer and scheduler info
-        print(f"⚙️ OPTIMIZER: {args.optimizer.upper()} with {args.scheduler} scheduler (weight_decay={args.weight_decay})")
-        if args.scheduler == 'cosine':
-            print(f"   └─ Cosine annealing: eta_min={args.cosine_eta_min}")
-        
-        # Show validation metrics configuration
-        print("📊 VALIDATION METRICS: YOLOv5 hierarchical + per-layer metrics")
-        print("   └─ YOLOv5: accuracy=mAP@0.5, precision/recall/F1 from hierarchical object detection")
-        print("   └─ Per-layer: layer_1_accuracy, layer_2_accuracy, layer_3_accuracy")
-        
-        # Show resume info
-        if args.resume:
-            if args.resume == 'auto':
-                print("🔄 RESUME TRAINING: Auto-detecting latest checkpoint")
-            else:
-                print(f"🔄 RESUME TRAINING: Loading from {args.resume}")
-            resume_components = []
-            if args.resume_optimizer:
-                resume_components.append("optimizer state")
-            if args.resume_scheduler:
-                resume_components.append("scheduler state")
-            if resume_components:
-                print(f"   └─ Resuming: {', '.join(resume_components)}")
-            if args.resume_epoch:
-                print(f"   └─ Epoch override: {args.resume_epoch}")
-        else:
-            print("🔄 TRAINING FROM SCRATCH: No checkpoint resume")
         
         # Get training arguments
         training_kwargs = get_training_kwargs(args)
@@ -499,12 +447,7 @@ def main():
                 checkpoint_path = find_latest_checkpoint(args.checkpoint_dir, args.backbone)
                 
                 if not checkpoint_path:
-                    print("❌ No 'last_*.pt' checkpoints found for auto-resume")
-                    print(f"💡 Searched in: {args.checkpoint_dir}")
-                    print("💡 Run training without --resume to start fresh, or specify a checkpoint path")
                     return 1
-                
-                print(f"🔍 Auto-detected checkpoint: {Path(checkpoint_path).name}")
             
             # Load the checkpoint
             resume_info = load_legacy_checkpoint_for_resume(checkpoint_path)
@@ -513,11 +456,7 @@ def main():
                     'resume_from_checkpoint': True,
                     'resume_info': resume_info
                 })
-                print(f"✅ Successfully loaded checkpoint: epoch {resume_info['epoch']} (phase {resume_info.get('phase', 'N/A')})")
             else:
-                print(f"❌ FAILED to load checkpoint {checkpoint_path}")
-                print("❌ TRAINING TERMINATED - Invalid checkpoint file")
-                print("💡 Please check the checkpoint path and try again")
                 return 1  # Exit with error code instead of continuing
         
         # Set model configuration using arguments from args
@@ -546,39 +485,17 @@ def main():
         # Run training pipeline - all output comes from callbacks
         result = run_full_training_pipeline(**training_kwargs)
         
-        # Only show final result status
-        print("=" * 60)
-        if result.get('success'):
-            print("✅ TRAINING COMPLETED SUCCESSFULLY")
-            exit_code = 0
-        else:
-            print("❌ TRAINING FAILED")
-            error = result.get('error', 'Unknown error')
-            print(f"Error: {error}")
-            exit_code = 1
-        print("=" * 60)
-        
         # Perform final memory cleanup
-        if args.verbose:
-            print("🧹 Performing final memory cleanup...")
-        cleanup_memory(verbose=args.verbose)
+        cleanup_memory(verbose=False)
         
-        return exit_code
+        return 0 if result.get('success') else 1
             
     except KeyboardInterrupt:
-        print("\n⚠️ TRAINING INTERRUPTED BY USER")
-        print("🧹 Performing cleanup after interruption...")
-        cleanup_memory(verbose=args.verbose)
+        cleanup_memory(verbose=False)
         return 1
         
-    except Exception as e:
-        print(f"\n❌ UNEXPECTED ERROR: {str(e)}")
-        if args.verbose:
-            import traceback
-            traceback.print_exc()
-        
-        print("🧹 Performing cleanup after error...")
-        cleanup_memory(verbose=args.verbose)
+    except Exception:
+        cleanup_memory(verbose=False)
         return 1
 
 

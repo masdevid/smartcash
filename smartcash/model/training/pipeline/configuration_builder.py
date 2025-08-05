@@ -157,12 +157,20 @@ class ConfigurationBuilder:
         return {
             'phase_1': {
                 'learning_rate': 0.001,
+                'learning_rates': {
+                    'head': 0.001,  # Default head LR for phase 1
+                    'backbone': 0.0001  # Default backbone LR (lower)
+                },
                 'freeze_backbone': True,
                 'layer_mode': 'single',
                 'description': 'Frozen backbone training'
             },
             'phase_2': {
                 'learning_rate': 0.0001,
+                'learning_rates': {
+                    'head': 0.0001,  # Default head LR for phase 2
+                    'backbone': 0.00001  # Default backbone LR (even lower for fine-tuning)
+                },
                 'freeze_backbone': False,
                 'layer_mode': 'multi',
                 'description': 'Fine-tuning with multi-layer'

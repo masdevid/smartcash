@@ -136,9 +136,7 @@ class OptimizerFactory:
         """Create learning rate scheduler"""
         total_epochs = total_epochs or self.total_epochs
         
-        # Only use scheduler in phase 2
-        if self.phase != 2:
-            return None
+        # Use scheduler for both phases by default (cosine annealing)
             
         if self.scheduler_type == 'cosine':
             return torch.optim.lr_scheduler.CosineAnnealingLR(

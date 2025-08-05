@@ -90,8 +90,15 @@ class PhaseOrchestrator:
             # Set up optimizer and scheduler
             optimizer_factory = OptimizerFactory(self.config)
             base_lr = phase_config.get('learning_rate', 0.001)
+            
+            # Log learning rate configuration for this phase
+            self._log_learning_rate_configuration(phase_num, base_lr, phase_config)
+            
             optimizer = optimizer_factory.create_optimizer(self.model, base_lr)
             scheduler = optimizer_factory.create_scheduler(optimizer, total_epochs=epochs)
+            
+            # Log scheduler configuration for this phase
+            self._log_scheduler_configuration(phase_num, scheduler, optimizer_factory)
             
             # Set up mixed precision scaler
             scaler = None
@@ -216,14 +223,14 @@ class PhaseOrchestrator:
     
     def setup_early_stopping(self, phase_num: int, save_best_path: Optional[str] = None):
         """Set up phase-specific early stopping configuration."""
-        # Get base early stopping configuration
+        # Get base early stopping configurationComprehensiveMetricsTracker
         es_config = self.config.get('training', {}).get('early_stopping', {})
         
         # Log the early stopping configuration for debugging
         logger.info(f"🔍 Early stopping config: {es_config}")
         
         # Check if phase-specific early stopping is enabled
-        use_phase_specific = es_config.get('phase_specific', False)
+        use_phase_specific = es_config.get('phase_specific', True)
         
         if use_phase_specific:
             logger.info(f"🎯 Using phase-specific early stopping for Phase {phase_num}")
@@ -381,6 +388,75 @@ class PhaseOrchestrator:
     def is_single_phase(self) -> bool:
         """Get single phase mode flag."""
         return self._is_single_phase
+    
+    def _log_learning_rate_configuration(self, phase_num: int, base_lr: float, phase_config: Dict[str, Any]):
+        """Log learning rate configuration for the current phase."""
+        logger.info(f"📊 Phase {phase_num} Learning Rate Configuration:")
+        
+        # Get learning rates from the phase config (which may include overrides)
+        learning_rates = phase_config.get('learning_rates', {})
+        head_lr = learning_rates.get('head', base_lr)
+        backbone_lr = learning_rates.get('backbone', base_lr * 0.1)  # Default scaling
+        
+        # Log the actual learning rates being used
+        logger.info(f"   • Head LR-P{phase_num}: {head_lr}")
+        logger.info(f"   • Backbone LR: {backbone_lr}")
+        
+        # Determine source of learning rates by checking if they differ from args defaults
+        # These are the actual defaults from training_args_helper.py
+        args_default_head_lr_p1 = 1e-3  # 0.001
+        args_default_head_lr_p2 = 1e-4  # 0.0001  
+        args_default_backbone_lr = 1e-5  # 0.00001 (same for both phases)
+        
+        is_custom = False
+        if phase_num == 1:
+            is_custom = (abs(head_lr - args_default_head_lr_p1) > 1e-9 or abs(backbone_lr - args_default_backbone_lr) > 1e-9)
+        else:
+            is_custom = (abs(head_lr - args_default_head_lr_p2) > 1e-9 or abs(backbone_lr - args_default_backbone_lr) > 1e-9)
+        
+        source = "Command-line overrides" if is_custom else "Default configuration"
+        logger.info(f"   • Learning rates from: {source}")
+    
+    def _log_scheduler_configuration(self, phase_num: int, scheduler, optimizer_factory):
+        """Log scheduler configuration for the current phase."""
+        logger.info(f"⚙️ Phase {phase_num} Scheduler Configuration:")
+        
+        # Get scheduler configuration from optimizer factory (it has the actual config)
+        scheduler_type = optimizer_factory.scheduler_type
+        optimizer_type = optimizer_factory.optimizer_type
+        weight_decay = optimizer_factory.weight_decay
+        
+        # Log scheduler information
+        if scheduler is not None:
+            scheduler_name = scheduler.__class__.__name__
+            logger.info(f"   • Scheduler: {scheduler_type} ({scheduler_name})")
+            
+            # Log scheduler-specific parameters
+            if scheduler_type == 'cosine':
+                cosine_eta_min = optimizer_factory.cosine_eta_min
+                logger.info(f"   • Cosine eta min: {cosine_eta_min}")
+                if hasattr(scheduler, 'T_max'):
+                    logger.info(f"   • T_max (epochs): {scheduler.T_max}")
+            elif scheduler_type == 'step':
+                if hasattr(scheduler, 'step_size'):
+                    logger.info(f"   • Step size: {scheduler.step_size}")
+                if hasattr(scheduler, 'gamma'):
+                    logger.info(f"   • Gamma: {scheduler.gamma}")
+            elif scheduler_type == 'plateau':
+                if hasattr(scheduler, 'factor'):
+                    logger.info(f"   • Factor: {scheduler.factor}")
+                if hasattr(scheduler, 'patience'):
+                    logger.info(f"   • Patience: {scheduler.patience}")
+        else:
+            logger.info(f"   • Scheduler: None (Phase {phase_num} uses no scheduler)")
+        
+        # Log optimizer information
+        logger.info(f"   • Optimizer: {optimizer_type}")
+        logger.info(f"   • Weight decay: {weight_decay}")
+        
+        # Mixed precision info
+        mixed_precision = optimizer_factory.mixed_precision
+        logger.info(f"   • Mixed precision: {'Enabled' if mixed_precision else 'Disabled'}")
     
     def _log_memory_optimization_info(self):
         """Log memory optimization and batch size information."""

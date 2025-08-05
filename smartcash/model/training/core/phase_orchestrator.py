@@ -389,30 +389,42 @@ class PhaseOrchestrator:
         """Get single phase mode flag."""
         return self._is_single_phase
     
-    def _log_learning_rate_configuration(self, phase_num: int, base_lr: float, phase_config: Dict[str, Any]):
+    def _log_learning_rate_configuration(self, phase_num: int, _base_lr: float, _phase_config: Dict[str, Any]):
         """Log learning rate configuration for the current phase."""
         logger.info(f"📊 Phase {phase_num} Learning Rate Configuration:")
         
-        # Get learning rates from the phase config (which may include overrides)
-        learning_rates = phase_config.get('learning_rates', {})
-        head_lr = learning_rates.get('head', base_lr)
-        backbone_lr = learning_rates.get('backbone', base_lr * 0.1)  # Default scaling
-        
-        # Log the actual learning rates being used
-        logger.info(f"   • Head LR-P{phase_num}: {head_lr}")
-        logger.info(f"   • Backbone LR: {backbone_lr}")
-        
-        # Determine source of learning rates by checking if they differ from args defaults
-        # These are the actual defaults from training_args_helper.py
+        # Format learning rates with scientific notation for default values
         args_default_head_lr_p1 = 1e-3  # 0.001
         args_default_head_lr_p2 = 1e-4  # 0.0001  
-        args_default_backbone_lr = 1e-5  # 0.00001 (same for both phases)
+        args_default_backbone_lr = 1e-5  # 0.00001
         
-        is_custom = False
-        if phase_num == 1:
-            is_custom = (abs(head_lr - args_default_head_lr_p1) > 1e-9 or abs(backbone_lr - args_default_backbone_lr) > 1e-9)
-        else:
-            is_custom = (abs(head_lr - args_default_head_lr_p2) > 1e-9 or abs(backbone_lr - args_default_backbone_lr) > 1e-9)
+        # Get both phase configurations to show complete learning rate setup
+        training_phases = self.config.get('training_phases', {})
+        phase_1_config = training_phases.get('phase_1', {})
+        phase_2_config = training_phases.get('phase_2', {})
+        
+        # Get learning rates for both phases
+        phase_1_lr = phase_1_config.get('learning_rates', {})
+        phase_2_lr = phase_2_config.get('learning_rates', {})
+        
+        head_lr_p1 = phase_1_lr.get('head', args_default_head_lr_p1)
+        head_lr_p2 = phase_2_lr.get('head', args_default_head_lr_p2)
+        backbone_lr = phase_1_lr.get('backbone', args_default_backbone_lr)  # Same for both phases
+        
+        # Format for display - use scientific notation for default values
+        head_lr_p1_display = "1e-03" if abs(head_lr_p1 - args_default_head_lr_p1) < 1e-9 else f"{head_lr_p1}"
+        head_lr_p2_display = "1e-04" if abs(head_lr_p2 - args_default_head_lr_p2) < 1e-9 else f"{head_lr_p2}"
+        backbone_lr_display = "1e-05" if abs(backbone_lr - args_default_backbone_lr) < 1e-9 else f"{backbone_lr}"
+        
+        # Log both phases for complete picture
+        logger.info(f"   • Head LR (Phase 1): {head_lr_p1_display}")
+        logger.info(f"   • Head LR (Phase 2): {head_lr_p2_display}")
+        logger.info(f"   • Backbone LR: {backbone_lr_display}")
+        
+        # Determine source of learning rates by checking if they differ from defaults
+        is_custom = (abs(head_lr_p1 - args_default_head_lr_p1) > 1e-9 or 
+                    abs(head_lr_p2 - args_default_head_lr_p2) > 1e-9 or 
+                    abs(backbone_lr - args_default_backbone_lr) > 1e-9)
         
         source = "Command-line overrides" if is_custom else "Default configuration"
         logger.info(f"   • Learning rates from: {source}")

@@ -201,9 +201,15 @@ def print_training_configuration(args: Any) -> None:
     
     # Learning Rate Configuration
     print(f"\n📊 Learning Rate Configuration:")
-    print(f"   • Head LR-P1: {args.head_lr_p1}")
-    print(f"   • Head LR-P2: {args.head_lr_p2}")
-    print(f"   • Backbone LR: {args.backbone_lr}")
+    
+    # Format learning rates - use scientific notation for default values
+    head_lr_p1_display = "1e-03" if args.head_lr_p1 == 1e-3 else f"{args.head_lr_p1}"
+    head_lr_p2_display = "1e-04" if args.head_lr_p2 == 1e-4 else f"{args.head_lr_p2}"
+    backbone_lr_display = "1e-05" if args.backbone_lr == 1e-5 else f"{args.backbone_lr}"
+    
+    print(f"   • Head LR (Phase 1): {head_lr_p1_display}")
+    print(f"   • Head LR (Phase 2): {head_lr_p2_display}")
+    print(f"   • Backbone LR: {backbone_lr_display}")
     
     # Training parameters
     print(f"\n🎛️ Training Parameters:")

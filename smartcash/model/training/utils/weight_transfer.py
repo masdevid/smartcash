@@ -304,7 +304,8 @@ class WeightTransferManager:
             return {'compatible': False, 'error': str(e)}
 
 
-# Factory function
-def create_weight_transfer_manager() -> WeightTransferManager:
-    """Create weight transfer manager instance."""
+def create_weight_transfer_manager():
+    """Factory function to create a WeightTransferManager instance."""
     return WeightTransferManager()
+
+

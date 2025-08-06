@@ -124,29 +124,22 @@ class TrainingProgressTracker:
         
         if self.progress_callback:
             self.progress_callback(phase_name, 0, total_steps, f"Starting {phase_name.replace('_', ' ').title()}")
-    
-    def update_phase(self, current_step: int, total_steps: int, message: str = "", **kwargs):
-        """Update progress within current phase.
-        
-        Args:
-            current_step: Current step in the phase (0-based)
-            total_steps: Total steps in the phase
-            message: Optional status message
-            **kwargs: Additional arguments to pass to the callback
-            
-        Note:
-            Ensures progress stays within 0-100% range to prevent tqdm warnings.
-        """
-        if not self.current_phase:
-            return
-            
-        # Calculate overall progress
-        phase_progress = (self.current_phase_index / max(1, len(self.phases))) * 100  # Avoid division by zero
-        step_progress = (current_step / max(1, total_steps)) * (100 / max(1, len(self.phases)))  # Avoid division by zero
-        overall_progress = min(100.0, max(0.0, phase_progress + step_progress))  # Clamp between 0 and 100
-            
+
+    def update_overall_progress(self, current_phase_name: str, current_step: int, total_steps: int):
+        """Update the overall progress bar with named steps."""
         if self.progress_callback:
-            self.progress_callback('overall', overall_progress, 100, message, **kwargs)
+            # The overall progress bar is managed by the executor, not the orchestrator
+            # This method is called by the executor to update its overall progress
+            # The orchestrator's progress_tracker is a sub-tracker
+            self.progress_callback('overall', current_step, total_steps, current_phase_name)
+
+    def update_overall_progress(self, current_phase_name: str, current_step: int, total_steps: int):
+        """Update the overall progress bar with named steps."""
+        if self.progress_callback:
+            # The overall progress bar is managed by the executor, not the orchestrator
+            # This method is called by the executor to update its overall progress
+            # The orchestrator's progress_tracker is a sub-tracker
+            self.progress_callback('overall', current_step, total_steps, current_phase_name)
     
     def start_epoch_tracking(self, total_epochs: int):
         """Start epoch progress tracking."""

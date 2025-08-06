@@ -5,28 +5,21 @@ This module provides a modular phase management system with proper inheritance
 hierarchy and mixins for different training phase responsibilities.
 """
 
+# Main training executor
+from .training_executor import TrainingPhaseExecutor
+
+# Core components  
 from .base import BasePhaseManager
 from .mixins.metrics_processing import MetricsProcessingMixin
-from .mixins.model_configuration import ModelConfigurationMixin
-from .mixins.component_setup import ComponentSetupMixin
+# Note: ModelConfigurationMixin and ComponentSetupMixin integrated into PipelineOrchestrator
 from .mixins.progress_tracking import ProgressTrackingMixin
-from .orchestrator import PhaseOrchestrator
-from .manager import TrainingPhaseManager
-from .configurator import PhaseConfigurator
-from .executor import PhaseExecutor
-
-# For backward compatibility
-from .manager import TrainingPhaseManager as TrainingPhaseManager
-from .orchestrator import PhaseOrchestrator as PhaseOrchestrator
+from .mixins.callbacks import CallbacksMixin
+# Note: Phase orchestration is now handled by PipelineOrchestrator
 
 __all__ = [
-    'BasePhaseManager',
+    'TrainingPhaseExecutor',
+    'BasePhaseManager', 
     'MetricsProcessingMixin',
-    'ModelConfigurationMixin', 
-    'ComponentSetupMixin',
     'ProgressTrackingMixin',
-    'PhaseOrchestrator',
-    'TrainingPhaseManager',
-    'PhaseConfigurator',
-    'PhaseExecutor'
+    'CallbacksMixin'
 ]

@@ -1,0 +1,33 @@
+[
+  {
+    "epoch": 0,
+    "phase": 2,
+    "timestamp": "2025-08-07T04:05:35.198421",
+    "train_loss": 1.087032,
+    "val_loss": 10.00437,
+    "learning_rate": 1e-06,
+    "val_map50": 0.0,
+    "val_map50_95": null,
+    "val_precision": 0.1772,
+    "val_recall": 0.0204,
+    "val_f1": 0.036,
+    "val_accuracy": 0.0204,
+    "val_map50_precision": null,
+    "val_map50_recall": null,
+    "val_map50_f1": null,
+    "val_map50_accuracy": null,
+    "layer_1_accuracy": null,
+    "layer_1_precision": null,
+    "layer_1_recall": null,
+    "layer_1_f1": null,
+    "layer_2_accuracy": null,
+    "layer_2_precision": null,
+    "layer_2_recall": null,
+    "layer_2_f1": null,
+    "layer_3_accuracy": null,
+    "layer_3_precision": null,
+    "layer_3_recall": null,
+    "layer_3_f1": null,
+    "additional_metrics": null
+  }
+]

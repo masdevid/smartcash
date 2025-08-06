@@ -147,24 +147,26 @@ class ConfigurationBuilder:
         # Note: base_config parameter kept for interface consistency
         return {
             'phase_1': {
-                'learning_rate': 0.001,
+                'description': 'Train detection heads with frozen backbone',
+                'epochs': base_config.get('phase_1_epochs', 1),
+                'freeze_backbone': True,
                 'learning_rates': {
                     'head': 0.001,  # Default head LR for phase 1
                     'backbone': 0.0001  # Default backbone LR (lower)
                 },
-                'freeze_backbone': True,
                 'layer_mode': 'single',
-                'description': 'Frozen backbone training'
+                'warmup_epochs': 0
             },
             'phase_2': {
-                'learning_rate': 0.0001,
+                'description': 'Fine-tune entire model',
+                'epochs': base_config.get('phase_2_epochs', 1),
+                'freeze_backbone': False,
                 'learning_rates': {
                     'head': 0.0001,  # Default head LR for phase 2
                     'backbone': 0.00001  # Default backbone LR (even lower for fine-tuning)
                 },
-                'freeze_backbone': False,
                 'layer_mode': 'multi',
-                'description': 'Fine-tuning with multi-layer'
+                'warmup_epochs': 0
             }
         }
     

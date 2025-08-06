@@ -6,13 +6,10 @@ to create specialized phase managers.
 """
 
 from .metrics_processing import MetricsProcessingMixin
-from .model_configuration import ModelConfigurationMixin
-from .component_setup import ComponentSetupMixin
 from .progress_tracking import ProgressTrackingMixin
+# Note: ModelConfigurationMixin and ComponentSetupMixin integrated into PipelineOrchestrator
 
 __all__ = [
     'MetricsProcessingMixin',
-    'ModelConfigurationMixin',
-    'ComponentSetupMixin',
     'ProgressTrackingMixin'
 ]

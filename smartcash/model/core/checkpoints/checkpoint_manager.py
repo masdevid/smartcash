@@ -449,6 +449,82 @@ class CheckpointManager:
             self.logger.warning(f"⚠️ Error extracting model info: {str(e)}")
             return {'error': str(e)}
     
+    def get_last_checkpoint_path(self) -> Optional[str]:
+        """🔍 Find the most recent 'last_*.pt' checkpoint."""
+        try:
+            last_checkpoints = list(self.save_dir.glob("last_*.pt"))
+            if not last_checkpoints:
+                return None
+            
+            # Sort by modification time (newest first)
+            last_checkpoints.sort(key=lambda x: x.stat().st_mtime, reverse=True)
+            return str(last_checkpoints[0])
+        except Exception as e:
+            self.logger.error(f"❌ Failed to find last checkpoint: {str(e)}")
+            return None
+
+    def check_for_resumable_checkpoint(self, backbone: str) -> Optional[Dict[str, Any]]:
+        """🔄 Check for resumable checkpoint for given backbone."""
+        try:
+            # Find all checkpoint files for this backbone
+            pattern = f"{backbone}_phase*_epoch*_best_*.pt"
+            checkpoint_files = list(self.save_dir.glob(pattern))
+            
+            if not checkpoint_files:
+                self.logger.info(f"📋 No resumable checkpoints found for {backbone}")
+                return None
+            
+            # Sort by modification time (most recent first)
+            checkpoint_files.sort(key=lambda x: x.stat().st_mtime, reverse=True)
+            
+            # Try to load the most recent checkpoint
+            for checkpoint_file in checkpoint_files:
+                try:
+                    resume_info = self.load_checkpoint_for_resume(str(checkpoint_file))
+                    if resume_info:
+                        return resume_info
+                except Exception as e:
+                    self.logger.warning(f"⚠️ Failed to load checkpoint {checkpoint_file.name}: {e}")
+                    continue
+            
+            self.logger.info(f"❌ No valid resumable checkpoints found for {backbone}")
+            return None
+            
+        except Exception as e:
+            self.logger.error(f"❌ Error checking for resumable checkpoint: {e}")
+            return None
+
+    def load_checkpoint_for_resume(self, checkpoint_path: str, verbose: bool = True) -> Optional[Dict[str, Any]]:
+        """📂 Load checkpoint data specifically for training resume."""
+        try:
+            from smartcash.common.checkpoint_utils import safe_load_checkpoint
+            checkpoint_data = safe_load_checkpoint(checkpoint_path)
+            
+            if not checkpoint_data:
+                return None
+            
+            # Extract resume information
+            resume_info = {
+                'checkpoint_path': checkpoint_path,
+                'epoch': checkpoint_data.get('epoch', 0),
+                'phase': checkpoint_data.get('phase', 1),
+                'metrics': checkpoint_data.get('metrics', {}),
+                'session_id': checkpoint_data.get('session_id'),
+                'model_config': checkpoint_data.get('model_config', {}),
+                'optimizer_state': checkpoint_data.get('optimizer_state_dict'),
+                'scheduler_state': checkpoint_data.get('scheduler_state_dict')
+            }
+            
+            if verbose:
+                self.logger.info(f"📂 Loaded resume info from {Path(checkpoint_path).name}")
+                self.logger.info(f"   Phase: {resume_info['phase']}, Epoch: {resume_info['epoch']}")
+            
+            return resume_info
+            
+        except Exception as e:
+            self.logger.error(f"❌ Failed to load checkpoint for resume: {e}")
+            return None
+
     def delete_checkpoint(self, checkpoint_path: str) -> bool:
         """🗑️ Delete specific checkpoint"""
         try:

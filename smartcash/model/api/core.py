@@ -193,11 +193,13 @@ class SmartCashModelAPI:
             return {'success': False, 'error': 'Model not built yet'}
         
         try:
-            self.model.eval()
+            # Get the actual model from the wrapper if it exists
+            model_to_validate = self.model.yolov5_model if hasattr(self.model, 'yolov5_model') else self.model
+            model_to_validate.eval()
             dummy_input = torch.randn(input_size).to(self.device)
             
             with torch.no_grad():
-                output = self.model(dummy_input)
+                output = model_to_validate(dummy_input)
             
             # Analyze output structure
             output_info = self._analyze_model_output(output)

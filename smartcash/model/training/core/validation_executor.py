@@ -31,7 +31,7 @@ logger = get_logger(__name__)
 class ValidationExecutor:
     """Orchestrates validation epoch execution using SRP-compliant components."""
     
-    def __init__(self, model, config, progress_tracker):
+    def __init__(self, model, config, progress_tracker, phase_num: int = None):
         """
         Initialize validation executor.
         
@@ -39,6 +39,7 @@ class ValidationExecutor:
             model: PyTorch model
             config: Training configuration
             progress_tracker: Progress tracking instance
+            phase_num: Explicit phase number (overrides model.current_phase detection)
         """
         self.model = model
         self.config = config
@@ -51,7 +52,12 @@ class ValidationExecutor:
         # Handle both single-value and multi-layer num_classes formats
         model_config = config.get('model', {})
         raw_num_classes = model_config.get('num_classes', 7)
-        current_phase = getattr(model, 'current_phase', None) or 1
+        
+        # Use explicit phase_num if provided, otherwise detect from model
+        if phase_num is not None:
+            current_phase = phase_num
+        else:
+            current_phase = getattr(model, 'current_phase', None) or 1
         
         # TASK.md: Extract phase-appropriate num_classes for standard mAP calculation
         if isinstance(raw_num_classes, dict):

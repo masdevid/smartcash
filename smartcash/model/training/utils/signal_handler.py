@@ -57,7 +57,23 @@ class TrainingSignalHandler:
                 logger.info("🛑 Graceful shutdown requested (Ctrl+C). Cleaning up...")
                 logger.info("💡 Press Ctrl+C again to force immediate exit")
                 self.shutdown_requested = True
-                self._run_cleanup_callbacks()
+                
+                # Set a timeout for graceful cleanup to prevent hang-ups
+                import threading
+                cleanup_thread = threading.Thread(target=self._run_cleanup_callbacks_with_timeout)
+                cleanup_thread.daemon = True
+                cleanup_thread.start()
+                
+                # Wait for cleanup with timeout to prevent hang-ups
+                cleanup_thread.join(timeout=5.0)  # 5 second timeout
+                
+                if cleanup_thread.is_alive():
+                    logger.warning("⚠️ Graceful cleanup timed out, forcing exit")
+                    self._force_cleanup()
+                else:
+                    logger.info("✅ Graceful cleanup completed")
+                
+                sys.exit(0)
                 
             elif self._interrupt_count == 2:
                 logger.warning("⚠️ Force shutdown requested. Attempting immediate cleanup...")
@@ -81,25 +97,78 @@ class TrainingSignalHandler:
         
         logger.info("✅ Cleanup callbacks completed")
     
+    def _run_cleanup_callbacks_with_timeout(self):
+        """Run cleanup callbacks with individual timeouts to prevent hang-ups."""
+        logger.info(f"🧹 Running {len(self.cleanup_callbacks)} cleanup callbacks with timeout...")
+        
+        import threading
+        import time
+        
+        for i, callback in enumerate(self.cleanup_callbacks):
+            try:
+                logger.debug(f"Running cleanup callback {i+1}/{len(self.cleanup_callbacks)}")
+                
+                # Run each callback in a separate thread with timeout
+                callback_thread = threading.Thread(target=callback)
+                callback_thread.daemon = True
+                callback_thread.start()
+                
+                # Wait for callback with 2-second timeout per callback
+                callback_thread.join(timeout=2.0)
+                
+                if callback_thread.is_alive():
+                    logger.warning(f"Cleanup callback {i+1} timed out, continuing...")
+                    # Don't wait for timed out callbacks - let daemon threads handle them
+                else:
+                    logger.debug(f"✅ Cleanup callback {i+1} completed successfully")
+                    
+            except Exception as e:
+                logger.warning(f"Cleanup callback {i+1} failed: {e}")
+        
+        logger.info("✅ Cleanup callbacks processing completed")
+    
     def _force_cleanup(self):
         """Force immediate cleanup of critical resources."""
         try:
-            # Cleanup DataLoaders
-            from smartcash.model.training.data_loader_factory import DataLoaderFactory
-            DataLoaderFactory.cleanup_all()
+            # Cleanup DataLoaders with timeout
+            try:
+                import signal
+                signal.alarm(2)  # 2-second timeout for DataLoader cleanup
+                from smartcash.model.training.data_loader_factory import DataLoaderFactory
+                DataLoaderFactory.cleanup_all()
+                signal.alarm(0)  # Cancel alarm
+                logger.debug("✅ DataLoader cleanup completed")
+            except Exception as e:
+                logger.warning(f"DataLoader cleanup failed or timed out: {e}")
+                signal.alarm(0)  # Cancel alarm
             
-            # PyTorch cleanup
-            import torch
-            if torch.cuda.is_available():
-                torch.cuda.empty_cache()
-                torch.cuda.synchronize()
+            # PyTorch cleanup with timeout
+            try:
+                import torch
+                if torch.cuda.is_available():
+                    torch.cuda.empty_cache()
+                    torch.cuda.synchronize()
+                logger.debug("✅ PyTorch cleanup completed")
+            except Exception as e:
+                logger.warning(f"PyTorch cleanup failed: {e}")
             
-            # Thread cleanup
-            main_thread = threading.main_thread()
-            for thread in threading.enumerate():
-                if thread != main_thread and thread.is_alive():
-                    logger.debug(f"Waiting for thread: {thread.name}")
-                    thread.join(timeout=1.0)
+            # Thread cleanup with stricter timeout
+            try:
+                main_thread = threading.main_thread()
+                active_threads = [t for t in threading.enumerate() if t != main_thread and t.is_alive() and not t.daemon]
+                
+                if active_threads:
+                    logger.debug(f"Waiting for {len(active_threads)} non-daemon threads...")
+                    for thread in active_threads:
+                        logger.debug(f"Waiting for thread: {thread.name}")
+                        thread.join(timeout=0.5)  # Reduced timeout to prevent hang-ups
+                        
+                        if thread.is_alive():
+                            logger.warning(f"Thread {thread.name} did not terminate in time")
+                
+                logger.debug("✅ Thread cleanup completed")
+            except Exception as e:
+                logger.warning(f"Thread cleanup failed: {e}")
             
             logger.info("✅ Force cleanup completed")
             

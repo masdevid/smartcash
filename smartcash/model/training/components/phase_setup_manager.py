@@ -1,20 +1,32 @@
 """
-Component setup mixin for phase management.
+Phase Setup Manager
 
-Handles setup of training components like optimizers, schedulers, and callbacks.
+Handles setup of training components for specific phases,
+keeping this responsibility separate from high-level orchestration.
 """
 
-from typing import Dict, Any, Optional, Tuple
+from typing import Dict, Any, Optional
 from smartcash.common.logger import get_logger
 
 logger = get_logger(__name__)
 
 
-class ComponentSetupMixin:
-    """Mixin for setting up training components."""
+class PhaseSetupManager:
+    """Manages setup of training components for specific phases."""
     
-    def setup_training_components(self, phase_num: int, epochs: int, 
-                                save_best_path: Optional[str] = None) -> Dict[str, Any]:
+    def __init__(self, model, config: Dict[str, Any]):
+        """
+        Initialize phase setup manager.
+        
+        Args:
+            model: PyTorch model instance
+            config: Training configuration
+        """
+        self.model = model
+        self.config = config
+        
+    def setup_phase_components(self, phase_num: int, epochs: int, 
+                               save_best_path: Optional[str] = None) -> Dict[str, Any]:
         """
         Set up all training components for a phase.
         
@@ -31,7 +43,7 @@ class ComponentSetupMixin:
         from smartcash.model.training.optimizer_factory import OptimizerFactory
         from smartcash.model.training.loss_manager import LossManager
         
-        logger = get_logger(self.__class__.__name__)
+        logger.info(f"🔧 Setting up Phase {phase_num} training components")
         
         try:
             phase_config = self.config['training_phases'][f'phase_{phase_num}']
@@ -75,9 +87,9 @@ class ComponentSetupMixin:
             )
             
             # Set up early stopping
-            early_stopping = self.setup_early_stopping(phase_num, save_best_path)
+            early_stopping = self._setup_early_stopping(phase_num, save_best_path)
             
-            return {
+            components = {
                 'train_loader': train_loader,
                 'val_loader': val_loader,
                 'loss_manager': loss_manager,
@@ -89,19 +101,18 @@ class ComponentSetupMixin:
                 'phase_config': phase_config
             }
             
+            logger.info(f"✅ Phase {phase_num} components setup completed")
+            return components
+            
         except Exception as e:
-            logger.error(f"Error setting up phase {phase_num}: {str(e)}", exc_info=True)
+            logger.error(f"❌ Error setting up phase {phase_num}: {str(e)}")
             raise
     
-    def setup_early_stopping(self, phase_num: int, save_best_path: Optional[str] = None):
+    def _setup_early_stopping(self, phase_num: int, save_best_path: Optional[str] = None):
         """Set up early stopping for the phase with best metrics preservation."""
         from smartcash.model.training.early_stopping import create_early_stopping, create_phase_specific_early_stopping
         
-        logger = get_logger(self.__class__.__name__)
         es_config = self.config.get('training', {}).get('early_stopping', {})
-        
-        logger.info(f"🔍 Early stopping config: {es_config}")
-        
         use_phase_specific = es_config.get('phase_specific', True)
         
         if use_phase_specific:
@@ -153,8 +164,6 @@ class ComponentSetupMixin:
     
     def _log_learning_rate_configuration(self, phase_num: int, base_lr: float, phase_config: Dict[str, Any]):
         """Log comprehensive learning rate and optimizer configuration."""
-        logger = get_logger(self.__class__.__name__)
-        
         # Learning Rate Configuration
         logger.info(f"📊 Phase {phase_num} Learning Rate Configuration:")
         
@@ -167,13 +176,6 @@ class ComponentSetupMixin:
         logger.info(f"• Head LR (Phase 1): {head_lr_p1}")
         logger.info(f"• Head LR (Phase 2): {head_lr_p2}")
         logger.info(f"• Backbone LR: {backbone_lr}")
-        
-        # Determine if learning rates are from command line or default
-        lr_source = "Command line arguments" if any(
-            self.config.get('training_phases', {}).get(f'phase_{i}', {}).get('learning_rates', {}) 
-            for i in [1, 2]
-        ) else "Default configuration"
-        logger.info(f"• Learning rates from: {lr_source}")
         
         # Optimizer and Scheduler Configuration
         logger.info(f"⚙️ Phase {phase_num} Scheduler Configuration:")
@@ -188,7 +190,6 @@ class ComponentSetupMixin:
         # Scheduler-specific settings
         if scheduler_type == 'cosine':
             cosine_eta_min = training_config.get('cosine_eta_min', 1e-6)
-            # Estimate T_max from phase epochs
             phase_epochs = phase_config.get('epochs', 30)
             logger.info(f"• Scheduler: {scheduler_type} (CosineAnnealingLR)")
             logger.info(f"• Cosine eta min: {cosine_eta_min}")
@@ -199,3 +200,17 @@ class ComponentSetupMixin:
         logger.info(f"• Optimizer: {optimizer_type}")
         logger.info(f"• Weight decay: {weight_decay}")
         logger.info(f"• Mixed precision: {'Enabled' if mixed_precision else 'Disabled'}")
+
+
+def create_phase_setup_manager(model, config: Dict[str, Any]) -> PhaseSetupManager:
+    """
+    Factory function to create PhaseSetupManager.
+    
+    Args:
+        model: PyTorch model instance
+        config: Training configuration
+        
+    Returns:
+        PhaseSetupManager instance
+    """
+    return PhaseSetupManager(model, config)

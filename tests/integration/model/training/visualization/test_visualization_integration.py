@@ -6,7 +6,82 @@ import numpy as np
 from pathlib import Path
 from unittest.mock import patch, MagicMock
 
-from smartcash.model.training.visualization import (
+from smartcash.model.analysis.visualization.visualization_manager import VisualizationManager
+
+
+class TestVisualizationIntegration:
+    """Integration tests for the visualization module."""
+    
+    def test_visualization_manager_integration(self, tmp_path):
+        """Test the visualization manager as the main entry point."""
+        # Configuration
+        num_classes_per_layer = {
+            'layer_1': 7,
+            'layer_2': 7,
+            'layer_3': 3
+        }
+        
+        # Create visualization manager
+        viz_manager = VisualizationManager(
+            config={'visualization': {'charts': {'figure_size': [12, 8], 'dpi': 150, 'style': 'seaborn-v0_8', 'color_palette': 'Set2'}}},
+            output_dir=str(tmp_path / 'viz_manager')
+        )
+        
+        # Mock analysis results structure that VisualizationManager expects
+        mock_analysis_results = {
+            'currency_analysis': {
+                'aggregated_metrics': {
+                    'strategy_distribution': {'strategy_a': 10, 'strategy_b': 20},
+                    'denomination_distribution': {'denom_a': 5, 'denom_b': 15}
+                },
+                'batch_summary': {
+                    'successful_analysis': 30, 'total_images': 30, 'images_with_currency': 25,
+                    'success_rate': 0.8, 'detection_rate': 0.7
+                }
+            },
+            'layer_analysis': {
+                'aggregated_layer_metrics': {
+                    'layer_1': {'avg_precision': 0.8, 'avg_recall': 0.7, 'avg_f1_score': 0.75, 'avg_confidence': 0.9},
+                    'layer_2': {'avg_precision': 0.7, 'avg_recall': 0.6, 'avg_f1_score': 0.65, 'avg_confidence': 0.8}
+                },
+                'batch_insights': {
+                    'layer_activity_rates': {'layer_1': 0.9, 'layer_2': 0.7}
+                },
+                'layer_consistency': {
+                    'layer_1': {'consistency_score': 0.95},
+                    'layer_2': {'consistency_score': 0.85}
+                }
+            },
+            'class_analysis': {
+                'per_class_metrics': {
+                    'class_0': {'precision': 0.9, 'recall': 0.8, 'f1_score': 0.85, 'ap': 0.88},
+                    'class_1': {'precision': 0.8, 'recall': 0.7, 'f1_score': 0.75, 'ap': 0.78}
+                },
+                'confusion_matrix': {
+                    'matrix': [[10, 1], [2, 15]],
+                    'class_names': ['class_0', 'class_1']
+                },
+                'class_distribution': {
+                    'class_0': 100, 'class_1': 50
+                }
+            },
+            'comparative_analysis': {
+                'backbone_comparison': {
+                    'backbone_a': {'accuracy': 0.9, 'inference_time': 0.01},
+                    'backbone_b': {'accuracy': 0.8, 'inference_time': 0.02}
+                },
+                'scenario_comparison': {
+                    'scenario_x': {'map': 0.85},
+                    'scenario_y': {'map': 0.75}
+                },
+                'efficiency_analysis': {
+                    'backbone_a': {'accuracy': 0.9, 'inference_time': 0.01},
+                    'backbone_b': {'accuracy': 0.8, 'inference_time': 0.02}
+                }
+            }
+        }
+
+        from smartcash.model.training.visualization import (
     BaseMetricsTracker,
     ChartGenerator,
     MetricsAnalyzer,
@@ -217,3 +292,5 @@ class TestVisualizationIntegration:
         
         # Manager should be cleaned up after context exits
         assert viz_manager.metrics_tracker._shutdown is True
+        
+        

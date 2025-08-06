@@ -10,11 +10,12 @@ import numpy as np
 from typing import Dict, Any, List
 
 from smartcash.common.logger import get_logger
+from smartcash.model.training.phases.mixins.callbacks import CallbacksMixin
 
 logger = get_logger(__name__)
 
 
-class ProgressManager:
+class ProgressManager(CallbacksMixin):
     """Handles progress tracking, callbacks, and visualization updates."""
     
     def __init__(self, progress_tracker, emit_metrics_callback=None, 
@@ -28,10 +29,16 @@ class ProgressManager:
             emit_live_chart_callback: Callback for live chart updates
             visualization_manager: Visualization manager instance
         """
+        super().__init__()
+        
         self.progress_tracker = progress_tracker
-        self.emit_metrics_callback = emit_metrics_callback
-        self.emit_live_chart_callback = emit_live_chart_callback
         self.visualization_manager = visualization_manager
+        
+        # Set callbacks using the mixin
+        self.set_callbacks(
+            metrics_callback=emit_metrics_callback,
+            live_chart_callback=emit_live_chart_callback
+        )
         
         # State for visualization
         self._is_single_phase = False
@@ -47,9 +54,6 @@ class ProgressManager:
             metrics: Metrics dictionary
             loss_breakdown: Optional loss breakdown dictionary
         """
-        if not self.emit_metrics_callback:
-            return
-        
         phase_name = 'training_phase_single' if self._is_single_phase else f'training_phase_{phase_num}'
         
         # Include loss breakdown in callback kwargs if available
@@ -57,7 +61,7 @@ class ProgressManager:
         if loss_breakdown:
             callback_kwargs['loss_breakdown'] = loss_breakdown
             
-        self.emit_metrics_callback(phase_name, epoch, metrics, **callback_kwargs)
+        self.emit_metrics(phase_name, epoch, metrics, **callback_kwargs)
     
     def emit_training_charts(self, epoch: int, phase_num: int, final_metrics: dict, layer_metrics: dict):
         """
@@ -69,7 +73,7 @@ class ProgressManager:
             final_metrics: Final metrics dictionary
             layer_metrics: Layer-specific metrics dictionary
         """
-        if not self.emit_live_chart_callback:
+        if not self.live_chart_callback:
             return
             
         # Determine active layers using the same logic as the metrics callback
@@ -95,11 +99,16 @@ class ProgressManager:
         }
         
         phase_label = 'Single Phase' if self._is_single_phase else f'Phase {phase_num}'
-        self.emit_live_chart_callback('training_curves', chart_data, {
+        
+        # Create complete chart data with metadata
+        complete_chart_data = {
+            **chart_data,
             'title': f'Training Progress - {phase_label}',
             'xlabel': 'Epoch',
             'ylabel': 'Loss / Accuracy'
-        })
+        }
+        
+        self.emit_live_chart('info', 'training_curves', complete_chart_data)
     
     def _emit_layer_metrics_chart(self, epoch: int, phase_num: int, 
                                 final_metrics: dict, show_layers: List[str]):
@@ -116,15 +125,16 @@ class ProgressManager:
         # Only emit chart if we have meaningful data for at least one layer
         if layer_chart_data and any(layer_chart_data[layer]['accuracy'] > 0 for layer in layer_chart_data):
             phase_label = "Single Phase" if self._is_single_phase else f"Phase {phase_num}"
-            self.emit_live_chart_callback('layer_metrics', {
+            complete_layer_data = {
                 'epoch': epoch + 1,
                 'layers': layer_chart_data,
-                'phase': phase_num
-            }, {
+                'phase': phase_num,
                 'title': f'Layer Performance - {phase_label}',
                 'xlabel': 'Layer',
                 'ylabel': 'Metric Value'
-            })
+            }
+            
+            self.emit_live_chart('info', 'layer_metrics', complete_layer_data)
     
     def _determine_active_layers_for_charts(self, phase_num: int, final_metrics: dict) -> List[str]:
         """Determine which layers should be included in charts using the same logic as metrics callback."""
@@ -374,9 +384,8 @@ class ProgressManager:
             if hasattr(self.visualization_manager, 'cleanup'):
                 self.visualization_manager.cleanup()
             
-            # Clear callback references
-            self.emit_metrics_callback = None
-            self.emit_live_chart_callback = None
+            # Clear callback references using mixin
+            self.cleanup_callbacks()
             
             logger.info("✅ Progress manager resources cleaned up")
             

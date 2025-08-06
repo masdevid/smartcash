@@ -92,9 +92,6 @@ __all__ = [
     'AdaptiveEarlyStopping', 'PhaseSpecificEarlyStopping',
     'create_early_stopping', 'create_adaptive_early_stopping', 'create_phase_specific_early_stopping',
     
-    # Visualization
-    'VisualizationService', 'create_visualization_service',
-    
     # Platform-aware training
     'PlatformPresets', 'get_platform_presets', 'get_platform_config',
     'TrainingPipeline'

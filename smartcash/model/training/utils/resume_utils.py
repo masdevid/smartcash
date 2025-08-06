@@ -8,7 +8,7 @@ This module handles training resumption logic and checkpoint-based training cont
 import uuid
 from typing import Dict, Any, Tuple
 from smartcash.common.logger import get_logger
-from smartcash.model.training.utils.checkpoint_utils import check_for_resumable_checkpoint, load_checkpoint_for_resume
+from smartcash.model.core.checkpoints import CheckpointManager
 
 logger = get_logger(__name__)
 
@@ -166,7 +166,11 @@ def setup_training_session(resume_from_checkpoint: bool, checkpoint_dir: str, ba
     resume_info = None
     
     if resume_from_checkpoint:
-        resume_info = check_for_resumable_checkpoint(checkpoint_dir, backbone)
+        # Create checkpoint manager to check for resumable checkpoints
+        checkpoint_config = {'checkpoint': {'save_dir': checkpoint_dir}}
+        checkpoint_manager = CheckpointManager(checkpoint_config)
+        
+        resume_info = checkpoint_manager.check_for_resumable_checkpoint(backbone)
         if resume_info:
             logger.info(f"🔄 Found resumable checkpoint: {resume_info['checkpoint_path']}")
             logger.info(f"   Phase: {resume_info['phase']}, Epoch: {resume_info['epoch']}")

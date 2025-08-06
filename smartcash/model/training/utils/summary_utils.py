@@ -17,7 +17,8 @@ def generate_markdown_summary(
     config: Optional[Dict[str, Any]] = None,
     phase_results: Optional[Dict[str, Dict[str, Any]]] = None,
     training_session_id: Optional[str] = None,
-    training_start_time: Optional[float] = None
+    training_start_time: Optional[float] = None,
+    visualization_results: Optional[Dict[str, Any]] = None
 ) -> str:
     """
     Generate markdown summary for UI display.
@@ -32,6 +33,18 @@ def generate_markdown_summary(
         Markdown formatted summary string
     """
     try:
+        if not isinstance(config, (dict, type(None))):
+            logger.warning(f"Error generating markdown summary: 'config' must be a dictionary or None, but got {type(config).__name__}")
+            return "# Training Summary\n\nError generating summary due to invalid configuration data."
+        
+        if not isinstance(phase_results, (dict, type(None))):
+            logger.warning(f"Error generating markdown summary: 'phase_results' must be a dictionary or None, but got {type(phase_results).__name__}")
+            return "# Training Summary\n\nError generating summary due to invalid phase results data."
+
+        if not isinstance(visualization_results, (dict, type(None))):
+            logger.warning(f"Error generating markdown summary: 'visualization_results' must be a dictionary or None, but got {type(visualization_results).__name__}")
+            return "# Training Summary\n\nError generating summary due to invalid visualization results data."
+
         summary = ["# SmartCash Training Summary\n"]
         
         # Configuration section
@@ -40,13 +53,13 @@ def generate_markdown_summary(
             summary.append(f"- **Backbone**: {config.get('model', {}).get('backbone', 'N/A')}")
             summary.append(f"- **Training Phases**: {len(config.get('training_phases', {}))}")
             
-            if 'training' in config:
+            if 'training' in config and isinstance(config['training'], dict):
                 training = config['training']
                 summary.append(f"- **Loss Type**: {training.get('loss', {}).get('type', 'N/A')}")
                 summary.append(f"- **Batch Size**: {training.get('data', {}).get('batch_size', 'Auto')}")
                 summary.append(f"- **Learning Rate**: {training.get('learning_rate', 'N/A')}")
                 
-                if 'early_stopping' in training:
+                if 'early_stopping' in training and isinstance(training['early_stopping'], dict):
                     es = training['early_stopping']
                     summary.append(f"- **Early Stopping**: {'Enabled' if es.get('enabled') else 'Disabled'}")
                     if es.get('enabled'):
@@ -60,9 +73,10 @@ def generate_markdown_summary(
         if phase_results:
             summary.append("## Phase Results")
             for phase_name, result in phase_results.items():
-                status = "✅ Success" if result.get('success') else "❌ Failed"
-                duration = result.get('duration', 0)
-                summary.append(f"- **{phase_name.replace('_', ' ').title()}**: {status} ({duration:.1f}s)")
+                if isinstance(result, dict):
+                    status = "✅ Success" if result.get('success') else "❌ Failed"
+                    duration = result.get('duration', 0)
+                    summary.append(f"- **{phase_name.replace('_', ' ').title()}**: {status} ({duration:.1f}s)")
             summary.append("")
         
         # Training session info section
@@ -73,13 +87,34 @@ def generate_markdown_summary(
                 total_duration = time.time() - training_start_time
                 summary.append(f"- **Total Duration**: {total_duration:.1f} seconds")
             summary.append("")
-        
+
+        # Visualization results section
+        if visualization_results:
+            summary.append("## Visualization Results")
+            if visualization_results.get('dashboard_path'):
+                summary.append(f"- **Comprehensive Dashboard**: {visualization_results['dashboard_path']}")
+            
+            if isinstance(visualization_results.get('currency_plots'), dict):
+                summary.append("- **Currency Analysis Plots**:")
+                for plot_name, plot_path in visualization_results['currency_plots'].items():
+                    summary.append(f"  - {plot_name.replace('_', ' ').title()}: {plot_path}")
+            
+            if isinstance(visualization_results.get('layer_plots'), dict):
+                summary.append("- **Layer Analysis Plots**:")
+                for plot_name, plot_path in visualization_results['layer_plots'].items():
+                    summary.append(f"  - {plot_name.replace('_', ' ').title()}: {plot_path}")
+            
+            if isinstance(visualization_results.get('class_plots'), dict):
+                summary.append("- **Class Analysis Plots**:")
+                for plot_name, plot_path in visualization_results['class_plots'].items():
+                    summary.append(f"  - {plot_name.replace('_', ' ').title()}: {plot_path}")
+            summary.append("")
+
         return "\n".join(summary)
         
     except Exception as e:
         logger.warning(f"Error generating markdown summary: {e}")
         return "# Training Summary\n\nError generating summary."
-
 
 def generate_training_report(
     pipeline_summary: Dict[str, Any],

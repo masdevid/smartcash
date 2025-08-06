@@ -50,10 +50,7 @@ class ModelBuilder:
         os.environ['PYTORCH_MPS_HIGH_WATERMARK_RATIO'] = '0.8'
         os.environ['PYTORCH_MPS_LOW_WATERMARK_RATIO'] = '0.3'
         
-        # Disable MPS if available to prevent any attempts to use it
-        if hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
-            torch.backends.mps.enabled = False
-            torch.backends.mps.is_available = lambda: False
+        
         
         # Legacy builder removed - using YOLOv5 integration only
         

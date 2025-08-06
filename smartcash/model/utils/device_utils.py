@@ -13,7 +13,7 @@ def setup_device(device_config: Dict[str, Any]) -> torch.device:
     
     # Check if device is explicitly set (force_cpu mode)
     explicit_device = device_config.get('device')
-    if explicit_device:
+    if explicit_device and explicit_device != 'auto':
         device = torch.device(explicit_device)
         logger.info(f"🔧 Device explicitly set to: {device}")
         return device

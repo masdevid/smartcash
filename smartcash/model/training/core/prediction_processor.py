@@ -459,7 +459,12 @@ class PredictionProcessor:
         class_ids = targets[:, 1].long()  # Extract all class IDs at once
         
         # Create vectorized mask using broadcasting - O(n) instead of O(n²)
-        mask = torch.isin(class_ids, valid_classes.to(targets.device))
+        # Check if current device is MPS and if torch.isin is not implemented for it
+        if targets.device.type == 'mps':
+            # Perform isin on CPU to avoid NotImplementedError on MPS
+            mask = torch.isin(class_ids.cpu(), valid_classes.cpu()).to(targets.device)
+        else:
+            mask = torch.isin(class_ids, valid_classes.to(targets.device))
         
         # Apply mask and clone in single operation
         filtered_targets = targets[mask].clone()

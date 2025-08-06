@@ -5,7 +5,7 @@ Deskripsi: Model package main exports dengan Fase 1 + Fase 2 integration
 
 # Fase 1: Core Model API
 from .api.core import SmartCashModelAPI, create_model_api
-from .core.checkpoint_manager import CheckpointManager
+from .core.checkpoints.checkpoint_manager import CheckpointManager
 from .utils.backbone_factory import BackboneFactory
 from .utils.device_utils import setup_device, get_device_info
 from .training.utils.progress_tracker import TrainingProgressTracker

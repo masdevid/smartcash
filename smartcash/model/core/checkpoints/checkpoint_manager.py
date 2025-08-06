@@ -3,14 +3,13 @@ File: smartcash/model/core/checkpoint_manager.py
 Deskripsi: Manager untuk checkpoint operations dengan progress tracking
 """
 
-import os
 import torch
 from pathlib import Path
 from typing import Dict, Any, Optional, List
 from datetime import datetime
 
 from smartcash.common.logger import get_logger
-from smartcash.model.training.utils.progress_tracker import TrainingProgressTracker
+from .best_metrics_manager import BestMetricsManager
 
 class CheckpointManager:
     """💾 Manager untuk checkpoint operations dengan automatic naming"""
@@ -27,13 +26,36 @@ class CheckpointManager:
         
         # Ensure directory exists
         self.save_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Initialize best metrics manager
+        self.best_metrics_manager = BestMetricsManager(self.save_dir)
+        
         self.logger.info(f"💾 CheckpointManager initialized | Dir: {self.save_dir}")
     
     def save_checkpoint(self, model: torch.nn.Module, metrics: Optional[Dict] = None, 
                        checkpoint_name: Optional[str] = None, **kwargs) -> str:
-        """💾 Save model checkpoint dengan automatic naming"""
+        """💾 Save model checkpoint with best metrics preservation"""
         
         try:
+            # Set current phase and load previous best metrics if needed
+            phase_num = kwargs.get('phase', 1)
+            self.best_metrics_manager.set_current_phase(phase_num)
+            
+            # Load previous best metrics for this phase if not already loaded
+            if phase_num not in self.best_metrics_manager.phase_best_metrics:
+                self.best_metrics_manager.load_previous_best_metrics(phase_num)
+            
+            # Determine if this should be saved as best
+            is_best = kwargs.get('is_best', False)
+            if not is_best and metrics:
+                # Check if current metrics are better than previous best
+                is_best = self.best_metrics_manager.should_save_as_best(
+                    metrics, 
+                    comparison_metric='val_accuracy',
+                    comparison_mode='max'
+                )
+                kwargs['is_best'] = is_best
+            
             # Generate checkpoint filename
             if checkpoint_name is None:
                 checkpoint_name = self._generate_checkpoint_name(metrics, **kwargs)
@@ -42,6 +64,11 @@ class CheckpointManager:
             
             # CRITICAL FIX: Get model configuration from proper source
             model_config = self._get_model_config_for_checkpoint(model, **kwargs)
+            
+            # Get best metrics manager metadata
+            epoch = kwargs.get('epoch', 0)
+            phase = kwargs.get('phase', 1)
+            manager_metadata = self.best_metrics_manager.get_checkpoint_save_metadata(epoch, phase)
             
             # Prepare checkpoint data
             checkpoint_data = {
@@ -53,11 +80,16 @@ class CheckpointManager:
                 'model_info': self._get_model_info(model)
             }
             
-            # Add optimizer dan scheduler jika ada
+            # Add best metrics manager metadata
+            checkpoint_data.update(manager_metadata)
+            
+            # Add optimizer and scheduler if available
             if 'optimizer' in kwargs:
                 checkpoint_data['optimizer_state_dict'] = kwargs['optimizer'].state_dict()
+                self.logger.debug("💾 Saved optimizer state")
             if 'scheduler' in kwargs:
                 checkpoint_data['scheduler_state_dict'] = kwargs['scheduler'].state_dict()
+                self.logger.debug("💾 Saved scheduler state")
             if 'epoch' in kwargs:
                 checkpoint_data['epoch'] = kwargs['epoch']
             if 'phase' in kwargs:
@@ -66,14 +98,21 @@ class CheckpointManager:
             # Save checkpoint
             torch.save(checkpoint_data, checkpoint_path)
             
+            # Update best metrics manager if this is a best checkpoint
+            if is_best and metrics:
+                self.best_metrics_manager.update_best_metrics(metrics, epoch, phase)
+            
             # Log save info
-            is_best = kwargs.get('is_best', False)
-            log_message = f"✅ {'Best' if is_best else 'Last'} checkpoint saved successfully at {checkpoint_path}"
+            log_message = f"✅ {'Best' if is_best else 'Regular'} checkpoint saved successfully at {checkpoint_path}"
+            if is_best and metrics:
+                val_acc = metrics.get('val_accuracy', 0)
+                val_loss = metrics.get('val_loss', 0)
+                log_message += f" | Accuracy: {val_acc:.4f}, Loss: {val_loss:.4f}"
             self.logger.info(log_message)
             
             # Create phase backup immediately if this is a best model
             if is_best:
-                phase_num = kwargs.get('phase', 1)  # Default to phase 1 if not specified
+                phase_num = kwargs.get('phase', 1)
                 backup_path = self._create_phase_backup_immediate(str(checkpoint_path), phase_num)
                 if backup_path:
                     self.logger.info(f"📦 Phase {phase_num} backup created: {Path(backup_path).name}")
@@ -91,10 +130,10 @@ class CheckpointManager:
     
     def load_checkpoint(self, model: torch.nn.Module, checkpoint_path: Optional[str] = None, 
                        strict: bool = True, **kwargs) -> Dict[str, Any]:
-        """📂 Load model dari checkpoint"""
+        """📂 Load model from checkpoint with best metrics restoration"""
         
         try:
-            # Find checkpoint jika tidak specified
+            # Find checkpoint if not specified
             if checkpoint_path is None:
                 checkpoint_path = self._find_best_checkpoint()
                 if checkpoint_path is None:
@@ -108,32 +147,55 @@ class CheckpointManager:
             from smartcash.common.checkpoint_utils import safe_load_checkpoint
             checkpoint_data = safe_load_checkpoint(str(checkpoint_path))
             
+            # Restore best metrics manager state from checkpoint
+            self.best_metrics_manager.restore_from_checkpoint_metadata(checkpoint_data)
+            
             # Load model state
             if 'model_state_dict' in checkpoint_data:
                 model.load_state_dict(checkpoint_data['model_state_dict'], strict=strict)
             else:
-                # Fallback untuk checkpoint format lama
+                # Fallback for old checkpoint format
                 model.load_state_dict(checkpoint_data, strict=strict)
             
-            # Load optimizer dan scheduler jika ada
+            # Load optimizer and scheduler if available
+            optimizer_loaded = False
+            scheduler_loaded = False
+            
             if 'optimizer' in kwargs and 'optimizer_state_dict' in checkpoint_data:
                 kwargs['optimizer'].load_state_dict(checkpoint_data['optimizer_state_dict'])
+                optimizer_loaded = True
+                self.logger.info("✅ Restored optimizer state from checkpoint")
             
             if 'scheduler' in kwargs and 'scheduler_state_dict' in checkpoint_data:
                 kwargs['scheduler'].load_state_dict(checkpoint_data['scheduler_state_dict'])
+                scheduler_loaded = True
+                self.logger.info("✅ Restored scheduler state from checkpoint")
+            
+            # Extract checkpoint info
+            loaded_metrics = checkpoint_data.get('metrics', {})
+            loaded_epoch = checkpoint_data.get('epoch', 0)
+            loaded_phase = checkpoint_data.get('phase', 1)
+            
+            self.logger.info(f"✅ Checkpoint loaded successfully from epoch {loaded_epoch}, phase {loaded_phase}")
+            if loaded_metrics:
+                val_acc = loaded_metrics.get('val_accuracy', 0)
+                val_loss = loaded_metrics.get('val_loss', 0)
+                self.logger.info(f"📊 Loaded metrics - Accuracy: {val_acc:.4f}, Loss: {val_loss:.4f}")
             
             # Return checkpoint info
             return {
                 'checkpoint_path': str(checkpoint_path),
-                'metrics': checkpoint_data.get('metrics', {}),
-                'epoch': checkpoint_data.get('epoch', 0),
+                'metrics': loaded_metrics,
+                'epoch': loaded_epoch,
+                'phase': loaded_phase,
                 'timestamp': checkpoint_data.get('timestamp', ''),
                 'model_info': checkpoint_data.get('model_info', {}),
                 'torch_version': checkpoint_data.get('torch_version', ''),
                 'loaded_components': {
                     'model': True,
-                    'optimizer': 'optimizer' in kwargs and 'optimizer_state_dict' in checkpoint_data,
-                    'scheduler': 'scheduler' in kwargs and 'scheduler_state_dict' in checkpoint_data
+                    'optimizer': optimizer_loaded,
+                    'scheduler': scheduler_loaded,
+                    'best_metrics_manager': True
                 }
             }
             
@@ -431,6 +493,22 @@ class CheckpointManager:
         except Exception as e:
             self.logger.warning(f"⚠️ Failed to create Phase {phase_num} backup: {e}")
             return None
+    
+    def get_best_metrics_manager(self) -> BestMetricsManager:
+        """Get the best metrics manager instance for external configuration."""
+        return self.best_metrics_manager
+    
+    def configure_early_stopping_with_best_metrics(self, early_stopping, phase_num: int = None):
+        """
+        Configure early stopping instance to preserve previous best metrics.
+        
+        Args:
+            early_stopping: Early stopping instance to configure
+            phase_num: Phase number for phase-specific configuration
+        """
+        return self.best_metrics_manager.configure_early_stopping_with_previous_best(
+            early_stopping, phase_num
+        )
 
 
 # Factory function

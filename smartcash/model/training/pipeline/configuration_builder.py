@@ -52,11 +52,6 @@ class ConfigurationBuilder:
             'start_phase': kwargs.get('start_phase', 1)
         }
         
-        # Enhanced debug flag tracking
-        if debug_map_value:
-            logger.info(f"🐛 ConfigurationBuilder: debug_map={debug_map_value} received from kwargs")
-            logger.info(f"🐛 ConfigurationBuilder: debug_map stored in config={config.get('debug_map')}")
-        
         # Add validation metrics configuration from command line args
         validation_config = kwargs.get('validation_metrics_config', {})
         # Validation metrics always use hierarchical approach (YOLOv5 + per-layer)
@@ -79,10 +74,6 @@ class ConfigurationBuilder:
         
         # Apply training overrides
         config = self._apply_overrides(config, **kwargs)
-        
-        # Final debug flag verification
-        if debug_map_value:
-            logger.info(f"🐛 ConfigurationBuilder: Final config debug_map={config.get('debug_map')}")
         
         logger.info(f"🔧 Training configuration built: {config['backbone']} | yolov5")
         return config
@@ -224,8 +215,9 @@ class ConfigurationBuilder:
     def _apply_overrides(self, config: Dict[str, Any], **kwargs) -> Dict[str, Any]:
         """Apply configuration overrides from kwargs."""
         try:
-            from smartcash.model.training.utils.setup_utils import apply_training_overrides
-            return apply_training_overrides(config, **kwargs)
+            from smartcash.model.training.utils.setup_utils import apply_configuration_overrides
+            result = apply_configuration_overrides(config, **kwargs)
+            return result
         except ImportError:
             logger.warning("Setup utils not available, skipping overrides")
             return config

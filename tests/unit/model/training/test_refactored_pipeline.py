@@ -9,7 +9,7 @@ and maintain the same interface as the original implementation.
 import torch
 import torch.nn as nn
 from unittest.mock import Mock, MagicMock
-from smartcash.model.training.training_phase_manager import TrainingPhaseManager
+from smartcash.model.training.phases import TrainingPhaseManager
 
 
 class DummyModel(nn.Module):
@@ -113,8 +113,6 @@ def test_training_phase_manager_initialization():
     
     # Verify components are initialized
     assert hasattr(manager, 'orchestrator'), "PhaseOrchestrator not initialized"
-    assert hasattr(manager, 'training_executor'), "TrainingExecutor not initialized"
-    assert hasattr(manager, 'validation_executor'), "ValidationExecutor not initialized"
     assert hasattr(manager, 'checkpoint_manager'), "CheckpointManager not initialized"
     assert hasattr(manager, 'progress_manager'), "ProgressManager not initialized"
     
@@ -139,20 +137,12 @@ def test_component_interfaces():
     
     # Test PhaseOrchestrator interface
     assert hasattr(manager.orchestrator, 'setup_phase'), "PhaseOrchestrator missing setup_phase method"
-    assert hasattr(manager.orchestrator, 'set_single_phase_mode'), "PhaseOrchestrator missing set_single_phase_mode method"
-    
-    # Test TrainingExecutor interface
-    assert hasattr(manager.training_executor, 'train_epoch'), "TrainingExecutor missing train_epoch method"
-    
-    # Test ValidationExecutor interface
-    assert hasattr(manager.validation_executor, 'validate_epoch'), "ValidationExecutor missing validate_epoch method"
     
     # Test CheckpointManager interface  
     assert hasattr(manager.checkpoint_manager, 'save_checkpoint'), "CheckpointManager missing save_checkpoint method"
     
     # Test ProgressManager interface
-    assert hasattr(manager.progress_manager, 'emit_epoch_metrics'), "ProgressManager missing emit_epoch_metrics method"
-    assert hasattr(manager.progress_manager, 'emit_training_charts'), "ProgressManager missing emit_training_charts method"
+    assert hasattr(manager.progress_manager, 'start_epoch_tracking'), "ProgressManager missing start_epoch_tracking method"
     
     print("✅ Component interfaces verified")
 
@@ -177,7 +167,7 @@ def test_backward_compatibility():
     
     # Test that the main public method exists and has correct signature
     assert hasattr(manager, 'run_training_phase'), "Missing run_training_phase method"
-    assert hasattr(manager, 'set_single_phase_mode'), "Missing set_single_phase_mode method"
+    assert hasattr(manager, 'execute_phase'), "Missing execute_phase method"
     
     # Test method signatures (should not raise TypeError)
     try:

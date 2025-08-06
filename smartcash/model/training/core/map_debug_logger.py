@@ -22,6 +22,7 @@ import numpy as np
 import torch
 from pathlib import Path
 from typing import Dict, List, Optional, Union
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from smartcash.common.logger import get_logger
 
@@ -57,6 +58,10 @@ class MapDebugLogger:
         self.debug_logger = None
         self.current_epoch = 0
         self._current_debug_epoch = -1
+        
+        # ThreadPool for non-blocking I/O operations
+        self.io_executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix='map_debug_io')
+        self.io_futures = []
         
         # Debug configuration
         self.confidence_thresholds = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
@@ -370,11 +375,37 @@ class MapDebugLogger:
         unique_target_classes = np.unique(target_cls_np)
         
         self.write_debug_log("\n📋 CLASS DISTRIBUTION:")
-        self.write_debug_log(f"  • Predicted classes: {unique_pred_classes}")
-        self.write_debug_log(f"  • Target classes: {unique_target_classes}")
-        self.write_debug_log(f"  • Classes in both pred & target: {np.intersect1d(unique_pred_classes, unique_target_classes)}")
-        self.write_debug_log(f"  • Classes only in predictions: {np.setdiff1d(unique_pred_classes, unique_target_classes)}")
-        self.write_debug_log(f"  • Classes only in targets: {np.setdiff1d(unique_target_classes, unique_pred_classes)}")
+        self.write_debug_log(f"   • Predictions: {unique_pred_classes}")
+        self.write_debug_log(f"   • Targets: {unique_target_classes}")
+        self.write_debug_log(f"   • Classes in both pred & target: {np.intersect1d(unique_pred_classes, unique_target_classes)}")
+        self.write_debug_log(f"   • Classes only in predictions: {np.setdiff1d(unique_pred_classes, unique_target_classes)}")
+        self.write_debug_log(f"   • Classes only in targets: {np.setdiff1d(unique_target_classes, unique_pred_classes)}")
+
+    def log_class_analysis_async(self, stats: List[Union[torch.Tensor, np.ndarray]]):
+        """Run class analysis in a background thread."""
+        future = self.io_executor.submit(self.log_class_analysis, stats)
+        self.io_futures.append(future)
+
+    def wait_for_io_completion(self):
+        """Wait for all background I/O tasks to complete."""
+        if not self.io_futures:
+            return
+
+        for future in as_completed(self.io_futures):
+            try:
+                future.result() # Raise exceptions if any
+            except Exception as e:
+                logger.error(f"Background mAP debug logging task failed: {e}")
+        
+        self.io_futures.clear()
+
+    def cleanup(self):
+        """Shutdown the thread pool executor gracefully."""
+        self.wait_for_io_completion()
+        self.io_executor.shutdown(wait=True)
+
+    def __del__(self):
+        self.cleanup()
     
     def _log_per_class_analysis(self, tp_np: np.ndarray, conf_np: np.ndarray,
                                pred_cls_np: np.ndarray, target_cls_np: np.ndarray) -> None:

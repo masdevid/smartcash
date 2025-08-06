@@ -295,8 +295,8 @@ class ProgressManager:
             should_stop = early_stopping(final_metrics, None, epoch)
             
             # Show early stopping status for visibility (even when not stopping)
+            status = early_stopping.get_status_summary()
             if not should_stop:
-                status = early_stopping.get_status_summary()
                 # Show current early stopping status without overwhelming output
                 if hasattr(early_stopping, 'phase1_loss_wait') or hasattr(early_stopping, 'phase2_f1_wait'):
                     if phase_num == 1:
@@ -315,7 +315,6 @@ class ProgressManager:
                             print(f"⏳ Early stopping: Phase 2 - F1 ({f1_wait}/{f1_patience}), mAP ({map_wait}/{map_patience})")
             
             if should_stop:
-                status = early_stopping.get_status_summary()
                 # Use print for immediate console feedback (visible to user)
                 print(f"🛑 Phase-specific early stopping triggered at epoch {epoch + 1}")
                 print(f"   Reason: {status['stop_reason']}")
@@ -342,7 +341,7 @@ class ProgressManager:
             should_stop = early_stopping(monitor_metric, None, epoch)  # Don't pass model for saving
             
             # Show legacy early stopping status for visibility (even when not stopping)
-            if not should_stop and hasattr(early_stopping, 'wait') and early_stopping.wait > 0:
+            if hasattr(early_stopping, 'wait') and early_stopping.wait > 0:
                 print(f"⏳ Early stopping: {early_stopping.metric} ({early_stopping.wait}/{early_stopping.patience}) - Best: {early_stopping.best_score:.6f}")
             
             if should_stop:

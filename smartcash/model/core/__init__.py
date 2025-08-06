@@ -4,7 +4,8 @@ Deskripsi: Core model components exports
 """
 
 from .model_builder import ModelBuilder
-from .checkpoint_manager import CheckpointManager
+from .checkpoints.checkpoint_manager import CheckpointManager
 from .yolo_head import YOLOHead
+from .model_utils import ModelUtils
 
-__all__ = ['ModelBuilder', 'CheckpointManager', 'YOLOHead']
+__all__ = ['ModelBuilder', 'CheckpointManager', 'YOLOHead', 'ModelUtils']

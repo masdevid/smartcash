@@ -8,6 +8,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from typing import Dict, List, Tuple, Optional, Any
 import math
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from smartcash.common.logger import SmartCashLogger
 from smartcash.model.training.loss_manager import YOLOLoss
@@ -75,6 +76,9 @@ class UncertaintyMultiTaskLoss(nn.Module):
         self.logger.info(f"✅ Uncertainty-based multi-task loss initialized for {self.num_layers} layers")
         for layer_name in self.layer_names:
             self.logger.info(f"   • {layer_name}: {layer_config[layer_name]['num_classes']} classes")
+
+        # ThreadPool for parallel loss calculation
+        self.loss_executor = ThreadPoolExecutor(max_workers=self.num_layers, thread_name_prefix='multi_task_loss')
     
     def forward(self, predictions: Dict[str, List[torch.Tensor]], 
                 targets: Dict[str, torch.Tensor], img_size: int = 640) -> Tuple[torch.Tensor, Dict[str, Any]]:
@@ -100,105 +104,36 @@ class UncertaintyMultiTaskLoss(nn.Module):
                         device = pred_list[0].device
                         break
         
+        # Initialize containers for losses and metrics
+        layer_losses: Dict[str, torch.Tensor] = {}
+        loss_breakdown: Dict[str, Any] = {}
+        uncertainties: Dict[str, float] = {}
         total_loss = torch.tensor(0.0, device=device, requires_grad=True)
-        loss_breakdown = {}
-        layer_losses = {}
-        uncertainties = {}
-        
-        # Compute individual layer losses
-        for layer_name in self.layer_names:
-            if layer_name in predictions and layer_name in targets:
-                layer_preds = predictions[layer_name]
-                layer_targets = targets[layer_name]
-                
-                # Ensure layer_preds is a list of tensors on the right device
-                if not isinstance(layer_preds, (list, tuple)):
-                    layer_preds = [layer_preds]
-                
-                # Convert and move tensors to device, handling various input types
-                processed_preds = []
-                for p in layer_preds:
-                    if isinstance(p, torch.Tensor):
-                        processed_preds.append(p.to(device))
-                    elif isinstance(p, (list, tuple)):
-                        # Handle nested lists/tuples of tensors
-                        nested_tensors = []
-                        for nested_p in p:
-                            if isinstance(nested_p, torch.Tensor):
-                                nested_tensors.append(nested_p.to(device))
-                            else:
-                                # Skip non-tensor elements
-                                self.logger.warning(f"Skipping non-tensor element in nested predictions: {type(nested_p)}")
-                                continue
-                        if nested_tensors:
-                            processed_preds.extend(nested_tensors)
-                    else:
-                        # Skip non-tensor, non-list elements
-                        self.logger.warning(f"Skipping non-tensor prediction element: {type(p)}")
-                        continue
-                
-                layer_preds = processed_preds
-                
-                # Skip if no valid predictions were found
-                if not layer_preds:
-                    self.logger.warning(f"No valid tensor predictions found for layer {layer_name}")
-                    layer_losses[layer_name] = torch.tensor(0.0, device=device, requires_grad=True)
-                    loss_breakdown[f"{layer_name}_total_loss"] = torch.tensor(0.0, device=device)
-                    continue
-                
-                # Ensure layer_targets is a tensor on the right device
-                if isinstance(layer_targets, (list, tuple)) and len(layer_targets) > 0:
-                    layer_targets = layer_targets[0]  # Take first element if it's a list
-                if isinstance(layer_targets, torch.Tensor):
-                    layer_targets = layer_targets.to(device)
-                
-                # Safe check for valid targets - avoid Boolean tensor comparison
-                has_valid_targets = False
-                if layer_targets is not None:
-                    self.logger.debug(f"Checking targets for {layer_name}: type={type(layer_targets)}, tensor={torch.is_tensor(layer_targets)}")
-                    if torch.is_tensor(layer_targets):
-                        has_valid_targets = layer_targets.numel() > 0
-                        self.logger.debug(f"  {layer_name} tensor targets: numel={layer_targets.numel()}, valid={has_valid_targets}")
-                    elif isinstance(layer_targets, (list, tuple)):
-                        has_valid_targets = len(layer_targets) > 0
-                        self.logger.debug(f"  {layer_name} list/tuple targets: len={len(layer_targets)}, valid={has_valid_targets}")
-                    else:
-                        has_valid_targets = True
-                        self.logger.debug(f"  {layer_name} other targets: valid={has_valid_targets}")
-                
-                if has_valid_targets:
-                    # Compute YOLO loss for this layer
-                    loss_fn = self.layer_losses[layer_name]
-                    try:
-                        # Convert predictions to format expected by YOLOLoss
-                        self.logger.debug(f"Converting predictions for {layer_name}: {len(layer_preds)} prediction tensors")
-                        converted_preds = convert_for_yolo_loss(layer_preds, img_size)
-                        self.logger.debug(f"Converted predictions for {layer_name}: {len(converted_preds)} tensors")
-                        
-                        # Call YOLOLoss with converted predictions
-                        self.logger.debug(f"Calling YOLOLoss for {layer_name} with targets shape: {layer_targets.shape if hasattr(layer_targets, 'shape') else 'no shape'}")
-                        layer_loss, layer_components = loss_fn(converted_preds, layer_targets, img_size)
-                        layer_losses[layer_name] = layer_loss
-                        self.logger.debug(f"YOLOLoss completed for {layer_name}: loss={layer_loss.item():.6f}")
-                        
-                        # Store individual loss components with layer prefix
-                        for comp_name, comp_value in layer_components.items():
-                            loss_breakdown[f"{layer_name}_{comp_name}"] = comp_value
-                    except Exception as e:
-                        import traceback
-                        self.logger.error(f"Error computing loss for layer {layer_name}: {str(e)}")
-                        self.logger.error(f"Traceback: {traceback.format_exc()}")
-                        layer_losses[layer_name] = torch.tensor(0.0, device=device, requires_grad=True)
-                        loss_breakdown[f"{layer_name}_total_loss"] = torch.tensor(0.0, device=device)
-                else:
-                    # No targets for this layer
-                    layer_losses[layer_name] = torch.tensor(0.0, device=device, requires_grad=True)
-                    loss_breakdown[f"{layer_name}_total_loss"] = torch.tensor(0.0, device=device)
-            else:
-                # Layer not in predictions or targets
+
+        # Parallelize loss calculation for each layer
+        future_to_layer = {
+            self.loss_executor.submit(
+                self._compute_layer_loss,
+                layer_name,
+                predictions.get(layer_name),
+                targets.get(layer_name),
+                img_size,
+                device
+            ): layer_name
+            for layer_name in self.layer_names
+        }
+
+        for future in as_completed(future_to_layer):
+            layer_name = future_to_layer[future]
+            try:
+                l_loss, l_breakdown = future.result()
+                layer_losses[layer_name] = l_loss
+                loss_breakdown.update(l_breakdown)
+            except Exception as e:
+                self.logger.error(f"Error computing loss for layer {layer_name} in parallel: {e}")
                 layer_losses[layer_name] = torch.tensor(0.0, device=device, requires_grad=True)
                 loss_breakdown[f"{layer_name}_total_loss"] = torch.tensor(0.0, device=device)
-        
+
         # Apply uncertainty-based weighting
         if self.use_dynamic_weighting:
             weighted_losses = {}
@@ -246,7 +181,70 @@ class UncertaintyMultiTaskLoss(nn.Module):
         })
         
         return total_loss, loss_breakdown
-    
+
+    def _compute_layer_loss(self, layer_name: str, layer_preds: Optional[List[torch.Tensor]], 
+                            layer_targets: Optional[torch.Tensor], img_size: int, device: torch.device) -> Tuple[torch.Tensor, Dict[str, Any]]:
+        """Compute loss for a single layer."""
+        loss_breakdown = {}
+        if layer_preds and layer_targets is not None:
+            # Ensure layer_preds is a list of tensors on the right device
+            if not isinstance(layer_preds, (list, tuple)):
+                layer_preds = [layer_preds]
+            
+            processed_preds = []
+            for p in layer_preds:
+                if isinstance(p, torch.Tensor):
+                    processed_preds.append(p.to(device))
+                elif isinstance(p, (list, tuple)):
+                    nested_tensors = []
+                    for nested_p in p:
+                        if isinstance(nested_p, torch.Tensor):
+                            nested_tensors.append(nested_p.to(device))
+                        else:
+                            self.logger.warning(f"Skipping non-tensor element in nested predictions: {type(nested_p)}")
+                            continue
+                    if nested_tensors:
+                        processed_preds.extend(nested_tensors)
+                else:
+                    self.logger.warning(f"Skipping non-tensor prediction element: {type(p)}")
+                    continue
+            
+            layer_preds = processed_preds
+            
+            if not layer_preds:
+                self.logger.warning(f"No valid tensor predictions found for layer {layer_name}")
+                return torch.tensor(0.0, device=device, requires_grad=True), {f"{layer_name}_total_loss": torch.tensor(0.0, device=device)}
+
+            if isinstance(layer_targets, (list, tuple)) and len(layer_targets) > 0:
+                layer_targets = layer_targets[0]
+            if isinstance(layer_targets, torch.Tensor):
+                layer_targets = layer_targets.to(device)
+
+            has_valid_targets = False
+            if layer_targets is not None:
+                if torch.is_tensor(layer_targets):
+                    has_valid_targets = layer_targets.numel() > 0
+                elif isinstance(layer_targets, (list, tuple)):
+                    has_valid_targets = len(layer_targets) > 0
+                else:
+                    has_valid_targets = True
+
+            if has_valid_targets:
+                loss_fn = self.layer_losses[layer_name]
+                try:
+                    converted_preds = convert_for_yolo_loss(layer_preds, img_size)
+                    layer_loss, layer_components = loss_fn(converted_preds, layer_targets, img_size)
+                    for comp_name, comp_value in layer_components.items():
+                        loss_breakdown[f"{layer_name}_{comp_name}"] = comp_value
+                    return layer_loss, loss_breakdown
+                except Exception as e:
+                    import traceback
+                    self.logger.error(f"Error computing loss for layer {layer_name}: {str(e)}")
+                    self.logger.error(f"Traceback: {traceback.format_exc()}")
+                    return torch.tensor(0.0, device=device, requires_grad=True), {f"{layer_name}_total_loss": torch.tensor(0.0, device=device)}
+        
+        return torch.tensor(0.0, device=device, requires_grad=True), {f"{layer_name}_total_loss": torch.tensor(0.0, device=device)}
+
     def get_uncertainty_weights(self) -> Dict[str, float]:
         """Get current uncertainty weights for each layer (TASK.md: weights = 1/σ²)"""
         weights = {}
@@ -295,6 +293,13 @@ class UncertaintyMultiTaskLoss(nn.Module):
             summary += unc_str + ", ".join(unc_parts)
         
         return summary
+
+    def cleanup(self):
+        """Shutdown the thread pool executor gracefully."""
+        self.loss_executor.shutdown(wait=True)
+
+    def __del__(self):
+        self.cleanup()
 
 
 class AdaptiveMultiTaskLoss(UncertaintyMultiTaskLoss):

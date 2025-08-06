@@ -16,11 +16,11 @@ from .utils.progress_tracker import (
     TrainingProgressTracker, create_training_progress_bridge,
     create_simple_progress_callback
 )
-from .utils.early_stopping import (
-    EarlyStopping, MultiMetricEarlyStopping, AdaptiveEarlyStopping,
-    create_early_stopping, create_adaptive_early_stopping
+from .early_stopping import (
+    EarlyStopping, StandardEarlyStopping, MultiMetricEarlyStopping, 
+    AdaptiveEarlyStopping, PhaseSpecificEarlyStopping,
+    create_early_stopping, create_adaptive_early_stopping, create_phase_specific_early_stopping
 )
-from .visualization_manager import ComprehensiveMetricsTracker, create_visualization_manager
 from .platform_presets import PlatformPresets, get_platform_presets, get_platform_config
 from .training_pipeline import TrainingPipeline
 # run_full_training_pipeline moved to smartcash.model.api.core
@@ -88,11 +88,12 @@ __all__ = [
     'create_simple_progress_callback',
     
     # Early stopping
-    'EarlyStopping', 'MultiMetricEarlyStopping', 'AdaptiveEarlyStopping',
-    'create_early_stopping', 'create_adaptive_early_stopping',
+    'EarlyStopping', 'StandardEarlyStopping', 'MultiMetricEarlyStopping', 
+    'AdaptiveEarlyStopping', 'PhaseSpecificEarlyStopping',
+    'create_early_stopping', 'create_adaptive_early_stopping', 'create_phase_specific_early_stopping',
     
     # Visualization
-    'ComprehensiveMetricsTracker', 'create_visualization_manager',
+    'VisualizationService', 'create_visualization_service',
     
     # Platform-aware training
     'PlatformPresets', 'get_platform_presets', 'get_platform_config',

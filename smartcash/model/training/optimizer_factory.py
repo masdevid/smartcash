@@ -184,7 +184,7 @@ class OptimizerFactory:
     def setup_mixed_precision(self) -> Optional[GradScaler]:
         """Setup mixed precision training"""
         if self.mixed_precision and torch.cuda.is_available():
-            return GradScaler()
+            return GradScaler('cuda')
         return None
     
     def step_optimizer(self, optimizer: torch.optim.Optimizer, loss: torch.Tensor,

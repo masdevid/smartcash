@@ -107,7 +107,7 @@ class ValidationExecutor:
         logger.info(f"  • YOLOv5 mAP calculator: {layer_info} classes")
         logger.info(f"  • mAP calculation mode: {'Standard (non-hierarchical)' if use_standard_map else 'Hierarchical'}")
         if use_standard_map:
-            logger.info(f"  • TASK.md: Phase 2 using standard mAP for all 17 classes")
+            logger.info(f"  • Phase 2 using standard mAP for all 17 classes")
         else:
             logger.info(f"  • Using hierarchical validation (YOLOv5 + per-layer metrics)")
         

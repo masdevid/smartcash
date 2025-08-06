@@ -116,7 +116,7 @@ class LossCoordinator:
             self.use_multi_task_loss = False
             self._setup_individual_losses()
             if self.current_phase == 1:
-                self.logger.info(f"🔧 Phase {self.current_phase}: Using default YOLOv5 loss (as per TASK.md)")
+                self.logger.info(f"🔧 Phase {self.current_phase}: Using default YOLOv5 loss")
             else:
                 self.logger.info(f"🔧 Phase {self.current_phase}: Using individual YOLO losses (fallback)")
     

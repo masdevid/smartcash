@@ -7,6 +7,7 @@ classification metrics, mAP metrics, and research-focused standardization.
 """
 
 import torch
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from smartcash.common.logger import get_logger
 from smartcash.model.training.utils.metrics_utils import calculate_multilayer_metrics
@@ -30,6 +31,9 @@ class ValidationMetricsComputer:
         self.config = config
         self.map_calculator = map_calculator
         
+        # ThreadPool for parallel metrics computation
+        self.metrics_executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix='validation_metrics')
+        
         # Cache for mAP results to avoid duplicate expensive computation
         self._cached_map_results = None
         
@@ -46,36 +50,44 @@ class ValidationMetricsComputer:
         # Phase-aware metrics computation
         logger.info(f"PHASE {phase_num}: Computing validation metrics.")
 
-        # Always compute per-layer classification metrics
-        computed_metrics = self._compute_classification_metrics(all_predictions, all_targets)
-        if computed_metrics:
-            raw_metrics.update(computed_metrics)
-            logger.debug(f"Computed per-layer metrics: {list(computed_metrics.keys())}")
+        # Parallelize metrics computation
+        future_to_metric = {
+            self.metrics_executor.submit(self._compute_classification_metrics, all_predictions, all_targets): "classification",
+            self.metrics_executor.submit(self.map_calculator.compute_map): "map"
+        }
 
-        # Compute and add YOLOv5 mAP metrics FIRST (so they don't override layer metrics)
-        try:
-            logger.debug("Computing YOLOv5 mAP metrics...")
-            if self._cached_map_results is None:
-                self._cached_map_results = self.map_calculator.compute_map()
-            
-            map_metrics = {
-                'map50': self._cached_map_results.get('map50', 0.0),
-                'map50_95': self._cached_map_results.get('map50_95', 0.0),
-                'map50_precision': self._cached_map_results.get('precision', 0.0),
-                'map50_recall': self._cached_map_results.get('recall', 0.0),
-                'map50_f1': self._cached_map_results.get('f1', 0.0),
-                'map50_accuracy': self._cached_map_results.get('accuracy', 0.0)
-            }
-            raw_metrics.update(map_metrics)
-            logger.debug("YOLOv5 mAP metrics computed and cached.")
+        computed_metrics = {}
+        map_metrics = {}
 
-        except Exception as e:
-            logger.warning(f"Error computing YOLOv5 mAP metrics: {e}")
-            # Set fallback mAP values
-            raw_metrics.update({
-                'map50': 0.0, 'map50_95': 0.0, 'map50_precision': 0.0, 
-                'map50_recall': 0.0, 'map50_f1': 0.0, 'map50_accuracy': 0.0
-            })
+        for future in as_completed(future_to_metric):
+            metric_type = future_to_metric[future]
+            try:
+                result = future.result()
+                if metric_type == "classification":
+                    computed_metrics = result
+                    if computed_metrics:
+                        logger.debug(f"Computed per-layer metrics: {list(computed_metrics.keys())}")
+                elif metric_type == "map":
+                    self._cached_map_results = result
+                    map_metrics = {
+                        'map50': self._cached_map_results.get('map50', 0.0),
+                        'map50_95': self._cached_map_results.get('map50_95', 0.0),
+                        'map50_precision': self._cached_map_results.get('precision', 0.0),
+                        'map50_recall': self._cached_map_results.get('recall', 0.0),
+                        'map50_f1': self._cached_map_results.get('f1', 0.0),
+                        'map50_accuracy': self._cached_map_results.get('accuracy', 0.0)
+                    }
+                    logger.debug("YOLOv5 mAP metrics computed and cached.")
+            except Exception as e:
+                logger.warning(f"Error computing {metric_type} metrics: {e}")
+                if metric_type == "map":
+                    map_metrics.update({
+                        'map50': 0.0, 'map50_95': 0.0, 'map50_precision': 0.0, 
+                        'map50_recall': 0.0, 'map50_f1': 0.0, 'map50_accuracy': 0.0
+                    })
+
+        raw_metrics.update(computed_metrics)
+        raw_metrics.update(map_metrics)
 
         # Update primary metrics (accuracy, precision, etc.) based on the current phase
         # This MUST come after YOLOv5 metrics to ensure layer metrics take precedence
@@ -220,5 +232,12 @@ class ValidationMetricsComputer:
             # As a fallback, use generic accuracy if available
             if 'accuracy' not in base_metrics:
                 base_metrics['accuracy'] = computed_metrics.get('layer_1_accuracy', 0.0)
+    
+    def cleanup(self):
+        """Shutdown the thread pool executor gracefully."""
+        self.metrics_executor.shutdown(wait=True)
+
+    def __del__(self):
+        self.cleanup()
     
     

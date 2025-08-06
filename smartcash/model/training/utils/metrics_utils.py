@@ -112,6 +112,27 @@ def calculate_multilayer_metrics(predictions: Dict[str, torch.Tensor],
                 
                 f1 = float(f1_score(target_classes, pred_classes, average='weighted', zero_division=0))
                 metrics[f'{layer_name}_f1'] = max(epsilon, f1)
+                
+                # Calculate confusion matrix for visualization
+                try:
+                    from sklearn.metrics import confusion_matrix
+                    # Determine number of classes for this layer
+                    layer_num_classes = {
+                        'layer_1': 7,  # Banknote denominations
+                        'layer_2': 7,  # Denomination features  
+                        'layer_3': 3   # Common features
+                    }
+                    num_classes = layer_num_classes.get(layer_name, 7)
+                    
+                    cm = confusion_matrix(target_classes, pred_classes, 
+                                        labels=list(range(num_classes)))
+                    # Store as list of lists for JSON serialization
+                    metrics[f'{layer_name}_confusion_matrix'] = cm.tolist()
+                    
+                    logger.debug(f"Layer {layer_name}: Confusion matrix calculated ({cm.shape})")
+                except Exception as cm_e:
+                    logger.debug(f"Failed to calculate confusion matrix for {layer_name}: {cm_e}")
+                    # Don't fail the whole process if CM calculation fails
             except Exception as e:
                 logger.warning(f"Error calculating sklearn metrics for {layer_name}: {e}")
                 # Fallback to simple calculation with epsilon

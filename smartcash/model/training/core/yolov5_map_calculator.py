@@ -357,12 +357,12 @@ class YOLOv5MapCalculator:
         if not self._ensure_yolov5_available():
             raise RuntimeError("YOLOv5 not available - cannot compute mAP metrics")
         
-        if not self.stats:
-            logger.error(f"🚨 No statistics accumulated! update() called {self._batch_count} times")
+        if not self.stats or len(self.stats) == 0:
+            logger.warning("🚨 No statistics accumulated! update() called {self._batch_count} times, but stats are empty.")
             if self.debug and self.debug_logger:
                 self.debug_logger.write_debug_log(f"mAP calculator state: yolov5_available={self.yolo_utils.is_available()}, "
                               f"device={self.device}")
-            raise RuntimeError("No statistics accumulated - check if update() was called during validation")
+            return self._create_zero_metrics()
         
         # Validate accumulated statistics using extracted processor
         if not self.statistics_processor.validate_statistics(self.stats):

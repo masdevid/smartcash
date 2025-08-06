@@ -11,6 +11,7 @@ from pathlib import Path
 from datetime import datetime
 from typing import Dict, List, Optional, Any
 from dataclasses import dataclass, asdict
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from smartcash.common.logger import get_logger
 
@@ -61,8 +62,6 @@ class EpochMetrics:
     
     # Additional metrics for debugging
     additional_metrics: Optional[Dict[str, float]] = None
-
-
 class MetricsHistoryRecorder:
     """
     JSON-based metrics history recorder for training visualization.
@@ -101,6 +100,10 @@ class MetricsHistoryRecorder:
         if session_id is None and not resume_mode:
             session_id = datetime.now().strftime("%Y%m%d_%H%M%S")
         self.session_id = session_id
+        
+        # ThreadPool for non-blocking I/O operations
+        self.io_executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix='metrics_io')
+        self.io_futures = []
         
         # Create phase-specific filenames with backbone and data info
         if resume_mode:
@@ -350,8 +353,8 @@ class MetricsHistoryRecorder:
                 logger.debug(f"Fresh training: Recorded epoch {epoch} metrics for phase {phase}")
             
             # Save immediately to disk
-            self._save_metrics()
-            self._save_latest()
+            self._save_metrics_async()
+            self._save_latest_async()
             
         except Exception as e:
             logger.error(f"Failed to record epoch {epoch} metrics: {e}")
@@ -390,7 +393,7 @@ class MetricsHistoryRecorder:
                 phase_summary['final_map50'] = phase_epochs[-1].val_map50
             
             self.phase_summaries[phase] = phase_summary
-            self._save_phase_summary()
+            self._save_phase_summary_async()
             
             logger.info(f"Finalized phase {phase}: {len(phase_epochs)} epochs, "
                        f"best val_loss: {phase_summary['best_val_loss']:.4f}")
@@ -511,6 +514,42 @@ class MetricsHistoryRecorder:
                     json.dump(latest_data, f, indent=2)
         except Exception as e:
             logger.error(f"Failed to save latest metrics: {e}")
+
+    def _save_metrics_async(self):
+        """Save metrics history to JSON file asynchronously."""
+        future = self.io_executor.submit(self._save_metrics)
+        self.io_futures.append(future)
+
+    def _save_phase_summary_async(self):
+        """Save phase summaries to JSON file asynchronously."""
+        future = self.io_executor.submit(self._save_phase_summary)
+        self.io_futures.append(future)
+
+    def _save_latest_async(self):
+        """Save latest metrics for quick access asynchronously."""
+        future = self.io_executor.submit(self._save_latest)
+        self.io_futures.append(future)
+
+    def wait_for_io_completion(self):
+        """Wait for all background I/O tasks to complete."""
+        if not self.io_futures:
+            return
+
+        for future in as_completed(self.io_futures):
+            try:
+                future.result() # Raise exceptions if any
+            except Exception as e:
+                logger.error(f"Background metrics saving task failed: {e}")
+        
+        self.io_futures.clear()
+
+    def cleanup(self):
+        """Shutdown the thread pool executor gracefully."""
+        self.wait_for_io_completion()
+        self.io_executor.shutdown(wait=True)
+
+    def __del__(self):
+        self.cleanup()
 
 
 def create_metrics_recorder(output_dir: str = "outputs", 

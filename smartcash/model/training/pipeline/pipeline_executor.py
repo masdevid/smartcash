@@ -13,9 +13,12 @@ from smartcash.common.logger import get_logger
 from smartcash.model.training.utils.resume_utils import handle_resume_training_pipeline
 from smartcash.model.training.utils.setup_utils import prepare_training_environment
 from smartcash.model.training.utils.summary_utils import generate_markdown_summary
-from smartcash.model.training.training_phase_manager import TrainingPhaseManager
+from smartcash.model.training.phases import TrainingPhaseManager
 from smartcash.model.training.utils.weight_transfer import create_weight_transfer_manager
 from smartcash.model.training.pipeline.configuration_builder import ConfigurationBuilder
+from smartcash.model.core.checkpoints.checkpoint_utils import CheckpointUtils
+from smartcash.model.core.model_utils import ModelUtils
+
 # Delayed import to avoid circular dependency - imported where used
 from smartcash.model.utils.memory_optimizer import get_memory_optimizer
 import torch
@@ -360,21 +363,19 @@ class PipelineExecutor:
             # Create visualization manager for comprehensive training charts
             from smartcash.model.training.visualization_manager import create_visualization_manager
             
-            # Use phase-aware layer configuration based on training mode
+            # Define layer configurations for different training modes
+            layer_configs = {
+                'two_phase': {'layer_1': 7},  # Phase 1: single-layer only
+                'single': {'layer_1': 7, 'layer_2': 7, 'layer_3': 3}  # Single-phase: all layers
+            }
             training_mode = config.get('training_mode', 'two_phase')
-            if training_mode == 'two_phase':
-                # Phase 1 starts with single-layer (layer_1 only)
-                num_classes_per_layer = {'layer_1': 7}
-            else:
-                # Single-phase uses all layers
-                num_classes_per_layer = {'layer_1': 7, 'layer_2': 7, 'layer_3': 3}
+            num_classes_per_layer = layer_configs[training_mode]
             
             visualization_manager = create_visualization_manager(
                 num_classes_per_layer=num_classes_per_layer,
                 save_dir="data/visualization",
                 verbose=True
             )
-            
             # Create training phase manager
             phase_manager = TrainingPhaseManager(
                 model=self.model,
@@ -408,7 +409,11 @@ class PipelineExecutor:
                         # Check if this is an early shutdown - should not continue to Phase 2
                         if phase1_result.get('early_shutdown', False):
                             logger.info("🛑 Phase 1 early shutdown detected - stopping training pipeline")
-                        return phase1_result
+                        return {
+                            'success': phase1_result.get('success', False),
+                            'error': phase1_result.get('error', 'Phase 1 training failed'),
+                            **phase1_result  # Include any additional fields from the original result
+                        }
                     
                     # Phase 1 backup is now created automatically by CheckpointManager when best model is saved
                     # phase1_backup_path = self._create_phase_backup(phase1_result.get('best_checkpoint'), 1)
@@ -428,13 +433,13 @@ class PipelineExecutor:
                     # Check if we should override standard best model with backup
                     if not config.get('resume_checkpoint'):
                         # Starting new Phase 2 training - override standard best.pt with backup if available
-                        phase1_backup_path = self._find_phase_backup_model(1, config)
+                        phase1_backup_path = CheckpointUtils.find_phase_backup_model(1, config)
                         if phase1_backup_path:
                             logger.info(f"📦 Overriding standard best.pt with Phase 1 backup for new Phase 2 training")
-                            self._override_standard_best_with_backup(phase1_backup_path, config)
+                            CheckpointUtils.override_standard_best_with_backup(phase1_backup_path, config)
                         else:
                             # Check if there's an existing standard best model
-                            standard_best_path = self._find_standard_best_model(config)
+                            standard_best_path = CheckpointUtils.find_standard_best_model(config)
                             if standard_best_path:
                                 logger.warning("⚠️ No Phase 1 backup found - using existing standard best.pt")
                             else:
@@ -464,17 +469,31 @@ class PipelineExecutor:
             else:
                 # Single phase training
                 self.progress_tracker.start_phase('training_phase_single', 6)
-                return phase_manager.run_training_phase(
+                result = phase_manager.run_training_phase(
                     phase_num=1, 
                     epochs=config.get('phase_1_epochs', 10), 
                     start_epoch=0
                 )
+                # Ensure result has 'success' key
+                if 'success' not in result:
+                    return {
+                        'success': False,
+                        'error': 'Training phase did not return success status',
+                        **result  # Include any additional fields from the original result
+                    }
+                return result
                 
         except ImportError:
             logger.error("Training phase manager not available")
             return {
                 'success': False,
                 'error': 'Training phase manager not available'
+            }
+        except Exception as e:
+            logger.error(f"❌ Training phases failed: {str(e)}")
+            return {
+                'success': False,
+                'error': f"Training phases failed: {str(e)}"
             }
     
     def _run_training_phases_resume(self, config: Dict[str, Any], resume_epoch: int, resume_phase: int) -> Dict[str, Any]:
@@ -498,7 +517,6 @@ class PipelineExecutor:
                 save_dir="data/visualization",
                 verbose=True
             )
-            
             # Create training phase manager
             phase_manager = TrainingPhaseManager(
                 model=self.model,
@@ -552,7 +570,7 @@ class PipelineExecutor:
                     logger.info(f"🔄 Skipping Phase 1, resuming Phase 2 from epoch {resume_epoch}")
                     
                     # Unfreeze backbone for Phase 2 resume
-                    self._unfreeze_backbone_for_phase2()
+                    ModelUtils.unfreeze_backbone_for_phase2(self.model)
                     
                     # CRITICAL: Propagate Phase 2 state to all model components for resume
                     logger.info("🔄 Propagating Phase 2 state to model components (resume mode)")
@@ -695,143 +713,6 @@ class PipelineExecutor:
             except Exception as e:
                 logger.warning(f"Log callback error: {e}")
     
-    def _create_phase_backup(self, checkpoint_path: str, phase_num: int) -> str:
-        """Create backup copy of phase checkpoint with phase suffix."""
-        if not checkpoint_path:
-            return None
-            
-        try:
-            import shutil
-            from pathlib import Path
-            
-            best_checkpoint_path = Path(checkpoint_path)
-            backup_checkpoint_path = best_checkpoint_path.parent / (best_checkpoint_path.stem + f'_phase{phase_num}' + best_checkpoint_path.suffix)
-            shutil.copy2(best_checkpoint_path, backup_checkpoint_path)
-            logger.info(f"✅ Created Phase {phase_num} backup model: {backup_checkpoint_path}")
-            return str(backup_checkpoint_path)
-        except Exception as e:
-            logger.warning(f"⚠️ Failed to create Phase {phase_num} backup model: {e}")
-            return None
-    
-    def _find_phase_backup_model(self, phase_num: int, config: Dict[str, Any]) -> str:
-        """Find existing phase backup model."""
-        try:
-            from pathlib import Path
-            import glob
-            
-            checkpoint_dir = Path(config.get('checkpoint_dir', 'data/checkpoints'))
-            
-            # Look for backup models with phase suffix
-            pattern = str(checkpoint_dir / f"*_phase{phase_num}.pt")
-            backup_files = glob.glob(pattern)
-            
-            if backup_files:
-                # Sort by modification time, get the most recent
-                backup_files.sort(key=lambda x: Path(x).stat().st_mtime, reverse=True)
-                backup_path = backup_files[0]
-                logger.info(f"📦 Found Phase {phase_num} backup model: {backup_path}")
-                return backup_path
-            else:
-                logger.warning(f"⚠️ No Phase {phase_num} backup model found in {checkpoint_dir}")
-                return None
-        except Exception as e:
-            logger.error(f"❌ Failed to find Phase {phase_num} backup model: {e}")
-            return None
-    
-    def _override_standard_best_with_backup(self, backup_path: str, config: Dict[str, Any]):
-        """Override standard best model with backup model content (file copy only)."""
-        try:
-            import shutil
-            from pathlib import Path
-            
-            backup_checkpoint_path = Path(backup_path)
-            checkpoint_dir = Path(config.get('checkpoint_dir', 'data/checkpoints'))
-            
-            # Find the current best model using the naming convention
-            standard_best_path = self._find_standard_best_model(config)
-            
-            if standard_best_path:
-                # Copy backup to standard best model location (override)
-                shutil.copy2(backup_checkpoint_path, standard_best_path)
-                logger.info(f"✅ Standard best model overridden with Phase 1 backup: {standard_best_path}")
-                logger.info("🔄 Training will load from standard best model (now contains Phase 1 backup)")
-            else:
-                # No existing best model, create new one with full naming convention
-                new_best_path = self._generate_new_best_model_name(config)
-                
-                shutil.copy2(backup_checkpoint_path, new_best_path)
-                logger.info(f"✅ Created new standard best model from Phase 1 backup: {new_best_path}")
-                
-        except Exception as e:
-            logger.error(f"❌ Failed to override standard best model with backup: {e}")
-    
-    def _generate_new_best_model_name(self, config: Dict[str, Any]) -> str:
-        """Generate new best model filename using the full naming convention."""
-        try:
-            from datetime import datetime
-            from pathlib import Path
-            
-            checkpoint_dir = Path(config.get('checkpoint_dir', 'data/checkpoints'))
-            
-            # Get model configuration for naming
-            model_config = config.get('model', {})
-            training_config = config.get('training', {})
-            
-            # Extract naming components (same logic as checkpoint manager)
-            backbone = model_config.get('backbone', config.get('backbone', 'unknown'))
-            
-            # Determine training mode
-            training_mode = training_config.get('training_mode', config.get('training_mode', 'two_phase'))
-            if training_mode not in ['single_phase', 'two_phase']:
-                training_mode = 'two_phase'  # Default fallback
-            
-            # Determine layer mode
-            layer_mode = model_config.get('layer_mode', 'multi')
-            if 'detection_layers' in model_config:
-                num_layers = len(model_config['detection_layers'])
-                layer_mode = 'single' if num_layers == 1 else 'multi'
-            
-            # Determine freeze status
-            freeze_backbone = model_config.get('freeze_backbone', False)
-            freeze_status = 'frozen' if freeze_backbone else 'unfrozen'
-            
-            # Check if pretrained is enabled
-            pretrained = model_config.get('pretrained', config.get('pretrained', False))
-            pretrained_suffix = 'pretrained' if pretrained else ''
-            
-            # Get current date
-            date_str = datetime.now().strftime('%Y%m%d')
-            
-            # Build checkpoint name parts for best checkpoints
-            name_parts = [
-                'best',
-                backbone,
-                training_mode,
-                layer_mode,
-                freeze_status
-            ]
-            
-            # Add pretrained suffix only if True
-            if pretrained_suffix:
-                name_parts.append(pretrained_suffix)
-            
-            name_parts.append(date_str)
-            filename = '_'.join(name_parts) + '.pt'
-            
-            return checkpoint_dir / filename
-            
-        except Exception as e:
-            # Fallback to simple naming if anything goes wrong
-            logger.warning(f"⚠️ Error generating full checkpoint name: {e}, using fallback")
-            from datetime import datetime
-            from pathlib import Path
-            
-            checkpoint_dir = Path(config.get('checkpoint_dir', 'data/checkpoints'))
-            backbone = config.get('backbone', 'unknown')
-            date_str = datetime.now().strftime('%Y%m%d')
-            filename = f"best_{backbone}_{date_str}.pt"
-            return checkpoint_dir / filename
-    
     def _transition_to_phase2_and_train(self, phase_manager, config: Dict[str, Any], phase1_result: Dict[str, Any]) -> Dict[str, Any]:
         """Handle transition from Phase 1 to Phase 2 and run Phase 2 training."""
         # CRITICAL: Phase 1 to Phase 2 transition logic
@@ -867,7 +748,7 @@ class PipelineExecutor:
         
         # 3. Rebuild model with Phase 2 configuration (multi-layer, unfrozen backbone)
         logger.info("🏗️ Rebuilding model with Phase 2 configuration (multi-layer, unfrozen backbone)")
-        phase2_model = self._rebuild_model_for_phase2(config)
+        phase2_model = ModelUtils.rebuild_model_for_phase2(self.model_api, self.model, config)
         
         # 4. Handle weight transfer from Phase 1 (single-layer) to Phase 2 (multi-layer)
         if phase1_checkpoint_data and 'model_state_dict' in phase1_checkpoint_data:
@@ -895,7 +776,7 @@ class PipelineExecutor:
                         logger.warning(f"⚠️ Config mismatch: saved num_classes={saved_num_classes}, but architecture suggests 17 classes (66 channels)")
                         logger.info("🔍 Using inference to get correct configuration")
                         checkpoint_path = phase1_result.get('best_checkpoint', '')
-                        inferred_config = self._infer_model_config_from_checkpoint(phase1_checkpoint_data, checkpoint_path)
+                        inferred_config = ModelUtils.infer_model_config_from_checkpoint(phase1_checkpoint_data, checkpoint_path)
                         if inferred_config:
                             logger.info(f"🔧 Using inferred config instead: {inferred_config}")
                             checkpoint_model_config = inferred_config
@@ -910,7 +791,7 @@ class PipelineExecutor:
                 logger.info("🔍 Model config empty in checkpoint, inferring from state dict structure")
                 # Pass checkpoint path context for better backbone inference
                 checkpoint_path = phase1_result.get('best_checkpoint', '')
-                checkpoint_model_config = self._infer_model_config_from_checkpoint(phase1_checkpoint_data, checkpoint_path)
+                checkpoint_model_config = ModelUtils.infer_model_config_from_checkpoint(phase1_checkpoint_data, checkpoint_path)
                 if checkpoint_model_config:
                     logger.info(f"🔧 Inferred model config: {checkpoint_model_config}")
             
@@ -923,7 +804,7 @@ class PipelineExecutor:
                 
                 # Rebuild model again with correct configuration from checkpoint
                 logger.info("🔄 Rebuilding model with correct checkpoint configuration")
-                corrected_model = self._rebuild_model_for_phase2(config)
+                corrected_model = ModelUtils.rebuild_model_for_phase2(self.model_api, self.model, config)
                 phase2_model = corrected_model
             
             # Use WeightTransferManager for intelligent single→multi weight transfer
@@ -979,128 +860,12 @@ class PipelineExecutor:
             start_epoch=0
         )
     
-    def _rebuild_model_for_phase2(self, config: Dict[str, Any]):
-        """Rebuild model with unfrozen backbone configuration for Phase 2."""
-        try:
-            logger.info("🏗️ Building new model with Phase 2 configuration (unfrozen backbone)")
-            
-            # Create a modified config for Phase 2 with unfrozen backbone
-            phase2_config = config.copy()
-            
-            # CRITICAL: Preserve the multi-layer configuration from Phase 1
-            # The original model config must be preserved to maintain architecture compatibility
-            original_model_config = config.get('model', {})
-            
-            # CRITICAL FIX: If model config is empty, extract configuration from current model
-            if not original_model_config or len(original_model_config) == 0:
-                logger.warning("⚠️ Original model config is empty, extracting from current model")
-                if self.model and hasattr(self.model, 'get_model_config'):
-                    try:
-                        extracted_config = self.model.get_model_config()
-                        logger.info(f"🔧 Extracted model config: {extracted_config}")
-                        original_model_config = extracted_config
-                    except Exception as e:
-                        logger.warning(f"⚠️ Failed to extract model config: {e}")
-                
-                # If still empty, infer from the current model API config
-                if (not original_model_config or len(original_model_config) == 0) and self.model_api:
-                    try:
-                        api_config = getattr(self.model_api, 'config', {})
-                        api_model_config = api_config.get('model', {})
-                        if api_model_config:
-                            logger.info(f"🔧 Using model API config: {api_model_config}")
-                            original_model_config = api_model_config
-                    except Exception as e:
-                        logger.warning(f"⚠️ Failed to get API model config: {e}")
-                
-                # Final fallback: infer from top-level config
-                if not original_model_config or len(original_model_config) == 0:
-                    logger.warning("⚠️ Using top-level config as fallback for model config")
-                    # Build minimal model config from top-level config
-                    original_model_config = {
-                        'backbone': config.get('backbone', 'cspdarknet'),
-                        'num_classes': config.get('num_classes', 17), 
-                        'layer_mode': config.get('layer_mode', 'multi'),
-                        'detection_layers': config.get('detection_layers', ['layer_1', 'layer_2', 'layer_3']),
-                        'pretrained': config.get('pretrained', False),
-                        'img_size': config.get('img_size', 640)
-                    }
-                    logger.info(f"🔧 Fallback model config: {original_model_config}")
-            
-            # Update model config to ensure backbone is unfrozen while preserving multi-layer setup
-            if 'model' not in phase2_config:
-                phase2_config['model'] = {}
-            
-            # Preserve all original model configuration parameters
-            phase2_config['model'].update(original_model_config)
-            
-            # Only override the freeze_backbone setting for Phase 2
-            phase2_config['model']['freeze_backbone'] = False
-            
-            # CRITICAL: Disable pretrained weights for Phase 2 model rebuild since we'll load Phase 1 weights
-            phase2_config['model']['pretrained'] = False
-            logger.info("🚫 Disabled pretrained weights for Phase 2 rebuild - will load Phase 1 trained weights instead")
-            
-            # Log the preserved configuration
-            model_config = phase2_config['model']
-            logger.info("🔥 Phase 2 model config: freeze_backbone = False")
-            logger.info(f"🔧 Preserved layer_mode: {model_config.get('layer_mode', 'N/A')}")
-            logger.info(f"🔧 Preserved detection_layers: {model_config.get('detection_layers', 'N/A')}")
-            logger.info(f"🔧 Preserved num_classes: {model_config.get('num_classes', 'N/A')}")
-            
-            # Rebuild model using the model API
-            if self.model_api:
-                logger.info("🔧 Using model API to rebuild model for Phase 2")
-                
-                # Use the preserved model configuration for rebuilding
-                
-                # Build new model with unfrozen backbone and preserved multi-layer config
-                build_result = self.model_api.build_model(model_config=model_config)
-                
-                # Log the build result for debugging
-                if build_result['success']:
-                    built_model = build_result['model']
-                    # Check if the model has the expected architecture
-                    if hasattr(built_model, 'yolov5_model') and hasattr(built_model.yolov5_model.model, 'model'):
-                        # Get the detection head to verify the output size
-                        detection_head = built_model.yolov5_model.model.model[-1]
-                        if hasattr(detection_head, 'm') and len(detection_head.m) > 0:
-                            head_output_size = detection_head.m[0].weight.shape[0] if hasattr(detection_head.m[0], 'weight') else 'unknown'
-                            logger.info(f"🔧 Phase 2 model detection head output size: {head_output_size}")
-                            logger.info(f"🔧 Expected: 66 for multi-layer (7+7+3)*6, or similar multi-layer config")
-                        else:
-                            logger.warning("⚠️ Could not inspect detection head structure")
-                    else:
-                        logger.warning("⚠️ Could not inspect model architecture for compatibility")
-                
-                if build_result['success']:
-                    new_model = build_result['model']
-                    logger.info("✅ Phase 2 model rebuilt successfully with unfrozen backbone and preserved configuration")
-                    return new_model
-                else:
-                    logger.error(f"❌ Failed to rebuild model for Phase 2: {build_result.get('error')}")
-                    logger.info("🔄 Falling back to manual backbone unfreezing (preserves architecture)")
-                    # Fallback to current model with manual unfreezing - this preserves the architecture
-                    self._unfreeze_backbone_for_phase2()
-                    return self.model
-            else:
-                logger.warning("⚠️ No model API available - using manual backbone unfreezing")
-                # Fallback to current model with manual unfreezing
-                self._unfreeze_backbone_for_phase2()
-                return self.model
-                
-        except Exception as e:
-            logger.error(f"❌ Error rebuilding model for Phase 2: {e}")
-            logger.info("🔄 Falling back to manual backbone unfreezing")
-            # Fallback to current model with manual unfreezing
-            self._unfreeze_backbone_for_phase2()
-            return self.model
     
     def _run_phase2_only(self, phase_manager, config: Dict[str, Any]) -> Dict[str, Any]:
         """Run Phase 2 training only (for direct Phase 2 start)."""
         # Save standard best model data before rebuilding
         standard_checkpoint_data = None
-        standard_best_path = self._find_standard_best_model(config)
+        standard_best_path = CheckpointUtils.find_standard_best_model(config)
         
         if standard_best_path:
             try:
@@ -1114,7 +879,7 @@ class PipelineExecutor:
         
         # Rebuild model with unfrozen backbone configuration for Phase 2
         logger.info("🏗️ Rebuilding model with unfrozen backbone configuration for Phase 2")
-        phase2_model = self._rebuild_model_for_phase2(config)
+        phase2_model = ModelUtils.rebuild_model_for_phase2(self.model_api, self.model, config)
         
         # Load standard best model weights into the rebuilt model
         if standard_checkpoint_data and 'model_state_dict' in standard_checkpoint_data:
@@ -1141,7 +906,7 @@ class PipelineExecutor:
                     if actual_output_channels == 66 and saved_num_classes != 17:
                         logger.warning(f"⚠️ Config mismatch: saved num_classes={saved_num_classes}, but architecture suggests 17 classes (66 channels)")
                         logger.info("🔍 Using inference to get correct configuration")
-                        inferred_config = self._infer_model_config_from_checkpoint(standard_checkpoint_data, standard_best_path)
+                        inferred_config = ModelUtils.infer_model_config_from_checkpoint(standard_checkpoint_data, standard_best_path)
                         if inferred_config:
                             logger.info(f"🔧 Using inferred config instead: {inferred_config}")
                             checkpoint_model_config = inferred_config
@@ -1154,7 +919,7 @@ class PipelineExecutor:
             else:
                 # Infer configuration from checkpoint state dict structure
                 logger.info("🔍 Model config empty in standard checkpoint, inferring from state dict structure")
-                checkpoint_model_config = self._infer_model_config_from_checkpoint(standard_checkpoint_data, standard_best_path)
+                checkpoint_model_config = ModelUtils.infer_model_config_from_checkpoint(standard_checkpoint_data, standard_best_path)
                 if checkpoint_model_config:
                     logger.info(f"🔧 Inferred model config: {checkpoint_model_config}")
             
@@ -1167,7 +932,7 @@ class PipelineExecutor:
                 
                 # Rebuild model again with correct configuration from checkpoint
                 logger.info("🔄 Rebuilding model with correct checkpoint configuration")
-                corrected_model = self._rebuild_model_for_phase2(config)
+                corrected_model = ModelUtils.rebuild_model_for_phase2(self.model_api, self.model, config)
                 phase2_model = corrected_model
             
             try:
@@ -1227,171 +992,3 @@ class PipelineExecutor:
             start_epoch=0
         )
     
-    def _find_standard_best_model(self, config: Dict[str, Any]) -> str:
-        """Find standard best model using naming convention (excludes backup models with _phase suffixes)."""
-        try:
-            from pathlib import Path
-            import glob
-            
-            checkpoint_dir = Path(config.get('checkpoint_dir', 'data/checkpoints'))
-            
-            # Look for best models with standard naming convention: best_*.pt
-            pattern = str(checkpoint_dir / "best_*.pt")
-            all_best_files = glob.glob(pattern)
-            
-            # Filter out backup models with _phase1 or _phase2 suffixes
-            standard_best_files = []
-            for file_path in all_best_files:
-                file_name = Path(file_path).stem  # Get filename without extension
-                # Exclude files that end with _phase1 or _phase2
-                if not (file_name.endswith('_phase1') or file_name.endswith('_phase2')):
-                    standard_best_files.append(file_path)
-            
-            if standard_best_files:
-                # Sort by modification time, get the most recent
-                standard_best_files.sort(key=lambda x: Path(x).stat().st_mtime, reverse=True)
-                best_path = standard_best_files[0]
-                logger.debug(f"📦 Found standard best model: {best_path}")
-                return best_path
-            else:
-                logger.debug(f"⚠️ No standard best model found in {checkpoint_dir} (excluding backup models)")
-                return None
-        except Exception as e:
-            logger.error(f"❌ Failed to find standard best model: {e}")
-            return None
-    
-    def _load_standard_best_model(self, config: Dict[str, Any]):
-        """Load standard best model into current model for Phase 2 training."""
-        try:
-            import torch
-            
-            # Find the current best model using the naming convention
-            best_model_path = self._find_standard_best_model(config)
-            
-            if best_model_path:
-                logger.info(f"🔄 Loading standard best model for Phase 2 training: {best_model_path}")
-                # Use weights_only=False for compatibility with PyTorch 2.6+
-                checkpoint = torch.load(best_model_path, map_location='cpu', weights_only=False)
-                if 'model_state_dict' in checkpoint:
-                    self.model.load_state_dict(checkpoint['model_state_dict'])
-                    logger.info("✅ Standard best model loaded into current model")
-                else:
-                    logger.warning("⚠️ No model_state_dict found in standard best model")
-            else:
-                logger.warning("⚠️ No standard best model found")
-                
-        except Exception as e:
-            logger.error(f"❌ Failed to load standard best model: {e}")
-    
-    def _infer_model_config_from_checkpoint(self, checkpoint_data: Dict[str, Any], checkpoint_path: str = '') -> Dict[str, Any]:
-        """Infer model configuration from checkpoint state dict structure."""
-        try:
-            state_dict = checkpoint_data.get('model_state_dict', {})
-            if not state_dict:
-                return {}
-            
-            # Analyze detection head output size to infer configuration
-            detection_head_keys = [k for k in state_dict.keys() if '.m.0.weight' in k and ('head' in k or 'model.24' in k)]
-            
-            if detection_head_keys:
-                # Get output channels from first detection head layer
-                first_head_key = detection_head_keys[0]
-                output_channels = state_dict[first_head_key].shape[0]
-                logger.info(f"🔍 Detected output channels: {output_channels}")
-                
-                # Infer configuration based on output channels
-                inferred_config = {}
-                
-                # Map output channels to known configurations
-                if output_channels == 36:  # 6 classes * 6 anchors
-                    inferred_config = {
-                        'num_classes': 6,
-                        'layer_mode': 'single',
-                        'detection_layers': ['layer_1']
-                    }
-                elif output_channels == 42:  # 7 classes * 6 anchors  
-                    inferred_config = {
-                        'num_classes': 7,
-                        'layer_mode': 'single',
-                        'detection_layers': ['layer_1']
-                    }
-                elif output_channels == 66:  # 11 classes * 6 anchors OR multi-layer (7+7+3) 
-                    # Check if this is multi-layer by looking for hierarchical structure clues
-                    inferred_config = {
-                        'num_classes': 17,  # 7+7+3 multi-layer configuration
-                        'layer_mode': 'multi',
-                        'detection_layers': ['layer_1', 'layer_2', 'layer_3']
-                    }
-                elif output_channels == 102:  # 17 classes * 6 anchors
-                    inferred_config = {
-                        'num_classes': 17,
-                        'layer_mode': 'single',
-                        'detection_layers': ['layer_1']
-                    }
-                else:
-                    # Generic inference based on output channels
-                    num_classes = output_channels // 6  # Assume 6 anchors per class
-                    inferred_config = {
-                        'num_classes': num_classes,
-                        'layer_mode': 'multi',  # Default to multi
-                        'detection_layers': ['layer_1', 'layer_2', 'layer_3']
-                    }
-                
-                # Try to infer backbone from parameter structure and checkpoint context
-                backbone_keys = [k for k in state_dict.keys() if 'backbone' in k.lower() or 'model.0' in k or 'model.1' in k]
-                if any('efficientnet' in k.lower() for k in backbone_keys):
-                    inferred_config['backbone'] = 'efficientnet_b4'
-                elif any('resnet' in k.lower() for k in backbone_keys):
-                    inferred_config['backbone'] = 'resnet50'
-                else:
-                    # Try to infer from checkpoint filename if available
-                    if checkpoint_path and ('efficientnet_b4' in checkpoint_path.lower()):
-                        inferred_config['backbone'] = 'efficientnet_b4'
-                    elif checkpoint_path and ('efficientnet_b0' in checkpoint_path.lower()):
-                        inferred_config['backbone'] = 'efficientnet_b0'
-                    elif checkpoint_path and ('resnet50' in checkpoint_path.lower()):
-                        inferred_config['backbone'] = 'resnet50'
-                    else:
-                        inferred_config['backbone'] = 'cspdarknet'  # Default
-                
-                # Additional metadata if available
-                if 'model_info' in checkpoint_data:
-                    model_info = checkpoint_data['model_info']
-                    if isinstance(model_info, dict):
-                        if 'backbone' in model_info:
-                            inferred_config['backbone'] = model_info['backbone']
-                        if 'layer_mode' in model_info:
-                            inferred_config['layer_mode'] = model_info['layer_mode']
-                        if 'detection_layers' in model_info:
-                            inferred_config['detection_layers'] = model_info['detection_layers']
-                
-                # Set defaults
-                inferred_config.setdefault('pretrained', True)
-                inferred_config.setdefault('img_size', 640)
-                
-                logger.info(f"🔍 Inferred model configuration from checkpoint structure: {inferred_config}")
-                return inferred_config
-            else:
-                logger.warning("⚠️ Could not find detection head keys in checkpoint")
-                return {}
-                
-        except Exception as e:
-            logger.error(f"❌ Failed to infer model config from checkpoint: {e}")
-            return {}
-
-    def _unfreeze_backbone_for_phase2(self):
-        """Unfreeze backbone parameters for Phase 2 training."""
-        try:
-            if hasattr(self.model, 'unfreeze_backbone'):
-                self.model.unfreeze_backbone()
-                logger.info("🔥 Backbone unfrozen for Phase 2 fine-tuning")
-            else:
-                # Manual backbone unfreezing
-                backbone_params_unfrozen = 0
-                for name, param in self.model.named_parameters():
-                    if any(backbone_part in name.lower() for backbone_part in ['backbone', 'model.0', 'model.1', 'model.2', 'model.3', 'model.4']):
-                        param.requires_grad = True
-                        backbone_params_unfrozen += 1
-                logger.info(f"🔥 Manually unfroze {backbone_params_unfrozen} backbone parameters for Phase 2")
-        except Exception as e:
-            logger.warning(f"⚠️ Failed to unfreeze backbone: {e}")

@@ -159,8 +159,9 @@ def apply_configuration_overrides(config: Dict[str, Any], **kwargs) -> Dict[str,
     
     # Batch size configuration
     if 'batch_size' in kwargs and kwargs['batch_size'] is not None:
-        training_overrides['data'] = training_overrides.get('data', {})
-        training_overrides['data']['batch_size'] = kwargs['batch_size']
+        training_overrides['training'] = training_overrides.get('training', {})
+        training_overrides['training']['batch_size'] = kwargs['batch_size']
+        logger.debug(f"🎯 Batch size override: {kwargs['batch_size']}")
     
     # Learning rate configurations for training phases
     if any(lr_key in kwargs for lr_key in ['head_lr_p1', 'head_lr_p2', 'backbone_lr']):
@@ -213,6 +214,46 @@ def apply_configuration_overrides(config: Dict[str, Any], **kwargs) -> Dict[str,
     if training_overrides:
         config = deep_merge_dict(config, training_overrides)
     
+    # Learning rate overrides - set both learning_rates and main learning_rate
+    if any(lr_key in kwargs for lr_key in ['head_lr_p1', 'head_lr_p2', 'backbone_lr']):
+        if 'training_phases' not in config:
+            config['training_phases'] = {}
+        
+        if 'head_lr_p1' in kwargs:
+            if 'phase_1' not in config['training_phases']:
+                config['training_phases']['phase_1'] = {}
+            if 'learning_rates' not in config['training_phases']['phase_1']:
+                config['training_phases']['phase_1']['learning_rates'] = {}
+            config['training_phases']['phase_1']['learning_rates']['head'] = kwargs['head_lr_p1']
+            # Also set main learning_rate for optimizer
+            config['training_phases']['phase_1']['learning_rate'] = kwargs['head_lr_p1']
+            logger.debug(f"🎯 Phase 1 head LR override: {kwargs['head_lr_p1']}")
+        
+        if 'head_lr_p2' in kwargs:
+            if 'phase_2' not in config['training_phases']:
+                config['training_phases']['phase_2'] = {}
+            if 'learning_rates' not in config['training_phases']['phase_2']:
+                config['training_phases']['phase_2']['learning_rates'] = {}
+            config['training_phases']['phase_2']['learning_rates']['head'] = kwargs['head_lr_p2']
+            # Also set main learning_rate for optimizer
+            config['training_phases']['phase_2']['learning_rate'] = kwargs['head_lr_p2']
+            logger.debug(f"🎯 Phase 2 head LR override: {kwargs['head_lr_p2']}")
+        
+        if 'backbone_lr' in kwargs:
+            # Apply backbone learning rate to both phases
+            for phase in ['phase_1', 'phase_2']:
+                if phase not in config['training_phases']:
+                    config['training_phases'][phase] = {}
+                if 'learning_rates' not in config['training_phases'][phase]:
+                    config['training_phases'][phase]['learning_rates'] = {}
+                config['training_phases'][phase]['learning_rates']['backbone'] = kwargs['backbone_lr']
+                
+                # For Phase 2 (unfrozen backbone), also set main learning_rate
+                if phase == 'phase_2':
+                    config['training_phases'][phase]['learning_rate'] = kwargs['backbone_lr']
+            logger.debug(f"🎯 Backbone LR override (both phases): {kwargs['backbone_lr']}")
+            logger.debug(f"🎯 Phase 2 main LR set to backbone LR: {kwargs['backbone_lr']}")
+
     # Apply any other custom configuration overrides
     excluded_keys = ['loss_type', 'batch_size', 'head_lr_p1', 'head_lr_p2', 'backbone_lr'] + early_stopping_keys
     for key, value in kwargs.items():
@@ -301,6 +342,8 @@ def apply_training_overrides(config: Dict[str, Any], **kwargs) -> Dict[str, Any]
             if 'learning_rates' not in config['training_phases']['phase_1']:
                 config['training_phases']['phase_1']['learning_rates'] = {}
             config['training_phases']['phase_1']['learning_rates']['head'] = kwargs['head_lr_p1']
+            # Also set main learning_rate for optimizer
+            config['training_phases']['phase_1']['learning_rate'] = kwargs['head_lr_p1']
             logger.debug(f"🎯 Phase 1 head LR override: {kwargs['head_lr_p1']}")
         
         if 'head_lr_p2' in kwargs:
@@ -309,6 +352,8 @@ def apply_training_overrides(config: Dict[str, Any], **kwargs) -> Dict[str, Any]
             if 'learning_rates' not in config['training_phases']['phase_2']:
                 config['training_phases']['phase_2']['learning_rates'] = {}
             config['training_phases']['phase_2']['learning_rates']['head'] = kwargs['head_lr_p2']
+            # Also set main learning_rate for optimizer
+            config['training_phases']['phase_2']['learning_rate'] = kwargs['head_lr_p2']
             logger.debug(f"🎯 Phase 2 head LR override: {kwargs['head_lr_p2']}")
         
         if 'backbone_lr' in kwargs:
@@ -319,7 +364,12 @@ def apply_training_overrides(config: Dict[str, Any], **kwargs) -> Dict[str, Any]
                 if 'learning_rates' not in config['training_phases'][phase]:
                     config['training_phases'][phase]['learning_rates'] = {}
                 config['training_phases'][phase]['learning_rates']['backbone'] = kwargs['backbone_lr']
+                
+                # For Phase 2 (unfrozen backbone), also set main learning_rate
+                if phase == 'phase_2':
+                    config['training_phases'][phase]['learning_rate'] = kwargs['backbone_lr']
             logger.debug(f"🎯 Backbone LR override (both phases): {kwargs['backbone_lr']}")
+            logger.debug(f"🎯 Phase 2 main LR set to backbone LR: {kwargs['backbone_lr']}")
 
     # Phase-specific epoch overrides
     if 'phase1_epochs' in kwargs and kwargs['phase1_epochs'] is not None:

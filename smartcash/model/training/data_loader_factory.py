@@ -173,17 +173,25 @@ class DataLoaderFactory:
         return self._get_fallback_config()
     
     def _get_fallback_config(self) -> Dict[str, Any]:
-        """Fallback config jika file tidak ada"""
+        """Fallback config jika file tidak ada."""
         # Detect PyTorch version and adjust multiprocessing settings
         import torch
         pytorch_version = tuple(map(int, torch.__version__.split('.')[:2]))
         
+        # Determine optimal number of workers based on CPU count
+        try:
+            cpu_count = os.cpu_count() or 1
+            # Set optimal workers to a safe value (e.g., half of CPU cores, max 8)
+            optimal_workers = min(cpu_count // 2 if cpu_count > 1 else 1, 8)
+        except NotImplementedError:
+            optimal_workers = 2 # Fallback for systems where cpu_count is not available
+
         # For PyTorch 2.7+, reduce multiprocessing complexity to avoid worker issues
         if pytorch_version >= (2, 7):
-            num_workers = 2  # Reduced workers for PyTorch 2.7+ compatibility
+            num_workers = min(optimal_workers, 4)  # Limit to 4 for PyTorch 2.7+ compatibility
             persistent_workers = False  # Disable persistent workers to avoid _workers_status issues
         else:
-            num_workers = 4
+            num_workers = optimal_workers
             persistent_workers = True
             
         return {

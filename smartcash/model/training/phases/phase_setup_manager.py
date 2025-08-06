@@ -26,7 +26,8 @@ class PhaseSetupManager:
         self.config = config
         
     def setup_phase_components(self, phase_num: int, epochs: int, 
-                               save_best_path: Optional[str] = None) -> Dict[str, Any]:
+                               save_best_path: Optional[str] = None,
+                               checkpoint_manager=None) -> Dict[str, Any]:
         """
         Set up all training components for a phase.
         
@@ -34,6 +35,7 @@ class PhaseSetupManager:
             phase_num: Phase number
             epochs: Total number of epochs
             save_best_path: Path to save best model
+            checkpoint_manager: Optional checkpoint manager for metrics state reset
             
         Returns:
             Dictionary containing all setup components
@@ -44,6 +46,14 @@ class PhaseSetupManager:
         from smartcash.model.training.loss_manager import LossManager
         
         logger.info(f"🔧 Setting up Phase {phase_num} training components")
+        
+        # Set checkpoint manager reference for this setup
+        if checkpoint_manager:
+            self.checkpoint_manager = checkpoint_manager
+        
+        # Reset metrics state for fresh phase start if not resuming
+        if not self._get_resume_mode():
+            self._reset_phase_metrics_state(phase_num)
         
         try:
             phase_config = self.config['training_phases'][f'phase_{phase_num}']
@@ -107,7 +117,8 @@ class PhaseSetupManager:
         except Exception as e:
             logger.error(f"❌ Error setting up phase {phase_num}: {str(e)}")
             raise
-    
+
+
     def _setup_early_stopping(self, phase_num: int, save_best_path: Optional[str] = None):
         """Set up early stopping for the phase with best metrics preservation."""
         from smartcash.model.training.early_stopping import create_early_stopping, create_phase_specific_early_stopping
@@ -150,6 +161,18 @@ class PhaseSetupManager:
                 logger.warning(f"⚠️ Failed to configure early stopping with best metrics: {e}")
         
         return early_stopping
+    
+    def _reset_phase_metrics_state(self, phase_num: int):
+        """Reset metrics state for fresh phase start to prevent comparing with previous runs."""
+        try:
+            if hasattr(self, 'checkpoint_manager') and self.checkpoint_manager:
+                best_metrics_manager = self.checkpoint_manager.get_best_metrics_manager()
+                best_metrics_manager.reset_phase_state(phase_num)
+                logger.info(f"🧹 Reset Phase {phase_num} metrics state for fresh start")
+            else:
+                logger.debug(f"⚠️ No checkpoint manager available to reset Phase {phase_num} metrics state")
+        except Exception as e:
+            logger.warning(f"⚠️ Failed to reset Phase {phase_num} metrics state: {e}")
     
     def _get_resume_mode(self) -> bool:
         """Determine if training is in resume mode."""

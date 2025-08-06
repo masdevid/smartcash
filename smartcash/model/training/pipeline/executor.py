@@ -37,7 +37,8 @@ class PipelineExecutor(CallbacksMixin):
                  metrics_callback: Optional[Callable] = None,
                  live_chart_callback: Optional[Callable] = None,
                  progress_callback: Optional[Callable] = None,
-                 use_yolov5_integration: bool = True):
+                 use_yolov5_integration: bool = True,
+                 is_resuming: bool = False):
         """
         Initialize simplified pipeline executor.
         
@@ -63,7 +64,7 @@ class PipelineExecutor(CallbacksMixin):
         )
         
         # Initialize component managers
-        self.model_manager = ModelManager(progress_tracker, log_callback)
+        self.model_manager = ModelManager(progress_tracker, log_callback, is_resuming=is_resuming)
         self.orchestrator = PipelineOrchestrator(
             progress_tracker, log_callback, metrics_callback,
             live_chart_callback, progress_callback
@@ -94,7 +95,7 @@ class PipelineExecutor(CallbacksMixin):
 
             # Step 2: Set up model (includes Build Model and initial Validate Model)
             self.progress_tracker.update_overall_progress("Setting up Model", current_overall_step, TOTAL_OVERALL_STEPS)
-            model_api, model = self.model_manager.setup_model(config, self.use_yolov5_integration)
+            model_api, model = self.model_manager.setup_model(config, self.use_yolov5_integration, is_resuming=self.is_resuming)
             current_overall_step += 1
 
             # Step 3: Execute training pipeline orchestration

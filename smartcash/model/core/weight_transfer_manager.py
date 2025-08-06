@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-Weight Transfer Utilities for Single→Multi Architecture Transition
+Weight Transfer Manager for Model Core Operations
 
-This module handles the transfer of weights from single-layer Phase 1 models
-to multi-layer Phase 2 models in the two-phase training pipeline.
+This module handles the transfer of weights between different model architectures
+during phase transitions. This is a core model concern, not a training utility.
 """
 
 import torch
@@ -22,6 +22,39 @@ class WeightTransferManager:
     def __init__(self):
         """Initialize weight transfer manager."""
         self.logger = logger
+    
+    def transfer_phase1_to_phase2_weights(
+        self, 
+        phase1_checkpoint_path: str, 
+        phase2_model: nn.Module,
+        transfer_mode: str = 'expand'
+    ) -> Tuple[bool, Dict[str, Any]]:
+        """
+        Transfer weights from Phase 1 checkpoint to Phase 2 model.
+        
+        Args:
+            phase1_checkpoint_path: Path to Phase 1 checkpoint
+            phase2_model: Phase 2 model to transfer weights into
+            transfer_mode: Transfer mode ('expand', 'copy', 'initialize')
+            
+        Returns:
+            Tuple of (success, transfer_info)
+        """
+        try:
+            # Load Phase 1 checkpoint
+            from smartcash.common.checkpoint_utils import safe_load_checkpoint
+            phase1_checkpoint = safe_load_checkpoint(phase1_checkpoint_path)
+            
+            if not phase1_checkpoint or 'model_state_dict' not in phase1_checkpoint:
+                return False, {'error': 'Invalid Phase 1 checkpoint'}
+            
+            return self.transfer_single_to_multi_weights(
+                phase1_checkpoint, phase2_model, transfer_mode
+            )
+            
+        except Exception as e:
+            self.logger.error(f"❌ Phase 1→2 weight transfer failed: {e}")
+            return False, {'error': str(e)}
     
     def transfer_single_to_multi_weights(
         self, 
@@ -302,10 +335,49 @@ class WeightTransferManager:
             
         except Exception as e:
             return {'compatible': False, 'error': str(e)}
+    
+    def rebuild_model_for_phase2(self, model_api, phase1_checkpoint_path: str) -> Tuple[bool, Any]:
+        """
+        Rebuild model for Phase 2 with proper architecture and weight transfer.
+        
+        Args:
+            model_api: Model API instance
+            phase1_checkpoint_path: Path to Phase 1 best checkpoint
+            
+        Returns:
+            Tuple of (success, rebuilt_model)
+        """
+        try:
+            self.logger.info("🔧 Rebuilding model for Phase 2...")
+            
+            # Build fresh Phase 2 model (multi-layer architecture)
+            build_result = model_api.build_model(
+                layer_mode='multi',  # Force multi-layer for Phase 2
+                detection_layers=['layer_1', 'layer_2', 'layer_3']
+            )
+            
+            if not build_result['success']:
+                return False, None
+            
+            phase2_model = build_result['model']
+            
+            # Transfer weights from Phase 1 to Phase 2
+            transfer_success, transfer_info = self.transfer_phase1_to_phase2_weights(
+                phase1_checkpoint_path, phase2_model, transfer_mode='expand'
+            )
+            
+            if transfer_success:
+                self.logger.info("✅ Model rebuilt for Phase 2 with weight transfer")
+                return True, phase2_model
+            else:
+                self.logger.warning("⚠️ Weight transfer failed, using fresh Phase 2 model")
+                return True, phase2_model  # Still return the model even if transfer failed
+                
+        except Exception as e:
+            self.logger.error(f"❌ Model rebuild for Phase 2 failed: {e}")
+            return False, None
 
 
-def create_weight_transfer_manager():
+def create_weight_transfer_manager() -> WeightTransferManager:
     """Factory function to create a WeightTransferManager instance."""
     return WeightTransferManager()
-
-

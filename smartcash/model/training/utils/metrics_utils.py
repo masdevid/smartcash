@@ -171,6 +171,11 @@ def filter_phase_relevant_metrics(metrics: Dict[str, float], phase_num: int) -> 
     if not metrics:
         return metrics
     
+    # Filter out private accumulated data keys
+    filtered_metrics = {k: v for k, v in metrics.items() 
+                       if not k.startswith('_accumulated')}
+    metrics = filtered_metrics
+    
     if phase_num == 1:
         # Phase 1: Simple YOLO loss - focus on basic YOLO training metrics
         relevant_metrics = {}

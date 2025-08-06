@@ -6,12 +6,51 @@ This module handles environment setup, configuration management, and preparation
 """
 
 import torch
+import glob
 from pathlib import Path
 from typing import Dict, Any
 from smartcash.common.logger import get_logger
 from smartcash.model.training.platform_presets import get_platform_config, setup_platform_optimizations, setup_platform_optimizations_with_device
 
 logger = get_logger(__name__)
+
+
+def cleanup_previous_session_checkpoints(checkpoint_dir: str):
+    """
+    Clean up last_*.pt checkpoints from previous training sessions.
+    
+    This prevents accidental loading of old checkpoints during fresh training.
+    Only removes last_*.pt files - keeps best_*.pt files for evaluation.
+    
+    Args:
+        checkpoint_dir: Directory containing checkpoints
+    """
+    try:
+        checkpoint_path = Path(checkpoint_dir)
+        if not checkpoint_path.exists():
+            logger.debug(f"Checkpoint directory doesn't exist: {checkpoint_dir}")
+            return
+        
+        # Find all last_*.pt files
+        last_checkpoint_pattern = checkpoint_path / "last_*.pt"
+        last_checkpoints = list(checkpoint_path.glob("last_*.pt"))
+        
+        if last_checkpoints:
+            logger.info(f"🧹 Cleaning up {len(last_checkpoints)} previous session checkpoints...")
+            
+            for checkpoint_file in last_checkpoints:
+                try:
+                    checkpoint_file.unlink()
+                    logger.info(f"   🗑️ Removed: {checkpoint_file.name}")
+                except Exception as e:
+                    logger.warning(f"   ⚠️ Failed to remove {checkpoint_file.name}: {e}")
+            
+            logger.info("✅ Previous session checkpoint cleanup completed")
+        else:
+            logger.debug("No previous session checkpoints found to clean up")
+            
+    except Exception as e:
+        logger.warning(f"⚠️ Error during checkpoint cleanup: {e}")
 
 
 def prepare_training_environment(
@@ -41,11 +80,15 @@ def prepare_training_environment(
         Dictionary containing preparation results and configuration
     """
     try:
-        # Step 1: Load platform-optimized configuration
+        # Step 1: Clean up previous session checkpoints (fresh training)
+        logger.debug("🧹 Cleaning up previous session checkpoints")
+        cleanup_previous_session_checkpoints(checkpoint_dir)
+        
+        # Step 2: Load platform-optimized configuration
         logger.debug("⚙️ Loading platform-optimized configuration")
         config = get_platform_config(backbone, phase_1_epochs, phase_2_epochs)
         
-        # Step 2: Set pretrained flag and training mode in configuration
+        # Step 3: Set pretrained flag and training mode in configuration
         if 'model' in config:
             config['model']['pretrained'] = pretrained
         
@@ -54,22 +97,22 @@ def prepare_training_environment(
         config['training']['training_mode'] = training_mode
         logger.info(f"🏗️ Training setup: {backbone} (pretrained={pretrained}, mode={training_mode})")
         
-        # Step 3: Apply force_cpu if specified
+        # Step 4: Apply force_cpu if specified
         if force_cpu:
             config = apply_force_cpu_configuration(config)
         
-        # Step 4: Platform detection and optimization (with device awareness)
+        # Step 5: Platform detection and optimization (with device awareness)
         logger.debug("🔧 Detecting platform and applying optimizations")
         target_device = None
         if force_cpu:
             target_device = torch.device('cpu')
         setup_platform_optimizations_with_device(target_device)
         
-        # Step 4: Apply custom overrides
+        # Step 6: Apply custom overrides
         if kwargs:
             config = apply_configuration_overrides(config, **kwargs)
         
-        # Step 5: Setup checkpoint directory
+        # Step 7: Setup checkpoint directory
         logger.debug("📁 Setting up checkpoint management")
         checkpoint_path = Path(checkpoint_dir)
         checkpoint_path.mkdir(parents=True, exist_ok=True)

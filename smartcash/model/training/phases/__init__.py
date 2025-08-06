@@ -8,6 +8,9 @@ hierarchy and mixins for different training phase responsibilities.
 # Main training executor
 from .training_executor import TrainingPhaseExecutor
 
+# Phase setup manager
+from .phase_setup_manager import PhaseSetupManager, create_phase_setup_manager
+
 # Core components  
 from .base import BasePhaseManager
 from .mixins.metrics_processing import MetricsProcessingMixin
@@ -18,6 +21,8 @@ from .mixins.callbacks import CallbacksMixin
 
 __all__ = [
     'TrainingPhaseExecutor',
+    'PhaseSetupManager',
+    'create_phase_setup_manager',
     'BasePhaseManager', 
     'MetricsProcessingMixin',
     'ProgressTrackingMixin',

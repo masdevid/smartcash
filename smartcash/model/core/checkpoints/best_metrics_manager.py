@@ -19,7 +19,7 @@ logger = get_logger(__name__)
 class BestMetricsManager:
     """Manages phase-specific best metrics during training operations."""
     
-    def __init__(self, checkpoint_dir: Union[str, Path]):
+    def __init__(self, checkpoint_dir: Union[str, Path], is_resuming: bool = False):
         """
         Initialize best metrics manager.
         
@@ -33,6 +33,8 @@ class BestMetricsManager:
         self.phase_best_metrics = {}  # {phase_num: {metrics}}
         self.phase_current_best = {}  # {phase_num: best_value}
         self.current_phase = None
+        self._fresh_phase_start = None # Initialize the flag
+        self.is_resuming = is_resuming # New attribute to indicate if the session is resuming
         
     def load_previous_best_metrics(self, phase_num: int) -> Dict[str, Any]:
         """
@@ -46,6 +48,13 @@ class BestMetricsManager:
         """
         try:
             self.current_phase = phase_num
+
+            # If it's Phase 1 and not resuming, or if _fresh_phase_start is set, skip loading previous metrics
+            if (phase_num == 1 and not self.is_resuming) or \
+               (self._fresh_phase_start == phase_num and phase_num != 2):
+                logger.info(f"🆕 Phase {phase_num} is marked for a fresh start (or is Phase 1 and not resuming) - skipping loading previous metrics.")
+                self._fresh_phase_start = None  # Reset the flag
+                return {}
             
             # Find phase-specific backup checkpoint first
             phase_backup = self._find_phase_backup(phase_num)
@@ -186,6 +195,11 @@ class BestMetricsManager:
         self.current_phase = phase_num
         logger.info(f"🔄 Set current phase to {phase_num}")
     
+    def set_is_resuming(self, is_resuming: bool):
+        """Set the resuming status of the manager."""
+        self.is_resuming = is_resuming
+        logger.info(f"🔄 BestMetricsManager resuming status set to {self.is_resuming}")
+
     def reset_phase_state(self, phase_num: int):
         """Reset all tracking state for a specific phase (for fresh phase start)."""
         if phase_num in self.phase_best_metrics:
@@ -198,6 +212,9 @@ class BestMetricsManager:
         keys_to_remove = [k for k in self.best_metrics_history.keys() if f"_phase_{phase_num}" in k]
         for key in keys_to_remove:
             del self.best_metrics_history[key]
+        
+        # Set a flag to prevent loading previous best metrics from disk
+        self._fresh_phase_start = phase_num
         
         logger.info(f"🧹 Reset all state for Phase {phase_num} (fresh start)")
     
@@ -376,7 +393,7 @@ class BestMetricsManager:
         return None
 
 
-def create_best_metrics_manager(checkpoint_dir: Union[str, Path]) -> BestMetricsManager:
+def create_best_metrics_manager(checkpoint_dir: Union[str, Path], is_resuming: bool = False) -> BestMetricsManager:
     """
     Factory function to create a BestMetricsManager instance.
     
@@ -386,4 +403,4 @@ def create_best_metrics_manager(checkpoint_dir: Union[str, Path]) -> BestMetrics
     Returns:
         BestMetricsManager instance
     """
-    return BestMetricsManager(checkpoint_dir)
+    return BestMetricsManager(checkpoint_dir, is_resuming=is_resuming)

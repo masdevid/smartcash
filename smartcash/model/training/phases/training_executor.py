@@ -40,7 +40,7 @@ class TrainingPhaseExecutor(CallbacksMixin, MetricsProcessingMixin):
     
     def __init__(self, model, model_api, config, progress_tracker,
                  log_callback=None, metrics_callback=None, live_chart_callback=None,
-                 progress_callback=None):
+                 progress_callback=None, is_resuming: bool = False):
         """
         Initialize training phase executor.
         
@@ -72,7 +72,7 @@ class TrainingPhaseExecutor(CallbacksMixin, MetricsProcessingMixin):
         # Note: Phase setup is now handled by PipelineOrchestrator and passed to execute_phase
         
         # Initialize checkpoint manager
-        self.checkpoint_manager = create_checkpoint_manager(config)
+        self.checkpoint_manager = create_checkpoint_manager(config, is_resuming=is_resuming)
         
         # Install signal handlers for graceful shutdown
         install_training_signal_handlers()
@@ -80,6 +80,7 @@ class TrainingPhaseExecutor(CallbacksMixin, MetricsProcessingMixin):
         
         # Training state
         self.current_phase = None
+        self.training_visualization_manager = None
         
         logger.info("🏃 TrainingPhaseExecutor initialized")
     
@@ -117,6 +118,12 @@ class TrainingPhaseExecutor(CallbacksMixin, MetricsProcessingMixin):
         except Exception as e:
             self.emit_log('error', f'❌ Phase {phase_num} execution failed: {str(e)}')
             raise
+    
+    def set_training_visualization_manager(self, visualization_manager):
+        """Set the training visualization manager for real-time metrics tracking."""
+        self.training_visualization_manager = visualization_manager
+        if visualization_manager:
+            logger.info("📊 Training visualization manager connected for real-time metrics tracking")
     
     def _execute_training_loop(self, components: Dict[str, Any], phase_num: int, 
                               total_epochs: int, start_epoch: int) -> Dict[str, Any]:
@@ -189,6 +196,17 @@ class TrainingPhaseExecutor(CallbacksMixin, MetricsProcessingMixin):
             # Record metrics
             if components.get('metrics_recorder'):
                 components['metrics_recorder'].record_epoch(epoch, phase_num, final_metrics)
+            
+            # Update training visualization manager with real-time metrics
+            if self.training_visualization_manager:
+                try:
+                    self.training_visualization_manager.update_with_research_metrics(
+                        epoch=epoch,
+                        phase_num=phase_num,
+                        metrics=final_metrics
+                    )
+                except Exception as e:
+                    logger.debug(f"Failed to update training visualization: {e}")
             
             # Handle early stopping
             should_stop = False

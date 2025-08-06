@@ -10,7 +10,8 @@ from .progress_tracker import TrainingProgressTracker, create_training_progress_
 from .signal_handler import install_training_signal_handlers, register_cleanup_callback
 from .setup_utils import prepare_training_environment
 from .resume_utils import handle_resume_training_pipeline, validate_training_mode_and_params
-from .weight_transfer import create_weight_transfer_manager
+# Weight transfer moved to model/core domain
+from smartcash.model.core.weight_transfer_manager import create_weight_transfer_manager
 from .summary_utils import generate_markdown_summary
 
 # Note: Checkpoint utilities have been migrated to smartcash.model.core.checkpoints.CheckpointManager

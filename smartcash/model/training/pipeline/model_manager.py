@@ -34,7 +34,7 @@ class ModelManager(CallbacksMixin):
     - Data loading (delegated to other components)
     """
     
-    def __init__(self, progress_tracker, log_callback=None):
+    def __init__(self, progress_tracker, log_callback=None, is_resuming: bool = False):
         """
         Initialize model manager.
         
@@ -53,7 +53,7 @@ class ModelManager(CallbacksMixin):
         self.memory_optimizer = None
         self.checkpoint_manager = None # Initialize to None
 
-    def setup_model(self, config: Dict[str, Any], use_yolov5_integration: bool = True) -> Tuple[Any, Any]:
+    def setup_model(self, config: Dict[str, Any], use_yolov5_integration: bool = True, is_resuming: bool = False) -> Tuple[Any, Any]:
         """
         Set up model API and build model according to configuration.
         
@@ -68,7 +68,7 @@ class ModelManager(CallbacksMixin):
             self.emit_log('info', '🏗️ Setting up model for training pipeline')
             
             # Initialize checkpoint manager here, where config is available
-            self.checkpoint_manager = create_checkpoint_manager(config)
+                                    self.checkpoint_manager = create_checkpoint_manager(config, is_resuming=is_resuming)
 
             # Create model API
             self.model_api = self._create_model_api(config, use_yolov5_integration)

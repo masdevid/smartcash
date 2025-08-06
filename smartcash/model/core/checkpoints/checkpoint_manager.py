@@ -14,7 +14,7 @@ from .best_metrics_manager import BestMetricsManager
 class CheckpointManager:
     """💾 Manager untuk checkpoint operations dengan automatic naming"""
     
-    def __init__(self, config: Dict[str, Any]):
+    def __init__(self, config: Dict[str, Any], is_resuming: bool = False):
         self.config = config
         self.logger = get_logger("model.checkpoint")
         
@@ -28,7 +28,7 @@ class CheckpointManager:
         self.save_dir.mkdir(parents=True, exist_ok=True)
         
         # Initialize best metrics manager
-        self.best_metrics_manager = BestMetricsManager(self.save_dir)
+        self.best_metrics_manager = BestMetricsManager(self.save_dir, is_resuming=is_resuming)
         
         self.logger.info(f"💾 CheckpointManager initialized | Dir: {self.save_dir}")
     
@@ -42,8 +42,16 @@ class CheckpointManager:
             self.best_metrics_manager.set_current_phase(phase_num)
             
             # Load previous best metrics for this phase if not already loaded
-            if phase_num not in self.best_metrics_manager.phase_best_metrics:
+            # BUT skip loading if this is a fresh phase start
+            should_load_previous = (
+                phase_num not in self.best_metrics_manager.phase_best_metrics and
+                getattr(self.best_metrics_manager, '_fresh_phase_start', None) != phase_num
+            )
+            
+            if should_load_previous:
                 self.best_metrics_manager.load_previous_best_metrics(phase_num)
+            else:
+                self.logger.info(f"🆕 Skipping previous metrics load for Phase {phase_num} (fresh start)")
             
             # Determine if this should be saved as best
             is_best = kwargs.get('is_best', False)
@@ -139,6 +147,15 @@ class CheckpointManager:
                 if checkpoint_path is None:
                     raise FileNotFoundError("❌ No checkpoint found")
             
+            # If resuming and loading into Phase 2, ensure we load the best checkpoint from Phase 1
+            if self.best_metrics_manager.is_resuming and kwargs.get('resume_phase', 1) == 2:
+                best_phase1_checkpoint = self.best_metrics_manager._find_best_checkpoint_for_phase(1)
+                if best_phase1_checkpoint:
+                    self.logger.info(f"🔄 Resuming into Phase 2: Loading best Phase 1 checkpoint: {best_phase1_checkpoint.name}")
+                    checkpoint_path = best_phase1_checkpoint
+                else:
+                    self.logger.warning("⚠️ Resuming into Phase 2 but no best Phase 1 checkpoint found. Loading last checkpoint.")
+            
             checkpoint_path = Path(checkpoint_path)
             if not checkpoint_path.exists():
                 raise FileNotFoundError(f"❌ Checkpoint not found: {checkpoint_path}")
@@ -149,6 +166,8 @@ class CheckpointManager:
             
             # Restore best metrics manager state from checkpoint
             self.best_metrics_manager.restore_from_checkpoint_metadata(checkpoint_data)
+            # Set the is_resuming flag in best_metrics_manager
+            self.best_metrics_manager.set_is_resuming(True)
             
             # Load model state
             if 'model_state_dict' in checkpoint_data:
@@ -588,6 +607,6 @@ class CheckpointManager:
 
 
 # Factory function
-def create_checkpoint_manager(config: Dict[str, Any]) -> CheckpointManager:
+def create_checkpoint_manager(config: Dict[str, Any], is_resuming: bool = False) -> CheckpointManager:
     """🏭 Factory untuk membuat CheckpointManager"""
     return CheckpointManager(config)

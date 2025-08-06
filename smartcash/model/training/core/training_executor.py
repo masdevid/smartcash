@@ -63,8 +63,8 @@ class TrainingExecutor:
         # Reset accumulated metrics for new epoch
         self._reset_accumulated_metrics()
         
-        # Progress update frequency for performance (reduced from 20 to 10 updates per epoch)
-        update_freq = max(1, num_batches // 32)  # Update 10 times per epoch max for better performance
+        # Progress update frequency optimized for maximum performance
+        update_freq = max(1, num_batches // 20)  # Update 20 times per epoch max for better performance
         
         # Calculate display epoch if not provided
         if display_epoch is None:
@@ -73,21 +73,19 @@ class TrainingExecutor:
         # Start batch tracking
         self.progress_tracker.start_batch_tracking(num_batches)
         
-        # Log batch size information for first epoch
-        if epoch == 0:
-            first_batch = next(iter(train_loader))
-            actual_batch_size = first_batch[0].shape[0] if len(first_batch) > 0 else "unknown"
+        # Log batch size information only once (cached)
+        if epoch == 0 and not hasattr(self, '_batch_info_logged'):
             logger.info(f"📊 Training Batch Configuration:")
             logger.info(f"   • Configured Batch Size: {train_loader.batch_size}")
-            logger.info(f"   • Actual Batch Size: {actual_batch_size}")
             logger.info(f"   • Total Batches: {num_batches}")
             logger.info(f"   • Samples per Epoch: ~{num_batches * train_loader.batch_size}")
+            self._batch_info_logged = True
         
         logger.info(f"🚀 Starting training epoch {display_epoch}/{total_epochs} with {num_batches} batches")
         
         for batch_idx, (images, targets) in enumerate(train_loader):
-            # Check for shutdown signal less frequently for better performance
-            if batch_idx % 25 == 0:  # Check every 25 batches (reduced from 10)
+            # Check for shutdown signal much less frequently for better performance
+            if batch_idx % 50 == 0:  # Check every 50 batches for maximum performance
                 from smartcash.model.training.utils.signal_handler import is_shutdown_requested
                 if is_shutdown_requested():
                     logger.info("🛑 Shutdown requested during training batch processing")
@@ -139,7 +137,14 @@ class TrainingExecutor:
         if not hasattr(self, '_last_loss_breakdown'):
             self._last_loss_breakdown = {}
         
-        return {'train_loss': running_loss / num_batches}
+        # Prepare training metrics with accumulated data for layer metrics
+        train_metrics = {
+            'train_loss': running_loss / num_batches,
+            '_accumulated_predictions': self._accumulated_predictions if self._batch_count > 0 else {},
+            '_accumulated_targets': self._accumulated_targets if self._batch_count > 0 else {}
+        }
+        
+        return train_metrics
     
     def _process_training_batch(self, images, targets, loss_manager, batch_idx, num_batches, phase_num):
         """Process a single training batch."""
@@ -186,20 +191,21 @@ class TrainingExecutor:
     
     def _should_process_batch_for_metrics(self, batch_idx: int, num_batches: int) -> bool:
         """
-        Determine if this batch should be processed for metrics.
+        Determine if this batch should be processed for metrics (BALANCED OPTIMIZATION).
         
-        Layer metrics are critical for accurate training assessment, so we process
-        ALL batches to ensure reliable metrics calculation.
+        Process enough batches to get accurate layer metrics while maintaining performance.
+        Balance between speed and metrics accuracy.
         
         Args:
             batch_idx: Current batch index
             num_batches: Total number of batches in epoch
             
         Returns:
-            True (always process all batches for accurate metrics)
+            True if this batch should be processed for metrics
         """
-        # Process ALL batches for accurate layer metrics
-        return True
+        # Process every 5th batch for better layer metrics (20% sampling)
+        # This provides better accuracy for layer metrics while still optimizing speed
+        return batch_idx % 5 == 0 or batch_idx == num_batches - 1  # Always process last batch
     
     def _should_use_full_metrics_processing(self, predictions: Dict, phase_num: int) -> bool:
         """

@@ -264,7 +264,7 @@ class MetricColorizer:
         else: return MetricStatus.CRITICAL
     
     def colorize_metric(self, metric_name: str, metric_value: float, 
-                       epoch: int = 1, max_epochs: int = 100, phase: int = 1) -> str:
+                        epoch: int = 1, max_epochs: int = 100, phase: int = 1) -> str:
         """
         Apply color coding to a metric value based on its type and performance.
         
@@ -278,6 +278,10 @@ class MetricColorizer:
         Returns:
             Colorized string representation of the metric
         """
+        # Skip color indicators for non-metric fields
+        if metric_name.lower() in ['learning_rate', 'epoch', 'phase_completed', 'phase_status', 'best_val_loss']:
+            return f"{metric_value:.4f}"
+        
         # Determine metric type and get status
         if "loss" in metric_name.lower():
             if "yolo" in metric_name.lower() or any(x in metric_name.lower() for x in ["train_loss", "val_loss", "total_loss"]):
@@ -338,7 +342,7 @@ class MetricColorizer:
     def format_metric_summary(self, metrics: Dict[str, float], 
                             epoch: int = 1, max_epochs: int = 100, phase: int = 1) -> str:
         """
-        Format a complete metrics summary with color coding.
+        Format a complete metrics summary with color coding, excluding color indicators for non-metric fields.
         
         Args:
             metrics: Dictionary of metric names and values
@@ -347,7 +351,7 @@ class MetricColorizer:
             phase: Training phase (1=single layer, 2=multi-layer)
             
         Returns:
-            Formatted, colorized metrics summary
+            Formatted metrics summary with appropriate color coding
         """
         lines = []
         

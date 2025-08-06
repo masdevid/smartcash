@@ -69,7 +69,7 @@ class TrainingPipeline:
             session_id, resume_info = self.session_manager.create_session(
                 backbone=kwargs.get('backbone', 'cspdarknet'),
                 training_mode=kwargs.get('training_mode', 'two_phase'),
-                resume_from_checkpoint=kwargs.get('resume_from_checkpoint', True),
+                resume_from_checkpoint=kwargs.get('resume_from_checkpoint', False),  # Default to fresh training
                 checkpoint_dir=kwargs.get('checkpoint_dir', 'data/checkpoints'),
                 resume_info=kwargs.get('resume_info')
             )
@@ -87,7 +87,8 @@ class TrainingPipeline:
                 progress_tracker=self.progress_tracker,
                 log_callback=self.log_callback,
                 metrics_callback=self.metrics_callback,
-                use_yolov5_integration=self.use_yolov5_integration
+                use_yolov5_integration=self.use_yolov5_integration,
+                is_resuming=bool(resume_info)
             )
             
             # Build configuration

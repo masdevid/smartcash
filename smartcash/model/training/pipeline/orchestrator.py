@@ -14,17 +14,12 @@ from smartcash.model.training.utils.setup_utils import prepare_training_environm
 from smartcash.model.training.utils.resume_utils import handle_resume_training_pipeline
 from smartcash.model.training.utils.summary_utils import generate_markdown_summary
 from smartcash.model.training.phases import TrainingPhaseExecutor
-from smartcash.model.training.utils.weight_transfer import (
-    create_weight_transfer_manager,
-)
+from smartcash.model.core.weight_transfer_manager import create_weight_transfer_manager
 from smartcash.model.config.model_config_manager import (
     create_model_configuration_manager,
 )
-from smartcash.model.training.components import create_phase_setup_manager
-from smartcash.model.analysis.visualization.visualization_manager import (
-    VisualizationManager,
-)
-from smartcash.model.analysis.analysis_service import AnalysisService
+from smartcash.model.training.phases import create_phase_setup_manager
+from smartcash.model.training.visualization_manager import create_visualization_manager
 
 logger = get_logger(__name__)
 
@@ -87,8 +82,7 @@ class PipelineOrchestrator(CallbacksMixin):
         # Component managers (initialized when pipeline starts)
         self.model_config_manager = None
         self.phase_setup_manager = None
-        self.visualization_manager = VisualizationManager(config=self.config)
-        self.analysis_service = AnalysisService(config=self.config, logger=logger)
+        self.training_visualization_manager = None
 
     def execute_pipeline(
         self, config: Dict[str, Any], model_api, model
@@ -112,6 +106,18 @@ class PipelineOrchestrator(CallbacksMixin):
         # Initialize component managers
         self.model_config_manager = create_model_configuration_manager(model, config)
         self.phase_setup_manager = create_phase_setup_manager(model, config)
+        
+        # Initialize training visualization manager
+        num_classes_per_layer = {
+            'layer_1': 7,  # Banknote denominations
+            'layer_2': 7,  # Denomination features  
+            'layer_3': 3   # Common features
+        }
+        self.training_visualization_manager = create_visualization_manager(
+            num_classes_per_layer=num_classes_per_layer,
+            save_dir="outputs/training_visualizations",
+            verbose=config.get("verbose", False)
+        )
 
         try:
             self.emit_log("info", "🚀 Starting training pipeline orchestration")
@@ -201,6 +207,10 @@ class PipelineOrchestrator(CallbacksMixin):
                 live_chart_callback=self.live_chart_callback,
                 progress_callback=self.progress_callback,
             )
+            
+            # Pass training visualization manager to phase executor for real-time updates
+            if self.training_visualization_manager:
+                phase_executor.set_training_visualization_manager(self.training_visualization_manager)
 
             # Create weight transfer manager
             weight_transfer_manager = create_weight_transfer_manager()
@@ -248,7 +258,8 @@ class PipelineOrchestrator(CallbacksMixin):
 
         # Configure model and set up Phase 1 components
         self.model_config_manager.configure_model_for_phase(1)
-        phase_1_components = self.phase_setup_manager.setup_phase_components(1, epochs)
+        phase_1_components = self.phase_setup_manager.setup_phase_components(
+            1, epochs, checkpoint_manager=phase_executor.checkpoint_manager)
 
         # Execute Phase 1 only
         phase_1_result = phase_executor.execute_phase(
@@ -291,7 +302,7 @@ class PipelineOrchestrator(CallbacksMixin):
             # Configure model and set up Phase 1 components
             self.model_config_manager.configure_model_for_phase(1)
             phase_1_components = self.phase_setup_manager.setup_phase_components(
-                1, phase_1_epochs
+                1, phase_1_epochs, checkpoint_manager=phase_executor.checkpoint_manager
             )
 
             phase_1_result = phase_executor.execute_phase(
@@ -303,15 +314,32 @@ class PipelineOrchestrator(CallbacksMixin):
 
             results["phase_1"] = phase_1_result
 
-            # Handle phase transition
+            # Handle phase transition with model rebuild
             self.emit_log("info", "🔄 Transitioning from Phase 1 to Phase 2")
             phase_executor.handle_phase_transition(2, {})
 
-            # Transfer weights if needed
-            if weight_transfer_manager:
-                weight_transfer_manager.transfer_single_to_multi_weights(
-                    phase_1_result["final_checkpoint"], self.model
+            # Rebuild model for Phase 2 with proper architecture and weight transfer
+            if weight_transfer_manager and phase_1_result.get("final_checkpoint"):
+                self.emit_log("info", "🔧 Rebuilding model for Phase 2 with weight transfer...")
+                
+                rebuild_success, rebuilt_model = weight_transfer_manager.rebuild_model_for_phase2(
+                    self.model_api, phase_1_result["final_checkpoint"]
                 )
+                
+                if rebuild_success and rebuilt_model:
+                    self.model = rebuilt_model  # Update orchestrator's model reference
+                    phase_executor.model = rebuilt_model  # Update phase executor's model reference
+                    self.emit_log("info", "✅ Model successfully rebuilt for Phase 2")
+                else:
+                    self.emit_log("warning", "⚠️ Model rebuild failed, using fresh Phase 2 model")
+                    # Fallback: build fresh Phase 2 model without weight transfer
+                    build_result = self.model_api.build_model(
+                        layer_mode='multi',
+                        detection_layers=['layer_1', 'layer_2', 'layer_3']
+                    )
+                    if build_result['success']:
+                        self.model = build_result['model']
+                        phase_executor.model = build_result['model']  # Update phase executor's model reference
 
         # Phase 2: Fine-tuning training
         phase_2_epochs = config.get("phase_2_epochs")
@@ -326,7 +354,7 @@ class PipelineOrchestrator(CallbacksMixin):
         # Configure model and set up Phase 2 components
         self.model_config_manager.configure_model_for_phase(2)
         phase_2_components = self.phase_setup_manager.setup_phase_components(
-            2, phase_2_epochs
+            2, phase_2_epochs, checkpoint_manager=phase_executor.checkpoint_manager
         )
 
         phase_2_result = phase_executor.execute_phase(
@@ -365,58 +393,41 @@ class PipelineOrchestrator(CallbacksMixin):
             # Generate markdown summary
             summary_path = generate_markdown_summary(summary_data, self.config)
 
-            # Run comprehensive analysis to get data for visualizations
-            self.emit_log(
-                "info", "🔬 Running comprehensive analysis for visualizations..."
-            )
-            analysis_results = self.analysis_service.run_comprehensive_analysis(
-                evaluation_results=training_results,  # Pass training_results as evaluation_results
-                progress_callback=self.progress_callback,  # Pass progress callback for UI updates
-                generate_visualizations=False,  # Visualizations will be generated by orchestrator
-                save_results=False,  # Orchestrator will handle saving final results
-            )
-
-            # Generate visualizations
+            # Generate comprehensive training visualizations
+            self.emit_log("info", "📊 Generating comprehensive training visualizations...")
             visualization_results = {}
-            if (
-                self.visualization_manager
-                and analysis_results
-                and not analysis_results.get("error")
-            ):
-                self.emit_log("info", "📊 Generating currency analysis plots...")
-                currency_plots = (
-                    self.visualization_manager.generate_currency_analysis_plots(
-                        analysis_results.get("currency_analysis", {})
+            
+            if self.training_visualization_manager:
+                try:
+                    # Determine current phase for context
+                    current_phase = self._determine_training_phase(training_results)
+                    session_id = f"training_{self.config.get('backbone', 'unknown')}_{int(time.time())}"
+                    
+                    # Generate all comprehensive charts
+                    generated_charts = self.training_visualization_manager.generate_comprehensive_charts(
+                        session_id=session_id,
+                        phase_num=current_phase
                     )
-                )
-                visualization_results["currency_plots"] = currency_plots
-
-                self.emit_log("info", "📊 Generating layer analysis plots...")
-                layer_plots = self.visualization_manager.generate_layer_analysis_plots(
-                    analysis_results.get("layer_analysis", {})
-                )
-                visualization_results["layer_plots"] = layer_plots
-
-                self.emit_log("info", "📊 Generating class analysis plots...")
-                class_plots = self.visualization_manager.generate_class_analysis_plots(
-                    analysis_results.get("class_analysis", {})
-                )
-                visualization_results["class_plots"] = class_plots
-
-                self.emit_log("info", "📊 Generating comprehensive dashboard...")
-                dashboard_path = (
-                    self.visualization_manager.generate_comprehensive_dashboard(
-                        analysis_results
-                    )
-                )
-                visualization_results["dashboard_path"] = dashboard_path
+                    
+                    if generated_charts:
+                        visualization_results.update(generated_charts)
+                        self.emit_log("info", f"✅ Generated {len(generated_charts)} comprehensive training visualizations")
+                        for chart_type, path in generated_charts.items():
+                            self.emit_log("info", f"   📊 {chart_type}: {path}")
+                    else:
+                        self.emit_log("warning", "⚠️ No training visualizations generated (insufficient data)")
+                        
+                except Exception as e:
+                    self.emit_log("error", f"❌ Failed to generate training visualizations: {str(e)}")
+                    visualization_results["chart_error"] = str(e)
+            else:
+                self.emit_log("warning", "⚠️ Training visualization manager not available")
 
             final_results = {
                 **training_results,
                 "pipeline_duration": pipeline_duration,
                 "summary_path": summary_path,
                 "visualization_results": visualization_results,
-                "analysis_results": analysis_results,  # Add full analysis results to final results
                 "success": True,
             }
 
@@ -441,6 +452,20 @@ class PipelineOrchestrator(CallbacksMixin):
                 "success": True,  # Training itself was successful
             }
 
+    def _determine_training_phase(self, training_results: Dict[str, Any]) -> int:
+        """Determine the current training phase from results."""
+        try:
+            # Check if we have phase 2 results
+            if "phase_2" in training_results and training_results["phase_2"]:
+                return 2
+            # Check training mode
+            elif training_results.get("training_mode") == "two_phase":
+                return 2  # Two-phase training completed both phases
+            else:
+                return 1  # Single phase or only phase 1 completed
+        except Exception:
+            return 1  # Default to phase 1
+
     def _cleanup_pipeline_resources(self):
         """Clean up pipeline resources."""
         try:
@@ -451,8 +476,7 @@ class PipelineOrchestrator(CallbacksMixin):
             self.training_results = {}
             self.model_config_manager = None
             self.phase_setup_manager = None
-            self.visualization_manager = None
-            self.analysis_service = None
+            self.training_visualization_manager = None
 
             self.emit_log("info", "🧹 Pipeline resources cleaned up")
 

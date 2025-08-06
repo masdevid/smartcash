@@ -31,10 +31,10 @@ class MetricsProcessingMixin:
         
         # Add phase and epoch info
         final_metrics['phase'] = phase_num
-        final_metrics['epoch'] = epoch
+        final_metrics['epoch'] = epoch + 1  # Convert 0-based to 1-based for display
         
         # Compute layer-specific metrics if needed
-        layer_metrics = self._compute_layer_metrics(phase_num)
+        layer_metrics = self._compute_layer_metrics(train_metrics, phase_num)
         final_metrics.update(layer_metrics)
         
         # Apply formatting
@@ -48,14 +48,40 @@ class MetricsProcessingMixin:
         
         return final_metrics
     
-    def _compute_layer_metrics(self, phase_num: int = None) -> Dict[str, float]:
-        """Compute layer-specific metrics."""
-        if not hasattr(self, 'model') or not self.model:
+    def _compute_layer_metrics(self, train_metrics: Dict, phase_num: int = None) -> Dict[str, float]:
+        """Compute layer-specific metrics from accumulated training data."""
+        
+        # Extract accumulated predictions and targets from training metrics
+        accumulated_predictions = train_metrics.get('_accumulated_predictions', {})
+        accumulated_targets = train_metrics.get('_accumulated_targets', {})
+        
+        if not accumulated_predictions or not accumulated_targets:
+            logger = get_logger(self.__class__.__name__)
+            logger.debug("No accumulated predictions/targets available for layer metrics")
             return {}
         
         try:
             from smartcash.model.training.utils.metrics_utils import calculate_multilayer_metrics
-            return calculate_multilayer_metrics(self.model, phase_num)
+            
+            # Concatenate accumulated tensors for each layer
+            layer_predictions = {}
+            layer_targets = {}
+            
+            for layer_name in accumulated_predictions.keys():
+                if (layer_name in accumulated_targets and 
+                    accumulated_predictions[layer_name] and 
+                    accumulated_targets[layer_name]):
+                    
+                    # Concatenate all batches for this layer
+                    import torch
+                    layer_predictions[layer_name] = torch.cat(accumulated_predictions[layer_name], dim=0)
+                    layer_targets[layer_name] = torch.cat(accumulated_targets[layer_name], dim=0)
+            
+            if layer_predictions and layer_targets:
+                return calculate_multilayer_metrics(layer_predictions, layer_targets)
+            else:
+                return {}
+                
         except Exception as e:
             logger = get_logger(self.__class__.__name__)
             logger.debug(f"Could not compute layer metrics: {e}")

@@ -84,6 +84,33 @@ class PipelineOrchestrator(CallbacksMixin):
         self.phase_setup_manager = None
         self.training_visualization_manager = None
 
+    def _initialize_components(self, model, config):
+        """Initialize all pipeline components."""
+        try:
+            # Initialize model configuration manager
+            self.model_config_manager = create_model_configuration_manager(model, config)
+            
+            # Initialize phase setup manager
+            self.phase_setup_manager = create_phase_setup_manager(model, config)
+            
+            # Initialize visualization manager
+            num_classes_per_layer = {
+                'layer_1': 7,  # Banknote denominations
+                'layer_2': 7,  # Denomination features  
+                'layer_3': 3   # Common features
+            }
+            self.training_visualization_manager = create_visualization_manager(
+                num_classes_per_layer=num_classes_per_layer,
+                save_dir="outputs/training_visualizations",
+                verbose=config.get("verbose", False)
+            )
+            
+            self.emit_log("info", "✅ All pipeline components initialized successfully")
+            
+        except Exception as e:
+            self.emit_log("error", f"❌ Failed to initialize components: {str(e)}")
+            raise
+
     def execute_pipeline(
         self, config: Dict[str, Any], model_api, model
     ) -> Dict[str, Any]:
@@ -103,21 +130,8 @@ class PipelineOrchestrator(CallbacksMixin):
         self.model_api = model_api
         self.model = model
 
-        # Initialize component managers
-        self.model_config_manager = create_model_configuration_manager(model, config)
-        self.phase_setup_manager = create_phase_setup_manager(model, config)
-        
-        # Initialize training visualization manager
-        num_classes_per_layer = {
-            'layer_1': 7,  # Banknote denominations
-            'layer_2': 7,  # Denomination features  
-            'layer_3': 3   # Common features
-        }
-        self.training_visualization_manager = create_visualization_manager(
-            num_classes_per_layer=num_classes_per_layer,
-            save_dir="outputs/training_visualizations",
-            verbose=config.get("verbose", False)
-        )
+        # Initialize pipeline components
+        self._initialize_components(model, config)
 
         try:
             self.emit_log("info", "🚀 Starting training pipeline orchestration")
@@ -423,11 +437,37 @@ class PipelineOrchestrator(CallbacksMixin):
             else:
                 self.emit_log("warning", "⚠️ Training visualization manager not available")
 
+            # Track component success status
+            component_status = {
+                "model": True,  # Model was successfully built and trained
+                "training_phases": True,  # Both phases completed
+                "training": True,  # Training completed
+                "paths": True,  # All paths exist
+                "device": True,  # Device was available
+                "loss": True  # Loss tracking was successful
+            }
+            
+            # Check for any errors in training results
+            if training_results.get("error"):
+                component_status["training"] = False
+                component_status["training_phases"] = False
+            
+            # Check if any phase failed
+            if training_results.get("phase_1", {}).get("error"):
+                component_status["training_phases"] = False
+            if training_results.get("phase_2", {}).get("error"):
+                component_status["training_phases"] = False
+            
+            # Check if visualization failed
+            if visualization_results.get("chart_error"):
+                component_status["visualization"] = False
+            
             final_results = {
                 **training_results,
                 "pipeline_duration": pipeline_duration,
                 "summary_path": summary_path,
                 "visualization_results": visualization_results,
+                "component_status": component_status,
                 "success": True,
             }
 

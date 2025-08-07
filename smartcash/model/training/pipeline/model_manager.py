@@ -68,7 +68,7 @@ class ModelManager(CallbacksMixin):
             self.emit_log('info', '🏗️ Setting up model for training pipeline')
             
             # Initialize checkpoint manager here, where config is available
-                                    self.checkpoint_manager = create_checkpoint_manager(config, is_resuming=is_resuming)
+            self.checkpoint_manager = create_checkpoint_manager(config, is_resuming=is_resuming)
 
             # Create model API
             self.model_api = self._create_model_api(config, use_yolov5_integration)
@@ -193,13 +193,14 @@ class ModelManager(CallbacksMixin):
             self.emit_log('warning', f'⚠️ Memory optimization setup failed: {str(e)}')
             # Don't raise here - memory optimization is not critical for training
     
-    def prepare_model_for_phase(self, phase_num: int, config: Dict[str, Any]) -> Any:
+    def prepare_model_for_phase(self, phase_num: int, config: Dict[str, Any], is_resuming: bool = False) -> Any:
         """
-        Prepare model for specific training phase.
+        Prepare model for specific training phase with backbone consistency checks.
         
         Args:
             phase_num: Phase number (1 or 2)
             config: Training configuration
+            is_resuming: Whether this is a resume operation
             
         Returns:
             Model prepared for the specified phase
@@ -208,7 +209,31 @@ class ModelManager(CallbacksMixin):
             self.emit_log('info', f'🔧 Preparing model for Phase {phase_num}')
             
             if phase_num == 2:
-                # Phase 2 requires backbone unfreezing
+                # Phase 2 special handling
+                if is_resuming:
+                    # When resuming Phase 2, first load Phase 1's best checkpoint
+                    self.emit_log('info', '🔄 Loading Phase 1 best checkpoint for Phase 2 resume')
+                    
+                    # Get Phase 1's best checkpoint
+                    phase1_checkpoint = self.checkpoint_manager.best_metrics_manager._find_best_checkpoint_for_phase(1)
+                    if phase1_checkpoint:
+                        # Load Phase 1's best model state
+                        self.model.load_state_dict(torch.load(phase1_checkpoint)['model_state_dict'])
+                        self.emit_log('info', f'✅ Loaded Phase 1 best checkpoint: {phase1_checkpoint.name}')
+                    else:
+                        raise RuntimeError('❌ No Phase 1 best checkpoint found for Phase 2 resume')
+                
+                # Verify backbone architecture consistency
+                current_backbone = self.model_api.get_backbone_name()
+                phase1_backbone = config.get('model', {}).get('backbone', 'unknown')
+                
+                if current_backbone != phase1_backbone:
+                    raise ValueError(
+                        f'❌ Backbone mismatch between phases: '
+                        f'Phase 1 used {phase1_backbone}, but current is {current_backbone}'
+                    )
+                
+                # Now rebuild for Phase 2 with unfrozen backbone
                 self.model = ModelUtils.rebuild_model_for_phase2(
                     self.model_api, self.model, config
                 )

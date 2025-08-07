@@ -25,6 +25,7 @@ import sys
 import logging
 import importlib.util
 import os
+import pytest
 
 @contextlib.contextmanager
 def capture_stdout_stderr():

@@ -79,10 +79,25 @@ class ValidationMapProcessor:
                         logger.debug(f"  • Non-zero confidences: {(conf_scores > 0.01).sum().item()}/{conf_scores.numel()}")
                         logger.debug(f"  • Classes present: {map_predictions[:, :, 5].unique() if map_predictions.dim() == 3 else map_predictions[:, 5].unique()}")
                 
-                self.map_calculator.update(map_predictions, map_targets, epoch)
-                
+                # COORDINATE FORMAT VERIFICATION (first batch only)
                 if batch_idx == 0:
                     logger.debug(f"mAP data - Predictions: {map_predictions.shape}, Targets: {map_targets.shape}")
+                    
+                    # Verify coordinate conversion worked before sending to mAP calculator
+                    if map_targets is not None and map_targets.numel() > 0:
+                        target_coords = map_targets[:, 2:6] if map_targets.shape[1] >= 6 else None
+                        if target_coords is not None:
+                            avg_wh = (target_coords[:, 2].mean() + target_coords[:, 3].mean()) / 2
+                            logger.debug(f"🔍 CONVERTED TARGET COORDINATES CHECK:")
+                            logger.debug(f"   • Coord 2 (width) range: [{target_coords[:, 2].min():.4f}, {target_coords[:, 2].max():.4f}]")
+                            logger.debug(f"   • Coord 3 (height) range: [{target_coords[:, 3].min():.4f}, {target_coords[:, 3].max():.4f}]")
+                            logger.debug(f"   • Average width/height: {avg_wh:.4f}")
+                            if avg_wh < 0.5:
+                                logger.debug(f"   ✅ Coordinate conversion SUCCESSFUL - targets in xywh format")
+                            else:
+                                logger.debug(f"   ❌ Coordinate conversion FAILED - targets still in xyxy format")
+                
+                self.map_calculator.update(map_predictions, map_targets, epoch)
             
         except Exception as e:
             logger.warning(f"Error updating mAP calculator for batch {batch_idx}: {e}")
@@ -165,7 +180,7 @@ class ValidationMapProcessor:
                 # Filter out predictions with low confidence
                 if num_features >= 5:  # Has confidence score
                     conf_scores = layer_1_preds[:, :, 4]  # Objectness/confidence at index 4
-                    conf_threshold = 0.01  # Extra low threshold for early training with new anchors
+                    conf_threshold = 0.001  # Ultra-low threshold for early training with very low confidence predictions
                     
                     # Keep detections above threshold per batch
                     valid_detections = []
@@ -314,9 +329,51 @@ class ValidationMapProcessor:
             if targets.numel() == 0:
                 return torch.empty((0, 6))
             
-            # Expected format: [batch_idx, class, x, y, w, h]
+            # Handle both coordinate formats: convert xyxy to xywh if needed
             if targets.dim() == 2 and targets.shape[-1] >= 6:
                 map_targets = targets[:, :6].clone()  # Take first 6 columns
+                
+                # CRITICAL FIX: Auto-detect and convert coordinate format
+                # Check if coordinates are in xyxy format (need conversion to xywh)
+                if map_targets.shape[0] > 0:
+                    # Extract coordinate columns (skip batch_idx, class)
+                    coords = map_targets[:, 2:6]  # [x, y, w_or_x2, h_or_y2]
+                    
+                    # Detect format based on coordinate patterns
+                    coord_2_vals = coords[:, 2]  # width or x2
+                    coord_3_vals = coords[:, 3]  # height or y2
+                    
+                    # If coord_2/coord_3 are large (> 0.5 average), likely xyxy format
+                    avg_coord_23 = (coord_2_vals.mean() + coord_3_vals.mean()) / 2
+                    if avg_coord_23 > 0.5:  # Likely xyxy format
+                        logger.debug(f"🔧 Converting targets from xyxy to xywh format (avg coord_23: {avg_coord_23:.3f})")
+                        # Convert from [batch_idx, class, x1, y1, x2, y2] to [batch_idx, class, x_center, y_center, width, height]
+                        x1, y1, x2, y2 = coords[:, 0], coords[:, 1], coords[:, 2], coords[:, 3]
+                        
+                        # Ensure x1 <= x2 and y1 <= y2 (fix coordinate order issues)
+                        x_min = torch.min(x1, x2)
+                        x_max = torch.max(x1, x2)
+                        y_min = torch.min(y1, y2)
+                        y_max = torch.max(y1, y2)
+                        
+                        x_center = (x_min + x_max) / 2
+                        y_center = (y_min + y_max) / 2
+                        width = x_max - x_min
+                        height = y_max - y_min
+                        
+                        # Replace coordinate columns with xywh format
+                        map_targets[:, 2] = x_center
+                        map_targets[:, 3] = y_center
+                        map_targets[:, 4] = width
+                        map_targets[:, 5] = height
+                        
+                        # Validate conversion - ensure positive width/height
+                        invalid_mask = (width <= 0) | (height <= 0)
+                        if invalid_mask.any():
+                            logger.warning(f"⚠️ Found {invalid_mask.sum()} targets with invalid dimensions after conversion, filtering them out")
+                            map_targets = map_targets[~invalid_mask]
+                    else:
+                        logger.debug(f"✅ Targets already in xywh format (avg coord_23: {avg_coord_23:.3f})")
                 
                 # Phase-aware class range filtering
                 if self.current_phase == 1:

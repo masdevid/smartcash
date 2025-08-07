@@ -146,6 +146,9 @@ class VisualizationMetricsTracker:
         # Per-layer metrics
         self.layer_metrics = VisualizationHelper.initialize_layer_metrics(num_classes_per_layer)
         
+        # Initialize current phase tracking
+        self.current_phase = None
+        
         if verbose:
             self.logger.info("📊 Comprehensive metrics tracker initialized")
             self.logger.info(f"   • Layers: {list(num_classes_per_layer.keys())}")
@@ -185,15 +188,31 @@ class VisualizationMetricsTracker:
             if 'val_loss' in metrics:
                 self.val_losses.append(metrics['val_loss'])
             
+            # Update learning rate tracking
+            if 'learning_rate' in metrics:
+                self.learning_rates.append(metrics['learning_rate'])
+            
             # Update phase transitions
             if phase_num and phase_num != self.current_phase:
+                if len(self.epoch_metrics) > 1:
+                    from_phase = self.epoch_metrics[-2].get('phase_name', f'phase_{self.current_phase}')
+                else:
+                    from_phase = f'phase_{self.current_phase}' if self.current_phase else 'initial'
+                
                 self.phase_transitions.append({
                     'epoch': epoch,
-                    'from_phase': self.epoch_metrics[-2]['phase'],
+                    'from_phase': from_phase,
                     'to_phase': phase
                 })
                 if self.verbose:
-                    self.logger.info(f"📍 Phase transition at epoch {epoch}: {self.epoch_metrics[-2]['phase']} → {phase}")
+                    self.logger.info(f"📍 Phase transition at epoch {epoch}: {from_phase} → {phase}")
+                
+                self.current_phase = phase_num
+            elif self.current_phase is None:
+                self.current_phase = phase_num or 1
+            
+            # Extract layer metrics from this epoch's data
+            self._extract_layer_metrics_from_epoch_data(metrics, epoch)
             
         except Exception as e:
             if self.verbose:
@@ -320,13 +339,13 @@ class VisualizationMetricsTracker:
         
         try:
             # 1. Training curves
-            training_curves_path = self.generate_training_curves_chart(session_id)
+            training_curves_path = self._generate_training_curves_chart(session_id)
             if training_curves_path:
                 generated_charts['training_curves'] = str(training_curves_path)
             
-            # 2. Confusion matrices for each layer
+            # 2. Confusion matrices for each layer  
             for layer in self.num_classes_per_layer.keys():
-                cm_path = self.generate_confusion_matrix_chart(layer, session_id)
+                cm_path = self._generate_confusion_matrix_chart(layer, session_id)
                 if cm_path:
                     generated_charts[f'confusion_matrix_{layer}'] = str(cm_path)
             
@@ -371,8 +390,29 @@ class VisualizationMetricsTracker:
                 self.logger.error(f"❌ Error generating charts: {str(e)}")
             return {}
     
+    def _generate_training_curves_chart(self, session_id: str) -> Optional[str]:
+        """
+        Generate training curves chart using the chart generator.
+        
+        Args:
+            session_id: Unique identifier for this training session
+            
+        Returns:
+            Path to generated chart image or None if generation failed
+        """
+        if not self.train_losses:
+            return None
+            
+        return self.chart_generator.generate_training_curves_chart(
+            train_losses=self.train_losses,
+            val_losses=self.val_losses,
+            learning_rates=self.learning_rates,
+            phase_transitions=self.phase_transitions,
+            session_id=session_id
+        )
+
     @VisualizationHelper.generate_chart_with_error_handling
-    def generate_confusion_matrix_chart(self, layer_name: str, session_id: str) -> Optional[str]:
+    def _generate_confusion_matrix_chart(self, layer_name: str, session_id: str) -> Optional[str]:
         """
         Generate confusion matrix chart for a specific layer.
         
@@ -394,6 +434,20 @@ class VisualizationMetricsTracker:
             session_id,
             layer_name
         )
+
+    @VisualizationHelper.generate_chart_with_error_handling
+    def generate_confusion_matrix_chart(self, layer_name: str, session_id: str) -> Optional[str]:
+        """
+        Generate confusion matrix chart for a specific layer.
+        
+        Args:
+            layer_name: Name of the layer (layer_1, layer_2, etc.)
+            session_id: Unique identifier for this training session
+            
+        Returns:
+            Path to generated chart image or None if generation failed
+        """
+        return self._generate_confusion_matrix_chart(layer_name, session_id)
     
     @VisualizationHelper.generate_chart_with_error_handling
     def _generate_layer_metrics_chart(self, session_dir: Path) -> Optional[str]:
@@ -643,10 +697,7 @@ class VisualizationMetricsTracker:
             ax3.set_ylabel('Training Loss')
             ax3.grid(True, alpha=0.3)
             
-            # Add research-focused summary text
-            summary_text = self._generate_research_summary_text()
-            fig.text(0.02, 0.02, summary_text, fontsize=10, verticalalignment='bottom', 
-                    bbox=dict(boxstyle='round', facecolor='lightgray', alpha=0.5))
+            # Research summary removed per user request
             
             chart_path = session_dir / f'research_dashboard_phase_{phase_num or "unknown"}.png'
             plt.savefig(chart_path, dpi=300, bbox_inches='tight')

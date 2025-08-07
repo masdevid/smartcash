@@ -39,7 +39,7 @@ class BatchProcessor:
     
     def __init__(
         self, 
-        conf_threshold: float = 0.01,
+        conf_threshold: float = 0.001,
         iou_threshold: float = 0.5,
         device: Optional[torch.device] = None,
         debug: bool = False

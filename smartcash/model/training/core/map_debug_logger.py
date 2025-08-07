@@ -805,17 +805,27 @@ class MapDebugLogger:
             # In xywh format: coord_2 and coord_3 are width/height (typically small, positive)
             # In xyxy format: coord_2 and coord_3 are x2/y2 (typically similar range to x1/y1)
             
-            # Check if coord_2/coord_3 look like width/height (small positive values)
-            width_height_like = (coord_2_min >= 0 and coord_2_max <= 1.0 and 
-                               coord_3_min >= 0 and coord_3_max <= 1.0)
+            # Improved detection logic based on actual coordinate patterns
             
-            # Check if coord_2/coord_3 have similar ranges to coord_0/coord_1 (x2/y2 like x1/y1)
-            x2_y2_like = (abs(coord_2_max - coord_0_max) < 0.5 and 
-                         abs(coord_3_max - coord_1_max) < 0.5)
+            # For xywh: width/height are typically much smaller than center coordinates
+            # For normalized coords: width/height usually < 0.5, often < 0.2
+            avg_wh = (coord_2_max + coord_3_max) / 2
+            avg_xy = (coord_0_max + coord_1_max) / 2
+            
+            # Check if coord_2/coord_3 look like width/height (significantly smaller than position coords)
+            width_height_like = (coord_2_min >= 0 and coord_3_min >= 0 and 
+                               avg_wh < 0.3 and avg_wh < avg_xy * 0.8)  # Width/height should be smaller
+            
+            # Check if coord_2/coord_3 are likely x2/y2 (similar or larger than x1/y1)
+            x2_y2_like = (coord_2_max >= coord_0_min and coord_3_max >= coord_1_min and 
+                         avg_wh > 0.4)  # x2/y2 typically larger values
+            
+            # Additional check: in xyxy format, x2 > x1 and y2 > y1 usually
+            likely_xyxy = (coord_2_max > coord_0_max * 0.8 and coord_3_max > coord_1_max * 0.8)
             
             if width_height_like and not x2_y2_like:
                 return 'xywh'
-            elif x2_y2_like and not width_height_like:
+            elif (x2_y2_like and not width_height_like) or likely_xyxy:
                 return 'xyxy'
             else:
                 return 'unknown'

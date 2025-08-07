@@ -41,6 +41,34 @@ class EnhancedTrainingCallbacks:
             ui_callback=self._handle_ui_metrics_update
         )
     
+    def _handle_ui_metrics_update(self, phase: str, epoch: int, metrics: Dict[str, Any], 
+                                colored_metrics: Dict[str, Dict], loss_breakdown: Dict[str, Any] = None):
+        """
+        Handle UI metrics updates from the metrics callback.
+        
+        Args:
+            phase: Training phase name
+            epoch: Current epoch number  
+            metrics: Raw metrics dictionary
+            colored_metrics: Metrics with color information
+            loss_breakdown: Loss breakdown dictionary
+        """
+        try:
+            if self.ui_module and hasattr(self.ui_module, '_update_metrics_display'):
+                # Update UI with metrics data
+                update_data = {
+                    'phase': phase,
+                    'epoch': epoch,
+                    'metrics': metrics,
+                    'colored_metrics': colored_metrics,
+                    'loss_breakdown': loss_breakdown or {}
+                }
+                self.ui_module._update_metrics_display(update_data)
+        except Exception as e:
+            # Silently handle UI update failures to not crash training
+            if self.verbose:
+                print(f"UI metrics update failed: {e}")
+    
     def create_log_callback(self) -> Callable:
         """Create enhanced log callback with UI integration."""
         def log_callback(level: str, message: str, data: dict = None):

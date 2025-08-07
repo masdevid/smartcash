@@ -318,8 +318,23 @@ class MetricsHistoryRecorder:
             standard_metrics = set(['epoch', 'phase'] + yolo_metrics + layer_metrics + val_layer_metrics +
                                    ['train_loss', 'val_loss', 'learning_rate'])
             
+            # Handle loss_breakdown specially - extract its components into additional_metrics
+            if 'loss_breakdown' in metrics and isinstance(metrics['loss_breakdown'], dict):
+                loss_breakdown = metrics['loss_breakdown']
+                for comp_key, comp_value in loss_breakdown.items():
+                    if isinstance(comp_value, (int, float)):
+                        additional[f"loss_{comp_key}"] = float(comp_value)
+                    elif hasattr(comp_value, 'item'):  # PyTorch tensor
+                        try:
+                            additional[f"loss_{comp_key}"] = float(comp_value.item())
+                        except:
+                            pass  # Skip if conversion fails
+            
             for key, value in metrics.items():
-                # Skip suspicious double-prefixed patterns
+                # Skip loss_breakdown (already handled above) and suspicious patterns
+                if key == 'loss_breakdown':
+                    continue
+                    
                 is_suspicious = any(key.startswith(pattern) for pattern in suspicious_patterns)
                 
                 if (key not in standard_metrics and 

@@ -26,12 +26,12 @@ class OptimizerFactory:
         
         # Phase-based defaults - AdamW with CosineAnnealingLR as standard
         if self.phase == 1:
-            # Phase 1: Frozen backbone, small learning rate
-            self.learning_rate = self.training_config.get('learning_rate', 1e-4)
+            # Phase 1: Head LR = 0.001, Backbone LR = 1e-05
+            self.learning_rate = self.training_config.get('learning_rate', 0.001)  # Head LR
             self.weight_decay = self.training_config.get('weight_decay', 1e-2)
         else:
-            # Phase 2: Unfrozen, train all layers - default AdamW 5e-4
-            self.learning_rate = self.training_config.get('learning_rate', 5e-4)
+            # Phase 2: Head LR = 0.0001, Backbone LR = 1e-05
+            self.learning_rate = self.training_config.get('learning_rate', 0.0001)  # Head LR
             self.weight_decay = self.training_config.get('weight_decay', 1e-2)
             
         self.optimizer_type = self.training_config.get('optimizer', 'adamw').lower()
@@ -39,6 +39,10 @@ class OptimizerFactory:
         self.mixed_precision = self.training_config.get('mixed_precision', True)
         self.gradient_clip = self.training_config.get('gradient_clip', 10.0)
         self.total_epochs = self.training_config.get('total_epochs', 100)  # For scheduler
+        
+        # Batch size and LR scaling
+        self.batch_size = self.training_config.get('batch_size', 16)  # Default batch size
+        self.backbone_lr = 1e-05  # Fixed backbone LR as specified
         
         # Configurable AdamW optimizer parameters
         self.adamw_betas = self.training_config.get('adamw_betas', (0.9, 0.999))
@@ -78,7 +82,7 @@ class OptimizerFactory:
         return optimizer
     
     def _create_parameter_groups(self, model: nn.Module, base_lr: float) -> List[Dict[str, Any]]:
-        """Create parameter groups dengan learning rate yang berbeda"""
+        """Create parameter groups with specified learning rates"""
         backbone_params = []
         head_params = []
         other_params = []
@@ -88,7 +92,7 @@ class OptimizerFactory:
             if not param.requires_grad:
                 continue
             
-            # Backbone parameters (biasanya freezed atau lower LR)
+            # Backbone parameters
             if 'backbone' in name.lower():
                 backbone_params.append(param)
             # Detection head parameters
@@ -98,35 +102,40 @@ class OptimizerFactory:
             else:
                 other_params.append(param)
         
-        # Parameter groups dengan learning rate yang berbeda
+        # Apply batch size scaling: if batch_size = 32, multiply LR by 3
+        lr_scale = 3.0 if self.batch_size == 32 else 1.0
+        scaled_head_lr = base_lr * lr_scale
+        scaled_backbone_lr = self.backbone_lr * lr_scale  # Fixed 1e-05 backbone LR
+        
+        # Parameter groups with specified learning rates
         param_groups = []
         
         if backbone_params:
             param_groups.append({
                 'params': backbone_params,
-                'lr': base_lr * 0.1,  # Lower learning rate untuk backbone
+                'lr': scaled_backbone_lr,  # Fixed backbone LR: 1e-05 (scaled by 3x if batch_size=32)
                 'name': 'backbone'
             })
         
         if head_params:
             param_groups.append({
                 'params': head_params,
-                'lr': base_lr,  # Full learning rate untuk head
+                'lr': scaled_head_lr,  # Head LR: Phase 1=0.001, Phase 2=0.0001 (scaled by 3x if batch_size=32)
                 'name': 'head'
             })
         
         if other_params:
             param_groups.append({
                 'params': other_params,
-                'lr': base_lr * 0.5,  # Medium learning rate untuk other components
+                'lr': scaled_head_lr * 0.5,  # Medium learning rate for other components
                 'name': 'other'
             })
         
-        # Fallback: jika tidak ada groups, gunakan semua parameters
+        # Fallback: if no groups found, use all parameters with head LR
         if not param_groups:
             param_groups.append({
                 'params': model.parameters(),
-                'lr': base_lr,
+                'lr': scaled_head_lr,
                 'name': 'all'
             })
         

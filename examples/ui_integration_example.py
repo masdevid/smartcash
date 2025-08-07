@@ -89,13 +89,17 @@ class MockUIInterface:
         value = color_data['value']
         status = color_data['status']
         
-        # Get colors for different display contexts
-        emoji = color_data['colors']['emoji']
-        html_color = color_data['colors']['html']
-        rgb_color = color_data['colors']['rgb']
+        # Get colors for different display contexts (handle empty colors for loss metrics)
+        colors = color_data.get('colors', {})
+        emoji = colors.get('emoji', '📊')  # Default emoji if not available
+        html_color = colors.get('html', '#666666')  # Default color if not available
+        rgb_color = colors.get('rgb', '(100, 100, 100)')  # Default RGB if not available
         
         print(f"   {emoji} {metric_name}: {value:.4f} ({status})")
-        print(f"      └─ HTML: {html_color} | RGB: {rgb_color}")
+        if colors:  # Only show color info if colors are available
+            print(f"      └─ HTML: {html_color} | RGB: {rgb_color}")
+        else:
+            print(f"      └─ No color coding for this metric type")
     
     def get_current_status_summary(self) -> Dict[str, Any]:
         """Get a summary of current training status for dashboard display."""

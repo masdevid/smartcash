@@ -95,7 +95,7 @@ class ValidationExecutor:
         
         self.map_calculator = create_yolov5_map_calculator(
             num_classes=num_classes,
-            conf_thres=0.01,  # Very low threshold for early training with new anchors
+            conf_thres=0.001,  # Ultra-low threshold for early training with very low confidence predictions
             iou_thres=0.5,   # AGGRESSIVE: Very low threshold for scale learning phase
             debug=debug_map,
             training_context=training_context,
@@ -263,7 +263,10 @@ class ValidationExecutor:
         if all_loss_breakdowns:
             aggregated_loss_breakdown = self._aggregate_loss_breakdowns(all_loss_breakdowns)
             final_metrics['loss_breakdown'] = aggregated_loss_breakdown
-            logger.debug(f"Added aggregated loss breakdown with {len(aggregated_loss_breakdown)} components")
+            logger.info(f"🔧 LOSS BREAKDOWN DEBUG: Added aggregated loss breakdown with {len(aggregated_loss_breakdown)} components")
+            logger.info(f"🔧 LOSS BREAKDOWN KEYS: {list(aggregated_loss_breakdown.keys())}")
+        else:
+            logger.warning(f"🔧 LOSS BREAKDOWN DEBUG: No loss breakdowns collected from {len(all_loss_breakdowns)} validation batches")
         
         return final_metrics
     

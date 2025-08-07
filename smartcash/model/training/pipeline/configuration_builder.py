@@ -174,7 +174,7 @@ class ConfigurationBuilder:
         """Build training parameters configuration."""
         return {
             'mixed_precision': False,  # Disable for CPU
-            'batch_size': 8,
+            'batch_size': 16,  # Default batch size as specified
             'num_workers': 0 if base_config['force_cpu'] else 4,
             'pin_memory': False,
             'training_mode': base_config['training_mode'],

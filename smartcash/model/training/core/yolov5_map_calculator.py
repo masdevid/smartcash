@@ -75,7 +75,7 @@ class YOLOv5MapCalculator:
     def __init__(
         self, 
         num_classes: int = 7, 
-        conf_thres: float = 0.01, 
+        conf_thres: float = 0.001, 
         iou_thres: float = 0.5, 
         debug: bool = True,
         training_context: dict = None,
@@ -156,20 +156,20 @@ class YOLOv5MapCalculator:
         """
         if epoch < 15:
             # Early phase: Focus on building ANY positive matches
-            # Keep IoU super low due to size mismatch issues in logs
-            return 0.01, 0.05   # Even more lenient IoU (was 0.1)
+            # FIXED: Model predictions have very low confidence (max ~0.012), use ultra-low threshold
+            return 0.001, 0.05   # Ultra-low confidence threshold to avoid filtering all predictions
         elif epoch < 25:
             # Mid-early: Start filtering confidence but keep IoU very low
-            # Logs show predictions are tiny compared to targets
-            return 0.05, 0.08   # Slight IoU increase but still very lenient
+            # Gradually increase confidence as model improves
+            return 0.005, 0.08   # Still very low confidence threshold
         elif epoch < 40:
             # Mid phase: Balance confidence and IoU improvements
             # Based on logs, most batches struggle to get >0.1 IoU
-            return 0.08, 0.12   # More gradual IoU progression
+            return 0.01, 0.12   # More gradual confidence progression
         elif epoch < 60:
             # Late-mid phase: Tighten confidence more than IoU
             # Logs show confidence range 0.05-0.55, focus on higher conf
-            return 0.15, 0.15   # Higher confidence threshold priority
+            return 0.05, 0.15   # More gradual confidence increase
         else:
             # Final phase: Balanced but realistic thresholds
             # Based on log analysis, 0.5 IoU may be too aggressive for banknotes
@@ -304,7 +304,7 @@ class YOLOv5MapCalculator:
                 else:
                     self.debug_logger.write_debug_log(f"📊 No targets in first batch - empty targets tensor")
                     
-                # COORDINATE DEBUG LOGGING - Use MapDebugLogger methods
+                # COORDINATE DEBUG LOGGING - Use MapDebugLogger methods (on RAW data)
                 if predictions.numel() > 0 and targets.numel() > 0:
                     self.debug_logger.log_coordinate_format_analysis(predictions, targets)
         
@@ -329,6 +329,42 @@ class YOLOv5MapCalculator:
                 # Enhanced debug logging for mAP investigation
                 if self.debug and self.debug_logger:
                     self.debug_logger.log_batch_processing(self._batch_count, batch_stats)
+                    
+                    # COORDINATE FORMAT ANALYSIS ON PROCESSED DATA (first batch only)
+                    if self._batch_count == 1:
+                        # Log processed coordinate analysis to verify conversion worked
+                        if standardized_predictions is not None and standardized_predictions.numel() > 0:
+                            if processed_targets is not None and processed_targets.numel() > 0:
+                                self.debug_logger.write_debug_log(f"\n🔍 PROCESSED COORDINATE FORMAT VERIFICATION")
+                                self.debug_logger.write_debug_log(f"="*50)
+                                self.debug_logger.write_debug_log(f"📊 PROCESSED COORDINATES ANALYSIS:")
+                                
+                                # Analyze processed predictions (should be normalized xywh)
+                                if standardized_predictions.dim() >= 2:
+                                    pred_coords = standardized_predictions[:, :4] if standardized_predictions.dim() == 2 else standardized_predictions[0, :, :4]
+                                    if pred_coords.numel() > 0:
+                                        self.debug_logger.write_debug_log(f"   PROCESSED PRED COORD_0 (x): [{pred_coords[:, 0].min():.4f}, {pred_coords[:, 0].max():.4f}]")
+                                        self.debug_logger.write_debug_log(f"   PROCESSED PRED COORD_1 (y): [{pred_coords[:, 1].min():.4f}, {pred_coords[:, 1].max():.4f}]")
+                                        self.debug_logger.write_debug_log(f"   PROCESSED PRED COORD_2 (w): [{pred_coords[:, 2].min():.4f}, {pred_coords[:, 2].max():.4f}]")
+                                        self.debug_logger.write_debug_log(f"   PROCESSED PRED COORD_3 (h): [{pred_coords[:, 3].min():.4f}, {pred_coords[:, 3].max():.4f}]")
+                                
+                                # Analyze processed targets (should be converted to xywh)
+                                if processed_targets.dim() >= 2 and processed_targets.shape[1] >= 6:
+                                    target_coords = processed_targets[:, 2:6]  # Skip batch_idx, class
+                                    if target_coords.numel() > 0:
+                                        self.debug_logger.write_debug_log(f"   PROCESSED TGT COORD_0 (x): [{target_coords[:, 0].min():.4f}, {target_coords[:, 0].max():.4f}]")
+                                        self.debug_logger.write_debug_log(f"   PROCESSED TGT COORD_1 (y): [{target_coords[:, 1].min():.4f}, {target_coords[:, 1].max():.4f}]")
+                                        self.debug_logger.write_debug_log(f"   PROCESSED TGT COORD_2 (w): [{target_coords[:, 2].min():.4f}, {target_coords[:, 2].max():.4f}]")
+                                        self.debug_logger.write_debug_log(f"   PROCESSED TGT COORD_3 (h): [{target_coords[:, 3].min():.4f}, {target_coords[:, 3].max():.4f}]")
+                                        
+                                        # Check if conversion worked (xywh format should have small width/height values)
+                                        avg_wh = (target_coords[:, 2].mean() + target_coords[:, 3].mean()) / 2
+                                        if avg_wh < 0.5:
+                                            self.debug_logger.write_debug_log(f"   ✅ COORDINATE CONVERSION SUCCESSFUL: Targets converted to xywh format (avg w/h: {avg_wh:.4f})")
+                                        else:
+                                            self.debug_logger.write_debug_log(f"   ❌ COORDINATE CONVERSION FAILED: Targets still appear to be xyxy format (avg w/h: {avg_wh:.4f})")
+                                
+                                self.debug_logger.write_debug_log(f"   📝 NOTE: If conversion worked, both predictions and targets should now be in xywh format for IoU calculation")
             else:
                 if self.debug and self.debug_logger:
                     self.debug_logger.write_debug_log(f"❌ batch_stats is None for batch {self._batch_count} - check prediction processing")
@@ -496,7 +532,7 @@ class YOLOv5MapCalculator:
 
 def create_yolov5_map_calculator(
     num_classes: int = 7, 
-    conf_thres: float = 0.1, 
+    conf_thres: float = 0.001, 
     iou_thres: float = 0.5, 
     debug: bool = False,
     training_context: dict = None,

@@ -22,19 +22,31 @@ class UIMetricsCallback:
     for both console display and UI integration.
     """
     
-    def __init__(self, verbose: bool = True, console_scheme: ColorScheme = ColorScheme.EMOJI, 
+    def __init__(self, verbose: bool = True, console_scheme: ColorScheme = None, 
                  training_logs_dir: str = "logs/training"):
         """
         Initialize the UI metrics callback. 
         
         Args:
             verbose: Whether to print verbose output
-            console_scheme: Color scheme for console output
+            console_scheme: Color scheme for console output. Defaults to EMOJI if supported, otherwise TERMINAL.
             training_logs_dir: Directory containing JSON metrics files
         """
         self.verbose = verbose
-        self.console_scheme = console_scheme
-        self.colorizer = MetricColorizer(console_scheme)
+        
+        # Default to EMOJI scheme if not specified, but fall back to TERMINAL if emojis aren't supported
+        if console_scheme is None:
+            try:
+                # Try to use emoji scheme, fall back to terminal if there's an issue
+                "".join(COLOR_MAPPINGS[ColorScheme.EMOJI].values())
+                self.console_scheme = ColorScheme.EMOJI
+            except (UnicodeEncodeError, UnicodeDecodeError, KeyError):
+                logger.warning("Emoji not supported in this environment, falling back to terminal colors")
+                self.console_scheme = ColorScheme.TERMINAL
+        else:
+            self.console_scheme = console_scheme
+            
+        self.colorizer = MetricColorizer(self.console_scheme)
         self.training_logs_dir = Path(training_logs_dir)
         
         # Storage for UI access
@@ -153,8 +165,8 @@ class UIMetricsCallback:
         if loss_breakdown:
             self._print_loss_breakdown(loss_breakdown)
         
-        # Print layer-specific metrics
-        layer_metrics = self._filter_layer_metrics(metrics, show_layers, filter_zeros)
+        # Print layer-specific metrics (include null values for debugging)
+        layer_metrics = self._filter_layer_metrics(metrics, show_layers, filter_zeros=False)  # Don't filter zeros for debugging
         for metric_name, value in layer_metrics.items():
             self._print_metric(metric_name, value, colored_metrics)
         
@@ -229,7 +241,10 @@ class UIMetricsCallback:
             any(metric_name.endswith(pattern) for pattern in no_indicator_metrics if pattern.startswith('_'))
         )
         
-        if should_suppress_color:
+        # Handle null values
+        if value is None:
+            print(f"    {metric_name}: null")
+        elif should_suppress_color:
             # Print without color indicator as per TASK.md
             print(f"    {metric_name}: {value:.4f}" if isinstance(value, (int, float)) else f"    {metric_name}: {value}")
         elif isinstance(value, (int, float)) and metric_name in colored_metrics:
@@ -317,6 +332,8 @@ class UIMetricsCallback:
                             # Don't filter loss metrics - they can legitimately be zero or small
                             if 'loss' in metric_name.lower():
                                 should_include = True
+                            elif value is None:
+                                should_include = True  # Include null values for debugging
                             elif isinstance(value, (int, float)) and value <= 0.0001:
                                 should_include = False  # Skip very small performance metrics
                         
@@ -529,21 +546,22 @@ class UIMetricsCallback:
             layer_count = len(show_layers)
             return f"Phase 2: Multi-task loss training ({layer_count} active layers, all metrics visible)"
         else:
-            return f"Custom phase: {len(show_layers)} layers visible (filter_zeros: {filter_zeros})"
+            return f"Custom phase: {len(show_layers)} layers visible"
 
 
 def create_ui_metrics_callback(verbose: bool = True, 
-                             console_scheme: ColorScheme = ColorScheme.EMOJI,
+                             console_scheme: Optional[ColorScheme] = None,
                              ui_callback: Optional[Callable] = None,
                              training_logs_dir: str = "logs/training",
                              backbone: str = "unknown",
-                             data_name: str = "data") -> UIMetricsCallback:
+                             data_name: str = "data") -> 'UIMetricsCallback':
     """
     Factory function to create a UI-enhanced metrics callback.
     
     Args:
         verbose: Whether to print console output
-        console_scheme: Color scheme for console display
+        console_scheme: Color scheme for console display. 
+                      Defaults to EMOJI if supported, otherwise falls back to TERMINAL.
         ui_callback: Optional UI callback function
         training_logs_dir: Directory containing JSON metrics files
         backbone: Backbone model name for filename
@@ -552,11 +570,21 @@ def create_ui_metrics_callback(verbose: bool = True,
     Returns:
         UIMetricsCallback instance
     """
-    callback = UIMetricsCallback(verbose, console_scheme, training_logs_dir)
+    # If no console_scheme is provided, let UIMetricsCallback auto-detect emoji support
+    callback = UIMetricsCallback(
+        verbose=verbose,
+        console_scheme=console_scheme,  # None will trigger auto-detection
+        training_logs_dir=training_logs_dir
+    )
+    
+    # Set the backbone and data name for filename generation
     callback.backbone = backbone
     callback.data_name = data_name
-    if ui_callback:
+    
+    # Set the UI callback if provided
+    if ui_callback is not None:
         callback.set_ui_callback(ui_callback)
+        
     return callback
 
 
@@ -569,8 +597,9 @@ def example_ui_callback(phase: str, epoch: int, _metrics: Dict[str, Any],
         if isinstance(color_data.get('value'), (int, float)):
             value = color_data['value']
             status = color_data['status']
-            emoji = color_data['colors']['emoji']
-            print(f"  {metric_name}: {value:.4f} ({status}) {emoji}")
+            status_indicator = color_info['colors'][self.console_scheme.value]
+            status_text = color_info['status']
+            print(f"    {metric_name}: {status_indicator} {value:.4f} ({status_text})")
     
     if loss_breakdown:
         print(f"\n📊 Loss Breakdown ({len(loss_breakdown)} components)")

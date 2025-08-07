@@ -84,14 +84,14 @@ Examples:
     parser.add_argument('--loss-type', type=str, default='uncertainty_multi_task',
                        choices=['uncertainty_multi_task', 'weighted_multi_task', 'focal', 'standard'],
                        help='Loss function type (default: uncertainty_multi_task)')
-    parser.add_argument('--head-lr-p1', type=float, default=1e-3,
-                       help='Learning rate for detection heads in phase 1 (default: 1e-3)')
-    parser.add_argument('--head-lr-p2', type=float, default=1e-4,
-                       help='Learning rate for detection heads in phase 2 (default: 1e-4)')
-    parser.add_argument('--backbone-lr', type=float, default=1e-5,
-                       help='Learning rate for backbone in phase 2 (default: 1e-5)')
-    parser.add_argument('--batch-size', type=int, default=None,
-                       help='Batch size for training (default: auto-detected based on platform)')
+    parser.add_argument('--head-lr-p1', type=float, default=0.001,
+                       help='Learning rate for detection heads in phase 1 (default: 0.001)')
+    parser.add_argument('--head-lr-p2', type=float, default=0.0001,
+                       help='Learning rate for detection heads in phase 2 (default: 0.0001)')
+    parser.add_argument('--backbone-lr', type=float, default=1e-05,
+                       help='Learning rate for backbone (default: 1e-05)')
+    parser.add_argument('--batch-size', type=int, default=16,
+                       help='Batch size for training (default: 16, multiply LR by 3x when set to 32)')
     
     # Optimizer configuration
     parser.add_argument('--optimizer', type=str, default='adamw',

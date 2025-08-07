@@ -169,25 +169,6 @@ class CheckpointUtils:
             # Extract naming components (same logic as checkpoint manager)
             backbone = model_config.get('backbone', config.get('backbone', 'unknown'))
             
-            # Determine training mode
-            training_mode = training_config.get('training_mode', config.get('training_mode', 'two_phase'))
-            if training_mode not in ['single_phase', 'two_phase']:
-                training_mode = 'two_phase'  # Default fallback
-            
-            # Determine layer mode
-            layer_mode = model_config.get('layer_mode', 'multi')
-            if 'detection_layers' in model_config:
-                num_layers = len(model_config['detection_layers'])
-                layer_mode = 'single' if num_layers == 1 else 'multi'
-            
-            # Determine freeze status
-            freeze_backbone = model_config.get('freeze_backbone', False)
-            freeze_status = 'frozen' if freeze_backbone else 'unfrozen'
-            
-            # Check if pretrained is enabled
-            pretrained = model_config.get('pretrained', config.get('pretrained', False))
-            pretrained_suffix = 'pretrained' if pretrained else ''
-            
             # Get current date
             date_str = datetime.now().strftime('%Y%m%d')
             
@@ -195,14 +176,7 @@ class CheckpointUtils:
             name_parts = [
                 'best',
                 backbone,
-                training_mode,
-                layer_mode,
-                freeze_status
             ]
-            
-            # Add pretrained suffix only if True
-            if pretrained_suffix:
-                name_parts.append(pretrained_suffix)
             
             name_parts.append(date_str)
             filename = '_'.join(name_parts) + '.pt'

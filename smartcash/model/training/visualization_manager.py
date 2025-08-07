@@ -26,19 +26,79 @@ import numpy as np
 from pathlib import Path
 from typing import Dict, Any, Optional, List
 from collections import defaultdict
+from pathlib import Path
 
-# Visualization imports with graceful fallback
+# Check if visualization libraries are available
 try:
     import matplotlib.pyplot as plt
     import seaborn as sns
-    from sklearn.metrics import confusion_matrix
     VISUALIZATION_AVAILABLE = True
 except ImportError:
     VISUALIZATION_AVAILABLE = False
 
 from smartcash.common.logger import get_logger
+from smartcash.model.training.charts.chart_generator import ChartGenerator
+from smartcash.model.training.charts.chart_utils import ChartUtils
 
-class ComprehensiveMetricsTracker:
+class VisualizationHelper:
+    """Helper class for common visualization operations."""
+    
+    @staticmethod
+    def get_default_layer_metrics() -> Dict[str, List[str]]:
+        """Get default metrics for each layer."""
+        return {
+            'accuracy': [],
+            'precision': [],
+            'recall': [],
+            'f1_score': []
+        }
+    
+    @staticmethod
+    def initialize_layer_metrics(num_classes_per_layer: Dict[str, int]) -> Dict[str, Dict[str, List]]:
+        """Initialize metrics structure for all layers."""
+        return {
+            layer: VisualizationHelper.get_default_layer_metrics()
+            for layer in num_classes_per_layer.keys()
+        }
+    
+    @staticmethod
+    def extract_metrics_from_dict(metrics: Dict[str, Any], layer_patterns: Dict[str, List[str]]) -> Dict[str, Dict[str, List]]:
+        """Extract metrics from a dictionary based on layer patterns."""
+        extracted_metrics = {}
+        for layer, metric_names in layer_patterns.items():
+            layer_metrics = VisualizationHelper.get_default_layer_metrics()
+            for metric_name in metric_names:
+                if metric_name in metrics and isinstance(metrics[metric_name], (int, float)):
+                    metric_type = metric_name.split('_', 2)[-1]
+                    metric_key_map = {
+                        'accuracy': 'accuracy',
+                        'precision': 'precision', 
+                        'recall': 'recall',
+                        'f1': 'f1_score'
+                    }
+                    if metric_type in metric_key_map:
+                        storage_key = metric_key_map[metric_type]
+                        layer_metrics[storage_key].append(metrics[metric_name])
+            extracted_metrics[layer] = layer_metrics
+        return extracted_metrics
+    
+    @staticmethod
+    def generate_chart_with_error_handling(func):
+        """Decorator to handle common chart generation errors."""
+        def wrapper(*args, **kwargs):
+            try:
+                return func(*args, **kwargs)
+            except Exception as e:
+                if args[0].verbose:  # Assuming first arg is self
+                    args[0].logger.warning(f"⚠️ Error generating chart: {str(e)}")
+                return None
+        return wrapper
+
+from smartcash.common.logger import get_logger
+from smartcash.model.training.charts.chart_generator import ChartGenerator
+from smartcash.model.training.charts.chart_utils import ChartUtils
+
+class VisualizationMetricsTracker:
     """
     Enhanced metrics tracker with confusion matrix and visualization capabilities.
     
@@ -55,7 +115,7 @@ class ComprehensiveMetricsTracker:
         
         Args:
             num_classes_per_layer: Dictionary mapping layer names to number of classes
-            class_names: Optional mapping of layer names to class name lists
+            class_names: Optional mapping of layer name lists to class name lists
             save_dir: Directory to save visualization outputs
             verbose: Enable verbose logging
         """
@@ -67,6 +127,9 @@ class ComprehensiveMetricsTracker:
         
         # Initialize logger - using instance logger as per QWEN.md guidelines
         self.logger = get_logger(f'{self.__class__.__module__}.{self.__class__.__name__}')
+        
+        # Initialize chart generator
+        self.chart_generator = ChartGenerator(save_dir=save_dir, verbose=verbose)
         
         # Metrics storage
         self.epoch_metrics = []
@@ -81,14 +144,7 @@ class ComprehensiveMetricsTracker:
         self.phase_transitions = []  # Track phase changes
         
         # Per-layer metrics
-        self.layer_metrics = {
-            layer: {
-                'precision': [],
-                'recall': [],
-                'f1_score': [],
-                'accuracy': []
-            } for layer in num_classes_per_layer.keys()
-        }
+        self.layer_metrics = VisualizationHelper.initialize_layer_metrics(num_classes_per_layer)
         
         if verbose:
             self.logger.info("📊 Comprehensive metrics tracker initialized")
@@ -112,50 +168,25 @@ class ComprehensiveMetricsTracker:
     def update_metrics(self, epoch: int, phase: str, metrics: Dict[str, Any], 
                       predictions: Dict[str, np.ndarray] = None, 
                       ground_truth: Dict[str, np.ndarray] = None, phase_num: int = None):
-        """
-        Update metrics with new epoch data including confusion matrix calculation.
-        
-        Args:
-            epoch: Current epoch number
-            phase: Training phase (e.g., 'phase_1', 'phase_2', 'training', 'validation')
-            metrics: Dictionary of metric values (using research-focused naming)
-            predictions: Per-layer predictions (optional)
-            ground_truth: Per-layer ground truth labels (optional)
-            phase_num: Training phase number (1 or 2) for research context
-        """
         try:
-            # Store basic metrics
-            epoch_data = {
-                'epoch': epoch,
-                'phase': phase,
-                'timestamp': time.time(),
-                **metrics
-            }
-            self.epoch_metrics.append(epoch_data)
+            # Add phase information
+            metrics['phase_num'] = phase_num or 1
+            metrics['phase_name'] = phase
             
-            # Update training curves with research-focused metrics
+            # Add epoch number
+            metrics['epoch'] = epoch
+            
+            # Store metrics
+            self.epoch_metrics.append(metrics)
+            
+            # Update loss tracking
             if 'train_loss' in metrics:
                 self.train_losses.append(metrics['train_loss'])
             if 'val_loss' in metrics:
                 self.val_losses.append(metrics['val_loss'])
-            if 'learning_rate' in metrics:
-                self.learning_rates.append(metrics['learning_rate'])
             
-            # Store phase information for research context
-            epoch_data['phase_num'] = phase_num
-            epoch_data['research_context'] = self._get_research_context(phase_num)
-            
-            # Extract layer metrics from the metrics dictionary
-            self._extract_layer_metrics_from_epoch_data(metrics, epoch)
-            
-            # Calculate confusion matrices for each layer
-            if predictions is not None and ground_truth is not None:
-                for layer in self.num_classes_per_layer.keys():
-                    if layer in predictions and layer in ground_truth:
-                        self._calculate_layer_confusion_matrix(layer, predictions[layer], ground_truth[layer], epoch)
-            
-            # Track phase transitions
-            if len(self.epoch_metrics) > 1 and self.epoch_metrics[-2]['phase'] != phase:
+            # Update phase transitions
+            if phase_num and phase_num != self.current_phase:
                 self.phase_transitions.append({
                     'epoch': epoch,
                     'from_phase': self.epoch_metrics[-2]['phase'],
@@ -184,26 +215,14 @@ class ComprehensiveMetricsTracker:
                 'layer_3': ['layer_3_accuracy', 'layer_3_precision', 'layer_3_recall', 'layer_3_f1']
             }
             
-            for layer, metric_names in layer_patterns.items():
-                if layer not in self.layer_metrics:
-                    continue
-                    
-                for metric_name in metric_names:
-                    if metric_name in metrics and isinstance(metrics[metric_name], (int, float)):
-                        # Extract the metric type (accuracy, precision, recall, f1)
-                        metric_type = metric_name.split('_', 2)[-1]  # Get the last part after layer_X_
-                        
-                        # Map metric names to internal storage keys
-                        metric_key_map = {
-                            'accuracy': 'accuracy',
-                            'precision': 'precision', 
-                            'recall': 'recall',
-                            'f1': 'f1_score'
-                        }
-                        
-                        if metric_type in metric_key_map:
-                            storage_key = metric_key_map[metric_type]
-                            self.layer_metrics[layer][storage_key].append(metrics[metric_name])
+            # Extract layer-specific metrics
+            extracted_metrics = VisualizationHelper.extract_metrics_from_dict(metrics, layer_patterns)
+            
+            # Update our metrics storage
+            for layer, metrics_dict in extracted_metrics.items():
+                if layer in self.layer_metrics:
+                    for metric_type, values in metrics_dict.items():
+                        self.layer_metrics[layer][metric_type].extend(values)
             
             # Also look for global validation metrics that can be used as fallback
             global_metrics = ['val_accuracy', 'val_precision', 'val_recall', 'val_f1']
@@ -301,13 +320,13 @@ class ComprehensiveMetricsTracker:
         
         try:
             # 1. Training curves
-            training_curves_path = self._generate_training_curves(session_dir)
+            training_curves_path = self.generate_training_curves_chart(session_id)
             if training_curves_path:
                 generated_charts['training_curves'] = str(training_curves_path)
             
             # 2. Confusion matrices for each layer
             for layer in self.num_classes_per_layer.keys():
-                cm_path = self._generate_confusion_matrix_chart(layer, session_dir)
+                cm_path = self.generate_confusion_matrix_chart(layer, session_id)
                 if cm_path:
                     generated_charts[f'confusion_matrix_{layer}'] = str(cm_path)
             
@@ -338,7 +357,7 @@ class ComprehensiveMetricsTracker:
                     generated_charts['detection_map_trends'] = str(map_trends_path)
             
             # Save metrics summary
-            self._save_metrics_summary(session_dir, session_id)
+            self.save_metrics_summary(session_dir, session_id)
             
             if self.verbose:
                 self.logger.info(f"📊 Generated {len(generated_charts)} visualization charts")
@@ -352,167 +371,86 @@ class ComprehensiveMetricsTracker:
                 self.logger.error(f"❌ Error generating charts: {str(e)}")
             return {}
     
-    def _generate_training_curves(self, session_dir: Path) -> Optional[str]:
-        """Generate enhanced training curves with improved loss scaling and loss breakdown."""
-        try:
-            if not self.train_losses and not self.val_losses:
-                return None
+    @VisualizationHelper.generate_chart_with_error_handling
+    def generate_confusion_matrix_chart(self, layer_name: str, session_id: str) -> Optional[str]:
+        """
+        Generate confusion matrix chart for a specific layer.
+        
+        Args:
+            layer_name: Name of the layer (layer_1, layer_2, etc.)
+            session_id: Unique identifier for this training session
             
-            # Create contextual chart title based on training configuration
-            contextual_title = self._get_contextual_chart_title()
-            
-            fig, axes = plt.subplots(2, 2, figsize=(16, 12))
-            fig.suptitle(contextual_title, fontsize=16, fontweight='bold')
-            
-            epochs = range(1, len(self.train_losses) + 1)
-            
-            # Enhanced Loss curves with proper scaling
-            self._plot_enhanced_loss_curves(axes[0, 0], epochs)
-            
-            # Learning rate schedule
-            if self.learning_rates:
-                axes[0, 1].plot(epochs[:len(self.learning_rates)], self.learning_rates, 'g-', linewidth=2, marker='o', markersize=3)
-                axes[0, 1].set_title('Learning Rate Schedule')
-                axes[0, 1].set_xlabel('Epoch')
-                axes[0, 1].set_ylabel('Learning Rate')
-                axes[0, 1].set_yscale('log')
-                axes[0, 1].grid(True, alpha=0.3)
-                
-                # Add phase transitions to learning rate chart
-                for transition in self.phase_transitions:
-                    axes[0, 1].axvline(x=transition['epoch'], color='orange', linestyle='--', alpha=0.7, 
-                                     label=f'Phase {transition["phase"]} Start' if transition == self.phase_transitions[0] else '')
-                if self.phase_transitions:
-                    axes[0, 1].legend()
-            
-            # Loss breakdown chart (replaces empty chart)
-            self._plot_loss_breakdown_chart(axes[1, 0], epochs)
-            
-            # Merged research accuracy and secondary metrics
-            self._plot_merged_research_metrics(axes[1, 1], epochs)
-            
-            plt.tight_layout()
-            
-            chart_path = session_dir / 'training_curves.png'
-            plt.savefig(chart_path, dpi=300, bbox_inches='tight', facecolor='white', edgecolor='none')
-            plt.close()
-            
-            return str(chart_path)
-            
-        except Exception as e:
-            if self.verbose:
-                self.logger.warning(f"⚠️ Error generating training curves: {str(e)}")
+        Returns:
+            Path to generated chart image or None if generation failed
+        """
+        if not self.confusion_matrices[layer_name]:
             return None
+            
+        latest_cm_data = self.confusion_matrices[layer_name][-1]
+        return self.chart_generator.generate_confusion_matrix_chart(
+            latest_cm_data['matrix'],
+            self.class_names[layer_name],
+            latest_cm_data['accuracy'],
+            session_id,
+            layer_name
+        )
     
-    def _generate_confusion_matrix_chart(self, layer: str, session_dir: Path) -> Optional[str]:
-        """Generate confusion matrix heatmap for a specific layer."""
-        try:
-            layer_cms = self.confusion_matrices.get(layer, [])
-            if not layer_cms:
-                return None
-            
-            # Use the latest confusion matrix
-            latest_cm = layer_cms[-1]['matrix']
-            class_names = self.class_names.get(layer, [f'Class_{i}' for i in range(len(latest_cm))])
-            
-            fig, axes = plt.subplots(1, 2, figsize=(15, 6))
-            fig.suptitle(f'Confusion Matrix Analysis - {layer.upper()}', fontsize=14, fontweight='bold')
-            
-            # Raw confusion matrix
-            sns.heatmap(latest_cm, annot=True, fmt='d', cmap='Blues', 
-                       xticklabels=class_names, yticklabels=class_names, ax=axes[0])
-            axes[0].set_title('Raw Counts')
-            axes[0].set_xlabel('Predicted')
-            axes[0].set_ylabel('Actual')
-            
-            # Normalized confusion matrix
-            cm_normalized = latest_cm.astype('float') / (latest_cm.sum(axis=1)[:, np.newaxis] + 1e-10)
-            sns.heatmap(cm_normalized, annot=True, fmt='.2f', cmap='Reds',
-                       xticklabels=class_names, yticklabels=class_names, ax=axes[1])
-            axes[1].set_title('Normalized (by True Class)')
-            axes[1].set_xlabel('Predicted')
-            axes[1].set_ylabel('Actual')
-            
-            plt.tight_layout()
-            
-            chart_path = session_dir / f'confusion_matrix_{layer}.png'
-            plt.savefig(chart_path, dpi=300, bbox_inches='tight')
-            plt.close()
-            
-            return str(chart_path)
-            
-        except Exception as e:
-            if self.verbose:
-                self.logger.warning(f"⚠️ Error generating confusion matrix for {layer}: {str(e)}")
-            return None
-    
+    @VisualizationHelper.generate_chart_with_error_handling
     def _generate_layer_metrics_chart(self, session_dir: Path) -> Optional[str]:
         """Generate per-layer metrics comparison chart."""
-        try:
-            if not self.layer_metrics:
-                return None
-            
-            fig, axes = plt.subplots(2, 2, figsize=(15, 10))
-            fig.suptitle('Per-Layer Metrics Comparison', fontsize=16, fontweight='bold')
-            
-            metrics_to_plot = ['accuracy', 'precision', 'recall', 'f1_score']
-            metric_titles = ['Accuracy', 'Precision', 'Recall', 'F1 Score']
-            
-            # Check if we're using global fallback (all layers have identical values)
-            using_global_fallback = self._check_if_using_global_fallback()
-            
-            for idx, (metric, title) in enumerate(zip(metrics_to_plot, metric_titles)):
-                ax = axes[idx // 2, idx % 2]
-                
-                # Define different line styles and markers for better visibility when overlapping
-                layer_styles = {
-                    'layer_1': {'color': '#1f77b4', 'linestyle': '-', 'marker': 'o'},
-                    'layer_2': {'color': '#ff7f0e', 'linestyle': '--', 'marker': 's'}, 
-                    'layer_3': {'color': '#2ca02c', 'linestyle': '-.', 'marker': '^'}
-                }
-                
-                lines_plotted = 0
-                for layer, layer_data in self.layer_metrics.items():
-                    metric_values = layer_data.get(metric, [])
-                    if metric_values:
-                        epochs = range(1, len(metric_values) + 1)
-                        style = layer_styles.get(layer, {'color': 'black', 'linestyle': '-', 'marker': 'o'})
-                        
-                        ax.plot(epochs, metric_values, 
-                               label=layer, 
-                               linewidth=2.5 if using_global_fallback else 2,
-                               linestyle=style['linestyle'],
-                               marker=style['marker'], 
-                               markersize=6 if using_global_fallback else 4,
-                               color=style['color'],
-                               alpha=0.8)
-                        lines_plotted += 1
-                
-                ax.set_title(title)
-                ax.set_xlabel('Epoch')
-                ax.set_ylabel(title)
-                ax.legend()
-                ax.grid(True, alpha=0.3)
-                ax.set_ylim(0, 1)
-                
-                # Add note for global fallback
-                if using_global_fallback and lines_plotted > 0:
-                    ax.text(0.02, 0.98, 'Note: Using global metrics\n(lines may overlap)', 
-                           transform=ax.transAxes, fontsize=8, verticalalignment='top',
-                           bbox=dict(boxstyle='round,pad=0.3', facecolor='yellow', alpha=0.7))
-            
-            plt.tight_layout()
-            
-            chart_path = session_dir / 'layer_metrics_comparison.png'
-            plt.savefig(chart_path, dpi=300, bbox_inches='tight')
-            plt.close()
-            
-            return str(chart_path)
-            
-        except Exception as e:
-            if self.verbose:
-                self.logger.warning(f"⚠️ Error generating layer metrics chart: {str(e)}")
+        if not self.layer_metrics:
             return None
+        
+        fig, axes = plt.subplots(2, 2, figsize=(15, 10))
+        fig.suptitle('Per-Layer Metrics Comparison', fontsize=16, fontweight='bold')
+        
+        metrics_to_plot = ['accuracy', 'precision', 'recall', 'f1_score']
+        metric_titles = ['Accuracy', 'Precision', 'Recall', 'F1 Score']
+        
+        # Check if we're using global fallback (all layers have identical values)
+        using_global_fallback = self._check_if_using_global_fallback()
+        
+        for idx, (metric, title) in enumerate(zip(metrics_to_plot, metric_titles)):
+            ax = axes[idx // 2, idx % 2]
+            
+            # Define different line styles and markers for better visibility when overlapping
+            layer_styles = {
+                'layer_1': {'color': '#1f77b4', 'linestyle': '-', 'marker': 'o'},
+                'layer_2': {'color': '#ff7f0e', 'linestyle': '--', 'marker': 's'}, 
+                'layer_3': {'color': '#2ca02c', 'linestyle': '-.', 'marker': '^'}
+            }
+            
+            lines_plotted = 0
+            for layer, layer_data in self.layer_metrics.items():
+                metric_values = layer_data.get(metric, [])
+                if metric_values:
+                    epochs = range(1, len(metric_values) + 1)
+                    style = layer_styles.get(layer, {'color': 'black', 'linestyle': '-', 'marker': 'o'})
+                    
+                    ax.plot(epochs, metric_values, 
+                           label=layer, 
+                           linewidth=2.5 if using_global_fallback else 2,
+                           linestyle=style['linestyle'],
+                           marker=style['marker'], 
+                           markersize=6 if using_global_fallback else 4,
+                           color=style['color'],
+                           alpha=0.8)
+                    lines_plotted += 1
+            
+            ax.set_title(title)
+            ax.set_xlabel('Epoch')
+            ax.set_ylabel('Score')
+            ax.grid(True, linestyle='--', alpha=0.7)
+            
+            if lines_plotted > 0:
+                ax.legend()
+                ax.set_ylim(0, 1)
+        
+        chart_path = session_dir / 'layer_metrics_comparison.png'
+        plt.tight_layout()
+        plt.savefig(chart_path)
+        plt.close()
+        return str(chart_path)
     
     def _check_if_using_global_fallback(self) -> bool:
         """
@@ -815,11 +753,6 @@ class ComprehensiveMetricsTracker:
             ax.grid(True, alpha=0.3)
             ax.set_ylim(0, 1)  # mAP is between 0 and 1
             
-            # Add research context annotation
-            ax.text(0.02, 0.98, '🔬 Research Context: Additional detection performance metric\nfor multi-layer hierarchical banknote detection',
-                   transform=ax.transAxes, fontsize=10, verticalalignment='top',
-                   bbox=dict(boxstyle='round', facecolor='lightblue', alpha=0.7))
-            
             chart_path = session_dir / 'detection_map50_trends.png'
             plt.savefig(chart_path, dpi=300, bbox_inches='tight')
             plt.close()
@@ -852,28 +785,6 @@ class ComprehensiveMetricsTracker:
         else:
             return f'{from_phase}\n→\n{to_phase}'
     
-    def _generate_research_summary_text(self) -> str:
-        """Generate research-focused summary text for the dashboard."""
-        try:
-            total_epochs = len(self.epoch_metrics)
-            final_train_loss = self.train_losses[-1] if self.train_losses else 'N/A'
-            final_val_loss = self.val_losses[-1] if self.val_losses else 'N/A'
-            
-            # Extract research-focused metrics from latest epoch
-            research_summary = self._extract_research_summary_metrics()
-            
-            summary = f"""🔬 SmartCash Research Training Summary:
-• Total Epochs: {total_epochs}
-• Final Train Loss: {final_train_loss:.4f if isinstance(final_train_loss, (int, float)) else final_train_loss}
-• Final Val Loss: {final_val_loss:.4f if isinstance(final_val_loss, (int, float)) else final_val_loss}
-• Phase Transitions: {len(self.phase_transitions)}
-{research_summary}"""
-            
-            return summary
-            
-        except Exception:
-            return "🔬 Research Training Summary: Data processing error"
-    
     def _get_research_context(self, phase_num: int) -> str:
         """Get research context description for the given phase."""
         if phase_num == 1:
@@ -885,214 +796,42 @@ class ComprehensiveMetricsTracker:
     
     def _extract_research_accuracy_trends(self) -> Dict[str, List[float]]:
         """Extract research-focused accuracy trends from epoch metrics."""
-        trends = {}
-        
-        # Primary metrics to track
-        research_metrics = [
-            'val_accuracy',   # Primary validation metric
-            'train_accuracy', # Training comparison
-        ]
-        
-        for metric_name in research_metrics:
-            values = []
-            for epoch_data in self.epoch_metrics:
-                if metric_name in epoch_data:
-                    values.append(epoch_data[metric_name])
-            if values:  # Only include if we have data
-                trends[metric_name] = values
-        
-        # Fallback to legacy metrics if research metrics not available
-        if not trends:
-            legacy_metrics = ['val_accuracy', 'train_accuracy']
-            for metric_name in legacy_metrics:
-                values = []
-                for epoch_data in self.epoch_metrics:
-                    if metric_name in epoch_data:
-                        values.append(epoch_data[metric_name])
-                if values:
-                    trends[metric_name] = values
-        
-        return trends
-    
+        return ChartUtils.extract_research_accuracy_trends(self.epoch_metrics)
+
     def _extract_secondary_metrics_trends(self) -> Dict[str, List[float]]:
         """Extract secondary research metrics trends."""
-        trends = {}
-        
-        # Secondary metrics
-        secondary_metrics = [
-            'val_map50',    # Object detection metric
-            'val_f1',       # F1 score
-            'val_precision', # Precision 
-            'val_recall'     # Recall
-        ]
-        
-        for metric_name in secondary_metrics:
-            values = []
-            for epoch_data in self.epoch_metrics:
-                if metric_name in epoch_data and epoch_data[metric_name] > 0:
-                    values.append(epoch_data[metric_name])
-            if values:  # Only include if we have meaningful data
-                trends[metric_name] = values
-        
-        return trends
-    
+        return ChartUtils.extract_secondary_metrics_trends(self.epoch_metrics)
+
     def _extract_all_research_trends(self) -> Dict[str, List[float]]:
         """Extract all available research trends for comprehensive visualization."""
-        all_trends = {}
-        
-        # Combine primary and secondary trends
-        primary_trends = self._extract_research_accuracy_trends()
-        secondary_trends = self._extract_secondary_metrics_trends()
-        
-        all_trends.update(primary_trends)
-        all_trends.update(secondary_trends)
-        
-        return all_trends
-    
+        return ChartUtils.extract_all_research_trends(self.epoch_metrics)
+
     def _get_metric_display_name(self, metric_name: str) -> str:
         """Convert internal metric names to user-friendly display names."""
-        display_names = {
-            # Standard YOLO metrics
-            'val_accuracy': 'Validation Accuracy',
-            'train_accuracy': 'Training Accuracy',
-            'val_precision': 'Validation Precision',
-            'val_recall': 'Validation Recall',
-            'val_f1': 'Validation F1',
-            'val_map50': 'mAP@0.5'
-        }
-        
-        return display_names.get(metric_name, metric_name.replace('_', ' ').title())
-    
+        return self.chart_generator._get_metric_display_name(metric_name)
+
     def _extract_research_summary_metrics(self) -> str:
         """Extract key research metrics for summary display."""
-        if not self.epoch_metrics:
-            return "• No training data available"
-        
-        latest_metrics = self.epoch_metrics[-1]
-        summary_lines = []
-        
-        # Simple summary for both phases
-        val_acc = latest_metrics.get('val_accuracy')
-        if val_acc is not None:
-            summary_lines.append(f"• Validation Accuracy: {val_acc:.4f} ({val_acc*100:.2f}%)")
-        
-        val_f1 = latest_metrics.get('val_f1')
-        if val_f1 is not None:
-            summary_lines.append(f"• Validation F1: {val_f1:.4f}")
-        
-        val_map50 = latest_metrics.get('val_map50')
-        if val_map50 is not None:
-            summary_lines.append(f"• mAP@0.5: {val_map50:.4f} ({val_map50*100:.2f}%)")
-        
-        return '\n'.join(summary_lines) if summary_lines else "• Research metrics not available"
+        return ChartUtils.get_research_summary_metrics(self.epoch_metrics)
     
-    def _save_metrics_summary(self, session_dir: Path, session_id: str):
-        """Save comprehensive research-focused metrics summary to JSON."""
-        try:
-            # Extract research context from final metrics
-            final_metrics = self.epoch_metrics[-1] if self.epoch_metrics else {}
-            research_context = final_metrics.get('research_context', 'unknown')
-            phase_num = final_metrics.get('phase_num')
-            
-            summary = {
-                'session_id': session_id,
-                'timestamp': time.time(),
-                'total_epochs': len(self.epoch_metrics),
-                'phase_transitions': self.phase_transitions,
-                'final_metrics': final_metrics,
-                'research_context': research_context,
-                'phase_num': phase_num,
-                'research_summary': self._generate_research_metrics_summary(),
-                'layer_metrics_summary': {},
-                'confusion_matrices_summary': {}
-            }
-            
-            # Layer metrics summary
-            for layer, layer_data in self.layer_metrics.items():
-                summary['layer_metrics_summary'][layer] = {
-                    'best_accuracy': max(layer_data.get('accuracy', [0])),
-                    'best_precision': max(layer_data.get('precision', [0])),
-                    'best_recall': max(layer_data.get('recall', [0])),
-                    'best_f1_score': max(layer_data.get('f1_score', [0])),
-                    'final_accuracy': layer_data.get('accuracy', [0])[-1] if layer_data.get('accuracy') else 0
-                }
-            
-            # Confusion matrices summary
-            for layer, cms in self.confusion_matrices.items():
-                if cms:
-                    latest_cm = cms[-1]
-                    summary['confusion_matrices_summary'][layer] = {
-                        'final_accuracy': latest_cm['accuracy'],
-                        'matrix_shape': latest_cm['matrix'].shape,
-                        'total_samples': int(np.sum(latest_cm['matrix']))
-                    }
-            
-            summary_path = session_dir / 'metrics_summary.json'
-            with open(summary_path, 'w') as f:
-                json.dump(summary, f, indent=2, default=str)
-            
-            if self.verbose:
-                self.logger.info(f"📊 Metrics summary saved: {summary_path.name}")
-                
-        except Exception as e:
-            if self.verbose:
-                self.logger.warning(f"⚠️ Error saving research metrics summary: {str(e)}")
-    
-    def _generate_research_metrics_summary(self) -> Dict[str, Any]:
-        """Generate simplified research metrics summary using standard YOLO metrics."""
-        if not self.epoch_metrics:
-            return {}
-        
-        research_trends = self._extract_all_research_trends()
-        
-        summary = {
-            'standard_detection': {},
-            'training_progression': {}
-        }
-        
-        # Standard YOLO detection analysis
-        if 'val_accuracy' in research_trends:
-            values = research_trends['val_accuracy']
-            summary['standard_detection'] = {
-                'best_accuracy': max(values),
-                'final_accuracy': values[-1],
-                'improvement': values[-1] - values[0] if len(values) > 1 else 0.0,
-                'epochs_to_best': values.index(max(values)) + 1
-            }
-        
-        # Add mAP information if available
-        if 'val_map50' in research_trends:
-            values = research_trends['val_map50']
-            summary['standard_detection'].update({
-                'best_map50': max(values),
-                'final_map50': values[-1],
-                'map50_improvement': values[-1] - values[0] if len(values) > 1 else 0.0
-            })
-        
-        # Training progression
-        summary['training_progression'] = {
-            'total_epochs': len(self.epoch_metrics),
-            'phase_transitions': len(self.phase_transitions),
-            'loss_reduction': self.train_losses[-1] - self.train_losses[0] if len(self.train_losses) > 1 else 0.0
-        }
-        
-        return summary
-    
-    def update_with_research_metrics(self, epoch: int, phase_num: int, metrics: Dict[str, Any], 
-                                   predictions: Dict[str, np.ndarray] = None, 
-                                   ground_truth: Dict[str, np.ndarray] = None):
+    def save_metrics_summary(self, session_dir: Path, session_id: str):
         """
-        Convenience method to update metrics with research context.
+        Save comprehensive research-focused metrics summary to JSON.
         
         Args:
-            epoch: Current epoch number
-            phase_num: Training phase number (1 or 2)
-            metrics: Dictionary of research-focused metric values
-            predictions: Per-layer predictions (optional)
-            ground_truth: Per-layer ground truth labels (optional)
+            session_dir: Directory to save the summary
+            session_id: Unique identifier for this training session
         """
-        phase_name = f"phase_{phase_num}"
-        self.update_metrics(epoch, phase_name, metrics, predictions, ground_truth, phase_num)
+        self.chart_generator.save_metrics_summary(
+            session_dir,
+            session_id,
+            self.epoch_metrics,
+            self.phase_transitions,
+            self.layer_metrics,
+            self.confusion_matrices
+        )
+    
+
     
     def _get_contextual_chart_title(self) -> str:
         """Generate contextual chart title based on training configuration."""
@@ -1326,7 +1065,7 @@ class ComprehensiveMetricsTracker:
 def create_visualization_manager(num_classes_per_layer: Dict[str, int], 
                                class_names: Dict[str, List[str]] = None,
                                save_dir: str = "data/visualization",
-                               verbose: bool = False) -> ComprehensiveMetricsTracker:
+                               verbose: bool = False) -> VisualizationMetricsTracker:
     """
     Factory function to create a research-focused visualization manager for training.
     
@@ -1342,9 +1081,9 @@ def create_visualization_manager(num_classes_per_layer: Dict[str, int],
         verbose: Enable verbose logging
         
     Returns:
-        Configured ComprehensiveMetricsTracker instance with research focus
+        Configured VisualizationMetricsTracker instance with research focus
     """
-    tracker = ComprehensiveMetricsTracker(
+    tracker = VisualizationMetricsTracker(
         num_classes_per_layer=num_classes_per_layer,
         class_names=class_names,
         save_dir=save_dir,

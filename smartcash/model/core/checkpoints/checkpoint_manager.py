@@ -20,14 +20,23 @@ class CheckpointManager:
         
         # Checkpoint configuration
         checkpoint_config = config.get('checkpoint', {})
-        self.save_dir = Path(checkpoint_config.get('save_dir', 'data/checkpoints'))
+        base_save_dir = Path(checkpoint_config.get('save_dir', 'data/checkpoints'))
+        
+        # Get backbone name from config
+        self.backbone = config.get('model', {}).get('backbone', '')
+        
+        # Create checkpoint directory - use base if no backbone specified
+        if self.backbone:
+            self.save_dir = base_save_dir / self.backbone
+        else:
+            self.save_dir = base_save_dir
+        
+        self.save_dir.mkdir(parents=True, exist_ok=True)
+        
         self.max_checkpoints = checkpoint_config.get('max_checkpoints', 5)
         self.auto_cleanup = checkpoint_config.get('auto_cleanup', True)
         
-        # Ensure directory exists
-        self.save_dir.mkdir(parents=True, exist_ok=True)
-        
-        # Initialize best metrics manager
+        # Initialize best metrics manager with backbone-specific directory
         self.best_metrics_manager = BestMetricsManager(self.save_dir, is_resuming=is_resuming)
         
         self.logger.info(f"💾 CheckpointManager initialized | Dir: {self.save_dir}")
@@ -68,8 +77,12 @@ class CheckpointManager:
             if checkpoint_name is None:
                 checkpoint_name = self._generate_checkpoint_name(metrics, **kwargs)
             
+            # Create backbone-specific checkpoint paths
             checkpoint_path = self.save_dir / checkpoint_name
+            best_model_path = self.save_dir / f'best_{self.backbone}.pt'
+            last_model_path = self.save_dir / f'last_{self.backbone}.pt'
             
+            # Save to both specific name and best/last model references
             # CRITICAL FIX: Get model configuration from proper source
             model_config = self._get_model_config_for_checkpoint(model, **kwargs)
             
@@ -94,24 +107,31 @@ class CheckpointManager:
             # Add optimizer and scheduler if available
             if 'optimizer' in kwargs:
                 checkpoint_data['optimizer_state_dict'] = kwargs['optimizer'].state_dict()
-                self.logger.debug("💾 Saved optimizer state")
+                self.logger.debug(" Saved optimizer state")
             if 'scheduler' in kwargs:
                 checkpoint_data['scheduler_state_dict'] = kwargs['scheduler'].state_dict()
-                self.logger.debug("💾 Saved scheduler state")
+                self.logger.debug(" Saved scheduler state")
             if 'epoch' in kwargs:
                 checkpoint_data['epoch'] = kwargs['epoch']
             if 'phase' in kwargs:
                 checkpoint_data['phase'] = kwargs['phase']
             
-            # Save checkpoint
+            # Save to both specific name and best/last model references
             torch.save(checkpoint_data, checkpoint_path)
+            
+            # Update best/last model references
+            if is_best:
+                torch.save(checkpoint_data, best_model_path)
+                self.logger.info(f"✅ Updated best model reference: {best_model_path.name}")
+            torch.save(checkpoint_data, last_model_path)
+            self.logger.info(f"✅ Updated last model reference: {last_model_path.name}")
             
             # Update best metrics manager if this is a best checkpoint
             if is_best and metrics:
                 self.best_metrics_manager.update_best_metrics(metrics, epoch, phase)
             
             # Log save info
-            log_message = f"✅ {'Best' if is_best else 'Regular'} checkpoint saved successfully at {checkpoint_path}"
+            log_message = f" Checkpoint saved successfully at {checkpoint_path}"
             if is_best and metrics:
                 val_acc = metrics.get('val_accuracy', 0)
                 val_loss = metrics.get('val_loss', 0)
@@ -123,7 +143,7 @@ class CheckpointManager:
                 phase_num = kwargs.get('phase', 1)
                 backup_path = self._create_phase_backup_immediate(str(checkpoint_path), phase_num)
                 if backup_path:
-                    self.logger.info(f"📦 Phase {phase_num} backup created: {Path(backup_path).name}")
+                    self.logger.info(f" Phase {phase_num} backup created: {Path(backup_path).name}")
             
             # Cleanup old checkpoints
             if self.auto_cleanup:
@@ -132,20 +152,26 @@ class CheckpointManager:
             return str(checkpoint_path)
             
         except Exception as e:
-            error_msg = f"❌ Checkpoint save failed: {str(e)}"
+            error_msg = f" Checkpoint save failed: {str(e)}"
             self.logger.error(error_msg)
             raise RuntimeError(error_msg)
     
     def load_checkpoint(self, model: torch.nn.Module, checkpoint_path: Optional[str] = None, 
                        strict: bool = True, **kwargs) -> Dict[str, Any]:
-        """📂 Load model from checkpoint with best metrics restoration"""
+        """ Load model from checkpoint with best metrics restoration"""
         
         try:
             # Find checkpoint if not specified
             if checkpoint_path is None:
-                checkpoint_path = self._find_best_checkpoint()
-                if checkpoint_path is None:
-                    raise FileNotFoundError("❌ No checkpoint found")
+                # First try best model reference
+                best_model_path = self.save_dir / f'best_{self.backbone}.pt'
+                if best_model_path.exists():
+                    checkpoint_path = best_model_path
+                else:
+                    # Fall back to finding best checkpoint
+                    checkpoint_path = self._find_best_checkpoint()
+                    if checkpoint_path is None:
+                        raise FileNotFoundError("❌ No checkpoint found")
             
             # If resuming and loading into Phase 2, ensure we load the best checkpoint from Phase 1
             if self.best_metrics_manager.is_resuming and kwargs.get('resume_phase', 1) == 2:
@@ -283,40 +309,12 @@ class CheckpointManager:
             # Extract naming components
             backbone = model_config.get('backbone', 'unknown')
             
-            # Determine training mode (phase mode)
-            training_mode = training_config.get('training_mode', 'two_phase')
-            if training_mode not in ['single_phase', 'two_phase']:
-                # Fallback: determine from phases configuration
-                total_phases = len([k for k in self.config.get('training_phases', {}) if 'phase_' in k])
-                training_mode = 'single_phase' if total_phases == 1 else 'two_phase'
-            
-            # Determine layer mode
-            layer_mode = model_config.get('layer_mode', 'multi')
-            if 'detection_layers' in model_config:
-                num_layers = len(model_config['detection_layers'])
-                layer_mode = 'single' if num_layers == 1 else 'multi'
-            
-            # Determine freeze status
-            freeze_backbone = model_config.get('freeze_backbone', False)
-            freeze_status = 'frozen' if freeze_backbone else 'unfrozen'
-            
-            # Check if pretrained is enabled
-            pretrained = model_config.get('pretrained', False)
-            pretrained_suffix = 'pretrained' if pretrained else ''
-            
             # For regular checkpoints, build name with backbone info (no date)
             if not is_best:
                 name_parts = [
                     'last',
                     backbone,
-                    training_mode,
-                    layer_mode,
-                    freeze_status
                 ]
-                
-                # Add pretrained suffix only if True
-                if pretrained_suffix:
-                    name_parts.append(pretrained_suffix)
                 
                 filename = '_'.join(name_parts) + '.pt'
                 self.logger.debug(f"📝 Generated regular checkpoint name: {filename}")
@@ -331,14 +329,7 @@ class CheckpointManager:
             name_parts = [
                 'best',
                 backbone,
-                training_mode,
-                layer_mode,
-                freeze_status
             ]
-            
-            # Add pretrained suffix only if True
-            if pretrained_suffix:
-                name_parts.append(pretrained_suffix)
             
             name_parts.append(date_str)
             filename = '_'.join(name_parts) + '.pt'

@@ -245,7 +245,7 @@ class CallbacksMixin:
         }
         
         val_acc = metrics.get('val_accuracy', 0)
-        message = f"💾 New best model saved: Phase {phase_num}, Epoch {epoch}, Acc: {val_acc:.4f}"
+        message = f"💾 New best model saved: Phase {phase_num}, Epoch {epoch + 1}, Acc: {val_acc:.4f}"
         
         self.emit_log('info', message, data)
         self.emit_live_chart('success', "New best model saved", data)

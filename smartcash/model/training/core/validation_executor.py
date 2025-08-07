@@ -107,7 +107,7 @@ class ValidationExecutor:
         self.batch_processor = ValidationBatchProcessor(model, config, self.prediction_processor)
         self.metrics_computer = ValidationMetricsComputer(model, config, self.map_calculator)
         self.model_manager = ValidationModelManager(model)
-        self.map_processor = ValidationMapProcessor(self.map_calculator)
+        self.map_processor = ValidationMapProcessor(self.map_calculator, current_phase)
         
         logger.info(f"Validation metrics configuration:")
         logger.info(f"  • YOLOv5 mAP calculator: {layer_info} classes")

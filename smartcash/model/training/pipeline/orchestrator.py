@@ -137,19 +137,19 @@ class PipelineOrchestrator(CallbacksMixin):
             self.emit_log("info", "🚀 Starting training pipeline orchestration")
 
             # Phase 1: Environment preparation
-            self.progress_tracker.update_overall_progress("Preparation", 1, 7)
+            self.progress_tracker.update_overall_progress("Preparation", 1, 5)
             self._execute_preparation_phase(config)
 
             # Phase 2: Handle resume if applicable
-            self.progress_tracker.update_overall_progress("Handle Resume", 2, 7)
+            self.progress_tracker.update_overall_progress("Handle Resume", 2, 5)
             resume_info = self._execute_resume_phase(config)
 
-            # Phase 3: Execute training phases
-            self.progress_tracker.update_overall_progress("Running Phase 1", 3, 7)
+            # Phase 3: Execute training phases (includes Phase 1 and Phase 2 with re-initialization)
+            self.progress_tracker.update_overall_progress("Running Phase 1", 3, 5)
             training_results = self._execute_training_phases(config, resume_info)
 
-            # Phase 4: Generate final summary
-            self.progress_tracker.update_overall_progress("Summary Generation", 7, 7)
+            # Phase 5: Generate final summary
+            self.progress_tracker.update_overall_progress("Summary Generation", 5, 5)
             final_results = self._execute_finalization_phase(training_results)
 
             self.emit_log("info", "✅ Pipeline orchestration completed successfully")
@@ -244,9 +244,7 @@ class PipelineOrchestrator(CallbacksMixin):
 
             # Update overall progress after training phases
             if training_mode == "two_phase":
-                self.progress_tracker.update_overall_progress("Rebuild Model", 4, 7)
-                self.progress_tracker.update_overall_progress("Validate Model", 5, 7)
-                self.progress_tracker.update_overall_progress("Running Phase 2", 6, 7)
+                self.progress_tracker.update_overall_progress("Running Phase 2", 4, 5)
 
             self.emit_log("info", "✅ Training phases completed successfully")
 
@@ -328,24 +326,25 @@ class PipelineOrchestrator(CallbacksMixin):
 
             results["phase_1"] = phase_1_result
 
-            # Handle phase transition with model rebuild
+            # Handle phase transition to Phase 2
             self.emit_log("info", "🔄 Transitioning from Phase 1 to Phase 2")
             phase_executor.handle_phase_transition(2, {})
 
-            # Rebuild model for Phase 2 with proper architecture and weight transfer
+            # Initialize fresh Phase 2 model and load best Phase 1 weights
             if weight_transfer_manager and phase_1_result.get("final_checkpoint"):
-                self.emit_log("info", "🔧 Rebuilding model for Phase 2 with weight transfer...")
+                phase1_checkpoint = phase_1_result["final_checkpoint"]
+                self.emit_log("info", f"🏗️ Initializing Phase 2 model and loading best Phase 1 weights from {phase1_checkpoint}")
                 
-                rebuild_success, rebuilt_model = weight_transfer_manager.rebuild_model_for_phase2(
-                    self.model_api, phase_1_result["final_checkpoint"]
+                init_success, phase2_model = weight_transfer_manager.initialize_phase2_model_with_phase1_weights(
+                    self.model_api, phase1_checkpoint
                 )
                 
-                if rebuild_success and rebuilt_model:
-                    self.model = rebuilt_model  # Update orchestrator's model reference
-                    phase_executor.model = rebuilt_model  # Update phase executor's model reference
-                    self.emit_log("info", "✅ Model successfully rebuilt for Phase 2")
+                if init_success and phase2_model:
+                    self.model = phase2_model  # Update orchestrator's model reference
+                    phase_executor.model = phase2_model  # Update phase executor's model reference
+                    self.emit_log("info", "✅ Phase 2 model initialized successfully with Phase 1 weights")
                 else:
-                    self.emit_log("warning", "⚠️ Model rebuild failed, using fresh Phase 2 model")
+                    self.emit_log("warning", "⚠️ Phase 2 model initialization failed, using fresh model")
                     # Fallback: build fresh Phase 2 model without weight transfer
                     build_result = self.model_api.build_model(
                         layer_mode='multi',

@@ -28,6 +28,7 @@ def generate_markdown_summary(
         phase_results: Dictionary of phase results
         training_session_id: Unique training session identifier
         training_start_time: Training start timestamp
+        visualization_results: Visualization results dictionary
         
     Returns:
         Markdown formatted summary string
@@ -74,7 +75,7 @@ def generate_markdown_summary(
             summary.append("## Phase Results")
             for phase_name, result in phase_results.items():
                 if isinstance(result, dict):
-                    status = "✅ Success" if result.get('success') else "❌ Failed"
+                    status = "✅ Success" if result.get('success', False) else "❌ Failed"
                     duration = result.get('duration', 0)
                     summary.append(f"- **{phase_name.replace('_', ' ').title()}**: {status} ({duration:.1f}s)")
             summary.append("")
@@ -95,23 +96,22 @@ def generate_markdown_summary(
                 summary.append(f"- **Comprehensive Dashboard**: {visualization_results['dashboard_path']}")
             
             if isinstance(visualization_results.get('currency_plots'), dict):
-                summary.append("- **Currency Analysis Plots**:")
+                summary.append("- **Currency Analysis Plots**: ")
                 for plot_name, plot_path in visualization_results['currency_plots'].items():
                     summary.append(f"  - {plot_name.replace('_', ' ').title()}: {plot_path}")
-            
+
             if isinstance(visualization_results.get('layer_plots'), dict):
-                summary.append("- **Layer Analysis Plots**:")
+                summary.append("- **Layer Analysis Plots**: ")
                 for plot_name, plot_path in visualization_results['layer_plots'].items():
                     summary.append(f"  - {plot_name.replace('_', ' ').title()}: {plot_path}")
-            
+
             if isinstance(visualization_results.get('class_plots'), dict):
-                summary.append("- **Class Analysis Plots**:")
+                summary.append("- **Class Analysis Plots**: ")
                 for plot_name, plot_path in visualization_results['class_plots'].items():
                     summary.append(f"  - {plot_name.replace('_', ' ').title()}: {plot_path}")
             summary.append("")
 
-        return "\n".join(summary)
-        
+        return '\n'.join(summary)
     except Exception as e:
         logger.warning(f"Error generating markdown summary: {e}")
         return "# Training Summary\n\nError generating summary."

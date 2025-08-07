@@ -16,14 +16,16 @@ logger = get_logger(__name__)
 class ValidationMapProcessor:
     """Handles mAP-related processing for validation."""
     
-    def __init__(self, map_calculator):
+    def __init__(self, map_calculator, current_phase=1):
         """
         Initialize validation mAP processor.
         
         Args:
             map_calculator: YOLOv5 mAP calculator instance
+            current_phase: Current training phase (1 or 2)
         """
         self.map_calculator = map_calculator
+        self.current_phase = current_phase
     
     def update_map_calculator(self, predictions, targets, images, batch_idx, epoch=0):
         """
@@ -99,15 +101,44 @@ class ValidationMapProcessor:
             Tensor in YOLOv5 format [batch, detections, 6] where each detection is [x, y, w, h, conf, class]
         """
         try:
-            # For object detection, we primarily use layer_1 predictions (main banknote detection)
+            # Use phase-appropriate layers for mAP calculation
             if isinstance(predictions, dict):
-                if 'layer_1' in predictions:
-                    layer_1_preds = predictions['layer_1']
+                # Phase-aware layer selection for mAP calculation
+                if self.current_phase == 1:
+                    # Phase 1: Only use layer_1 predictions (classes 0-6)
+                    if 'layer_1' in predictions and predictions['layer_1'] is not None:
+                        layer_1_preds = predictions['layer_1']
+                        logger.debug(f"Phase 1: Using layer_1 predictions for mAP calculation (classes 0-6)")
+                    else:
+                        # Fallback to first available layer in Phase 1
+                        first_key = next(iter(predictions.keys()))
+                        layer_1_preds = predictions[first_key]
+                        logger.debug(f"Phase 1: Using {first_key} predictions for mAP (layer_1 not found)")
                 else:
-                    # Fallback to first available layer
-                    first_key = next(iter(predictions.keys()))
-                    layer_1_preds = predictions[first_key]
-                    logger.debug(f"Using {first_key} predictions for mAP (layer_1 not found)")
+                    # Phase 2: Combine predictions from all layers for comprehensive mAP evaluation (classes 0-16)
+                    all_layer_preds = []
+                    for layer_name in ['layer_1', 'layer_2', 'layer_3']:
+                        if layer_name in predictions and predictions[layer_name] is not None:
+                            all_layer_preds.append(predictions[layer_name])
+                    
+                    if all_layer_preds:
+                        # Concatenate all layer predictions
+                        if len(all_layer_preds) == 1:
+                            layer_1_preds = all_layer_preds[0]
+                        else:
+                            # Concatenate along detection dimension if possible
+                            try:
+                                layer_1_preds = torch.cat(all_layer_preds, dim=1)
+                                logger.debug(f"Phase 2: Combined {len(all_layer_preds)} layers for mAP calculation (classes 0-16)")
+                            except:
+                                # Fallback to first layer if concatenation fails
+                                layer_1_preds = all_layer_preds[0]
+                                logger.debug(f"Phase 2: Using first layer for mAP (concatenation failed)")
+                    else:
+                        # Fallback to first available layer
+                        first_key = next(iter(predictions.keys()))
+                        layer_1_preds = predictions[first_key]
+                        logger.debug(f"Phase 2: Using {first_key} predictions for mAP (no standard layers found)")
             else:
                 layer_1_preds = predictions
             
@@ -287,10 +318,17 @@ class ValidationMapProcessor:
             if targets.dim() == 2 and targets.shape[-1] >= 6:
                 map_targets = targets[:, :6].clone()  # Take first 6 columns
                 
-                # CRITICAL FIX: Filter out invalid class indices
-                # SmartCash model has 7 classes (0-6), but targets may contain invalid classes (7-13)
-                num_classes = 7  # SmartCash banknote classes: 0-6
-                valid_mask = map_targets[:, 1] < num_classes  # Class index is at position 1
+                # Phase-aware class range filtering
+                if self.current_phase == 1:
+                    # Phase 1: Only layer_1 classes (0-6)
+                    num_classes = 7  # SmartCash Phase 1: layer_1 only (7 classes: 0-6)
+                    valid_mask = map_targets[:, 1] < num_classes  # Class index is at position 1
+                    logger.debug(f"Phase 1: Filtering targets to {num_classes} classes (0-6)")
+                else:
+                    # Phase 2: Full class range for multi-layer model (0-16) 
+                    num_classes = 17  # SmartCash Phase 2: all layers (17 classes: 0-16)
+                    valid_mask = map_targets[:, 1] < num_classes  # Class index is at position 1
+                    logger.debug(f"Phase 2: Using full class range {num_classes} classes (0-16)")
                 
                 if valid_mask.sum() == 0:
                     logger.debug("⚠️ No valid target classes found after filtering")

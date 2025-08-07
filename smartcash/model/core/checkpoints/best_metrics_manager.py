@@ -49,9 +49,9 @@ class BestMetricsManager:
         try:
             self.current_phase = phase_num
 
-            # If it's Phase 1 and not resuming, or if _fresh_phase_start is set, skip loading previous metrics
+            # If it's Phase 1 and not resuming, or if _fresh_phase_start is set for any phase, skip loading previous metrics
             if (phase_num == 1 and not self.is_resuming) or \
-               (self._fresh_phase_start == phase_num and phase_num != 2):
+               (self._fresh_phase_start == phase_num):
                 logger.info(f"🆕 Phase {phase_num} is marked for a fresh start (or is Phase 1 and not resuming) - skipping loading previous metrics.")
                 self._fresh_phase_start = None  # Reset the flag
                 return {}

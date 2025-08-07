@@ -192,6 +192,15 @@ class TrainingPhaseExecutor(CallbacksMixin, MetricsProcessingMixin):
             )
             if current_lr is not None:
                 final_metrics['learning_rate'] = current_lr
+            else:
+                # Fallback: try to get learning rate directly from optimizer
+                if components.get('optimizer') and components['optimizer'].param_groups:
+                    try:
+                        final_metrics['learning_rate'] = components['optimizer'].param_groups[0]['lr']
+                    except (IndexError, KeyError):
+                        final_metrics['learning_rate'] = 0.0
+                else:
+                    final_metrics['learning_rate'] = 0.0
             
             # Record metrics
             if components.get('metrics_recorder'):

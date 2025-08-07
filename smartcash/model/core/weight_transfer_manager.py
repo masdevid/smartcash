@@ -336,24 +336,25 @@ class WeightTransferManager:
         except Exception as e:
             return {'compatible': False, 'error': str(e)}
     
-    def rebuild_model_for_phase2(self, model_api, phase1_checkpoint_path: str) -> Tuple[bool, Any]:
+    def initialize_phase2_model_with_phase1_weights(self, model_api, phase1_checkpoint_path: str) -> Tuple[bool, Any]:
         """
-        Rebuild model for Phase 2 with proper architecture and weight transfer.
+        Initialize fresh Phase 2 model and load best Phase 1 checkpoint weights.
         
         Args:
             model_api: Model API instance
-            phase1_checkpoint_path: Path to Phase 1 best checkpoint
+            phase1_checkpoint_path: Path to Phase 1 best checkpoint (should end with _phase1)
             
         Returns:
-            Tuple of (success, rebuilt_model)
+            Tuple of (success, initialized_model)
         """
         try:
-            self.logger.info("🔧 Rebuilding model for Phase 2...")
+            self.logger.info("🏗️ Initializing fresh multi-layer model for Phase 2...")
             
-            # Build fresh Phase 2 model (multi-layer architecture)
+            # Initialize fresh Phase 2 model (multi-layer, no pretrained weights)
             build_result = model_api.build_model(
                 layer_mode='multi',  # Force multi-layer for Phase 2
-                detection_layers=['layer_1', 'layer_2', 'layer_3']
+                detection_layers=['layer_1', 'layer_2', 'layer_3'],
+                pretrained=False     # No pretrained weights - load Phase 1 checkpoint instead
             )
             
             if not build_result['success']:
@@ -361,21 +362,51 @@ class WeightTransferManager:
             
             phase2_model = build_result['model']
             
-            # Transfer weights from Phase 1 to Phase 2
-            transfer_success, transfer_info = self.transfer_phase1_to_phase2_weights(
-                phase1_checkpoint_path, phase2_model, transfer_mode='expand'
-            )
+            # Load best Phase 1 checkpoint into the fresh Phase 2 model
+            self.logger.info(f"📂 Loading best Phase 1 weights from: {phase1_checkpoint_path}")
+            load_result = model_api.load_checkpoint(phase1_checkpoint_path)
             
-            if transfer_success:
-                self.logger.info("✅ Model rebuilt for Phase 2 with weight transfer")
+            if load_result.get('success', False):
+                self.logger.info("✅ Best Phase 1 weights loaded successfully into fresh Phase 2 model")
+                
+                # Unfreeze backbone for Phase 2 fine-tuning
+                self._unfreeze_backbone_for_phase2(phase2_model)
+                
                 return True, phase2_model
             else:
-                self.logger.warning("⚠️ Weight transfer failed, using fresh Phase 2 model")
-                return True, phase2_model  # Still return the model even if transfer failed
+                self.logger.warning("⚠️ Failed to load Phase 1 weights, proceeding with fresh Phase 2 model")
+                
+                # Still unfreeze backbone for training
+                self._unfreeze_backbone_for_phase2(phase2_model)
+                
+                return True, phase2_model  # Still return the model for fresh Phase 2 training
                 
         except Exception as e:
-            self.logger.error(f"❌ Model rebuild for Phase 2 failed: {e}")
+            self.logger.error(f"❌ Phase 2 model initialization failed: {e}")
             return False, None
+    
+    def _unfreeze_backbone_for_phase2(self, model: nn.Module):
+        """
+        Unfreeze backbone parameters for Phase 2 fine-tuning.
+        
+        Args:
+            model: PyTorch model to unfreeze
+        """
+        try:
+            # Unfreeze all parameters for Phase 2 fine-tuning
+            unfrozen_count = 0
+            for name, param in model.named_parameters():
+                if param.requires_grad == False:
+                    param.requires_grad = True
+                    unfrozen_count += 1
+            
+            if unfrozen_count > 0:
+                self.logger.info(f"🔓 Unfroze {unfrozen_count} backbone parameters for Phase 2 fine-tuning")
+            else:
+                self.logger.info("🔓 All model parameters already unfrozen for Phase 2")
+                
+        except Exception as e:
+            self.logger.warning(f"⚠️ Failed to unfreeze backbone parameters: {e}")
 
 
 def create_weight_transfer_manager() -> WeightTransferManager:

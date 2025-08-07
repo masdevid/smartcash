@@ -141,7 +141,8 @@ class TrainingExecutor:
         train_metrics = {
             'train_loss': running_loss / num_batches,
             '_accumulated_predictions': self._accumulated_predictions if self._batch_count > 0 else {},
-            '_accumulated_targets': self._accumulated_targets if self._batch_count > 0 else {}
+            '_accumulated_targets': self._accumulated_targets if self._batch_count > 0 else {},
+            'loss_breakdown': self._last_loss_breakdown  # Include loss breakdown for metrics reporting
         }
         
         return train_metrics

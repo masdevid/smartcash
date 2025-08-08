@@ -70,8 +70,8 @@ def main():
     """
     Augments images with lighting variations in parallel.
     """
-    source_dir = "/Users/masdevid/Projects/smartcash/data/test"
-    output_dir = "/Users/masdevid/Projects/smartcash/data/test_lighting"
+    source_dir = "/Users/masdevid/Projects/smartcash/data/preprocessed/test"
+    output_dir = "/Users/masdevid/Projects/smartcash/data/preprocessed/test_lighting"
 
     if os.path.exists(output_dir):
         shutil.rmtree(output_dir)

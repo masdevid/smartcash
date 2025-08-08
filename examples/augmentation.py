@@ -164,8 +164,8 @@ def main():
                       help='Number of augmented variations per image (default: 3)')
     parser.add_argument('--target-count', type=int, default=int(os.getenv('AUG_TARGET_COUNT', 1000)),
                       help='Target number of images per class (default: 1000)')
-    parser.add_argument('--augmentation-types', type=str, default=os.getenv('AUG_TYPES', 'combined'),
-                      help='Comma-separated list of augmentation types (default: combined)')
+    parser.add_argument('--augmentation-types', type=str, default=os.getenv('AUG_TYPES', 'lighting'),
+                      help='Comma-separated list of augmentation types (default: lighting)')
     parser.add_argument('--intensity', type=float, default=float(os.getenv('AUG_INTENSITY', '0.8')),
                       help='Augmentation intensity level (0.0-1.0, default: 0.8)')
     parser.add_argument('--normalization', type=str, default=os.getenv('NORMALIZATION', 'default'),

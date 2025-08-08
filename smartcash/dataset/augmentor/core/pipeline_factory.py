@@ -117,33 +117,49 @@ class PipelineFactory:
         return builders.get(aug_type, self._build_combined_pipeline)
     
     def _build_lighting_pipeline(self, intensity: float) -> A.Compose:
-        """🌟 Pipeline variasi pencahayaan"""
+        """🌟 Pipeline variasi pencahayaan - Updated to match augment_lighting.py extreme variations"""
         lighting_config = self.aug_config.get('lighting', {})
         
-        brightness_limit = lighting_config.get('brightness_limit', 0.2) * intensity
-        contrast_limit = lighting_config.get('contrast_limit', 0.15) * intensity
-        hsv_hue = lighting_config.get('hsv_hue', 10)
-        hsv_saturation = lighting_config.get('hsv_saturation', 15)
+        # More extreme brightness ranges to match augment_lighting.py
+        # Original: (0.2, 0.5) for dark, (1.5, 2.5) for bright -> converted to albumentations format
+        brightness_limit = lighting_config.get('brightness_limit', 0.6) * intensity  # Increased from 0.2
+        contrast_limit = lighting_config.get('contrast_limit', 0.3) * intensity  # Increased from 0.15
+        hsv_hue = lighting_config.get('hsv_hue', 15)  # Increased from 10
+        hsv_saturation = lighting_config.get('hsv_saturation', 20)  # Increased from 15
         
         return A.Compose([
-            A.RandomBrightnessContrast(
-                brightness_limit=brightness_limit,
-                contrast_limit=contrast_limit,
-                p=0.8
-            ),
-            A.RandomGamma(gamma_limit=(80, 120), p=0.6),
+            # Extreme brightness variations to match augment_lighting.py
+            A.OneOf([
+                # Dark variations (matches brightness 0.2-0.5 range)
+                A.RandomBrightnessContrast(brightness_limit=(-0.8, -0.5), contrast_limit=0, p=1.0),
+                # Bright variations (matches brightness 1.5-2.5 range)  
+                A.RandomBrightnessContrast(brightness_limit=(0.5, 1.5), contrast_limit=0, p=1.0),
+                # Normal contrast variations
+                A.RandomBrightnessContrast(
+                    brightness_limit=brightness_limit,
+                    contrast_limit=contrast_limit,
+                    p=1.0
+                )
+            ], p=0.9),
+            
+            # Gamma correction to match augment_lighting.py (0.7, 1.3)
+            A.RandomGamma(gamma_limit=(70, 130), p=0.7),  # Increased probability and wider range
+            
+            # HSV variations to match augment_lighting.py ranges
             A.HueSaturationValue(
-                hue_shift_limit=hsv_hue,
-                sat_shift_limit=hsv_saturation,
-                val_shift_limit=10,
-                p=0.6
+                hue_shift_limit=hsv_hue,  # Matches (-15, 15) range
+                sat_shift_limit=hsv_saturation,  # Matches (0.8, 1.2) scale
+                val_shift_limit=15,  # Increased for more variation
+                p=0.8  # Increased probability
             ),
-            A.CLAHE(clip_limit=2.0 * intensity, tile_grid_size=(8, 8), p=0.4),
+            
+            # Keep some additional lighting effects but with lower probability
+            A.CLAHE(clip_limit=2.0 * intensity, tile_grid_size=(8, 8), p=0.3),  # Reduced probability
             A.RandomShadow(
                 shadow_roi=(0, 0.5, 1, 1),
                 num_shadows_limit=(1, 2),
                 shadow_dimension=5,
-                p=0.3
+                p=0.2  # Reduced probability to focus on core lighting variations
             )
         ], bbox_params=A.BboxParams(format='yolo', label_fields=['class_labels']))
     

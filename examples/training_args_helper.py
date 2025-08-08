@@ -70,6 +70,8 @@ Examples:
                        help='Model backbone architecture (default: cspdarknet)')
     parser.add_argument('--pretrained', action='store_true',
                        help='Use pretrained weights for backbone (default: False, train from scratch)')
+    parser.add_argument('--use-smartcash-architecture', action='store_true',
+                       help='Use new SmartCash YOLOv5 architecture (17 classes with post-inference mapping)')
     parser.add_argument('--phase1-epochs', type=int, default=1,
                        help='Number of epochs for phase 1 (frozen backbone training) (default: 1)')
     parser.add_argument('--phase2-epochs', type=int, default=1,
@@ -303,6 +305,7 @@ def get_training_kwargs(args: Any) -> dict:
     return {
         'backbone': args.backbone,
         'pretrained': args.pretrained,
+        'use_smartcash_architecture': args.use_smartcash_architecture,
         'phase_1_epochs': args.phase1_epochs,
         'phase_2_epochs': args.phase2_epochs,
         'checkpoint_dir': args.checkpoint_dir,

@@ -49,7 +49,8 @@ class ConfigurationBuilder:
             'force_cpu': kwargs.get('force_cpu', False),
             'session_id': self.session_id,
             'debug_map': debug_map_value,
-            'start_phase': kwargs.get('start_phase', 1)
+            'start_phase': kwargs.get('start_phase', 1),
+            'use_smartcash_architecture': kwargs.get('use_smartcash_architecture', False)
         }
         
         # Add validation metrics configuration from command line args
@@ -93,24 +94,40 @@ class ConfigurationBuilder:
         training_mode = base_config.get('training_mode', 'two_phase')
         
         if training_mode == 'two_phase':
+            # Check if we're using SmartCash architecture (always 17 classes)
+            use_smartcash = base_config.get('use_smartcash_architecture', 
+                                          model_config.get('model_name') == 'smartcash_yolov5_integrated')
+            logger.info(f"🔍 SmartCash detection: use_smartcash={use_smartcash}, base_config flag={base_config.get('use_smartcash_architecture')}, model_name={model_config.get('model_name')}")
+            
             if phase_num == 1:
-                # Phase 1: Single-layer, denomination detection only (classes 0-6)
-                model_config.update({
-                    'layer_mode': 'single',
-                    'detection_layers': ['layer_1'],
-                    'num_classes': 7,
-                    'freeze_backbone': True
-                })
-                logger.info("🔧 Phase 1 model config: single-layer, 7 classes, frozen backbone")
+                if use_smartcash:
+                    # SmartCash Phase 1: 17 classes with head-only training
+                    model_config.update({
+                        'layer_mode': 'multi',  # SmartCash uses multi-layer
+                        'detection_layers': ['layer_1', 'layer_2', 'layer_3'],
+                        'num_classes': 17,  # Always 17 for SmartCash
+                        'freeze_backbone': True
+                    })
+                    logger.info("🔧 Phase 1 SmartCash config: 17 classes, head-only training")
+                else:
+                    # Legacy Phase 1: Single-layer, denomination detection only (classes 0-6)
+                    model_config.update({
+                        'layer_mode': 'single',
+                        'detection_layers': ['layer_1'],
+                        'num_classes': 7,
+                        'freeze_backbone': True
+                    })
+                    logger.info("🔧 Phase 1 legacy config: single-layer, 7 classes, frozen backbone")
             elif phase_num == 2:
-                # Phase 2: Multi-layer, all detection tasks (classes 0-16)
+                # Phase 2: Multi-layer, all detection tasks (classes 0-16) - same for both
                 model_config.update({
                     'layer_mode': 'multi', 
                     'detection_layers': ['layer_1', 'layer_2', 'layer_3'],
                     'num_classes': 17,
                     'freeze_backbone': False
                 })
-                logger.info("🔧 Phase 2 model config: multi-layer, 17 classes, unfrozen backbone")
+                config_type = "SmartCash" if use_smartcash else "legacy"
+                logger.info(f"🔧 Phase 2 {config_type} config: multi-layer, 17 classes, unfrozen backbone")
         
         return model_config
     
@@ -122,9 +139,19 @@ class ConfigurationBuilder:
         if training_mode == 'two_phase':
             # For two-phase training: Use default phase-aware configuration
             # Phase-specific configs will be applied during phase setup
-            default_layer_mode = 'single'  # Phase 1 default
-            default_detection_layers = ['layer_1']  # Phase 1 default 
-            default_num_classes = 7  # Phase 1 default (Layer 1 only)
+            use_smartcash = base_config.get('use_smartcash_architecture', 
+                                          model_config.get('model_name') == 'smartcash_yolov5_integrated')
+            
+            if use_smartcash:
+                # SmartCash defaults: Always 17 classes, multi-layer
+                default_layer_mode = 'multi' 
+                default_detection_layers = ['layer_1', 'layer_2', 'layer_3']
+                default_num_classes = 17
+            else:
+                # Legacy defaults: Phase 1 starts with single layer
+                default_layer_mode = 'single'  # Phase 1 default
+                default_detection_layers = ['layer_1']  # Phase 1 default 
+                default_num_classes = 7  # Phase 1 default (Layer 1 only)
         else:
             # For single-phase training: Use multi-layer configuration
             default_layer_mode = 'multi'

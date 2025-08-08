@@ -10,6 +10,7 @@ import torch
 from typing import Dict
 
 from smartcash.common.logger import get_logger
+from smartcash.model.architectures.model import SmartCashYOLOv5Model
 from .prediction_processor import PredictionProcessor
 from .yolov5_map_calculator import create_yolov5_map_calculator
 from .validation_batch_processor import ValidationBatchProcessor
@@ -45,6 +46,9 @@ class ValidationExecutor:
         self.config = config
         self.progress_tracker = progress_tracker
         
+        # Detect if we're using SmartCashYOLOv5Model
+        self.is_smartcash_model = isinstance(model, SmartCashYOLOv5Model)
+        
         # Initialize core components
         self.prediction_processor = PredictionProcessor(config, model)
         
@@ -59,21 +63,30 @@ class ValidationExecutor:
         else:
             current_phase = getattr(model, 'current_phase', None) or 1
         
-        # TASK.md: Extract phase-appropriate num_classes for standard mAP calculation
-        if isinstance(raw_num_classes, dict):
-            # Multi-layer format: {'layer_1': 7, 'layer_2': 7, 'layer_3': 3}
-            if current_phase == 1:
-                # Phase 1: Only layer_1 classes (classes 0-6) for standard mAP
-                num_classes = raw_num_classes.get('layer_1', 7)
-                layer_info = f"layer_1: {num_classes}"
-            else:
-                # Phase 2: All 17 classes (0-16) for standard mAP calculation
-                num_classes = 17  # TASK.md: Fixed total classes for SmartCash (Layer 1: 0-6, Layer 2: 7-13, Layer 3: 14-16)
-                layer_info = f"all_classes: {num_classes} (standard mAP)"
+        # For SmartCash models, simplify the validation process
+        if self.is_smartcash_model:
+            # SmartCash model handles hierarchical processing internally
+            # Use its built-in class configuration
+            model_info = model.get_model_config()
+            num_classes = model_info.get('num_classes', 17)  # SmartCash default
+            layer_info = f"SmartCash: {num_classes} classes (internal inference processing)"
+            logger.info(f"🆕 Using SmartCashYOLOv5Model with {num_classes} classes (internal inference processing)")
         else:
-            # Single-value format: just use the value
-            num_classes = raw_num_classes
-            layer_info = str(num_classes)
+            # Legacy model processing - Extract phase-appropriate num_classes for standard mAP calculation
+            if isinstance(raw_num_classes, dict):
+                # Multi-layer format: {'layer_1': 7, 'layer_2': 7, 'layer_3': 3}
+                if current_phase == 1:
+                    # Phase 1: Only layer_1 classes (classes 0-6) for standard mAP
+                    num_classes = raw_num_classes.get('layer_1', 7)
+                    layer_info = f"layer_1: {num_classes}"
+                else:
+                    # Phase 2: All 17 classes (0-16) for standard mAP calculation
+                    num_classes = 17  # TASK.md: Fixed total classes for SmartCash (Layer 1: 0-6, Layer 2: 7-13, Layer 3: 14-16)
+                    layer_info = f"all_classes: {num_classes} (standard mAP)"
+            else:
+                # Single-value format: just use the value
+                num_classes = raw_num_classes
+                layer_info = str(num_classes)
         
         debug_map = config.get('debug_map', False)
         
@@ -88,10 +101,14 @@ class ValidationExecutor:
             'detection_layers': config.get('model', {}).get('detection_layers', 'N/A')
         }
         
-        # TASK.md: Use standard mAP calculation for both phases
-        # Phase 1: Use layer_1 classes only (classes 0-6) with standard mAP
-        # Phase 2: Use all 17 classes (0-16) with standard mAP calculation
-        use_standard_map = True  # Enable standard mAP for both Phase 1 and Phase 2
+        # For SmartCash models, always use standard mAP (no hierarchical processing)
+        # For legacy models, use standard mAP as per TASK.md
+        use_standard_map = True  # Always use standard mAP for both SmartCash and legacy models
+        
+        # For SmartCash models, disable hierarchical processing entirely
+        if self.is_smartcash_model:
+            training_context['smartcash_model'] = True
+            training_context['disable_hierarchical'] = True
         
         self.map_calculator = create_yolov5_map_calculator(
             num_classes=num_classes,
@@ -99,7 +116,7 @@ class ValidationExecutor:
             iou_thres=0.5,   # AGGRESSIVE: Very low threshold for scale learning phase
             debug=debug_map,
             training_context=training_context,
-            use_standard_map=use_standard_map  # TASK.md: Enable standard mAP for Phase 2
+            use_standard_map=use_standard_map  # Always use standard mAP
         )
         
         

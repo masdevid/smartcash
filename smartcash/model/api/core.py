@@ -12,6 +12,7 @@ from datetime import datetime
 
 from smartcash.common.logger import get_logger
 from smartcash.model.core.model_builder import ModelBuilder
+from smartcash.model.architectures.model import SmartCashYOLOv5Model
 from smartcash.model.core.checkpoints.checkpoint_manager import CheckpointManager
 from smartcash.model.utils.device_utils import setup_device, get_device_info
 from smartcash.model.training.utils.progress_tracker import TrainingProgressTracker
@@ -27,7 +28,8 @@ class SmartCashModelAPI:
     def __init__(self, config_path: Optional[str] = None, 
                  progress_callback: Optional[Callable] = None, 
                  config: Optional[Dict[str, Any]] = None,
-                 use_yolov5_integration: bool = True):
+                 use_yolov5_integration: bool = True,
+                 use_smartcash_architecture: bool = True):
         """
         Initialize SmartCash API with YOLOv5 integration
         
@@ -35,11 +37,13 @@ class SmartCashModelAPI:
             config_path: Path to configuration file
             progress_callback: Progress callback function
             config: Configuration dictionary
-            use_yolov5_integration: Enable YOLOv5 integration
+            use_yolov5_integration: Enable YOLOv5 integration (legacy)
+            use_smartcash_architecture: Enable new SmartCashYOLOv5Model directly
         """
         self.logger = get_logger("model.api")
         self.progress_bridge = TrainingProgressTracker(progress_callback, True, 'single_phase')
         self.use_yolov5_integration = use_yolov5_integration
+        self.use_smartcash_architecture = use_smartcash_architecture
         
         # Load configuration
         if config is not None:
@@ -98,12 +102,13 @@ class SmartCashModelAPI:
         
         return config
     
-    def build_model(self, model_config: Dict[str, Any] = None, **kwargs) -> Dict[str, Any]:
+    def build_model(self, model_config: Dict[str, Any] = None, use_smartcash_architecture: bool = True, **kwargs) -> Dict[str, Any]:
         """
-        Build model using enhanced builder
+        Build model using enhanced builder or new SmartCash architecture
         
         Args:
             model_config: Model configuration dictionary
+            use_smartcash_architecture: Whether to use new SmartCashYOLOv5Model directly
             **kwargs: Additional model parameters
             
         Returns:
@@ -124,41 +129,13 @@ class SmartCashModelAPI:
                 self.config['model'] = {}
             self.config['model'].update(model_config)
             
-            # Set defaults
-            backbone = model_config.get('backbone', 'cspdarknet')
+            if use_smartcash_architecture:
+                # Use new SmartCashYOLOv5Model directly
+                result = self._build_smartcash_model(model_config)
+            else:
+                # Use legacy model builder
+                result = self._build_legacy_model(model_config)
             
-            self.logger.debug(f"🔧 Building model: {backbone} | Architecture: yolov5")
-            
-            # Build model
-            self.model = self.model_builder.build(
-                backbone=backbone,
-                detection_layers=model_config.get('detection_layers', ['layer_1', 'layer_2', 'layer_3']),
-                layer_mode=model_config.get('layer_mode', 'multi'),
-                num_classes=model_config.get('num_classes', 7),
-                img_size=model_config.get('img_size', 640),
-                pretrained=model_config.get('pretrained', True),
-                feature_optimization=model_config.get('feature_optimization', {'enabled': True})
-            )
-            
-            # Move to device
-            self.model = self.model.to(self.device)
-            self.is_model_built = True
-            
-            # Get model info
-            model_info = self.model_builder.get_model_info(self.model)
-            
-            self.progress_bridge.complete(4, "Model build complete")
-            
-            result = {
-                'success': True,
-                'model': self.model,
-                'model_info': model_info,
-                'architecture_type': 'yolov5',
-                'device': str(self.device),
-                'memory_config': self.memory_config
-            }
-            
-            self.logger.info(f"✅ Model built successfully: {model_info.get('total_parameters', 0):,} parameters")
             return result
             
         except Exception as e:
@@ -170,6 +147,109 @@ class SmartCashModelAPI:
                 'error': str(e),
                 'model': None
             }
+    
+    def _build_smartcash_model(self, model_config: Dict[str, Any]) -> Dict[str, Any]:
+        """Build model using new SmartCashYOLOv5Model architecture."""
+        # Extract parameters for SmartCashYOLOv5Model
+        backbone = model_config.get('backbone', 'yolov5s')
+        num_classes = model_config.get('num_classes', 17)  # Default to 17 for SmartCash
+        img_size = model_config.get('img_size', 640)
+        pretrained = model_config.get('pretrained', True)
+        device = str(self.device)
+        
+        self.logger.debug(f"🔧 Building SmartCashYOLOv5Model: {backbone} | Classes: {num_classes}")
+        
+        # Create SmartCash model
+        self.model = SmartCashYOLOv5Model(
+            backbone=backbone,
+            num_classes=num_classes,
+            img_size=img_size,
+            pretrained=pretrained,
+            device=device
+        )
+        
+        # Move to device
+        self.model = self.model.to(self.device)
+        self.is_model_built = True
+        
+        # Get model info
+        model_info = self._get_smartcash_model_info()
+        
+        self.progress_bridge.complete(4, "SmartCash model build complete")
+        
+        result = {
+            'success': True,
+            'model': self.model,
+            'model_info': model_info,
+            'architecture_type': 'SmartCashYOLOv5Model',
+            'device': str(self.device),
+            'memory_config': self.memory_config
+        }
+        
+        self.logger.info(f"✅ SmartCashYOLOv5Model built successfully: {model_info.get('total_parameters', 0):,} parameters")
+        return result
+    
+    def _build_legacy_model(self, model_config: Dict[str, Any]) -> Dict[str, Any]:
+        """Build model using legacy model builder."""
+        # Set defaults
+        backbone = model_config.get('backbone', 'cspdarknet')
+        
+        self.logger.debug(f"🔧 Building legacy model: {backbone} | Architecture: yolov5")
+        
+        # Build model
+        self.model = self.model_builder.build(
+            backbone=backbone,
+            detection_layers=model_config.get('detection_layers', ['layer_1', 'layer_2', 'layer_3']),
+            layer_mode=model_config.get('layer_mode', 'multi'),
+            num_classes=model_config.get('num_classes', 7),
+            img_size=model_config.get('img_size', 640),
+            pretrained=model_config.get('pretrained', True),
+            feature_optimization=model_config.get('feature_optimization', {'enabled': True})
+        )
+        
+        # Move to device
+        self.model = self.model.to(self.device)
+        self.is_model_built = True
+        
+        # Get model info
+        model_info = self.model_builder.get_model_info(self.model)
+        
+        self.progress_bridge.complete(4, "Legacy model build complete")
+        
+        result = {
+            'success': True,
+            'model': self.model,
+            'model_info': model_info,
+            'architecture_type': 'yolov5',
+            'device': str(self.device),
+            'memory_config': self.memory_config
+        }
+        
+        self.logger.info(f"✅ Legacy model built successfully: {model_info.get('total_parameters', 0):,} parameters")
+        return result
+    
+    def _get_smartcash_model_info(self) -> Dict[str, Any]:
+        """Get model information for SmartCash model."""
+        if not isinstance(self.model, SmartCashYOLOv5Model):
+            return {}
+        
+        total_params = sum(p.numel() for p in self.model.parameters())
+        trainable_params = sum(p.numel() for p in self.model.parameters() if p.requires_grad)
+        
+        phase_info = self.model.get_phase_info()
+        model_config = self.model.get_model_config()
+        
+        return {
+            'total_parameters': total_params,
+            'trainable_parameters': trainable_params,
+            'model_size_mb': total_params * 4 / (1024 * 1024),
+            'backbone': model_config.get('backbone'),
+            'num_classes': model_config.get('num_classes'),
+            'img_size': model_config.get('img_size'),
+            'current_phase': phase_info.get('phase'),
+            'backbone_frozen': phase_info.get('backbone_frozen'),
+            'trainable_ratio': phase_info.get('trainable_ratio')
+        }
     
     def get_available_architectures(self) -> List[str]:
         """Get list of available architecture types"""
@@ -193,7 +273,11 @@ class SmartCashModelAPI:
             return {'success': False, 'error': 'Model not built yet'}
         
         try:
-            # Get the actual model from the wrapper if it exists
+            # Handle SmartCash models
+            if isinstance(self.model, SmartCashYOLOv5Model):
+                return self._validate_smartcash_model(input_size)
+            
+            # Get the actual model from the wrapper if it exists (legacy)
             model_to_validate = self.model.yolov5_model if hasattr(self.model, 'yolov5_model') else self.model
             model_to_validate.eval()
             dummy_input = torch.randn(input_size).to(self.device)
@@ -214,6 +298,44 @@ class SmartCashModelAPI:
             
         except Exception as e:
             self.logger.error(f"❌ Model validation failed: {str(e)}")
+            return {
+                'success': False,
+                'error': str(e)
+            }
+    
+    def _validate_smartcash_model(self, input_size: tuple = (1, 3, 640, 640)) -> Dict[str, Any]:
+        """Validate SmartCash model specifically."""
+        try:
+            self.model.eval()
+            dummy_input = torch.randn(input_size).to(self.device)
+            
+            with torch.no_grad():
+                # Test training mode output
+                training_output = self.model(dummy_input, training=True)
+                # Test inference mode output  
+                inference_output = self.model(dummy_input, training=False)
+            
+            # Get model configuration
+            model_config = self.model.get_model_config()
+            phase_info = self.model.get_phase_info()
+            
+            return {
+                'success': True,
+                'input_shape': input_size,
+                'output_info': {
+                    'training_output_type': type(training_output).__name__,
+                    'inference_output_type': type(inference_output).__name__,
+                    'training_shape': getattr(training_output, 'shape', 'N/A'),
+                    'inference_length': len(inference_output) if isinstance(inference_output, list) else 'N/A'
+                },
+                'model_config': model_config,
+                'phase_info': phase_info,
+                'device': str(self.device),
+                'model_mode': 'SmartCashYOLOv5Model'
+            }
+            
+        except Exception as e:
+            self.logger.error(f"❌ SmartCash model validation failed: {str(e)}")
             return {
                 'success': False,
                 'error': str(e)
@@ -444,6 +566,10 @@ def create_api(config_path: Optional[str] = None, **kwargs) -> SmartCashModelAPI
     Returns:
         SmartCashModelAPI instance
     """
+    # Default to using SmartCash architecture unless explicitly disabled
+    if 'use_smartcash_architecture' not in kwargs:
+        kwargs['use_smartcash_architecture'] = True
+        
     return SmartCashModelAPI(config_path=config_path, **kwargs)
 
 

@@ -12,8 +12,8 @@ import yaml
 import numpy as np
 from torch.utils.data import DataLoader
 
-from smartcash.model.architectures.direct_yolov5 import SmartCashYOLOv5Model
-from smartcash.common.logger import SmartCashLogger
+from smartcash.model.architectures.model import SmartCashYOLOv5Model
+from smartcash.common.logger import get_logger
 
 
 class DirectTrainingManager:
@@ -52,7 +52,7 @@ class DirectTrainingManager:
             self.device = torch.device(device)
         self.model = self.model.to(self.device)
         
-        self.logger = SmartCashLogger(__name__)
+        self.logger = get_logger(__name__)
         
         # Training state
         self.current_phase = 1
@@ -65,7 +65,7 @@ class DirectTrainingManager:
         self.phase2_optimizer = None
         self.scheduler = None
         
-        self.logger.info(f"✅ Initialized DirectTrainingManager for {model.backbone}")
+        self.logger.info(f"✅ Initialized DirectTrainingManager for {model.backbone_type}")
     
     def setup_phase_1(self, learning_rate: float = 1e-3, weight_decay: float = 5e-4):
         """
@@ -78,8 +78,8 @@ class DirectTrainingManager:
         self.current_phase = 1
         self.model.current_phase = 1
         
-        # Ensure backbone is frozen
-        self.model._setup_phase_1(self.model.model)
+        # Delegate phase setup to the backbone
+        self.model.model._setup_phase_1(self.model.model)
         
         # Get trainable parameters (detection head only)
         trainable_params = [p for p in self.model.parameters() if p.requires_grad]
@@ -112,7 +112,8 @@ class DirectTrainingManager:
             weight_decay: Weight decay
         """
         self.current_phase = 2
-        self.model.setup_phase_2()
+        # Delegate phase setup to the backbone
+        self.model.model.setup_phase_2(self.model.model)
         
         # Get all parameters (now all trainable)
         trainable_params = [p for p in self.model.parameters() if p.requires_grad]
@@ -433,7 +434,7 @@ class DirectTrainingManager:
             map_score: mAP score
             checkpoint_name: Name for checkpoint
         """
-        checkpoint_path = self.checkpoint_dir / f"{checkpoint_name}_{self.model.backbone}.pt"
+        checkpoint_path = self.checkpoint_dir / f"{checkpoint_name}_{self.model.backbone_type}.pt"
         
         checkpoint = {
             'epoch': epoch,
@@ -454,7 +455,7 @@ class DirectTrainingManager:
     
     def _load_phase1_weights(self):
         """Load best Phase 1 weights for Phase 2 initialization"""
-        phase1_path = self.checkpoint_dir / f"best_phase1_{self.model.backbone}.pt"
+        phase1_path = self.checkpoint_dir / f"best_phase1_{self.model.backbone_type}.pt"
         
         if phase1_path.exists():
             try:

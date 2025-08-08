@@ -11,6 +11,7 @@ from smartcash.common.logger import get_logger
 from smartcash.model.training.phases.mixins.callbacks import CallbacksMixin
 from smartcash.model.core.model_utils import ModelUtils
 from smartcash.model.utils.memory_optimizer import get_memory_optimizer
+from smartcash.model.architectures.model import SmartCashYOLOv5Model
 import torch
 
 from smartcash.model.core.checkpoints.checkpoint_manager import create_checkpoint_manager
@@ -53,13 +54,15 @@ class ModelManager(CallbacksMixin):
         self.memory_optimizer = None
         self.checkpoint_manager = None # Initialize to None
 
-    def setup_model(self, config: Dict[str, Any], use_yolov5_integration: bool = True, is_resuming: bool = False) -> Tuple[Any, Any]:
+    def setup_model(self, config: Dict[str, Any], use_yolov5_integration: bool = True, use_smartcash_architecture: bool = True, is_resuming: bool = False) -> Tuple[Any, Any]:
         """
         Set up model API and build model according to configuration.
         
         Args:
             config: Training configuration
-            use_yolov5_integration: Whether to use YOLOv5 integration
+            use_yolov5_integration: Whether to use YOLOv5 integration (legacy)
+            use_smartcash_architecture: Whether to use new SmartCashYOLOv5Model directly
+            is_resuming: Whether this is a resume operation
             
         Returns:
             Tuple of (model_api, built_model)
@@ -70,14 +73,27 @@ class ModelManager(CallbacksMixin):
             # Initialize checkpoint manager here, where config is available
             self.checkpoint_manager = create_checkpoint_manager(config, is_resuming=is_resuming)
 
-            # Create model API
-            self.model_api = self._create_model_api(config, use_yolov5_integration)
-
-            # Build model
-            self.model = self._build_model(config)
-            
-            # Validate model architecture
-            self._validate_model_architecture()
+            if use_smartcash_architecture:
+                # Use new SmartCashYOLOv5Model directly
+                self.emit_log('info', '🆕 Using SmartCashYOLOv5Model architecture')
+                self.model = self._create_smartcash_model_directly(config)
+                
+                # For SmartCash model, we create a lightweight API wrapper
+                self.model_api = self._create_smartcash_api_wrapper(config)
+                
+                # Move model to appropriate device
+                device = next(self.model.parameters()).device
+                self.model = self.model.to(device)
+                
+            else:
+                # Use legacy approach for backward compatibility
+                self.emit_log('info', '🔄 Using legacy model API approach')
+                # Create model API
+                self.model_api = self._create_model_api(config, use_yolov5_integration)
+                # Build model
+                self.model = self._build_model(config)
+                # Validate model architecture
+                self._validate_model_architecture()
             
             # Setup memory optimization
             self._setup_memory_optimization()
@@ -114,6 +130,105 @@ class ModelManager(CallbacksMixin):
         except Exception as e:
             self.emit_log('error', f'❌ Failed to create model API: {str(e)}')
             raise
+    
+    def _create_smartcash_model_directly(self, config: Dict[str, Any]) -> SmartCashYOLOv5Model:
+        """Create SmartCashYOLOv5Model directly without the model API wrapper."""
+        try:
+            model_config = config.get('model', {})
+            
+            # Extract parameters for SmartCashYOLOv5Model
+            backbone = model_config.get('backbone', 'yolov5s')
+            
+            # CRITICAL FIX: SmartCash architecture always uses 17 classes (never the legacy dict format)
+            raw_num_classes = model_config.get('num_classes', 17)
+            if isinstance(raw_num_classes, dict):
+                # Legacy format detected - force to 17 for SmartCash
+                num_classes = 17
+                self.emit_log('info', '🔧 Fixed SmartCash num_classes: dict format overridden to 17', {})
+            else:
+                num_classes = raw_num_classes
+            img_size = model_config.get('img_size', 640)
+            pretrained = model_config.get('pretrained', True)
+            device = config.get('device', {}).get('type', 'auto')
+            
+            
+            # Create the SmartCash YOLOv5 model
+            model = SmartCashYOLOv5Model(
+                backbone=backbone,
+                num_classes=num_classes,
+                img_size=img_size,
+                pretrained=pretrained,
+                device=device
+            )
+            
+            self.emit_log('info', '✅ SmartCashYOLOv5Model created directly', {
+                'backbone': backbone,
+                'num_classes': num_classes,
+                'img_size': img_size,
+                'pretrained': pretrained,
+                'device': device
+            })
+            
+            return model
+            
+        except Exception as e:
+            self.emit_log('error', f'❌ Failed to create SmartCashYOLOv5Model: {str(e)}')
+            raise
+    
+    def _create_smartcash_api_wrapper(self, config: Dict[str, Any]) -> Any:
+        """Create a lightweight API wrapper for SmartCashYOLOv5Model."""
+        
+        class SmartCashAPIWrapper:
+            """Lightweight API wrapper for SmartCashYOLOv5Model to maintain interface compatibility."""
+            
+            def __init__(self, model: SmartCashYOLOv5Model, config: Dict[str, Any]):
+                self.model = model
+                self.config = config
+                self.is_model_built = True
+                
+            def get_backbone_name(self) -> str:
+                """Get backbone name from the model."""
+                return self.model.backbone_type
+                
+            def validate_model(self) -> Dict[str, Any]:
+                """Validate the model."""
+                try:
+                    # Simple validation by checking if model can process dummy input
+                    dummy_input = torch.randn(1, 3, 640, 640).to(self.model.device)
+                    with torch.no_grad():
+                        output = self.model(dummy_input)
+                    return {
+                        'success': True,
+                        'output_type': 'smartcash_yolov5',
+                        'backbone': self.model.backbone_type,
+                        'num_classes': self.model.num_classes
+                    }
+                except Exception as e:
+                    return {
+                        'success': False,
+                        'error': str(e)
+                    }
+            
+            def save_checkpoint(self, **kwargs) -> str:
+                """Save checkpoint using the model's own configuration."""
+                # Get model configuration for checkpoint
+                model_config = self.model.get_model_config()
+                
+                # Basic checkpoint structure for SmartCash model
+                checkpoint = {
+                    'model_state_dict': self.model.state_dict(),
+                    'model_config': model_config,
+                    'architecture': 'SmartCashYOLOv5Model',
+                    **kwargs
+                }
+                
+                # Generate checkpoint path if not provided
+                checkpoint_path = kwargs.get('checkpoint_path', 'data/checkpoints/smartcash_checkpoint.pt')
+                torch.save(checkpoint, checkpoint_path)
+                
+                return checkpoint_path
+        
+        return SmartCashAPIWrapper(self.model, config)
     
     def _build_model(self, config: Dict[str, Any]) -> Any:
         """Build model using model API."""
@@ -208,6 +323,9 @@ class ModelManager(CallbacksMixin):
         try:
             self.emit_log('info', f'🔧 Preparing model for Phase {phase_num}')
             
+            # Check if we're using SmartCash architecture
+            is_smartcash_model = isinstance(self.model, SmartCashYOLOv5Model)
+            
             if phase_num == 2:
                 # Phase 2 special handling
                 if is_resuming:
@@ -233,14 +351,24 @@ class ModelManager(CallbacksMixin):
                         f'Phase 1 used {phase1_backbone}, but current is {current_backbone}'
                     )
                 
-                # Now rebuild for Phase 2 with unfrozen backbone
-                self.model = ModelUtils.rebuild_model_for_phase2(
-                    self.model_api, self.model, config
-                )
-                self.emit_log('info', '🔥 Model prepared for Phase 2 (backbone unfrozen)')
+                if is_smartcash_model:
+                    # For SmartCash model, use its built-in phase 2 setup
+                    self.model.setup_phase_2()
+                    self.emit_log('info', '🔥 SmartCash model prepared for Phase 2 (backbone unfrozen)')
+                else:
+                    # Use legacy approach for other models
+                    self.model = ModelUtils.rebuild_model_for_phase2(
+                        self.model_api, self.model, config
+                    )
+                    self.emit_log('info', '🔥 Model prepared for Phase 2 (backbone unfrozen)')
             else:
-                # Phase 1 uses model as-is
-                self.emit_log('info', '❄️ Model prepared for Phase 1 (backbone frozen)')
+                # Phase 1 uses model as-is (backbone frozen)
+                if is_smartcash_model:
+                    # Ensure SmartCash model is in Phase 1
+                    self.model.current_phase = 1
+                    self.emit_log('info', '❄️ SmartCash model prepared for Phase 1 (backbone frozen)')
+                else:
+                    self.emit_log('info', '❄️ Model prepared for Phase 1 (backbone frozen)')
             
             return self.model
             
@@ -257,7 +385,7 @@ class ModelManager(CallbacksMixin):
             total_params = sum(p.numel() for p in self.model.parameters())
             trainable_params = sum(p.numel() for p in self.model.parameters() if p.requires_grad)
             
-            return {
+            info = {
                 'total_parameters': total_params,
                 'trainable_parameters': trainable_params,
                 'model_size_mb': total_params * 4 / (1024 * 1024),
@@ -265,6 +393,23 @@ class ModelManager(CallbacksMixin):
                 'device': str(next(self.model.parameters()).device),
                 'memory_optimizer_available': self.memory_optimizer is not None
             }
+            
+            # Add SmartCash-specific information
+            if isinstance(self.model, SmartCashYOLOv5Model):
+                phase_info = self.model.get_phase_info()
+                model_config = self.model.get_model_config()
+                
+                info.update({
+                    'backbone': model_config.get('backbone', 'unknown'),
+                    'num_classes': model_config.get('num_classes', 17),
+                    'img_size': model_config.get('img_size', 640),
+                    'current_phase': phase_info.get('phase', 1),
+                    'backbone_frozen': phase_info.get('backbone_frozen', True),
+                    'trainable_ratio': phase_info.get('trainable_ratio', 0.0),
+                    'class_mapping': model_config.get('class_mapping', {})
+                })
+            
+            return info
             
         except Exception as e:
             self.emit_log('warning', f'⚠️ Failed to get model info: {str(e)}')

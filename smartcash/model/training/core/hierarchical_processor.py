@@ -60,6 +60,10 @@ class HierarchicalProcessor:
         self.debug = debug
         self.training_context = training_context or {}
         self.use_standard_map = use_standard_map  # TASK.md: Enable standard mAP calculation for all classes
+        
+        # Check if hierarchical processing should be disabled (for SmartCash models)
+        self.disable_hierarchical = self.training_context.get('disable_hierarchical', False)
+        
         self.memory_optimizer = get_memory_optimizer()
         
         # Memory safety thresholds
@@ -187,6 +191,11 @@ class HierarchicalProcessor:
         Time Complexity: O(P) for filtering + O(P₁ * P₂) for modulation
         Space Complexity: O(P) for storing processed predictions
         """
+        # For SmartCash models, skip hierarchical processing entirely
+        if self.disable_hierarchical:
+            logger.debug("🆕 SmartCash model detected - bypassing hierarchical processing")
+            return predictions, targets
+        
         self.current_epoch = epoch
         
         # Setup or update debug logging for current epoch

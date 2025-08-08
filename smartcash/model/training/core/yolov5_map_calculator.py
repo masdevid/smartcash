@@ -113,9 +113,6 @@ class YOLOv5MapCalculator:
         self.statistics_processor = MapStatisticsProcessor(debug)
         self.metrics_computer = MapMetricsComputer(debug)
         
-        if debug:
-            logger.info(f"🐛 YOLOv5MapCalculator DEBUG MODE ENABLED - Debug logging will be setup per epoch")
-        
         # Initialize specialized processors
         self._init_processors()
         
@@ -220,8 +217,8 @@ class YOLOv5MapCalculator:
         )
         
         # Connect debug logger to batch processor for IoU analysis
-        if self.debug and self.debug_logger:
-            self.batch_processor.debug_logger = self.debug_logger
+        if self.debug:
+            logger.debug("Batch processor initialized")
     
     def reset(self):
         """
@@ -229,9 +226,9 @@ class YOLOv5MapCalculator:
         
         Time Complexity: O(1) - simple list clearing
         """
-        # Log before reset for debugging
-        if self.debug and self.debug_logger:
-            self.debug_logger.log_epoch_reset(len(self.stats), self._batch_count)
+        # Log epoch reset
+        if self.debug:
+            logger.debug(f"Epoch reset: stats={len(self.stats)}, batches={self._batch_count}")
         
         self.stats.clear()
         self._batch_count = 0
@@ -256,39 +253,14 @@ class YOLOv5MapCalculator:
         self.current_epoch = epoch
         
         # Setup or update debug logging for current epoch
-        if self.debug and self.debug_logger:
-            # Update the current phase in debug logger before setting up logging
-            if hasattr(self, 'model') and self.model:
-                current_phase = getattr(self.model, 'current_phase', None)
-                if current_phase is None and self.training_context:
-                    # Try to infer from training context
-                    current_phase = self.training_context.get('phase', 1)
-                
-                if current_phase:
-                    # Update the debug logger's training context with current phase
-                    self.debug_logger.update_current_phase(current_phase)
-            
-            self.debug_logger.setup_debug_logging(epoch)
-            
-            # Log Phase configuration on first batch of new epoch
-            if self._batch_count == 0 and hasattr(self, 'model') and self.model:
-                try:
-                    # Determine current phase from model or context
-                    current_phase = getattr(self.model, 'current_phase', None)
-                    if current_phase is None and self.training_context:
-                        # Try to infer from training context
-                        current_phase = self.training_context.get('phase', 1)
-                    
-                    if current_phase:
-                        self.debug_logger.log_phase_configuration(self.model, current_phase, detailed=True)
-                except Exception as e:
-                    self.debug_logger.write_debug_log(f"❌ Failed to log phase configuration: {e}")
+        if self.debug:
+            logger.debug(f"Epoch {epoch}: Updating mAP statistics")
         
         # Check YOLOv5 availability
         if not self._ensure_yolov5_available() or predictions is None or targets is None:
-            if self.debug and self.debug_logger:
-                self.debug_logger.write_debug_log(f"Skipping update: yolov5_available={self.yolo_utils.is_available()}, "
-                              f"predictions={predictions is not None}, targets={targets is not None}")
+            if self.debug:
+                logger.debug(f"Skipping update: yolov5_available={self.yolo_utils.is_available()}, "
+                           f"predictions={predictions is not None}, targets={targets is not None}")
             return
         
         # Comprehensive input validation
@@ -298,20 +270,11 @@ class YOLOv5MapCalculator:
         # Track batch count for debugging
         self._batch_count += 1
         
-        # Enhanced debug logging for mAP investigation
-        if self.debug and self.debug_logger:
-            if self._batch_count == 1:
-                self.debug_logger.write_debug_log(f"📊 mAP update first batch: pred_shape={predictions.shape}, target_shape={targets.shape}")
-                self.debug_logger.write_debug_log(f"📊 Initial predictions sample: conf_range=[{predictions[:,:,4].min():.6f}, {predictions[:,:,4].max():.6f}]")
-                self.debug_logger.write_debug_log(f"📊 Initial predictions classes: unique={torch.unique(predictions[:,:,5]).tolist()}")
-                if targets.numel() > 0:
-                    self.debug_logger.write_debug_log(f"📊 Initial targets classes: unique={torch.unique(targets[:,1]).tolist()}")
-                else:
-                    self.debug_logger.write_debug_log(f"📊 No targets in first batch - empty targets tensor")
-                    
-                # COORDINATE DEBUG LOGGING - Use MapDebugLogger methods (on RAW data)
-                if predictions.numel() > 0 and targets.numel() > 0:
-                    self.debug_logger.log_coordinate_format_analysis(predictions, targets)
+        # Log first batch details for debugging
+        if self.debug and self._batch_count == 1:
+            logger.debug(f"First batch - pred_shape={predictions.shape}, target_shape={targets.shape}")
+            if len(targets) > 0:
+                logger.debug(f"First batch targets: {torch.unique(targets[:,1]).tolist()}")
         
         try:
             # Apply hierarchical filtering for Phase 2 multi-layer architecture
@@ -331,54 +294,12 @@ class YOLOv5MapCalculator:
             
             if batch_stats is not None:
                 self.stats.append(batch_stats)
-                # Enhanced debug logging for mAP investigation
-                if self.debug and self.debug_logger:
-                    self.debug_logger.log_batch_processing(self._batch_count, batch_stats)
-                    
-                    # COORDINATE FORMAT ANALYSIS ON PROCESSED DATA (first batch only)
-                    if self._batch_count == 1:
-                        # Log processed coordinate analysis to verify conversion worked
-                        if standardized_predictions is not None and standardized_predictions.numel() > 0:
-                            if processed_targets is not None and processed_targets.numel() > 0:
-                                self.debug_logger.write_debug_log(f"\n🔍 PROCESSED COORDINATE FORMAT VERIFICATION")
-                                self.debug_logger.write_debug_log(f"="*50)
-                                self.debug_logger.write_debug_log(f"📊 PROCESSED COORDINATES ANALYSIS:")
-                                
-                                # Analyze processed predictions (should be normalized xywh)
-                                if standardized_predictions.dim() >= 2:
-                                    # Correctly slice coordinates, excluding batch_idx at column 0
-                                    pred_coords = standardized_predictions[:, 1:5] if standardized_predictions.dim() == 2 else standardized_predictions[0, :, 1:5]
-                                    if pred_coords.numel() > 0:
-                                        self.debug_logger.write_debug_log(f"   PROCESSED PRED COORD_0 (x1): [{pred_coords[:, 0].min():.4f}, {pred_coords[:, 0].max():.4f}]")
-                                        self.debug_logger.write_debug_log(f"   PROCESSED PRED COORD_1 (y1): [{pred_coords[:, 1].min():.4f}, {pred_coords[:, 1].max():.4f}]")
-                                        self.debug_logger.write_debug_log(f"   PROCESSED PRED COORD_2 (x2): [{pred_coords[:, 2].min():.4f}, {pred_coords[:, 2].max():.4f}]")
-                                        self.debug_logger.write_debug_log(f"   PROCESSED PRED COORD_3 (y2): [{pred_coords[:, 3].min():.4f}, {pred_coords[:, 3].max():.4f}]")
-                                
-                                # Analyze processed targets (should be converted to xywh)
-                                if processed_targets.dim() >= 2 and processed_targets.shape[1] >= 6:
-                                    target_coords = processed_targets[:, 2:6]  # Skip batch_idx, class
-                                    if target_coords.numel() > 0:
-                                        self.debug_logger.write_debug_log(f"   PROCESSED TGT COORD_0 (x): [{target_coords[:, 0].min():.4f}, {target_coords[:, 0].max():.4f}]")
-                                        self.debug_logger.write_debug_log(f"   PROCESSED TGT COORD_1 (y): [{target_coords[:, 1].min():.4f}, {target_coords[:, 1].max():.4f}]")
-                                        self.debug_logger.write_debug_log(f"   PROCESSED TGT COORD_2 (w): [{target_coords[:, 2].min():.4f}, {target_coords[:, 2].max():.4f}]")
-                                        self.debug_logger.write_debug_log(f"   PROCESSED TGT COORD_3 (h): [{target_coords[:, 3].min():.4f}, {target_coords[:, 3].max():.4f}]")
-                                        
-                                        # A more robust check for xywh format
-                                        # In xywh, x_center +/- width/2 should be within [0, 1]. If not, it's likely xyxy.
-                                        is_likely_xywh = torch.all((target_coords[:, 0] - target_coords[:, 2] / 2 >= -1e-6) &
-                                                                   (target_coords[:, 1] - target_coords[:, 3] / 2 >= -1e-6) &
-                                                                   (target_coords[:, 0] + target_coords[:, 2] / 2 <= 1.0 + 1e-6) &
-                                                                   (target_coords[:, 1] + target_coords[:, 3] / 2 <= 1.0 + 1e-6))
-
-                                        if is_likely_xywh:
-                                            self.debug_logger.write_debug_log(f"   ✅ COORDINATE CONVERSION SUCCESSFUL: Targets appear to be in xywh format.")
-                                        else:
-                                            self.debug_logger.write_debug_log(f"   ❌ COORDINATE CONVERSION FAILED: Targets still appear to be in xyxy format.")
-                                
-                                self.debug_logger.write_debug_log(f"   📝 NOTE: If conversion worked, both predictions and targets should now be in xywh format for IoU calculation")
+                # Log batch processing
+                if self.debug and self._batch_count % 10 == 0:  # Log every 10th batch
+                    logger.debug(f"Processed batch {self._batch_count}")
             else:
-                if self.debug and self.debug_logger:
-                    self.debug_logger.write_debug_log(f"❌ batch_stats is None for batch {self._batch_count} - check prediction processing")
+                if self.debug:
+                    logger.warning(f"batch_stats is None for batch {self._batch_count} - check prediction processing")
             
         except Exception as e:
             logger.warning(f"Error updating mAP statistics: {e}")
@@ -406,9 +327,9 @@ class YOLOv5MapCalculator:
         
         if not self.stats or len(self.stats) == 0:
             logger.warning("🚨 No statistics accumulated! update() called {self._batch_count} times, but stats are empty.")
-            if self.debug and self.debug_logger:
-                self.debug_logger.write_debug_log(f"mAP calculator state: yolov5_available={self.yolo_utils.is_available()}, "
-                              f"device={self.device}")
+            if self.debug:
+                logger.debug(f"mAP calculator state: yolov5_available={self.yolo_utils.is_available()}, "
+                           f"stats_count={len(self.stats)}, batch_count={self._batch_count}")
             return self._create_zero_metrics()
         
         # Validate accumulated statistics using extracted processor
@@ -422,16 +343,11 @@ class YOLOv5MapCalculator:
             if len(stats) >= 4:  # Ensure we have all 4 required stat arrays
                 data_size = len(stats[2]) if len(stats) > 2 else 0  # Use pred_cls length
                 
-                # Enhanced debugging using extracted debug logger
-                if self.debug and self.debug_logger:
-                    summary = self.statistics_processor.get_statistics_summary(stats)
-                    self.debug_logger.write_debug_log(f"📊 Statistics summary: {summary}")
-                    logger.info(f"🐛 Running mAP debug analysis (see debug log file)...")
-                    self.debug_logger.write_debug_log(f"\n🔍 STARTING mAP COMPUTATION ANALYSIS (Epoch validation)")
-                    self.debug_logger.write_debug_log(f"📊 Total batches processed: {self._batch_count}")
-                    self.debug_logger.write_debug_log(f"📊 Total stat entries: {len(self.stats)}")
-                    self.debug_logger.write_debug_log(f"📊 Total detection samples: {data_size}")
-                    self.debug_logger.log_class_analysis(stats)
+                # Log basic statistics in debug mode
+                if self.debug:
+                    logger.debug(f"📊 Total batches processed: {self._batch_count}")
+                    logger.debug(f"📊 Total stat entries: {len(self.stats)}")
+                    logger.debug(f"📊 Total detection samples: {data_size}")
                 
                 # Check if we have any data at all
                 if data_size > 0:
@@ -440,21 +356,20 @@ class YOLOv5MapCalculator:
                 else:
                     # No data samples
                     logger.warning("📊 No detection samples accumulated - check if predictions are being generated")
-                    if self.debug and self.debug_logger:
-                        self.debug_logger.write_debug_log(f"\n❌ CRITICAL: NO DETECTION SAMPLES ACCUMULATED")
-                        self.debug_logger.write_debug_log(f"📊 Batches processed: {self._batch_count}")
-                        self.debug_logger.write_debug_log(f"📊 Stat entries: {len(self.stats)}")
-                        self.debug_logger.write_debug_log(f"📊 This means either:")
-                        self.debug_logger.write_debug_log(f"   1. Model is not generating predictions")
-                        self.debug_logger.write_debug_log(f"   2. Predictions are filtered out by confidence threshold ({self.conf_thres})")
-                        self.debug_logger.write_debug_log(f"   3. Batch processing is failing")
-                        self.debug_logger.write_debug_log(f"   4. update() method is not being called during validation")
+                    if self.debug:
+                        logger.debug(f"📊 Batches processed: {self._batch_count}")
+                        logger.debug(f"📊 Stat entries: {len(self.stats)}")
+                        logger.debug("Possible issues:")
+                        logger.debug("1. Model is not generating predictions")
+                        logger.debug(f"2. Predictions are filtered out by confidence threshold ({self.conf_thres})")
+                        logger.debug("3. Batch processing is failing")
+                        logger.debug("4. update() method is not being called during validation")
                     return self._create_zero_metrics()
             else:
                 # Malformed statistics
                 logger.error(f"🚨 Malformed statistics! Expected 4 arrays, got {len(stats)}")
-                if self.debug and self.debug_logger:
-                    self.debug_logger.write_debug_log(f"Statistics structure: {[type(s) for s in stats]}")
+                if self.debug:
+                    logger.debug(f"Statistics structure: {[type(s) for s in stats]}")
                 return self._create_zero_metrics()
             
         except Exception as e:

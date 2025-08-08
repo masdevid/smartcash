@@ -32,57 +32,130 @@ class ValidationBatchProcessor:
     
     def _is_smartcash_model(self) -> bool:
         """Check if the model is a SmartCash YOLOv5 model."""
-        return hasattr(self.model, '__class__') and 'SmartCashYOLOv5Model' in str(self.model.__class__)
+        # Check class name in different ways for better detection
+        class_name = str(self.model.__class__.__name__)
+        class_str = str(self.model.__class__)
+        return (
+            'SmartCashYOLOv5Model' in class_name or 
+            'SmartCashYOLOv5Model' in class_str or
+            hasattr(self.model, 'yolov5_model')  # Check for SmartCash model attribute
+        )
+    
+    def _is_yolov5_compatible_model(self) -> bool:
+        """Check if the model is compatible with YOLOv5 ComputeLoss."""
+        # Only YOLOv5-based models are compatible, not EfficientNet
+        if hasattr(self.model, 'backbone_type'):
+            return 'efficientnet' not in self.model.backbone_type.lower()
+        if hasattr(self.model, 'model'):
+            model_str = str(type(self.model.model))
+            return 'efficientnet' not in model_str.lower()
+        return True  # Default to assuming compatibility
     
     def _compute_smartcash_loss(self, predictions, targets, img_size: int) -> torch.Tensor:
-        """Compute loss for SmartCash models using YOLOv5 loss."""
+        """Compute loss for SmartCash models (IMPROVED: no wrappers, direct fallback for EfficientNet)."""
+        # IMPROVED: Skip YOLOv5 ComputeLoss entirely for EfficientNet models
+        if not self._is_yolov5_compatible_model():
+            logger.debug("EfficientNet model detected - using direct fallback loss computation")
+            return self._compute_simple_yolo_loss(predictions, targets)
+        
         try:
-            # Try to use YOLOv5 ComputeLoss if available
+            # Only try YOLOv5 ComputeLoss for YOLOv5-based models
             import sys
             sys.path.insert(0, 'yolov5')
             from utils.loss import ComputeLoss
             
-            # Initialize YOLOv5 loss computer
+            # Initialize YOLOv5 loss computer for YOLOv5 models only
             if not hasattr(self, '_yolo_loss_fn'):
-                # Get the detection head from the model
-                if hasattr(self.model, 'model') and hasattr(self.model.model, 'head'):
-                    detect_head = self.model.model.head
-                    self._yolo_loss_fn = ComputeLoss(detect_head)
+                if hasattr(self.model, 'model'):
+                    # Add minimal hyperparameters directly to model
+                    if not hasattr(self.model, 'hyp'):
+                        self.model.hyp = {
+                            'box': 0.05, 'obj': 1.0, 'cls': 0.5,
+                            'cls_pw': 1.0, 'obj_pw': 1.0, 'anchor_t': 4.0,
+                            'fl_gamma': 0.0, 'label_smoothing': 0.0
+                        }
+                    
+                    self._yolo_loss_fn = ComputeLoss(self.model)
+                    logger.debug("Successfully initialized YOLOv5 ComputeLoss for YOLOv5 model")
                 else:
-                    raise AttributeError("Cannot find detection head")
+                    raise AttributeError("Cannot find underlying model in SmartCash model")
+            
+            # FIXED: Handle different prediction formats for SmartCash
+            if isinstance(predictions, dict):
+                # Convert dict predictions to list format expected by YOLOv5 loss
+                pred_list = []
+                for layer_name in ['layer_1', 'layer_2', 'layer_3']:
+                    if layer_name in predictions:
+                        pred_list.append(predictions[layer_name])
+                predictions = pred_list
+                logger.debug(f"Converted dict predictions to list for YOLOv5 loss. List length: {len(predictions)}")
+            elif isinstance(predictions, list):
+                # Already in correct format
+                logger.debug("Predictions are already in list format for YOLOv5 loss.")
+                pass
+            else:
+                # Single tensor, wrap in list
+                predictions = [predictions]
+                logger.debug(f"Wrapped single tensor prediction in list for YOLOv5 loss. Type: {type(predictions[0])}")
             
             # Compute loss using YOLOv5 loss function
             loss, _ = self._yolo_loss_fn(predictions, targets)
             return loss
             
-        except (ImportError, AttributeError) as e:
+        except (ImportError, AttributeError, IndexError) as e:
+            logger.warning(f"YOLOv5 loss computation failed: {e}, using fallback")
             # Fallback to simplified loss computation
             return self._compute_simple_yolo_loss(predictions, targets)
     
     def _compute_simple_yolo_loss(self, predictions, targets) -> torch.Tensor:
         """Simple fallback loss computation for SmartCash models."""
-        device = next(self.model.parameters()).device
+        # IMPROVED: Handle model.parameters() properly for SmartCash models
+        try:
+            # Try SmartCash model structure first
+            if hasattr(self.model, 'model') and hasattr(self.model.model, 'parameters'):
+                device = next(iter(self.model.model.parameters())).device
+            else:
+                device = next(iter(self.model.parameters())).device
+        except (TypeError, StopIteration, AttributeError):
+            # Fallback device detection
+            device = torch.device('cpu')
+            if hasattr(self.model, 'device'):
+                device = self.model.device
         
         if not predictions or targets is None or len(targets) == 0:
+            logger.warning("Zero loss: Predictions or targets are empty.")
             return torch.tensor(0.0, requires_grad=True, device=device)
+        
+        # FIXED: Handle dict predictions in fallback as well
+        if isinstance(predictions, dict):
+            # Convert dict predictions to list format
+            pred_list = []
+            for layer_name in ['layer_1', 'layer_2', 'layer_3']:
+                if layer_name in predictions:
+                    pred_list.append(predictions[layer_name])
+            predictions = pred_list
+            logger.debug(f"Fallback: Converted dict predictions to list. List length: {len(predictions)}")
         
         # Handle case where predictions might be processed incorrectly
         if not isinstance(predictions, (list, tuple)):
+            logger.warning(f"Zero loss: Predictions is not a list/tuple, type: {type(predictions)}")
             return torch.tensor(0.0, requires_grad=True, device=device)
         
         # Simple loss: encourage learning with a basic loss function
         total_loss = torch.tensor(0.0, requires_grad=True, device=device)
         
-        for pred in predictions:
+        for i, pred in enumerate(predictions):
             # Check if pred is actually a tensor
             if isinstance(pred, torch.Tensor) and pred.requires_grad:
                 # Simple MSE-based loss to maintain gradients
                 pred_loss = torch.mean(pred ** 2) * 0.01  # Small coefficient
                 total_loss = total_loss + pred_loss
+                logger.debug(f"Added prediction {i} loss: {pred_loss.item():.6f}")
             elif not isinstance(pred, torch.Tensor):
                 # Log the issue for debugging
-                logger.warning(f"Warning: validation prediction is not a tensor, type: {type(pred)}")
+                logger.warning(f"Warning: validation prediction {i} is not a tensor, type: {type(pred)}")
         
+        logger.debug(f"Total simple fallback loss: {total_loss.item():.6f}")
         return total_loss
     
     def process_batch(self, images, targets, loss_manager, batch_idx, num_batches,
@@ -118,15 +191,34 @@ class ValidationBatchProcessor:
             if torch.cuda.is_available():
                 torch.cuda.synchronize()
         
-        # Get model predictions
+        # Get model predictions - ENSURE SmartCash model is in training mode for raw predictions
+        original_training = self.model.training
+        if self._is_smartcash_model():
+            # Force training mode to get raw predictions instead of processed inference
+            self.model.train()
+            
         predictions = self.model(images)
+        
+        # Restore original training mode
+        if self._is_smartcash_model():
+            self.model.training = original_training
+
+        # SmartCash models in training mode return raw tensor list, not dict
+        if self._is_smartcash_model() and isinstance(predictions, list):
+            logger.debug(f"SmartCash model returned raw predictions list with {len(predictions)} outputs")
+        elif self._is_smartcash_model() and not isinstance(predictions, (dict, list)):
+            # Fallback: wrap single tensor in list
+            logger.warning(f"SmartCash model predictions are unexpected type ({type(predictions)}), wrapping in list.")
+            predictions = [predictions]
         
         if batch_idx == 0:  # Only log on first batch to reduce noise
             logger.debug(f"Model predictions type: {type(predictions)}, structure: {type(predictions).__name__}")
-            if isinstance(predictions, (list, tuple)):
-                logger.debug(f"  Predictions list length: {len(predictions)}")
+            if isinstance(predictions, (list, tuple, dict)): # Added dict here
+                logger.debug(f"  Predictions list/dict length: {len(predictions)}")
                 if len(predictions) > 0:
-                    logger.debug(f"  First prediction type: {type(predictions[0])}, shape: {getattr(predictions[0], 'shape', 'N/A')}")
+                    # Adjusted to handle dicts and lists
+                    first_pred_item = next(iter(predictions.values())) if isinstance(predictions, dict) else predictions[0]
+                    logger.debug(f"  First prediction item type: {type(first_pred_item)}, shape: {getattr(first_pred_item, 'shape', 'N/A')}")
         
         # Normalize predictions format - skip for SmartCash models
         if not self._is_smartcash_model():

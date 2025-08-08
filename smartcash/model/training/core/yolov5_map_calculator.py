@@ -157,15 +157,15 @@ class YOLOv5MapCalculator:
         if epoch < 15:
             # Early phase: Focus on building ANY positive matches
             # FIXED: Model predictions have very low confidence (max ~0.012), use ultra-low threshold
-            return 0.001, 0.05   # Ultra-low confidence threshold to avoid filtering all predictions
+            return 0.005, 0.05   # Ultra-low confidence threshold to avoid filtering all predictions
         elif epoch < 25:
             # Mid-early: Start filtering confidence but keep IoU very low
             # Gradually increase confidence as model improves
-            return 0.005, 0.08   # Still very low confidence threshold
+            return 0.01, 0.08   # Still very low confidence threshold
         elif epoch < 40:
             # Mid phase: Balance confidence and IoU improvements
             # Based on logs, most batches struggle to get >0.1 IoU
-            return 0.01, 0.12   # More gradual confidence progression
+            return 0.02, 0.12   # More gradual confidence progression
         elif epoch < 60:
             # Late-mid phase: Tighten confidence more than IoU
             # Logs show confidence range 0.05-0.55, focus on higher conf
@@ -341,12 +341,13 @@ class YOLOv5MapCalculator:
                                 
                                 # Analyze processed predictions (should be normalized xywh)
                                 if standardized_predictions.dim() >= 2:
-                                    pred_coords = standardized_predictions[:, :4] if standardized_predictions.dim() == 2 else standardized_predictions[0, :, :4]
+                                    # Correctly slice coordinates, excluding batch_idx at column 0
+                                    pred_coords = standardized_predictions[:, 1:5] if standardized_predictions.dim() == 2 else standardized_predictions[0, :, 1:5]
                                     if pred_coords.numel() > 0:
-                                        self.debug_logger.write_debug_log(f"   PROCESSED PRED COORD_0 (x): [{pred_coords[:, 0].min():.4f}, {pred_coords[:, 0].max():.4f}]")
-                                        self.debug_logger.write_debug_log(f"   PROCESSED PRED COORD_1 (y): [{pred_coords[:, 1].min():.4f}, {pred_coords[:, 1].max():.4f}]")
-                                        self.debug_logger.write_debug_log(f"   PROCESSED PRED COORD_2 (w): [{pred_coords[:, 2].min():.4f}, {pred_coords[:, 2].max():.4f}]")
-                                        self.debug_logger.write_debug_log(f"   PROCESSED PRED COORD_3 (h): [{pred_coords[:, 3].min():.4f}, {pred_coords[:, 3].max():.4f}]")
+                                        self.debug_logger.write_debug_log(f"   PROCESSED PRED COORD_0 (x1): [{pred_coords[:, 0].min():.4f}, {pred_coords[:, 0].max():.4f}]")
+                                        self.debug_logger.write_debug_log(f"   PROCESSED PRED COORD_1 (y1): [{pred_coords[:, 1].min():.4f}, {pred_coords[:, 1].max():.4f}]")
+                                        self.debug_logger.write_debug_log(f"   PROCESSED PRED COORD_2 (x2): [{pred_coords[:, 2].min():.4f}, {pred_coords[:, 2].max():.4f}]")
+                                        self.debug_logger.write_debug_log(f"   PROCESSED PRED COORD_3 (y2): [{pred_coords[:, 3].min():.4f}, {pred_coords[:, 3].max():.4f}]")
                                 
                                 # Analyze processed targets (should be converted to xywh)
                                 if processed_targets.dim() >= 2 and processed_targets.shape[1] >= 6:
@@ -357,12 +358,17 @@ class YOLOv5MapCalculator:
                                         self.debug_logger.write_debug_log(f"   PROCESSED TGT COORD_2 (w): [{target_coords[:, 2].min():.4f}, {target_coords[:, 2].max():.4f}]")
                                         self.debug_logger.write_debug_log(f"   PROCESSED TGT COORD_3 (h): [{target_coords[:, 3].min():.4f}, {target_coords[:, 3].max():.4f}]")
                                         
-                                        # Check if conversion worked (xywh format should have small width/height values)
-                                        avg_wh = (target_coords[:, 2].mean() + target_coords[:, 3].mean()) / 2
-                                        if avg_wh < 0.5:
-                                            self.debug_logger.write_debug_log(f"   ✅ COORDINATE CONVERSION SUCCESSFUL: Targets converted to xywh format (avg w/h: {avg_wh:.4f})")
+                                        # A more robust check for xywh format
+                                        # In xywh, x_center +/- width/2 should be within [0, 1]. If not, it's likely xyxy.
+                                        is_likely_xywh = torch.all((target_coords[:, 0] - target_coords[:, 2] / 2 >= -1e-6) &
+                                                                   (target_coords[:, 1] - target_coords[:, 3] / 2 >= -1e-6) &
+                                                                   (target_coords[:, 0] + target_coords[:, 2] / 2 <= 1.0 + 1e-6) &
+                                                                   (target_coords[:, 1] + target_coords[:, 3] / 2 <= 1.0 + 1e-6))
+
+                                        if is_likely_xywh:
+                                            self.debug_logger.write_debug_log(f"   ✅ COORDINATE CONVERSION SUCCESSFUL: Targets appear to be in xywh format.")
                                         else:
-                                            self.debug_logger.write_debug_log(f"   ❌ COORDINATE CONVERSION FAILED: Targets still appear to be xyxy format (avg w/h: {avg_wh:.4f})")
+                                            self.debug_logger.write_debug_log(f"   ❌ COORDINATE CONVERSION FAILED: Targets still appear to be in xyxy format.")
                                 
                                 self.debug_logger.write_debug_log(f"   📝 NOTE: If conversion worked, both predictions and targets should now be in xywh format for IoU calculation")
             else:

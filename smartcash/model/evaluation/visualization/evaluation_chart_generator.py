@@ -276,8 +276,7 @@ class EvaluationChartGenerator:
             plt.tight_layout()
             
             # Save chart
-            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-            filename = f"checkpoint_performance_{timestamp}.png"
+            filename = f"checkpoint_performance.png"
             save_path = self.output_dir / filename
             plt.savefig(save_path, dpi=300, bbox_inches='tight', facecolor='white')
             plt.close()
@@ -465,8 +464,7 @@ class EvaluationChartGenerator:
             plt.tight_layout()
             
             # Save chart
-            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-            filename = f"denomination_analysis_{timestamp}.png"
+            filename = f"denomination_analysis.png"
             save_path = self.output_dir / filename
             plt.savefig(save_path, dpi=300, bbox_inches='tight', facecolor='white')
             plt.close()
@@ -478,6 +476,29 @@ class EvaluationChartGenerator:
             self.logger.error(f"❌ Error generating denomination analysis chart: {str(e)}")
             return ""
     
+    def _safe_float_convert(self, value) -> float:
+        """Safely convert various data types to float"""
+        try:
+            if value is None:
+                return 0.0
+            elif isinstance(value, (int, float)):
+                return float(value)
+            elif isinstance(value, str):
+                return float(value)
+            elif isinstance(value, (list, tuple)):
+                if len(value) == 0:
+                    return 0.0
+                elif len(value) == 1:
+                    return self._safe_float_convert(value[0])
+                else:
+                    # Use mean of numeric values
+                    numeric_vals = [self._safe_float_convert(v) for v in value if v is not None]
+                    return sum(numeric_vals) / len(numeric_vals) if numeric_vals else 0.0
+            else:
+                return 0.0
+        except (TypeError, ValueError, IndexError):
+            return 0.0
+
     def generate_evaluation_dashboard(self, results_data: Dict[str, Any],
                                     title: str = "SmartCash Evaluation Dashboard") -> str:
         """🎛️ Generate comprehensive evaluation dashboard"""
@@ -487,31 +508,73 @@ class EvaluationChartGenerator:
             fig = plt.figure(figsize=(20, 16))
             fig.suptitle(title, fontsize=20, fontweight='bold')
             
-            # Extract key metrics
+            # Extract key metrics with data validation
             scenarios = []
             map_scores = []
             fps_scores = []
             detection_rates = []
             
             for result in results_data.get('results', []):
+                if not isinstance(result, dict):
+                    self.logger.debug(f"⚠️ Invalid result format: {type(result)}")
+                    continue
+                    
                 scenario_name = result.get('scenario_name', 'unknown')
                 metrics = result.get('metrics', {})
                 
-                scenarios.append(scenario_name.replace('_', ' ').title())
-                map_scores.append(metrics.get('map50', 0))
-                fps_scores.append(metrics.get('fps', 0))
+                if not isinstance(metrics, dict):
+                    self.logger.debug(f"⚠️ Invalid metrics format for {scenario_name}: {type(metrics)}")
+                    metrics = {}
                 
-                # Calculate detection rate from additional data
+                scenarios.append(scenario_name.replace('_', ' ').title())
+                
+                # Safe numeric extraction
+                map_val = metrics.get('map50', 0)
+                fps_val = metrics.get('fps', 0)
+                
+                # Use safe conversion helper
+                map_scores.append(self._safe_float_convert(map_val))
+                fps_scores.append(self._safe_float_convert(fps_val))
+                
+                # Calculate detection rate from additional data or metrics
                 additional_data = result.get('additional_data', {})
-                if 'confusion_matrix' in additional_data:
-                    cm = additional_data['confusion_matrix']
-                    if isinstance(cm, list):
-                        cm = np.array(cm)
-                    total = cm.sum()
-                    detected = cm[:-1, :-1].sum()
-                    detection_rates.append(detected / total if total > 0 else 0)
-                else:
-                    detection_rates.append(0)
+                
+                # Try multiple sources for detection rate
+                detection_rate = 0
+                
+                # 1. Try from metrics first
+                if 'detection_rate' in metrics:
+                    rate_val = metrics['detection_rate']
+                    detection_rate = self._safe_float_convert(rate_val)
+                # 2. Try from recall (close proxy)
+                elif 'recall' in metrics:
+                    recall_val = metrics['recall']
+                    detection_rate = self._safe_float_convert(recall_val)
+                # 3. Try from confusion matrix
+                elif 'confusion_matrix' in additional_data:
+                    try:
+                        cm = additional_data['confusion_matrix']
+                        if isinstance(cm, (list, tuple)):
+                            cm = np.array(cm)
+                        elif isinstance(cm, (int, float)):
+                            # Single value confusion matrix doesn't make sense, use 0
+                            detection_rate = 0
+                        else:
+                            cm = np.array(cm)
+                        
+                        if isinstance(cm, np.ndarray) and cm.size > 1:
+                            total = cm.sum()
+                            detected = cm[:-1, :-1].sum() if cm.ndim > 1 else cm.sum()
+                            detection_rate = detected / total if total > 0 else 0
+                    except (TypeError, IndexError, ValueError) as e:
+                        self.logger.debug(f"⚠️ Error processing confusion matrix: {e}")
+                        detection_rate = 0
+                # 4. Fallback to precision as proxy
+                elif 'precision' in metrics:
+                    precision_val = metrics['precision']
+                    detection_rate = self._safe_float_convert(precision_val)
+                
+                detection_rates.append(max(0, min(1, detection_rate)))  # Ensure 0-1 range
             
             if not scenarios:
                 self.logger.warning("⚠️ No data available for dashboard generation")
@@ -612,8 +675,10 @@ SMARTCASH MODEL EVALUATION SUMMARY
             # 5. Robustness Analysis
             ax5 = plt.subplot(3, 4, 9)
             
-            if len(map_scores) >= 2:
-                robustness_score = 1 - (abs(max(map_scores) - min(map_scores)) / max(map_scores)) if max(map_scores) > 0 else 0
+            if len(map_scores) >= 2 and all(isinstance(score, (int, float)) for score in map_scores):
+                max_score = max(map_scores)
+                min_score = min(map_scores)
+                robustness_score = 1 - (abs(max_score - min_score) / max_score) if max_score > 0 else 0
                 
                 # Gauge chart for robustness
                 theta = np.linspace(0, np.pi, 100)
@@ -719,8 +784,7 @@ EVALUATION INFO
             plt.tight_layout()
             
             # Save dashboard
-            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-            filename = f"evaluation_dashboard_{timestamp}.png"
+            filename = f"evaluation_dashboard.png"
             save_path = self.output_dir / filename
             plt.savefig(save_path, dpi=300, bbox_inches='tight', facecolor='white')
             plt.close()

@@ -137,7 +137,7 @@ class MemoryOptimizer:
         if self.platform_info['is_apple_silicon']:
             batch_size = config['mps_batch']
             gradient_accumulation_steps = max(1, config['target_effective_batch'] // batch_size)
-            num_workers = 4  # Always 0 for MPS to prevent issues
+            num_workers = 8  # Always 0 for MPS to prevent issues
             pin_memory = False
             
         elif self.platform_info['is_cuda_workstation']:

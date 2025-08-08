@@ -339,14 +339,15 @@ class ValidationMapProcessor:
                     # Extract coordinate columns (skip batch_idx, class)
                     coords = map_targets[:, 2:6]  # [x, y, w_or_x2, h_or_y2]
                     
-                    # Detect format based on coordinate patterns
-                    coord_2_vals = coords[:, 2]  # width or x2
-                    coord_3_vals = coords[:, 3]  # height or y2
-                    
-                    # If coord_2/coord_3 are large (> 0.5 average), likely xyxy format
-                    avg_coord_23 = (coord_2_vals.mean() + coord_3_vals.mean()) / 2
-                    if avg_coord_23 > 0.5:  # Likely xyxy format
-                        logger.debug(f"🔧 Converting targets from xyxy to xywh format (avg coord_23: {avg_coord_23:.3f})")
+                    # A more robust check for xyxy format
+                    # In xywh, x_center +/- width/2 should be within [0, 1]. If not, it's likely xyxy.
+                    is_likely_xywh = torch.all((coords[:, 0] - coords[:, 2] / 2 >= -1e-6) &
+                                               (coords[:, 1] - coords[:, 3] / 2 >= -1e-6) &
+                                               (coords[:, 0] + coords[:, 2] / 2 <= 1.0 + 1e-6) &
+                                               (coords[:, 1] + coords[:, 3] / 2 <= 1.0 + 1e-6))
+
+                    if not is_likely_xywh:
+                        logger.debug(f"🔧 Detected likely xyxy format, converting to xywh.")
                         # Convert from [batch_idx, class, x1, y1, x2, y2] to [batch_idx, class, x_center, y_center, width, height]
                         x1, y1, x2, y2 = coords[:, 0], coords[:, 1], coords[:, 2], coords[:, 3]
                         
@@ -373,7 +374,7 @@ class ValidationMapProcessor:
                             logger.warning(f"⚠️ Found {invalid_mask.sum()} targets with invalid dimensions after conversion, filtering them out")
                             map_targets = map_targets[~invalid_mask]
                     else:
-                        logger.debug(f"✅ Targets already in xywh format (avg coord_23: {avg_coord_23:.3f})")
+                        logger.debug(f"✅ Targets appear to be in xywh format.")
                 
                 # Phase-aware class range filtering
                 if self.current_phase == 1:

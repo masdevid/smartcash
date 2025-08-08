@@ -30,7 +30,7 @@ from .analysis.currency_analyzer import CurrencyAnalyzer
 from .analysis.layer_analyzer import LayerAnalyzer
 
 from .evaluation import (
-    EvaluationService, CheckpointSelector, EvaluationMetrics, ScenarioManager
+    EvaluationService, CheckpointSelector, ScenarioManager, HierarchicalMetricsCalculator
 )
 
 # Fase 4: Reporting

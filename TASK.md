@@ -20,6 +20,8 @@ Updated 04 August 2025, 03:10:
   - Labels as .txt files
 
 # CURRENT ISSUES:
+- [✅] **medium priority** PROCESSED COORDINATE FORMAT VERIFICATION - Fixed a critical bug in the validation map processor where the coordinate format detection logic was incorrectly identifying valid `xywh` bounding boxes as `xyxy`, leading to a faulty conversion that produced invalid bounding box data. The issue was resolved by replacing the flawed detection heuristic with a more robust method that accurately verifies if the coordinates adhere to the `xywh` format by checking if the bounding boxes are within the normalized range. (08/07/2025)
+- [✅] **medium priority** PROCESSED COORDINATE FORMAT VERIFICATION - Fixed a critical bug in the validation map processor where the coordinate format detection logic was incorrectly identifying valid `xywh` bounding boxes as `xyxy`, leading to a faulty conversion that produced invalid bounding box data. The issue was resolved by replacing the flawed detection heuristic with a more robust method that accurately verifies if the coordinates adhere to the `xywh` format by checking if the bounding boxes are within the normalized range. (08/07/2025)
 - Phase specific early stopping doesn't work, it shows no feedbacks
 - Metrics history issues:
   - Learning Rate each epoch not recorded

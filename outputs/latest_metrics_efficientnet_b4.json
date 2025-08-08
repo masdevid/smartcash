@@ -1,0 +1,39 @@
+{
+  "latest_epoch": {
+    "epoch": 8,
+    "phase": 2,
+    "timestamp": "2025-08-08T07:12:15.386688",
+    "train_loss": 0.505017,
+    "val_loss": 4.995542,
+    "learning_rate": 4.618033988749896e-06,
+    "val_map50": 0.0081,
+    "val_map50_95": null,
+    "val_precision": 0.9436,
+    "val_recall": 0.9417,
+    "val_f1": 0.9412,
+    "val_accuracy": 0.9417,
+    "val_map50_precision": null,
+    "val_map50_recall": null,
+    "val_map50_f1": null,
+    "val_map50_accuracy": null,
+    "layer_1_accuracy": 0.0473,
+    "layer_1_precision": 0.0022,
+    "layer_1_recall": 0.0473,
+    "layer_1_f1": 0.0043,
+    "layer_2_accuracy": null,
+    "layer_2_precision": null,
+    "layer_2_recall": null,
+    "layer_2_f1": null,
+    "layer_3_accuracy": null,
+    "layer_3_precision": null,
+    "layer_3_recall": null,
+    "layer_3_f1": null,
+    "additional_metrics": null
+  },
+  "session_id": "20250808_061401",
+  "total_epochs": 9,
+  "file_paths": {
+    "metrics": "outputs/metrics_history_efficientnet_b4_data_phase2.json",
+    "phase_summary": "outputs/phase_summary_efficientnet_b4_data.json"
+  }
+}

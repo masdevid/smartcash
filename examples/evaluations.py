@@ -1,35 +1,25 @@
 #!/usr/bin/env python3
 """
-SmartCash Model Evaluation Example
+SmartCash Model Evaluation - Simplified Interface
 
-This example demonstrates how to use the SmartCash evaluation system to:
-- Evaluate trained models on different research scenarios
-- Compare performance across different backbones
-- Generate comprehensive evaluation reports
-- Test models with position and lighting variations
+This example provides a streamlined evaluation interface that:
+- Reuses training infrastructure for fast, consistent checkpoint loading
+- Auto-detects best checkpoints for each backbone
+- Eliminates redundant model building and warmup steps
+- Provides simplified CLI focused on essential scenarios
 
 Usage:
-    # Single scenario with specific checkpoint
+    # Evaluate all scenarios with best cspdarknet checkpoint
+    python examples/evaluations.py --scenario-all --backbone cspdarknet
+    
+    # Evaluate all scenarios with best efficientnet_b4 checkpoint  
+    python examples/evaluations.py --scenario-all --backbone efficientnet_b4
+    
+    # Evaluate specific scenario with specific checkpoint
     python examples/evaluations.py --scenario position_variation --checkpoint data/checkpoints/best_model.pt
     
-    # All scenarios with top 3 checkpoints
-    python examples/evaluations.py --all-scenarios --checkpoint-dir data/checkpoints --top-n 3 --verbose
-    
-    # Evaluate specific checkpoints by name
-    python examples/evaluations.py --all-scenarios --checkpoints "best_cspdarknet.pt,best_efficientnet.pt"
-    
-    # Filter by backbone and minimum performance
-    python examples/evaluations.py --all-scenarios --backbone cspdarknet --min-map 0.5
-    
-    # Compare different backbone architectures
-    python examples/evaluations.py --compare-backbones --checkpoint-dir data/checkpoints
-    
-Features:
-    - Multiple research scenarios (position, lighting variations)
-    - Automatic checkpoint discovery and selection
-    - Comprehensive metrics calculation (mAP, precision, recall, F1)
-    - Performance benchmarking with inference timing
-    - Export results in multiple formats (JSON, CSV, Markdown)
+    # List available backbones and checkpoints
+    python examples/evaluations.py --list-resources
 """
 
 # Fix OpenMP duplicate library issue before any imports
@@ -39,7 +29,7 @@ os.environ['KMP_DUPLICATE_LIB_OK'] = 'TRUE'
 import sys
 import argparse
 from pathlib import Path
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 from dotenv import load_dotenv
 
 # Add project root to path
@@ -49,11 +39,12 @@ if project_root not in sys.path:
 
 from smartcash.model.evaluation import (
     create_evaluation_service,
-    run_evaluation_pipeline,
     create_checkpoint_selector,
-    create_scenario_manager
+    run_backbone_comparison_evaluation,
+    generate_backbone_comparison_charts,
+    validate_all_scenario_data_sources,
 )
-from smartcash.model.api.core import create_api
+# Training infrastructure is imported within functions to avoid circular imports
 
 
 def create_evaluation_config(args=None) -> Dict[str, Any]:
@@ -69,9 +60,7 @@ def create_evaluation_config(args=None) -> Dict[str, Any]:
     
     # Override with command line arguments if provided
     if args:
-        test_dir = getattr(args, 'test_data_dir', test_dir)
-        results_dir = getattr(args, 'results_output_dir', results_dir)
-        charts_dir = getattr(args, 'charts_output_dir', charts_dir)
+        test_dir = getattr(args, 'test_dir', test_dir)
         evaluation_dir = getattr(args, 'scenario_data_dir', evaluation_dir)
         logs_dir = getattr(args, 'logs_dir', logs_dir)
         checkpoint_dir = getattr(args, 'checkpoint_dir', checkpoint_dir)
@@ -82,6 +71,8 @@ def create_evaluation_config(args=None) -> Dict[str, Any]:
         discovery_paths.append(checkpoint_dir)
     discovery_paths.extend([
         "data/checkpoints",
+        "data/checkpoints/cspdarknet",
+        "data/checkpoints/efficientnet_b4",
         "runs/train/*/weights",
         "models/checkpoints"
     ])
@@ -109,12 +100,14 @@ def create_evaluation_config(args=None) -> Dict[str, Any]:
                 "discovery_paths": discovery_paths,
                 "filename_patterns": [
                     "best_*.pt",
-                    "last.pt",
-                    "*_best.pt"
+                    "last_*.pt", 
+                    "*_best.pt",
+                    "*/best_*.pt",  # Include subdirectories
+                    "*/last_*.pt"   # Include subdirectories
                 ],
                 "required_keys": ["model_state_dict"],
                 "supported_backbones": ["cspdarknet", "efficientnet_b4", "yolov5s", "unknown"],
-                "min_val_map": 0.1,
+                "min_val_map": 0.0,
                 "sort_by": "val_map",
                 "max_checkpoints": 10,
                 "auto_select_best": True
@@ -270,428 +263,290 @@ def create_progress_callback(verbose: bool = True):
     return progress_callback
 
 
-def get_selected_checkpoints(args, config: Dict[str, Any]):
-    """Get list of checkpoints based on user selection criteria."""
+def find_best_checkpoint_for_backbone(backbone: str) -> str:
+    """Find the best checkpoint for a given backbone, preferring _phase2 and latest date."""
+    config = create_evaluation_config()
     checkpoint_selector = create_checkpoint_selector(config)
-    
-    # Set discovery paths
-    if args.checkpoint_dir:
-        checkpoint_selector.discovery_paths = [Path(args.checkpoint_dir)]
     
     # Get all available checkpoints
     available_checkpoints = checkpoint_selector.list_available_checkpoints()
     
     if not available_checkpoints:
-        return []
+        raise ValueError(f"No checkpoints found")
     
-    # If specific checkpoint provided, use it
-    if args.checkpoint:
-        return [args.checkpoint]
+    # Filter by backbone
+    backbone_checkpoints = [cp for cp in available_checkpoints 
+                           if cp['backbone'].lower() == backbone.lower()]
     
-    # If specific checkpoints listed, find them
-    if args.checkpoints:
-        selected_checkpoints = []
-        checkpoint_names = [name.strip() for name in args.checkpoints.split(',')]
-        
-        for cp in available_checkpoints:
-            cp_name = Path(cp['path']).name
-            # Match by filename or display name
-            if (cp_name in checkpoint_names or 
-                cp['display_name'] in checkpoint_names or
-                any(name in cp_name for name in checkpoint_names)):
-                selected_checkpoints.append(cp['path'])
-        
-        if not selected_checkpoints:
-            print(f"⚠️ Warning: No checkpoints found matching: {', '.join(checkpoint_names)}")
-            print(f"Available checkpoints:")
-            for cp in available_checkpoints[:5]:
-                print(f"   - {Path(cp['path']).name}")
-        
-        return selected_checkpoints
+    if not backbone_checkpoints:
+        raise ValueError(f"No checkpoints found for backbone: {backbone}")
     
-    # Filter by backbone if specified
-    filtered_checkpoints = available_checkpoints
-    if args.backbone:
-        filtered_checkpoints = [cp for cp in filtered_checkpoints 
-                              if cp['backbone'].lower() == args.backbone.lower()]
+    # Prioritize checkpoints with _phase2 suffix and latest date
+    def checkpoint_priority(cp):
+        filename = cp['filename']
         
-        if not filtered_checkpoints:
-            print(f"⚠️ Warning: No checkpoints found for backbone '{args.backbone}'")
-            available_backbones = list(set(cp['backbone'] for cp in available_checkpoints))
-            print(f"Available backbones: {', '.join(available_backbones)}")
-            return []
-    
-    # Filter by minimum mAP if specified
-    if args.min_map is not None:
-        filtered_checkpoints = [cp for cp in filtered_checkpoints 
-                              if cp.get('metrics', {}).get('val_map', 0) >= args.min_map]
+        # Priority scores (higher is better)
+        phase2_score = 100 if '_phase2' in filename else 0
         
-        if not filtered_checkpoints:
-            print(f"⚠️ Warning: No checkpoints found with mAP >= {args.min_map}")
+        # Extract date from filename for sorting (format: YYYYMMDD)
+        import re
+        date_match = re.search(r'_(\d{8})', filename)
+        date_score = int(date_match.group(1)) if date_match else 0
+        
+        # Use mAP as tiebreaker
+        map_score = cp.get('metrics', {}).get('val_map', 0) * 10  # Scale to make it significant
+        
+        return phase2_score + date_score + map_score
     
-    # Take top N checkpoints
-    selected = filtered_checkpoints[:args.top_n]
-    return [cp['path'] for cp in selected]
+    # Sort by priority (highest first)
+    backbone_checkpoints.sort(key=checkpoint_priority, reverse=True)
+    
+    best_checkpoint = backbone_checkpoints[0]
+    print(f"📋 Priority selection: {best_checkpoint['filename']} (phase2: {'_phase2' in best_checkpoint['filename']})")
+    
+    return best_checkpoint['path']
 
+
+def load_model_with_training_infrastructure(checkpoint_path: str) -> Any:
+    """Load model using existing model API infrastructure for consistency."""
+    print(f"📦 Loading model: {Path(checkpoint_path).name}")
+    
+    # Import here to avoid circular imports
+    from smartcash.model.api.core import create_api
+    import torch
+    
+    try:
+        # Load checkpoint to extract model configuration
+        checkpoint_data = torch.load(checkpoint_path, map_location='cpu', weights_only=False)
+        
+        # Use configuration from checkpoint if available
+        model_config = checkpoint_data.get('config', {})
+        if not model_config:
+            # Fallback config based on checkpoint analysis
+            state_dict = checkpoint_data.get('model_state_dict', {})
+            detection_head_keys = [k for k in state_dict.keys() if '.m.0.weight' in k and ('head' in k or 'model.24' in k)]
+            
+            if detection_head_keys:
+                output_channels = state_dict[detection_head_keys[0]].shape[0]
+                num_classes = (output_channels // 3) - 5  # YOLOv5 formula: (classes + 5) * 3 anchors
+                
+                model_config = {
+                    'backbone': 'cspdarknet',
+                    'num_classes': num_classes,
+                    'layer_mode': 'multi',
+                    'detection_layers': ['layer_1', 'layer_2', 'layer_3'],
+                    'pretrained': False,
+                    'img_size': 640
+                }
+                print(f"🔍 Inferred model config: {num_classes} classes, {output_channels} outputs")
+        
+        # Create model API with checkpoint configuration
+        config = {
+            'model': model_config
+        }
+        api = create_api(config=config, use_yolov5_integration=True)
+        
+        # Build model with correct configuration first
+        build_result = api.build_model(model_config=model_config)
+        if not build_result.get('success', False):
+            print(f"❌ Failed to build model: {build_result.get('error')}")
+            return None
+        
+        # Load checkpoint
+        result = api.load_checkpoint(checkpoint_path)
+        
+        if result.get('success', False):
+            print(f"✅ Model loaded: {result.get('message', 'Success')}")
+            return api
+        else:
+            print(f"❌ Failed to load model: {result.get('error', 'Unknown error')}")
+            return None
+            
+    except Exception as e:
+        print(f"❌ Error loading model: {e}")
+        return None
 
 def run_single_scenario(args) -> Dict[str, Any]:
-    """Run evaluation on a single scenario."""
-    print(f"🎯 Running single scenario evaluation: {args.scenario}")
+    """Run evaluation on a single scenario using training infrastructure."""
+    print(f"🎯 Running scenario evaluation: {args.scenario}")
     
-    config = create_evaluation_config(args)
+    if not args.checkpoint:
+        print("❌ Error: --checkpoint is required for single scenario evaluation")
+        return {'status': 'error', 'error': 'Checkpoint path required'}
     
-    # Create model API with enhanced error handling
-    model_api = None
-    if args.checkpoint:
-        try:
-            print(f"🔧 Creating model API for checkpoint: {args.checkpoint}")
-            # Let the evaluation service create the API with checkpoint-specific config
-            # This ensures proper model configuration matching the checkpoint
-            model_api = None  # Will be created in evaluation service
-            print(f"📝 Model API will be created automatically by evaluation service")
-        except Exception as e:
-            print(f"⚠️ Warning: Could not create model API: {e}")
-    
-    # Create evaluation service with enhanced configuration
     try:
+        # Load model using training infrastructure (no warmup needed)
+        model_api = load_model_with_training_infrastructure(args.checkpoint)
+        
+        if not model_api:
+            return {'status': 'error', 'error': 'Failed to load model'}
+        
+        # Create simple evaluation service
+        config = create_evaluation_config(args)
         service = create_evaluation_service(model_api=model_api, config=config)
         
         # Run scenario evaluation
         result = service.run_scenario(args.scenario, args.checkpoint)
+        
+        if result['status'] == 'success':
+            _print_evaluation_results(args.scenario, result['metrics'])
+        else:
+            print(f"❌ Evaluation failed: {result.get('error', 'Unknown error')}")
+        
+        return result
+        
     except Exception as e:
-        print(f"❌ Error during scenario evaluation: {e}")
+        print(f"❌ Error during evaluation: {e}")
         if args.verbose:
             import traceback
             traceback.print_exc()
         return {'status': 'error', 'error': str(e)}
-    
-    if result['status'] == 'success':
-        print(f"✅ Scenario evaluation completed successfully!")
-        
-        metrics = result['metrics']
-        print(f"\n📊 Comprehensive Results for {args.scenario}:")
-        
-        # mAP-based metrics (YOLOv5 training module)
-        print(f"\n🎯 mAP-based Metrics (Object Detection):")
-        print(f"   map50: {metrics.get('map50', 0):.3f}")
-        print(f"   map50_precision: {metrics.get('map50_precision', 0):.3f}")
-        print(f"   map50_recall: {metrics.get('map50_recall', 0):.3f}")
-        print(f"   map50_f1: {metrics.get('map50_f1', 0):.3f}")
-        
-        # Denomination classification metrics (7 classes)
-        print(f"\n💰 Denomination Classification Metrics (7 Classes):")
-        print(f"   accuracy: {metrics.get('accuracy', 0):.3f}")
-        print(f"   precision: {metrics.get('precision', 0):.3f}")
-        print(f"   recall: {metrics.get('recall', 0):.3f}")
-        print(f"   f1: {metrics.get('f1', 0):.3f}")
-        
-        # Performance metrics
-        print(f"\n⏱️ Performance Metrics:")
-        if 'inference_time_avg' in metrics:
-            print(f"   inference_time: {metrics['inference_time_avg']:.3f}s")
-            print(f"   fps: {metrics.get('fps', 0):.1f}")
-        
-        # Show confusion matrix if available
-        if 'confusion_matrix' in metrics:
-            confusion_matrix = metrics['confusion_matrix']
-            matrix_size = len(confusion_matrix)
-            
-            if matrix_size == 8:
-                print(f"\n📊 Confusion Matrix (8x8 - Denomination Classes + No Detection):")
-                print("     ", end="")
-                for i in range(7):
-                    print(f"  {i:2d}", end="")
-                print("  ND")  # No Detection
-            else:
-                print(f"\n📊 Confusion Matrix ({matrix_size}x{matrix_size} - Denomination Classes):")
-                print("     ", end="")
-                for i in range(matrix_size):
-                    print(f"  {i:2d}", end="")
-            
-            print()
-            for i, row in enumerate(confusion_matrix):
-                if matrix_size == 8 and i < 7:
-                    print(f" {i:2d}: ", end="")
-                elif matrix_size == 8 and i == 7:
-                    print(f" ND: ", end="")  # No Detection row
-                else:
-                    print(f" {i:2d}: ", end="")
-                    
-                for val in row:
-                    print(f"{val:4d}", end="")
-                print()
-            
-            # Show additional denomination metrics details
-            if 'total_samples' in metrics:
-                print(f"\n📊 Denomination Classification Details:")
-                print(f"   Total ground truth samples: {metrics['total_samples']}")
-                print(f"   Successfully detected: {metrics.get('detected_samples', 0)}")
-                print(f"   Missed detections: {metrics.get('missed_samples', 0)}")
-                detection_rate = (metrics.get('detected_samples', 0) / metrics['total_samples']) * 100 if metrics['total_samples'] > 0 else 0
-                print(f"   Detection rate: {detection_rate:.1f}%")
-        
-        # Legacy compatibility
-        if 'mAP' in metrics:
-            print(f"\n📈 Legacy Metrics:")
-            print(f"   mAP (legacy): {metrics.get('mAP', 0):.3f}")
-            print(f"   F1-Score (legacy): {metrics.get('f1_score', 0):.3f}")
-        
-    else:
-        print(f"❌ Scenario evaluation failed: {result.get('error', 'Unknown error')}")
-    
-    return result
 
 
 def run_all_scenarios(args) -> Dict[str, Any]:
-    """Run evaluation on all enabled scenarios."""
-    print(f"🚀 Running comprehensive evaluation on all scenarios")
+    """Run evaluation on all scenarios with best checkpoint for backbone(s)."""
     
+    # Determine backbones to evaluate
+    backbones = [args.backbone] if args.backbone else None  # None triggers default comparison
+    scenarios = ['position_variation', 'lighting_variation']
+    
+    # Create configuration
     config = create_evaluation_config(args)
     
-    # Determine checkpoints to use
-    checkpoints = get_selected_checkpoints(args, config)
-    if not checkpoints:
-        print("❌ No checkpoints found to evaluate")
-        return {'status': 'error', 'error': 'No checkpoints found'}
+    # Validate scenario data sources first
+    validation_result = validate_all_scenario_data_sources(config)
+    print(f"📁 Data source validation: {validation_result['scenarios_valid']}/{validation_result['scenarios_configured']} scenarios valid")
     
-    print(f"📋 Selected {len(checkpoints)} checkpoint(s) for evaluation:")
-    for i, cp_path in enumerate(checkpoints, 1):
-        print(f"   {i}. {Path(cp_path).name}")
+    if validation_result['scenarios_invalid'] > 0:
+        print(f"⚠️ Warning: {validation_result['scenarios_invalid']} scenarios have invalid data sources")
+        for issue in validation_result['issues'][:3]:  # Show first 3 issues
+            print(f"   • {issue}")
     
-    # Create callbacks
-    metrics_callback = create_metrics_callback(args.verbose)
-    progress_callback = create_progress_callback(args.verbose)
+    # Run backbone comparison evaluation
+    print("🚀 Starting backbone comparison evaluation...")
+    result = run_backbone_comparison_evaluation(
+        backbones=backbones,
+        scenarios=scenarios, 
+        config=config,
+        verbose=args.verbose
+    )
     
-    # Run comprehensive evaluation with improved error handling
-    try:
-        result = run_evaluation_pipeline(
-            scenarios=None,  # Use all enabled scenarios
-            checkpoints=checkpoints,
-            model_api=None,  # Let the service create the API
-            config=config,
-            progress_callback=progress_callback,
-            ui_components={}
-        )
-    except Exception as e:
-        print(f"❌ Error during evaluation pipeline: {e}")
-        if args.verbose:
-            import traceback
-            traceback.print_exc()
-        return {'status': 'error', 'error': str(e)}
+    # Generate comparison charts
+    chart_files = []
+    charts_dir = getattr(args, 'charts_output_dir', 'data/evaluation/charts')
     
     if result['status'] == 'success':
-        print(f"\n✅ Comprehensive evaluation completed!")
-        print(f"   Scenarios evaluated: {result['scenarios_evaluated']}")
-        print(f"   Checkpoints evaluated: {result['checkpoints_evaluated']}")
-        
-        # Call metrics callback to display results
-        metrics_callback(result)
-        
-        # Save results if requested
-        if args.output_dir:
-            output_dir = Path(args.output_dir)
-            output_dir.mkdir(parents=True, exist_ok=True)
-            
-            service = create_evaluation_service(config=config)
-            export_files = service.save_results(result, formats=['json', 'csv', 'markdown'])
-            
-            print(f"\n💾 Results saved to:")
-            for format_name, file_path in export_files.items():
-                print(f"   {format_name.upper()}: {file_path}")
-        
-    else:
-        print(f"❌ Comprehensive evaluation failed: {result.get('error', 'Unknown error')}")
+        print("📊 Generating comparison charts...")
+        try:
+            chart_files = generate_backbone_comparison_charts(result, charts_dir)
+            print(f"✅ Generated {len(chart_files)} comparison charts")
+        except Exception as e:
+            print(f"⚠️ Chart generation failed: {e}")
+            if args.verbose:
+                import traceback
+                traceback.print_exc()
+    
+    # Add chart files to result
+    result['chart_files'] = chart_files
+    
+    # Print summary using the manager's built-in summary printer
+    if result['status'] == 'success':
+        from smartcash.model.evaluation.managers.backbone_comparison_manager import create_backbone_comparison_manager
+        manager = create_backbone_comparison_manager(config)
+        manager.print_comparison_summary(result)
     
     return result
 
 
-def compare_backbones(args) -> Dict[str, Any]:
-    """Compare performance across different backbones."""
-    print(f"⚖️ Comparing backbone performance")
+def _print_evaluation_results(scenario: str, metrics: Dict[str, Any], brief: bool = False) -> None:
+    """Print evaluation results in a consistent format."""
+    if brief:
+        map_score = metrics.get('map50', 0)
+        accuracy = metrics.get('accuracy', 0)
+        print(f"   Results: mAP={map_score:.3f}, Accuracy={accuracy:.3f}")
+        return
     
-    config = create_evaluation_config(args)
+    print(f"\n📊 Results for {scenario}:")
+    print(f"\n🎯 Object Detection:")
+    print(f"   mAP@50: {metrics.get('map50', 0):.3f}")
+    print(f"   Precision: {metrics.get('precision', 0):.3f}")
+    print(f"   Recall: {metrics.get('recall', 0):.3f}")
+    print(f"   F1: {metrics.get('f1', 0):.3f}")
     
-    # Get available checkpoints
-    checkpoint_selector = create_checkpoint_selector(config)
-    if args.checkpoint_dir:
-        checkpoint_selector.discovery_paths = [Path(args.checkpoint_dir)]
+    print(f"\n💰 Classification:")
+    print(f"   Accuracy: {metrics.get('accuracy', 0):.3f}")
     
-    available_checkpoints = checkpoint_selector.list_available_checkpoints()
-    
-    # Group by backbone
-    backbone_checkpoints = {}
-    checkpoints_to_use = available_checkpoints[:args.top_n * 3]  # Get more to ensure coverage
-    
-    for cp in checkpoints_to_use:
-        backbone = cp['backbone']
-        if backbone not in backbone_checkpoints:
-            backbone_checkpoints[backbone] = []
-        backbone_checkpoints[backbone].append(cp)
-    
-    # Take best checkpoint for each backbone
-    backbone_best = {}
-    for backbone, cps in backbone_checkpoints.items():
-        # Sort by mAP and take the best
-        cps.sort(key=lambda x: x.get('metrics', {}).get('val_map', 0), reverse=True)
-        backbone_best[backbone] = cps[0]['path']
-    
-    print(f"📊 Found checkpoints for backbones: {list(backbone_best.keys())}")
-    
-    # Run evaluation for each backbone with error handling
-    results = {}
-    for backbone, checkpoint_path in backbone_best.items():
-        print(f"\n🏗️ Evaluating {backbone} backbone...")
-        print(f"   Using checkpoint: {Path(checkpoint_path).name}")
-        
-        try:
-            result = run_evaluation_pipeline(
-                scenarios=['position_variation', 'lighting_variation'],
-                checkpoints=[checkpoint_path],
-                config=config,
-                progress_callback=create_progress_callback(args.verbose)
-            )
-            results[backbone] = result
-        except Exception as e:
-            print(f"❌ Error evaluating {backbone}: {e}")
-            results[backbone] = {'status': 'error', 'error': str(e)}
-    
-    # Display comparison
-    print(f"\n📊 BACKBONE COMPARISON RESULTS")
-    print("=" * 60)
-    
-    for backbone, result in results.items():
-        if result['status'] == 'success':
-            summary = result.get('summary', {})
-            metrics = summary.get('aggregated_metrics', {}).get('overall_metrics', {})
-            
-            print(f"\n🏗️ {backbone.upper()}:")
-            print(f"   mAP: {metrics.get('mAP', 0):.3f}")
-            print(f"   Precision: {metrics.get('precision', 0):.3f}")
-            print(f"   Recall: {metrics.get('recall', 0):.3f}")
-            print(f"   F1-Score: {metrics.get('f1_score', 0):.3f}")
-            
-            if 'inference_time_avg' in metrics:
-                print(f"   Avg Inference Time: {metrics['inference_time_avg']:.3f}s")
-        else:
-            print(f"\n🏗️ {backbone.upper()}: ❌ Failed")
-    
-    return results
+    if 'inference_time_avg' in metrics:
+        print(f"\n⏱️ Performance:")
+        print(f"   Inference: {metrics['inference_time_avg']:.3f}s")
+        print(f"   FPS: {metrics.get('fps', 0):.1f}")
 
 
 def list_available_resources(args) -> None:
-    """List available checkpoints and scenarios."""
+    """List available checkpoints and backbones."""
     print(f"📋 Available Resources")
     print("=" * 40)
     
     config = create_evaluation_config(args)
     
-    # List checkpoints
+    # List checkpoints grouped by backbone
     print(f"\n🏷️ Available Checkpoints:")
     checkpoint_selector = create_checkpoint_selector(config)
-    if args.checkpoint_dir:
-        checkpoint_selector.discovery_paths = [Path(args.checkpoint_dir)]
-    
     checkpoints = checkpoint_selector.list_available_checkpoints()
     
     if checkpoints:
-        for i, cp in enumerate(checkpoints, 1):
-            metrics = cp['metrics']
-            map_score = metrics.get('val_map', metrics.get('mAP', 0))
-            print(f"   {i}. {cp['display_name']}")
-            print(f"      Path: {cp['path']}")
-            print(f"      Backbone: {cp['backbone']}")
-            print(f"      mAP: {map_score:.3f}")
-            print(f"      Size: {cp['file_size_mb']} MB")
-            print()
+        # Group by backbone
+        backbone_checkpoints = {}
+        for cp in checkpoints:
+            backbone = cp['backbone']
+            if backbone not in backbone_checkpoints:
+                backbone_checkpoints[backbone] = []
+            backbone_checkpoints[backbone].append(cp)
+        
+        for backbone, cps in backbone_checkpoints.items():
+            print(f"\n   🏗️ {backbone.upper()}:")
+            for cp in cps[:3]:  # Show top 3 per backbone
+                metrics = cp['metrics']
+                map_score = metrics.get('val_map', metrics.get('mAP', 0))
+                print(f"      • {Path(cp['path']).name} (mAP: {map_score:.3f})")
+            if len(cps) > 3:
+                print(f"      ... and {len(cps) - 3} more")
+        
+        # Show best for each backbone
+        print(f"\n🏆 Best Checkpoints:")
+        for backbone in backbone_checkpoints:
+            best_path = find_best_checkpoint_for_backbone(backbone)
+            if best_path:
+                print(f"   {backbone}: {Path(best_path).name}")
     else:
-        print("   No checkpoints found. Make sure to:")
-        print("   - Train a model first using examples/callback_only_training_example.py")
-        print("   - Check that checkpoint paths exist")
-        print("   - Verify checkpoint format compatibility")
+        print("   No checkpoints found. Train models first.")
     
-    # List scenarios
+    # List available scenarios
     print(f"\n🎯 Available Scenarios:")
-    scenario_manager = create_scenario_manager(config)
-    scenarios = scenario_manager.list_available_scenarios()
-    
-    for scenario in scenarios:
-        status_icon = "✅" if scenario.get('ready', False) else "⚠️"
-        print(f"   {status_icon} {scenario['display_name']}")
-        print(f"      Name: {scenario['name']}")
-        print(f"      Enabled: {scenario['enabled']}")
-        print(f"      Data exists: {scenario['data_exists']}")
-        if 'description' in scenario:
-            print(f"      Description: {scenario['description']}")
-        print()
+    print(f"   • position_variation")
+    print(f"   • lighting_variation")
 
 
-def setup_scenarios(args) -> None:
-    """Setup and prepare evaluation scenarios."""
-    print(f"🚀 Setting up evaluation scenarios")
-    
-    config = create_evaluation_config(args)
-    scenario_manager = create_scenario_manager(config)
-    
-    # Prepare all scenarios
-    result = scenario_manager.prepare_all_scenarios(force_regenerate=args.force_regenerate)
-    
-    print(f"\n📊 Scenario Setup Results:")
-    print(f"   Total scenarios: {result['total_scenarios']}")
-    print(f"   Successful: {result['successful']}")
-    print(f"   Failed: {result['failed']}")
-    
-    # Display detailed results
-    for scenario_name, scenario_result in result['results'].items():
-        status = scenario_result.get('status', 'unknown')
-        if status in ['successful', 'existing']:
-            print(f"   ✅ {scenario_name}: Ready")
-            if 'validation' in scenario_result:
-                validation = scenario_result['validation']
-                print(f"      Images: {validation.get('images_count', 0)}")
-                print(f"      Labels: {validation.get('labels_count', 0)}")
-        else:
-            print(f"   ❌ {scenario_name}: {scenario_result.get('error', 'Failed')}")
 
 
 def create_argument_parser():
-    """Create command line argument parser."""
+    """Create simplified command line argument parser."""
     parser = argparse.ArgumentParser(
-        description='SmartCash Model Evaluation System',
+        description='SmartCash Model Evaluation System - Simplified Interface',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  # Evaluate single scenario with specific checkpoint
+  # Evaluate all scenarios with best cspdarknet checkpoint
+  python examples/evaluations.py --scenario-all --backbone cspdarknet
+  
+  # Evaluate all scenarios with best efficientnet_b4 checkpoint
+  python examples/evaluations.py --scenario-all --backbone efficientnet_b4
+  
+  # Evaluate specific scenario with specific checkpoint
   python examples/evaluations.py --scenario position_variation --checkpoint data/checkpoints/best_model.pt
   
-  # Run comprehensive evaluation on all scenarios with top 3 checkpoints
-  python examples/evaluations.py --all-scenarios --checkpoint-dir data/checkpoints --top-n 3 --verbose
-  
-  # Evaluate specific checkpoints by name
-  python examples/evaluations.py --all-scenarios --checkpoints "best_cspdarknet_multi.pt,best_efficientnet_b4.pt"
-  
-  # Filter checkpoints by backbone and minimum mAP
-  python examples/evaluations.py --all-scenarios --backbone cspdarknet --min-map 0.5 --top-n 2
-  
-  # Compare different backbones (automatically selects best checkpoint per backbone)
-  python examples/evaluations.py --compare-backbones --checkpoint-dir data/checkpoints --top-n 5
-  
-  # List available resources to see what checkpoints and scenarios exist
-  python examples/evaluations.py --list-resources --checkpoint-dir data/checkpoints
-  
-  # Setup evaluation scenarios (required before first evaluation)
-  python examples/evaluations.py --setup-scenarios --force-regenerate
-  
-  # Use custom data directories (useful for different datasets or environments)
-  python examples/evaluations.py --scenario position_variation --checkpoint best_model.pt \\
-    --test-data-dir /path/to/custom/test/data \\
-    --charts-output-dir /path/to/custom/charts \\
-    --results-output-dir /path/to/custom/results
-  
-  # Evaluate with external test data and save charts to specific location
-  python examples/evaluations.py --all-scenarios --checkpoint-dir /external/checkpoints \\
-    --test-data-dir /external/test/data \\
-    --charts-output-dir /external/evaluation/charts \\
-    --scenario-data-dir /external/evaluation/scenarios
+  # List available backbones and checkpoints
+  python examples/evaluations.py --list-resources
         """
     )
     
@@ -699,53 +554,26 @@ Examples:
     mode_group = parser.add_mutually_exclusive_group(required=True)
     mode_group.add_argument('--scenario', type=str, 
                            choices=['position_variation', 'lighting_variation'],
-                           help='Run single scenario evaluation')
-    mode_group.add_argument('--all-scenarios', action='store_true',
-                           help='Run evaluation on all enabled scenarios')
-    mode_group.add_argument('--compare-backbones', action='store_true',
-                           help='Compare performance across different backbones')
+                           help='Run single scenario evaluation (requires --checkpoint)')
+    mode_group.add_argument('--scenario-all', action='store_true',
+                           help='Run evaluation on all scenarios (optional --backbone, defaults to comparison)')
     mode_group.add_argument('--list-resources', action='store_true',
                            help='List available checkpoints and scenarios')
-    mode_group.add_argument('--setup-scenarios', action='store_true',
-                           help='Setup and prepare evaluation scenarios')
     
-    # Checkpoint selection options
-    checkpoint_group = parser.add_mutually_exclusive_group()
-    checkpoint_group.add_argument('--checkpoint', type=str,
-                                 help='Path to specific checkpoint file')
-    checkpoint_group.add_argument('--checkpoints', type=str,
-                                 help='Comma-separated list of checkpoint names/patterns to evaluate')
-    
-    # Checkpoint discovery and filtering
-    parser.add_argument('--checkpoint-dir', type=str, default='data/checkpoints',
-                       help='Directory to search for checkpoints (default: data/checkpoints)')
+    # Parameters for specific modes
     parser.add_argument('--backbone', type=str,
-                       choices=['cspdarknet', 'efficientnet_b4', 'yolov5s'],
-                       help='Filter checkpoints by backbone architecture')
-    parser.add_argument('--min-map', type=float,
-                       help='Minimum mAP threshold for checkpoint selection')
-    parser.add_argument('--top-n', type=int, default=3,
-                       help='Number of top checkpoints to evaluate (default: 3)')
+                       choices=['cspdarknet', 'efficientnet_b4'],
+                       help='Backbone architecture (optional for --scenario-all, defaults to comparison)')
+    parser.add_argument('--checkpoint', type=str,
+                       help='Path to specific checkpoint file (required for --scenario)')
     
-    # General options
-    parser.add_argument('--output-dir', type=str,
-                       help='Directory to save evaluation results')
-    parser.add_argument('--force-regenerate', action='store_true',
-                       help='Force regeneration of scenario data')
+    # Optional parameters
     parser.add_argument('--verbose', action='store_true',
                        help='Enable verbose output')
-    
-    # Custom folder paths for different data sources
-    parser.add_argument('--test-data-dir', type=str, default='data/preprocessed/test',
-                       help='Directory containing test data (default: data/preprocessed/test)')
-    parser.add_argument('--charts-output-dir', type=str, default='data/evaluation/charts',
-                       help='Directory to save evaluation charts (default: data/evaluation/charts)')
-    parser.add_argument('--results-output-dir', type=str, default='data/evaluation/results',
-                       help='Directory to save evaluation results (default: data/evaluation/results)')
-    parser.add_argument('--scenario-data-dir', type=str, default='data/evaluation',
-                       help='Directory containing scenario data (default: data/evaluation)')
-    parser.add_argument('--logs-dir', type=str, default='logs/validation_metrics',
-                       help='Directory for evaluation logs (default: logs/validation_metrics)')
+    parser.add_argument('--output-dir', type=str,
+                       help='Directory to save evaluation results')
+    parser.add_argument('--test-dir', type=str, default='data/preprocessed/test',
+                       help='Directory containing test images (default: data/preprocessed/test)')
     
     return parser
 
@@ -759,8 +587,8 @@ def main():
     parser = create_argument_parser()
     args = parser.parse_args()
     
-    print("🚀 STARTING SmartCash Model Evaluation")
-    print("=" * 50)
+    print("🚀 SmartCash Model Evaluation")
+    print("=" * 40)
     
     try:
         # Route to appropriate function based on mode
@@ -770,18 +598,12 @@ def main():
                 return 1
             result = run_single_scenario(args)
             
-        elif args.all_scenarios:
+        elif args.scenario_all:
+            # Backbone is now optional - defaults to comparison if not specified
             result = run_all_scenarios(args)
-            
-        elif args.compare_backbones:
-            result = compare_backbones(args)
             
         elif args.list_resources:
             list_available_resources(args)
-            return 0
-            
-        elif args.setup_scenarios:
-            setup_scenarios(args)
             return 0
         
         # Check result status

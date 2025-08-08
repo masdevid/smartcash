@@ -138,7 +138,7 @@ class PlatformPresets:
         
         elif self.platform_info['is_m1_mac']:
             # M1 Mac: MAXIMUM SPEED - unified memory allows aggressive optimization
-            base_batch = 12 if backbone == 'cspdarknet' else 10  # INCREASED: Take advantage of unified memory
+            base_batch = 16  # INCREASED: Take advantage of unified memory
             config.update({
                 'batch_size': base_batch,
                 'num_workers': 8,  # MAXIMUM: Use all 8 workers for speed
@@ -156,7 +156,7 @@ class PlatformPresets:
         elif self.platform_info['is_cuda_workstation']:
             # CUDA workstation: maximize throughput
             config.update({
-                'batch_size': 24 if backbone == 'cspdarknet' else 16,
+                'batch_size': 24,
                 'num_workers': config['num_workers'],  # Use full workers
                 'prefetch_factor': 2
             })

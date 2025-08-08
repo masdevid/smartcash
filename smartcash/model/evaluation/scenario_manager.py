@@ -4,11 +4,11 @@ Deskripsi: Manager untuk research scenarios dengan position dan lighting variati
 """
 
 from pathlib import Path
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List
 import shutil
 
 from smartcash.common.logger import get_logger
-from smartcash.model.evaluation.scenario_augmentation import ScenarioAugmentation
+from smartcash.model.evaluation.processors.scenario_data_source_selector import ScenarioDataSourceSelector
 
 class ScenarioManager:
     """Manager untuk research scenarios evaluation"""
@@ -24,7 +24,7 @@ class ScenarioManager:
         if not hasattr(self, 'logger'):
             self.logger = get_logger('scenario_manager')
         
-        self.scenario_augmentation = ScenarioAugmentation(config)
+        self.data_source_selector = ScenarioDataSourceSelector(config)
         
         # Setup directories with safe config access
         try:
@@ -56,98 +56,86 @@ class ScenarioManager:
         self._ensure_directories()
     
     def setup_position_scenario(self) -> Dict[str, Any]:
-        """📐 Setup position variation scenario"""
+        """📐 Setup position variation scenario using data source selector"""
         scenario_config = self.config.get('evaluation', {}).get('scenarios', {}).get('position_variation', {})
         
-        if not scenario_config.get('enabled', False):
+        if not scenario_config.get('enabled', True):  # Default enabled
             raise ValueError("❌ Position variation scenario tidak aktif")
         
         scenario_name = 'position_variation'
-        output_dir = self.evaluation_dir / scenario_name
         
         self.logger.info(f"📐 Setting up {scenario_config.get('name', 'Position Variation')} scenario")
         
-        # Generate scenario data
-        result = self.scenario_augmentation.generate_position_variations(
-            test_dir=str(self.test_dir),
-            output_dir=str(output_dir),
-            num_variations=scenario_config.get('augmentation_config', {}).get('num_variations', 5)
-        )
+        # Get data directory for this scenario
+        data_dir = self.data_source_selector.get_scenario_data_directory(scenario_name)
         
-        # Validate scenario data
-        validation = self.scenario_augmentation.validate_scenario_data(str(output_dir))
+        # Validate scenario data directory
+        validation = self.data_source_selector.validate_scenario_data_directory(scenario_name, data_dir)
         
         scenario_info = {
             'name': scenario_name,
             'display_name': scenario_config.get('name', 'Position Variation'),
             'enabled': True,
-            'data_path': str(output_dir),
-            'status': 'successful',
-            'generation_result': result,
+            'data_path': data_dir,
+            'status': 'ready' if validation['valid'] else 'invalid',
             'validation': validation,
             'config': scenario_config
         }
         
         if validation['valid']:
-            self.logger.info(f"✅ Position scenario ready: {validation['images_count']} images")
+            self.logger.info(f"✅ Position scenario ready: {validation['images_count']} images from {data_dir}")
         else:
             self.logger.warning(f"⚠️ Position scenario validation issues: {validation['issues']}")
         
         return scenario_info
     
     def setup_lighting_scenario(self) -> Dict[str, Any]:
-        """💡 Setup lighting variation scenario"""
+        """💡 Setup lighting variation scenario using data source selector"""
         scenario_config = self.config.get('evaluation', {}).get('scenarios', {}).get('lighting_variation', {})
         
-        if not scenario_config.get('enabled', False):
+        if not scenario_config.get('enabled', True):  # Default enabled
             raise ValueError("❌ Lighting variation scenario tidak aktif")
         
         scenario_name = 'lighting_variation'
-        output_dir = self.evaluation_dir / scenario_name
         
         self.logger.info(f"💡 Setting up {scenario_config.get('name', 'Lighting Variation')} scenario")
         
-        # Generate scenario data
-        result = self.scenario_augmentation.generate_lighting_variations(
-            test_dir=str(self.test_dir),
-            output_dir=str(output_dir),
-            num_variations=scenario_config.get('augmentation_config', {}).get('num_variations', 5)
-        )
+        # Get data directory for this scenario
+        data_dir = self.data_source_selector.get_scenario_data_directory(scenario_name)
         
-        # Validate scenario data
-        validation = self.scenario_augmentation.validate_scenario_data(str(output_dir))
+        # Validate scenario data directory
+        validation = self.data_source_selector.validate_scenario_data_directory(scenario_name, data_dir)
         
         scenario_info = {
             'name': scenario_name,
             'display_name': scenario_config.get('name', 'Lighting Variation'),
             'enabled': True,
-            'data_path': str(output_dir),
-            'status': 'successful',
-            'generation_result': result,
+            'data_path': data_dir,
+            'status': 'ready' if validation['valid'] else 'invalid',
             'validation': validation,
             'config': scenario_config
         }
         
         if validation['valid']:
-            self.logger.info(f"✅ Lighting scenario ready: {validation['images_count']} images")
+            self.logger.info(f"✅ Lighting scenario ready: {validation['images_count']} images from {data_dir}")
         else:
             self.logger.warning(f"⚠️ Lighting scenario validation issues: {validation['issues']}")
         
         return scenario_info
     
-    def generate_scenario_data(self, scenario_name: str, force_regenerate: bool = False) -> Dict[str, Any]:
+    def generate_scenario_data(self, scenario_name: str) -> Dict[str, Any]:
         """🔄 Generate data untuk specific scenario"""
-        scenario_dir = self.evaluation_dir / scenario_name
         
-        # Check if data already exists
-        if scenario_dir.exists() and not force_regenerate:
-            validation = self.scenario_augmentation.validate_scenario_data(str(scenario_dir))
-            if validation['valid']:
-                self.logger.info(f"📁 Using existing {scenario_name} data")
-                return {'status': 'existing', 'validation': validation, 'data_path': str(scenario_dir)}
+        # Get data directory for this scenario 
+        data_dir = self.data_source_selector.get_scenario_data_directory(scenario_name)
+        validation = self.data_source_selector.validate_scenario_data_directory(scenario_name, data_dir)
         
-        # Generate new data
-        self.logger.info(f"🔄 Generating new {scenario_name} data")
+        if validation['valid']:
+            self.logger.info(f"📁 Using existing {scenario_name} data from {data_dir}")
+            return {'status': 'ready', 'validation': validation, 'data_path': data_dir}
+        
+        # Data not valid - delegate to setup methods
+        self.logger.info(f"⚠️ Setting up {scenario_name} scenario (data not valid)")
         
         if scenario_name == 'position_variation':
             return self.setup_position_scenario()
@@ -167,7 +155,6 @@ class ScenarioManager:
     
     def validate_scenario(self, scenario_name: str) -> Dict[str, Any]:
         """✅ Validate scenario setup dan data"""
-        scenario_dir = self.evaluation_dir / scenario_name
         
         validation_result = {
             'scenario_name': scenario_name,
@@ -187,15 +174,13 @@ class ScenarioManager:
         except ValueError as e:
             validation_result['issues'].append(str(e))
         
-        # Validate data
-        if scenario_dir.exists():
-            data_validation = self.scenario_augmentation.validate_scenario_data(str(scenario_dir))
-            validation_result['data_valid'] = data_validation['valid']
-            
-            if not data_validation['valid']:
-                validation_result['issues'].extend(data_validation['issues'])
-        else:
-            validation_result['issues'].append(f"❌ Data directory tidak ditemukan: {scenario_dir}")
+        # Validate data using data source selector
+        data_dir = self.data_source_selector.get_scenario_data_directory(scenario_name)
+        data_validation = self.data_source_selector.validate_scenario_data_directory(scenario_name, data_dir)
+        validation_result['data_valid'] = data_validation['valid']
+        
+        if not data_validation['valid']:
+            validation_result['issues'].extend(data_validation['issues'])
         
         # Overall readiness
         validation_result['ready_for_evaluation'] = (

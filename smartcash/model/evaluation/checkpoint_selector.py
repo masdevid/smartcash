@@ -204,9 +204,13 @@ class CheckpointSelector:
             for scan_path in paths_to_scan:
                 self.logger.debug(f"📁 Scanning directory: {scan_path}")
                 
-                # Apply each filename pattern
+                # Apply each filename pattern (including recursive patterns)
                 for pattern in self.filename_patterns:
-                    checkpoint_files = list(scan_path.glob(pattern))
+                    # Handle recursive patterns (with '/')
+                    if '/' in pattern:
+                        checkpoint_files = list(scan_path.rglob(pattern.split('/')[-1]))
+                    else:
+                        checkpoint_files = list(scan_path.glob(pattern))
                     
                     # Group checkpoints by base name to prioritize unified checkpoints
                     checkpoint_groups = {}
@@ -284,9 +288,12 @@ class CheckpointSelector:
             with torch.serialization.safe_globals(safe_globals):
                 checkpoint_data = torch.load(checkpoint_path, map_location='cpu', weights_only=False)
         
-        # Parse filename pattern: enhanced for new training pipeline formats
-        # Updated to handle unified training pipeline checkpoint naming
+        # Parse filename pattern: updated to match actual checkpoint files
         filename_patterns = [
+            r'best_(cspdarknet|efficientnet_b4)_(\d{8})_phase(\d+)\.pt',  # Phase format: best_backbone_YYYYMMDD_phaseN.pt
+            r'best_(cspdarknet|efficientnet_b4)_(\d{8})\.pt',  # Date format: best_backbone_YYYYMMDD.pt
+            r'best_(cspdarknet|efficientnet_b4)\.pt',  # Simple format: best_backbone.pt
+            r'last_(cspdarknet|efficientnet_b4)\.pt',  # Last format: last_backbone.pt
             r'best_(\w+)_(\w+)_(\w+)_(\w+)_(\w+)_(\d{8})\.pt',  # New format: best_backbone_phase_mode_frozen_pretrained_date.pt
             r'best_(\w+)_(\w+)_(\w+)_(\d{8})\.pt',  # Original pattern: best_model_backbone_mode_date.pt
             r'best_(\w+)_(efficientnet_b4)_(\w+)_(\d{8})\.pt',  # EfficientNet-B4 specific
@@ -308,23 +315,41 @@ class CheckpointSelector:
             if match:
                 groups = match.groups()
                 
-                if i == 0:  # New format: best_backbone_phase_mode_frozen_pretrained_date.pt
-                    backbone, phase_mode, layer_mode, frozen_status, pretrained, date_str = groups
+                if i == 0:  # Phase format: best_backbone_YYYYMMDD_phaseN.pt
+                    backbone, date_str, phase_num = groups
                     model_name = 'smartcash'
-                elif i <= 3:  # Original patterns: best_model_backbone_mode_date.pt
-                    model_name, backbone, layer_mode, date_str = groups
-                elif i == 5:  # YOLOv5 format: best_yolov5_backbone_mode_date.pt
-                    backbone, layer_mode, date_str = groups
-                    model_name = 'smartcash_yolov5'
-                elif i == 6:  # Unified format: unified_backbone_mode_best_date.pt
-                    backbone, layer_mode, date_str = groups
-                    model_name = 'smartcash_unified'
-                elif i == 7:  # Simple format: smartcash_backbone_best.pt
+                    layer_mode = 'multi'
+                elif i == 1:  # Date format: best_backbone_YYYYMMDD.pt
+                    backbone, date_str = groups
+                    model_name = 'smartcash'
+                    layer_mode = 'multi'
+                elif i == 2:  # Simple format: best_backbone.pt
                     backbone = groups[0]
                     model_name = 'smartcash'
                     layer_mode = 'multi'
                     date_str = None
-                elif i == 8:  # Generic: best_model.pt
+                elif i == 3:  # Last format: last_backbone.pt
+                    backbone = groups[0]
+                    model_name = 'smartcash'
+                    layer_mode = 'multi'
+                    date_str = None
+                elif i == 4:  # New format: best_backbone_phase_mode_frozen_pretrained_date.pt
+                    backbone, phase_mode, layer_mode, frozen_status, pretrained, date_str = groups
+                    model_name = 'smartcash'
+                elif i <= 7:  # Original patterns: best_model_backbone_mode_date.pt
+                    model_name, backbone, layer_mode, date_str = groups
+                elif i == 8:  # YOLOv5 format: best_yolov5_backbone_mode_date.pt
+                    backbone, layer_mode, date_str = groups
+                    model_name = 'smartcash_yolov5'
+                elif i == 9:  # Unified format: unified_backbone_mode_best_date.pt
+                    backbone, layer_mode, date_str = groups
+                    model_name = 'smartcash_unified'
+                elif i == 10:  # Simple format: smartcash_backbone_best.pt
+                    backbone = groups[0]
+                    model_name = 'smartcash'
+                    layer_mode = 'multi'
+                    date_str = None
+                elif i == 11:  # Generic: best_model.pt
                     model_name = 'smartcash'
                     backbone = 'cspdarknet'  # Default backbone
                     layer_mode = 'multi'

@@ -1,9 +1,10 @@
 """
 File: smartcash/model/training/__init__.py
-Deskripsi: Training package exports untuk Fase 2 implementation
+Description: Training package exports for the SmartCash model training pipeline
 """
 
-# Old training service removed - use merged training_pipeline instead
+# Core training components
+from . import layers  # New layers package
 from .data_loader_factory import DataLoaderFactory, create_data_loaders, get_dataset_stats
 from .utils.metrics_history import create_metrics_recorder
 from .optimizer_factory import (
@@ -69,6 +70,9 @@ def get_training_info(config=None):
 __all__ = [
     # Main training API
     'start_training', 'get_training_info',
+    
+    # Layer management
+    'layers',
     
     # Data loading
     'DataLoaderFactory', 'create_data_loaders', 'get_dataset_stats',

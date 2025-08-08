@@ -22,23 +22,23 @@ augmentation:
     translate_limit: 0.08    # translate slider
     scale_limit: 0.04        # scale slider
   
-  # Advanced form fields (lighting) - Updated to match augment_lighting.py extreme variations
+  # Advanced form fields (lighting) - BALANCED values to prevent extreme black/white images
   lighting:
-    brightness_limit: 0.6    # brightness slider - Increased for extreme variations (0.2->0.5 dark, 1.5->2.5 bright)
-    contrast_limit: 0.3      # contrast slider - Increased to match (0.7->1.3 range)
-    hsv_hue: 15              # Increased to match (-15, 15) range  
-    hsv_saturation: 20       # Increased to match (0.8, 1.2) saturation scale
+    brightness_limit: 0.3    # brightness slider - REDUCED from 0.6 to prevent complete black/white
+    contrast_limit: 0.25     # contrast slider - REDUCED from 0.3 for more natural contrast
+    hsv_hue: 12              # REDUCED from 15 for more natural color variations
+    hsv_saturation: 15       # REDUCED from 20 for balanced saturation changes
   
-  # Combined params (sync dengan position + lighting) - Updated to match augment_lighting.py
+  # Combined params (sync dengan position + lighting) - BALANCED values to prevent extreme images
   combined:
     horizontal_flip: 0.5
     rotation_limit: 12
     translate_limit: 0.08
     scale_limit: 0.04
-    brightness_limit: 0.6    # Updated to match lighting extreme variations
-    contrast_limit: 0.3      # Updated to match lighting extreme variations
-    hsv_hue: 15              # Updated to match lighting extreme variations
-    hsv_saturation: 20       # Updated to match lighting extreme variations
+    brightness_limit: 0.3    # REDUCED from 0.6 to prevent extreme black/white images
+    contrast_limit: 0.25     # REDUCED from 0.3 for more natural contrast
+    hsv_hue: 12              # REDUCED from 15 for more natural color variations
+    hsv_saturation: 15       # REDUCED from 20 for balanced saturation changes
 
 # Normalization form fields
 preprocessing:

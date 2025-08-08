@@ -16,7 +16,7 @@ from smartcash.model.evaluation.utils.inference_timer import InferenceTimer
 from smartcash.model.evaluation.utils.results_aggregator import ResultsAggregator
 from smartcash.model.evaluation.visualization.evaluation_chart_generator import EvaluationChartGenerator
 from smartcash.model.evaluation.evaluators.scenario_evaluator import create_scenario_evaluator
-from smartcash.model.evaluation.utils.model_config_extractor import create_model_config_extractor
+from smartcash.model.inference.inference_service import InferenceService
 
 
 class MockProgressBridge:
@@ -47,10 +47,10 @@ class MockProgressBridge:
 class EvaluationService:
     """Main evaluation service orchestrator - SRP refactored version"""
     
-    def __init__(self, model_api=None, config: Dict[str, Any] = None):
+    def __init__(self, config: Dict[str, Any] = None):
         self.logger = get_logger('evaluation_service')
         self.config = self._normalize_config(config)
-        self.model_api = model_api
+        self.inference_service = InferenceService(config)
         self._shutdown_requested = False
         
         # Initialize core components
@@ -87,7 +87,6 @@ class EvaluationService:
             self.checkpoint_selector = CheckpointSelector(config=self.config)
             self.inference_timer = InferenceTimer(self.config)
             self.results_aggregator = ResultsAggregator(self.config)
-            self.model_config_extractor = create_model_config_extractor()
             
             # Initialize chart generator for visualization
             chart_config = self.config.get('evaluation', {}).get('export', {})
@@ -132,32 +131,8 @@ class EvaluationService:
         try:
             self.logger.info("🧹 Performing cleanup...")
             
-            # Cleanup model resources
-            if hasattr(self, 'model_api') and self.model_api:
-                if hasattr(self.model_api, 'model') and self.model_api.model:
-                    # Move model to CPU to free GPU memory
-                    try:
-                        self.model_api.model.cpu()
-                        self.logger.debug("Model moved to CPU")
-                    except:
-                        pass
-            
-            # Cleanup chart generator
-            if hasattr(self, 'chart_generator') and self.chart_generator:
-                try:
-                    # Ensure any pending chart operations are completed
-                    pass
-                except:
-                    pass
-            
-            # Clear CUDA cache if available
-            try:
-                import torch
-                if torch.cuda.is_available():
-                    torch.cuda.empty_cache()
-                    self.logger.debug("CUDA cache cleared")
-            except:
-                pass
+            if self.inference_service:
+                self.inference_service.cleanup()
             
             self.logger.info("✅ Cleanup completed")
             
@@ -322,7 +297,7 @@ class EvaluationService:
         return scenario_evaluator.evaluate_scenario(
             scenario_name=scenario_name,
             checkpoint_info=checkpoint_info,
-            model_api=self.model_api,
+            inference_service=self.inference_service,
             progress_callback=progress_callback
         )
     
@@ -336,20 +311,8 @@ class EvaluationService:
                 self.logger.debug(f"🚀 Skipping checkpoint reload - model already loaded (optimization)")
                 return checkpoint_info
             
-            if self.model_api:
-                # Load model with checkpoint using latest API
-                load_result = self.model_api.load_checkpoint(checkpoint_path)
-                if load_result.get('success', False):
-                    checkpoint_info['model_loaded'] = True
-                    checkpoint_info['architecture_type'] = load_result.get('architecture_type', 'yolov5')
-                    checkpoint_info['model_info'] = load_result.get('model_info', {})
-                    self.logger.info(f"✅ Model loaded: {checkpoint_info['display_name']} ({checkpoint_info['architecture_type']})")
-                else:
-                    self.logger.warning(f"⚠️ Model load failed: {checkpoint_path}")
-                    checkpoint_info['model_loaded'] = False
-            else:
-                # Create model API using checkpoint metadata
-                checkpoint_info['model_loaded'] = self._create_model_api_from_checkpoint(checkpoint_info, checkpoint_path)
+            self.inference_service.load_model(checkpoint_path)
+            checkpoint_info['model_loaded'] = True
             
             return checkpoint_info
             
@@ -357,48 +320,7 @@ class EvaluationService:
             self.logger.error(f"❌ Checkpoint load error: {str(e)}")
             return None
     
-    def _create_model_api_from_checkpoint(self, checkpoint_info: Dict[str, Any], checkpoint_path: str) -> bool:
-        """🔧 Create model API from checkpoint metadata"""
-        try:
-            from smartcash.model.api.core import create_api
-            
-            # Extract model configuration from checkpoint
-            model_config = self.model_config_extractor.extract_model_config_from_checkpoint(checkpoint_info)
-            
-            # Create API with extracted configuration
-            self.model_api = create_api(
-                config=model_config,
-                use_yolov5_integration=True
-            )
-            
-            # Build model first with proper configuration
-            build_result = self.model_api.build_model(
-                backbone=checkpoint_info.get('backbone', 'cspdarknet'),
-                num_classes=17,  # Force hierarchical prediction
-                img_size=model_config.get('img_size', 640),
-                layer_mode=checkpoint_info.get('layer_mode', 'multi'),
-                detection_layers=['layer_1', 'layer_2', 'layer_3'],
-                pretrained=False  # We'll load weights from checkpoint
-            )
-            
-            if build_result.get('success', False):
-                # Now load checkpoint weights
-                load_result = self.model_api.load_checkpoint(checkpoint_path)
-                if load_result.get('success', False):
-                    checkpoint_info['architecture_type'] = load_result.get('architecture_type', 'yolov5')
-                    checkpoint_info['model_info'] = load_result.get('model_info', {})
-                    self.logger.info(f"✅ Model API created and loaded: {checkpoint_info['display_name']}")
-                    return True
-                else:
-                    self.logger.warning(f"⚠️ Failed to load checkpoint weights: {checkpoint_path}")
-                    return False
-            else:
-                self.logger.warning(f"⚠️ Failed to build model: {build_result.get('error', 'Unknown error')}")
-                return False
-                
-        except Exception as api_error:
-            self.logger.warning(f"⚠️ Failed to create model API: {api_error}")
-            return False
+    
     
     def _generate_charts(self, evaluation_results: Dict[str, Any], scenarios: List[str], 
                         checkpoints: List[str], summary: Dict[str, Any]) -> List[str]:
@@ -494,14 +416,14 @@ class EvaluationService:
 
 
 # Factory functions
-def create_evaluation_service(model_api=None, config: Dict[str, Any] = None) -> EvaluationService:
+def create_evaluation_service(config: Dict[str, Any] = None) -> EvaluationService:
     """🏭 Factory for EvaluationService"""
-    return EvaluationService(model_api, config)
+    return EvaluationService(config)
 
 
 def run_evaluation_pipeline(scenarios: List[str] = None, checkpoints: List[str] = None,
-                           model_api=None, config: Dict[str, Any] = None,
+                           config: Dict[str, Any] = None,
                            progress_callback=None, ui_components: Dict[str, Any] = None) -> Dict[str, Any]:
     """🚀 One-liner for run complete evaluation pipeline"""
-    service = create_evaluation_service(model_api, config)
+    service = create_evaluation_service(config)
     return service.run_evaluation(scenarios, checkpoints, progress_callback, ui_components=ui_components)

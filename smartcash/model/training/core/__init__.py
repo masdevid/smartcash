@@ -8,15 +8,32 @@ Single Responsibility Principle (SRP) design.
 from .training_executor import TrainingExecutor
 from .validation_executor import ValidationExecutor
 from .prediction_processor import PredictionProcessor
-# mAP calculator modules removed - calculation disabled for performance
-# TrainingCheckpointAdapter removed - using CheckpointManager directly
 from .progress_manager import ProgressManager
 
+# Import mAP calculator and utilities
+from .yolov5_map_calculator import (
+    YOLOv5MapCalculator,  # Now uses Ultralytics backend
+    UltralyticsMapCalculator,
+    get_box_iou,
+    get_xywh2xyxy,
+    get_non_max_suppression,
+    get_ap_per_class
+)
+
 __all__ = [
+    # Core components
     'TrainingExecutor', 
     'ValidationExecutor',
     'PredictionProcessor',
-    # mAP calculator classes removed
-    # TrainingCheckpointAdapter removed - using CheckpointManager directly
-    'ProgressManager'
+    'ProgressManager',
+    
+    # mAP calculator (now with Ultralytics backend)
+    'YOLOv5MapCalculator',
+    'UltralyticsMapCalculator',
+    
+    # Utility functions
+    'get_box_iou',
+    'get_xywh2xyxy',
+    'get_non_max_suppression',
+    'get_ap_per_class'
 ]

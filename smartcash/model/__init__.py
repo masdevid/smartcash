@@ -24,19 +24,12 @@ from .training import (
 # Main training API moved to .api.core.run_full_training_pipeline
 
 # Fase 3: Analysis & Evaluation
-from .analysis.analysis_service import AnalysisService
-from .analysis.class_analyzer import ClassAnalyzer
-from .analysis.currency_analyzer import CurrencyAnalyzer
-from .analysis.layer_analyzer import LayerAnalyzer
 
 from .evaluation import (
     EvaluationService, CheckpointSelector, ScenarioManager
 )
 
-# Fase 4: Reporting
-from .reporting import (
-    ReportService, ResearchGenerator, SummaryGenerator, ComparisonGenerator
-)
+
 
 # Re-export quick functions from API
 from .api.core import quick_build_model
@@ -76,13 +69,10 @@ __all__ = [
     'create_training_service', 'get_training_info',
     
     # Fase 3 - Analysis & Evaluation
-    'AnalysisService', 'ClassAnalyzer', 'CurrencyAnalyzer', 
-    'LayerAnalyzer', 'EvaluationService', 'CheckpointSelector',
+    'EvaluationService', 'CheckpointSelector',
     'EvaluationMetrics', 'ScenarioManager',
     
     # Fase 4 - Reporting
-    'ReportService', 'ResearchGenerator', 'SummaryGenerator', 
-    'ComparisonGenerator',
     
     # Quick functions
     'quick_build_model', 'quick_train_model', 'get_model_status'

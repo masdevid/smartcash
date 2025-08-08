@@ -19,7 +19,7 @@ from smartcash.model.config.model_config_manager import (
     create_model_configuration_manager,
 )
 from smartcash.model.training.phases import create_phase_setup_manager
-from smartcash.model.training.visualization_manager import create_visualization_manager
+from smartcash.model.training.visualization import VisualizationManager
 
 logger = get_logger(__name__)
 
@@ -82,7 +82,7 @@ class PipelineOrchestrator(CallbacksMixin):
         # Component managers (initialized when pipeline starts)
         self.model_config_manager = None
         self.phase_setup_manager = None
-        self.training_visualization_manager = None
+        self.visualization_manager = None  # Updated to use new visualization package
 
     def _initialize_components(self, model, config):
         """Initialize all pipeline components."""
@@ -93,14 +93,23 @@ class PipelineOrchestrator(CallbacksMixin):
             # Initialize phase setup manager
             self.phase_setup_manager = create_phase_setup_manager(model, config)
             
-            # Initialize visualization manager
+            # Initialize visualization manager with the new package
             num_classes_per_layer = {
                 'layer_1': 7,  # Banknote denominations
                 'layer_2': 7,  # Denomination features  
                 'layer_3': 3   # Common features
             }
-            self.training_visualization_manager = create_visualization_manager(
+            
+            # Define class names for better visualization
+            class_names = {
+                'layer_1': [str(i) for i in range(7)],  # Example class names for layer 1
+                'layer_2': [str(i) for i in range(7)],  # Example class names for layer 2
+                'layer_3': [str(i) for i in range(3)]   # Example class names for layer 3
+            }
+            
+            self.visualization_manager = VisualizationManager(
                 num_classes_per_layer=num_classes_per_layer,
+                class_names=class_names,
                 save_dir="outputs/training_visualizations",
                 verbose=config.get("verbose", False)
             )
@@ -222,9 +231,9 @@ class PipelineOrchestrator(CallbacksMixin):
                 progress_callback=self.progress_callback,
             )
             
-            # Pass training visualization manager to phase executor for real-time updates
-            if self.training_visualization_manager:
-                phase_executor.set_training_visualization_manager(self.training_visualization_manager)
+            # Set visualization manager for phase executor
+            if self.visualization_manager:
+                phase_executor.set_training_visualization_manager(self.visualization_manager)
 
             # Create weight transfer manager
             weight_transfer_manager = create_weight_transfer_manager()
@@ -408,29 +417,29 @@ class PipelineOrchestrator(CallbacksMixin):
 
             # Generate comprehensive training visualizations
             self.emit_log("info", "📊 Generating comprehensive training visualizations...")
-            visualization_results = {}
-            
-            if self.training_visualization_manager:
+            # Generate final visualizations if visualization manager is available
+            if self.visualization_manager:
                 try:
-                    # Determine current phase for context
-                    current_phase = self._determine_training_phase(training_results)
-                    session_id = f"training_{self.config.get('backbone', 'unknown')}_{int(time.time())}"
+                    # Generate all available charts
+                    results = self.visualization_manager.generate_all_charts()
                     
-                    # Generate all comprehensive charts
-                    generated_charts = self.training_visualization_manager.generate_comprehensive_charts(
-                        session_id=session_id,
-                        phase_num=current_phase
-                    )
+                    if results:
+                        self.emit_log("info", f"✅ Generated visualization charts")
+                        
+                        # Log the paths of generated files
+                        for chart_type, path in results.items():
+                            if isinstance(path, dict):
+                                for layer, layer_path in path.items():
+                                    self.emit_log("debug", f"Generated {chart_type} for {layer}: {layer_path}")
+                            else:
+                                self.emit_log("debug", f"Generated {chart_type}: {path}")
                     
-                    if generated_charts:
-                        visualization_results.update(generated_charts)
-                        self.emit_log("info", f"✅ Generated {len(generated_charts)} comprehensive training visualizations")
-                        for chart_type, path in generated_charts.items():
-                            self.emit_log("info", f"   📊 {chart_type}: {path}")
-                    else:
-                        self.emit_log("warning", "⚠️ No training visualizations generated (insufficient data)")
+                    # Save metrics summary
+                    summary_path = self.visualization_manager.save_metrics_summary()
+                    self.emit_log("info", f"📊 Saved metrics summary to {summary_path}")
                         
                 except Exception as e:
+                    self.emit_log("error", f"Failed to generate training visualizations: {e}", exc_info=True)
                     self.emit_log("error", f"❌ Failed to generate training visualizations: {str(e)}")
                     visualization_results["chart_error"] = str(e)
             else:

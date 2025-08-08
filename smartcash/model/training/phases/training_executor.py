@@ -80,7 +80,7 @@ class TrainingPhaseExecutor(CallbacksMixin, MetricsProcessingMixin):
         
         # Training state
         self.current_phase = None
-        self.training_visualization_manager = None
+        self.visualization_manager = None  # Updated to use new visualization package
         
         logger.info("🏃 TrainingPhaseExecutor initialized")
     
@@ -120,10 +120,14 @@ class TrainingPhaseExecutor(CallbacksMixin, MetricsProcessingMixin):
             raise
     
     def set_training_visualization_manager(self, visualization_manager):
-        """Set the training visualization manager for real-time metrics tracking."""
-        self.training_visualization_manager = visualization_manager
+        """Set the training visualization manager for real-time metrics tracking.
+        
+        Args:
+            visualization_manager: Instance of VisualizationManager from the new visualization package
+        """
+        self.visualization_manager = visualization_manager
         if visualization_manager:
-            logger.info("📊 Training visualization manager connected for real-time metrics tracking")
+            logger.info("📊 Visualization manager connected for real-time metrics tracking")
     
     def _execute_training_loop(self, components: Dict[str, Any], phase_num: int, 
                               total_epochs: int, start_epoch: int) -> Dict[str, Any]:
@@ -206,16 +210,23 @@ class TrainingPhaseExecutor(CallbacksMixin, MetricsProcessingMixin):
             if components.get('metrics_recorder'):
                 components['metrics_recorder'].record_epoch(epoch, phase_num, final_metrics)
             
-            # Update training visualization manager with real-time metrics
-            if self.training_visualization_manager:
+            # Update visualization manager with real-time metrics
+            if self.visualization_manager:
                 try:
-                    self.training_visualization_manager.update_with_research_metrics(
+                    # Convert phase_num to phase name for better readability
+                    phase_name = f"phase_{phase_num}"
+                    
+                    # Update metrics using the new visualization package
+                    self.visualization_manager.update_metrics(
                         epoch=epoch,
-                        phase_num=phase_num,
-                        metrics=final_metrics
+                        metrics=final_metrics,
+                        phase=phase_name,
+                        learning_rate=final_metrics.get('learning_rate')
                     )
                 except Exception as e:
-                    logger.debug(f"Failed to update training visualization: {e}")
+                    logger.debug(f"Failed to update visualization: {e}")
+                    if self.visualization_manager.verbose:
+                        logger.error(f"Visualization error: {str(e)}")
             
             # Handle early stopping
             should_stop = False

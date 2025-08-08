@@ -9,11 +9,12 @@ import time
 
 from smartcash.common.logger import get_logger
 from smartcash.model.training.core.yolov5_map_calculator import YOLOv5MapCalculator
-from smartcash.model.evaluation.processors.data_loader import create_evaluation_data_loader
+from smartcash.model.evaluation.processors.data_loader import EvaluationDataLoader
 from smartcash.model.evaluation.processors.inference_processor import create_inference_processor
+from smartcash.model.inference.inference_service import InferenceService
 # Hierarchical metrics calculator removed - SmartCash models handle metrics internally
 # from smartcash.model.evaluation.metrics.hierarchical_metrics_calculator import create_hierarchical_metrics_calculator
-from smartcash.model.evaluation.converters.yolov5_format_converter import create_yolov5_format_converter
+
 
 
 class ScenarioEvaluator:
@@ -26,10 +27,9 @@ class ScenarioEvaluator:
         self.num_classes = num_classes
         
         # Initialize components
-        self.data_loader = create_evaluation_data_loader()
+        self.data_loader = EvaluationDataLoader()
         # Hierarchical metrics removed - SmartCash models handle metrics internally
         self.hierarchical_metrics = None  # Placeholder for backward compatibility
-        self.yolov5_converter = create_yolov5_format_converter(num_classes=num_classes)
         
         # Use training module's YOLOv5 mAP calculator for consistency
         self.map_calculator = YOLOv5MapCalculator(
@@ -41,7 +41,7 @@ class ScenarioEvaluator:
         )
     
     def evaluate_scenario(self, scenario_name: str, checkpoint_info: Dict[str, Any], 
-                         model_api=None, progress_callback=None) -> Dict[str, Any]:
+                         inference_service: InferenceService, progress_callback=None) -> Dict[str, Any]:
         """🧪 Evaluate single scenario with specific checkpoint"""
         
         # Get scenario data path
@@ -72,7 +72,7 @@ class ScenarioEvaluator:
         if progress_callback:
             progress_callback(30, "Running inference")
         
-        inference_processor = create_inference_processor(model_api=model_api, inference_timer=self.inference_timer)
+        inference_processor = create_inference_processor(inference_service=inference_service, inference_timer=self.inference_timer)
         predictions, inference_times = inference_processor.run_inference_with_timing(
             test_data['images'], checkpoint_info
         )
@@ -106,18 +106,11 @@ class ScenarioEvaluator:
                                           inference_times: List[float] = None) -> Dict[str, Any]:
         """📊 Calculate mAP using training module's YOLOv5 calculator for consistency"""
         try:
-            # Convert evaluation format to YOLOv5 training format
-            yolo_predictions, yolo_targets = self.yolov5_converter.convert_to_yolo_format(predictions, ground_truths)
-            
-            if yolo_predictions is None or yolo_targets is None:
-                self.logger.warning("Failed to convert predictions/targets to YOLOv5 format")
-                return self._get_empty_metrics(inference_times)
-            
             # Reset mAP calculator for new evaluation
             self.map_calculator.reset()
             
             # Update with converted data
-            self.map_calculator.update(yolo_predictions, yolo_targets)
+            self.map_calculator.update(predictions, ground_truths)
             
             # Calculate final mAP
             map_results = self.map_calculator.compute_map()

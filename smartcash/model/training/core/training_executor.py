@@ -148,24 +148,22 @@ class TrainingExecutor:
         return train_metrics
     
     def _process_training_batch(self, images, targets, loss_manager, batch_idx, num_batches, phase_num):
-        """Process a single training batch."""
-        # Cache device detection for performance
+        """Process a single training batch (OPTIMIZED)."""
+        # OPTIMIZATION: Cache device detection and model type for performance
         if not hasattr(self, '_cached_device'):
             self._cached_device = next(self.model.parameters()).device
+            self._cached_is_smartcash = self._is_smartcash_model()
+            self._cached_use_amp = hasattr(self, 'scaler') and self.scaler is not None
         
-        # Move data to device efficiently
+        # Move data to device efficiently with pre-cached device
         images = images.to(self._cached_device, non_blocking=True)
         targets = targets.to(self._cached_device, non_blocking=True)
         
-        # Forward pass with mixed precision (cache scaler check)
-        if not hasattr(self, '_use_amp'):
-            self._use_amp = hasattr(self, 'scaler') and self.scaler is not None
-        
-        with autocast('cuda', enabled=self._use_amp):
+        with autocast('cuda', enabled=self._cached_use_amp):
             predictions = self.model(images)
             
-            # Normalize predictions format - skip for SmartCash models
-            if not self._is_smartcash_model():
+            # Normalize predictions format - skip for SmartCash models (use cached check)
+            if not self._cached_is_smartcash:
                 predictions = self.prediction_processor.normalize_training_predictions(
                     predictions, phase_num, batch_idx
                 )
@@ -186,8 +184,8 @@ class TrainingExecutor:
                         predictions, targets, self._cached_device
                     )
             
-            # Calculate loss - handle SmartCash models differently
-            if self._is_smartcash_model():
+            # Calculate loss - handle SmartCash models differently (use cached check)
+            if self._cached_is_smartcash:
                 loss = self._compute_smartcash_loss(predictions, targets, images.shape[-1])
                 loss_breakdown = {'total_loss': loss.item(), 'smartcash_loss': loss.item()}
             else:
@@ -252,10 +250,10 @@ class TrainingExecutor:
 
     def _should_process_batch_for_metrics(self, batch_idx: int, num_batches: int) -> bool:
         """
-        Determine if this batch should be processed for metrics (BALANCED OPTIMIZATION).
+        Determine if this batch should be processed for metrics (OPTIMIZED FOR SPEED).
         
-        Process enough batches to get accurate layer metrics while maintaining performance.
-        Balance between speed and metrics accuracy.
+        Minimal sampling approach: process only key batches for essential metrics
+        while maximizing training throughput.
         
         Args:
             batch_idx: Current batch index
@@ -264,9 +262,9 @@ class TrainingExecutor:
         Returns:
             True if this batch should be processed for metrics
         """
-        # Process every 5th batch for better layer metrics (20% sampling)
-        # This provides better accuracy for layer metrics while still optimizing speed
-        return batch_idx % 5 == 0 or batch_idx == num_batches - 1  # Always process last batch
+        # OPTIMIZED: Process only every 10th batch for minimal overhead (10% sampling)
+        # Plus first and last batch for consistency
+        return batch_idx == 0 or batch_idx % 10 == 0 or batch_idx == num_batches - 1
     
     def _should_use_full_metrics_processing(self, predictions: Dict, phase_num: int) -> bool:
         """
@@ -312,7 +310,9 @@ class TrainingExecutor:
     
     def _accumulate_batch_metrics(self, processed_predictions, processed_targets, batch_idx: int):
         """
-        Accumulate predictions and targets from current batch.
+        Accumulate predictions and targets from current batch (MEMORY OPTIMIZED).
+        
+        OPTIMIZED: Use memory-efficient accumulation with size limits and sampling.
         
         Args:
             processed_predictions: Processed predictions from current batch
@@ -321,6 +321,9 @@ class TrainingExecutor:
         """
         try:
             self._batch_count += 1
+            
+            # OPTIMIZATION: Limit accumulation to prevent memory bloat
+            MAX_ACCUMULATED_BATCHES = 20  # Limit total accumulated batches
             
             # Handle dict-based predictions (multi-layer)
             if isinstance(processed_predictions, dict) and isinstance(processed_targets, dict):
@@ -331,12 +334,25 @@ class TrainingExecutor:
                             self._accumulated_predictions[layer_name] = []
                             self._accumulated_targets[layer_name] = []
                         
+                        # MEMORY OPTIMIZATION: Skip accumulation if we have enough samples
+                        current_count = len(self._accumulated_predictions[layer_name])
+                        if current_count >= MAX_ACCUMULATED_BATCHES:
+                            continue  # Skip this layer to prevent memory bloat
+                        
                         # Accumulate predictions and targets for this layer
                         pred_tensor = processed_predictions[layer_name]
                         target_tensor = processed_targets[layer_name]
                         
                         if pred_tensor is not None and target_tensor is not None:
-                            # Convert to CPU and detach to avoid memory issues
+                            # OPTIMIZATION: Sample data to reduce memory usage
+                            if isinstance(pred_tensor, torch.Tensor) and pred_tensor.shape[0] > 100:
+                                # Sample max 100 predictions per batch to reduce memory
+                                indices = torch.randperm(pred_tensor.shape[0])[:100]
+                                pred_tensor = pred_tensor[indices]
+                                if isinstance(target_tensor, torch.Tensor) and target_tensor.shape[0] > 100:
+                                    target_tensor = target_tensor[indices[:target_tensor.shape[0]]]
+                            
+                            # Convert to CPU and detach (optimized)
                             if isinstance(pred_tensor, torch.Tensor):
                                 pred_tensor = pred_tensor.detach().cpu()
                             if isinstance(target_tensor, torch.Tensor):

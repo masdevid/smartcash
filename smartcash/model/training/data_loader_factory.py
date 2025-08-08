@@ -18,26 +18,46 @@ import yaml
 class YOLODataset(Dataset):
     """Dataset class untuk YOLO format dengan preprocessed .npy files"""
     
-    def __init__(self, images_dir: str, labels_dir: str, img_size: int = 640, augment: bool = False):
+    def __init__(self, images_dir: str, labels_dir: str, img_size: int = 640, 
+                 augment: bool = False, max_samples: Optional[int] = None):
+        """
+        Initialize YOLO dataset.
+        
+        Args:
+            images_dir: Directory containing image .npy files
+            labels_dir: Directory containing label .txt files
+            img_size: Target image size (height=width)
+            augment: Whether to apply data augmentation
+            max_samples: Maximum number of samples to use (for testing)
+        """
         self.images_dir = Path(images_dir)
         self.labels_dir = Path(labels_dir)
         self.img_size = img_size
         self.augment = augment
         
-        # Get preprocessed .npy files (pre_**.npy dan aug_**_{variance}.npy)
+        # Get preprocessed .npy files (pre_**.npy and aug_**_{variance}.npy)
         npy_files = list(self.images_dir.glob('*.npy'))
         self.image_files = [f for f in npy_files if f.name.startswith(('pre_', 'aug_'))]
         self.image_files.sort()
         
-        # Filter files dengan label yang ada
+        # Filter files with existing labels
         self.valid_files = []
         for npy_file in self.image_files:
             label_file = self.labels_dir / f"{npy_file.stem}.txt"
             if label_file.exists():
                 self.valid_files.append(npy_file)
+                
+        # Limit number of samples if max_samples is specified
+        self.max_samples = max_samples
+        if self.max_samples is not None and self.max_samples > 0:
+            self.valid_files = self.valid_files[:self.max_samples]
+            print(f"[DEBUG] YOLODataset: Limited to {self.max_samples} samples")
     
     def __len__(self) -> int:
-        return len(self.valid_files)
+        length = len(self.valid_files)
+        if hasattr(self, 'max_samples') and self.max_samples is not None:
+            print(f"[DEBUG] YOLODataset.__len__: Returning {length} samples (max_samples={self.max_samples})")
+        return length
     
     def __getitem__(self, idx: int) -> Tuple[torch.Tensor, torch.Tensor]:
         npy_path = self.valid_files[idx]
@@ -220,16 +240,28 @@ class DataLoaderFactory:
             if not labels_dir.exists():
                 raise FileNotFoundError(f"❌ Labels directory tidak ditemukan: {labels_dir}")
     
-    def create_train_loader(self, img_size: int = 640) -> DataLoader:
-        """Create training data loader"""
+    def create_train_loader(self, img_size: int = 640, max_samples: Optional[int] = None) -> DataLoader:
+        """
+        Create training data loader
+        
+        Args:
+            img_size: Target image size (height=width)
+            max_samples: Maximum number of samples to use (for testing)
+            
+        Returns:
+            DataLoader for training data
+        """
+        print(f"[DEBUG] create_train_loader called with max_samples={max_samples}")
         images_dir = self.data_dir / 'train' / 'images'
         labels_dir = self.data_dir / 'train' / 'labels'
+        print(f"[DEBUG] Loading training data from {images_dir}")
         
         dataset = YOLODataset(
             images_dir=str(images_dir),
             labels_dir=str(labels_dir),
             img_size=img_size,
-            augment=True
+            augment=True,
+            max_samples=max_samples
         )
         
         data_config = self.config.get('training', {}).get('data', {})
@@ -298,8 +330,18 @@ class DataLoaderFactory:
         self._dataloaders.append(loader)
         return loader
     
-    def create_val_loader(self, img_size: int = 640) -> DataLoader:
-        """Create validation data loader"""
+    def create_val_loader(self, img_size: int = 640, max_samples: Optional[int] = None) -> DataLoader:
+        print(f"[DEBUG] create_val_loader called with max_samples={max_samples}")
+        """
+        Create validation data loader
+        
+        Args:
+            img_size: Target image size (height=width)
+            max_samples: Maximum number of samples to use (for testing)
+            
+        Returns:
+            DataLoader for validation data
+        """
         images_dir = self.data_dir / 'valid' / 'images'
         labels_dir = self.data_dir / 'valid' / 'labels'
         
@@ -307,7 +349,8 @@ class DataLoaderFactory:
             images_dir=str(images_dir),
             labels_dir=str(labels_dir),
             img_size=img_size,
-            augment=False
+            augment=False,
+            max_samples=max_samples
         )
         
         data_config = self.config.get('training', {}).get('data', {})
@@ -361,8 +404,18 @@ class DataLoaderFactory:
         self._dataloaders.append(loader)
         return loader
     
-    def create_test_loader(self, img_size: int = 640) -> Optional[DataLoader]:
-        """Create test data loader jika tersedia"""
+    def create_test_loader(self, img_size: int = 640, max_samples: Optional[int] = None) -> Optional[DataLoader]:
+        print(f"[DEBUG] create_test_loader called with max_samples={max_samples}")
+        """
+        Create test data loader if available
+        
+        Args:
+            img_size: Target image size (height=width)
+            max_samples: Maximum number of samples to use (for testing)
+            
+        Returns:
+            DataLoader for test data if available, else None
+        """
         images_dir = self.data_dir / 'test' / 'images'
         labels_dir = self.data_dir / 'test' / 'labels'
         
@@ -373,7 +426,8 @@ class DataLoaderFactory:
             images_dir=str(images_dir),
             labels_dir=str(labels_dir),
             img_size=img_size,
-            augment=False
+            augment=False,
+            max_samples=max_samples
         )
         
         data_config = self.config.get('training', {}).get('data', {})

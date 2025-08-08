@@ -19,7 +19,7 @@ import torch
 from typing import Optional, Tuple, Dict, Any
 
 from smartcash.common.logger import get_logger
-from .yolo_utils_manager import get_xywh2xyxy, get_box_iou
+from .ultralytics_utils_manager import get_xywh2xyxy, get_box_iou
 from .memory_optimized_processor import MemoryOptimizedProcessor
 
 logger = get_logger(__name__, level="DEBUG")
@@ -415,37 +415,14 @@ class BatchProcessor:
             # Direct computation for reasonable sizes
             iou_matrix = get_box_iou()(pred_boxes, target_boxes_xyxy)
             
-            # IoU DISTRIBUTION DEBUG LOGGING - Use MapDebugLogger if available
+            # IoU DISTRIBUTION DEBUG LOGGING - Simplified
             if self.debug and iou_matrix is not None and iou_matrix.numel() > 0:
-                # Check if we have access to the debug logger through a parent reference
-                debug_logger = getattr(self, 'debug_logger', None)
-                if debug_logger and hasattr(debug_logger, 'log_iou_distribution_analysis'):
-                    # Convert to expected format for the debug logger
-                    # Need to reconstruct predictions tensor from pred_boxes for debug logger
-                    try:
-                        # Create minimal predictions tensor with bbox coords for debugging
-                        batch_size = 1  # Assuming single batch
-                        num_preds = pred_boxes.shape[0]
-                        debug_predictions = torch.zeros(batch_size, num_preds, 6)  # x,y,w,h,conf,class
-                        debug_predictions[0, :, :4] = pred_boxes  # Copy bbox coordinates
-                        
-                        # Create minimal targets tensor with batch_idx and class info
-                        num_targets = target_boxes_xyxy.shape[0]
-                        debug_targets = torch.zeros(num_targets, 6)  # batch_idx, class, x, y, w, h
-                        debug_targets[:, 2:6] = target_boxes_xyxy  # Copy bbox coordinates
-                        
-                        debug_logger.log_iou_distribution_analysis(iou_matrix, debug_predictions, debug_targets)
-                    except Exception as e:
-                        logger.debug(f"Debug logger analysis failed: {e}")
-                        
-                # Fallback to basic logging if debug logger not available
+                max_ious, _ = torch.max(iou_matrix, dim=1)
+                valid_ious = max_ious[max_ious > 0]
+                if len(valid_ious) > 0:
+                    logger.debug(f"🔍 IoU DISTRIBUTION: Max={max_ious.max().item():.4f}, Mean={valid_ious.mean().item():.4f}")
                 else:
-                    max_ious, _ = torch.max(iou_matrix, dim=1)
-                    valid_ious = max_ious[max_ious > 0]
-                    if len(valid_ious) > 0:
-                        logger.debug(f"🔍 IoU DISTRIBUTION: Max={max_ious.max().item():.4f}, Mean={valid_ious.mean().item():.4f}")
-                    else:
-                        logger.debug(f"❌ IoU ANALYSIS: ALL IoUs are ZERO! Matrix shape: {iou_matrix.shape}")
+                    logger.debug(f"❌ IoU ANALYSIS: ALL IoUs are ZERO! Matrix shape: {iou_matrix.shape}")
             
             return iou_matrix
             

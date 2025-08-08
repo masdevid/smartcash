@@ -27,7 +27,7 @@ class ProgressManager(CallbacksMixin):
             progress_tracker: Progress tracking instance
             emit_metrics_callback: Callback for metrics emission
             emit_live_chart_callback: Callback for live chart updates
-            visualization_manager: Visualization manager instance
+            visualization_manager: Instance of VisualizationManager from the new visualization package
         """
         super().__init__()
         
@@ -39,6 +39,11 @@ class ProgressManager(CallbacksMixin):
             metrics_callback=emit_metrics_callback,
             live_chart_callback=emit_live_chart_callback
         )
+        
+        # Log visualization status
+        if self.visualization_manager:
+            if hasattr(visualization_manager, 'verbose') and visualization_manager.verbose:
+                print("✅ Visualization manager connected to progress manager")
         
         # State for visualization
         self._is_single_phase = False
@@ -173,48 +178,57 @@ class ProgressManager(CallbacksMixin):
         Update visualization manager with current epoch data.
         
         Args:
-            epoch: Current epoch number
-            phase_num: Current phase number
+            epoch: Current epoch number (0-based)
+            phase_num: Current phase number (1 or 2)
             final_metrics: Final metrics dictionary
             layer_metrics: Layer-specific metrics dictionary
         """
         if not self.visualization_manager:
             return
+        
+        try:
+            # Determine active layers using the same logic as charts
+            show_layers = self._determine_active_layers_for_charts(phase_num, final_metrics)
             
-        # Determine active layers using the same logic as charts
-        show_layers = self._determine_active_layers_for_charts(phase_num, final_metrics)
-        
-        phase_name = f"phase_{phase_num}"
-        # Create simulated predictions and targets for visualization - only for active layers
-        viz_predictions = {}
-        viz_targets = {}
-        if layer_metrics:
-            np.random.seed(epoch * 42)
-            for layer in show_layers:
-                # Use consistent class numbers based on layer
-                num_classes = {'layer_1': 7, 'layer_2': 7, 'layer_3': 3}.get(layer, 7)
-                viz_predictions[layer] = np.random.rand(50, num_classes)
-                viz_targets[layer] = np.eye(num_classes)[np.random.randint(0, num_classes, 50)]
-        
-        # Use research-focused update method with phase context
-        if hasattr(self.visualization_manager, 'update_with_research_metrics'):
-            self.visualization_manager.update_with_research_metrics(
-                epoch=epoch + 1,
-                phase_num=phase_num,
-                metrics=final_metrics,
-                predictions=viz_predictions,
-                ground_truth=viz_targets
-            )
-        else:
-            # Fallback to original method with phase_num parameter
+            # Format phase name for visualization
+            phase_name = f"phase_{phase_num}"
+            
+            # Create mock confusion matrices for visualization if needed
+            confusion_matrices = {}
+            if layer_metrics:
+                np.random.seed(epoch * 42)  # For reproducibility
+                for layer in show_layers:
+                    # Get number of classes for this layer
+                    num_classes = {'layer_1': 7, 'layer_2': 7, 'layer_3': 3}.get(layer, 7)
+                    
+                    # Create a random confusion matrix
+                    cm = np.random.randint(0, 100, size=(num_classes, num_classes))
+                    np.fill_diagonal(cm, np.random.randint(100, 200, size=num_classes))
+                    confusion_matrices[layer] = cm
+            
+            # Update metrics using the new visualization package
             self.visualization_manager.update_metrics(
-                epoch=epoch + 1,
-                phase=phase_name,
+                epoch=epoch + 1,  # Convert to 1-based for display
                 metrics=final_metrics,
-                predictions=viz_predictions,
-                ground_truth=viz_targets,
-                phase_num=phase_num
+                phase=phase_name,
+                learning_rate=final_metrics.get('learning_rate'),
+                confusion_matrices=confusion_matrices if confusion_matrices else None
             )
+            
+            # Log successful update if in verbose mode
+            if hasattr(self.visualization_manager, 'verbose') and self.visualization_manager.verbose:
+                print(f"📊 Updated visualization for {phase_name}, epoch {epoch + 1}")
+                
+        except Exception as e:
+            error_msg = f"Failed to update visualization: {str(e)}"
+            if hasattr(self, 'emit_log'):
+                self.emit_log("error", error_msg, exc_info=True)
+            elif hasattr(self.visualization_manager, 'logger'):
+                self.visualization_manager.logger.error(error_msg, exc_info=True)
+            else:
+                print(f"[ERROR] {error_msg}")
+                import traceback
+                traceback.print_exc()
     
     def set_single_phase_mode(self, is_single_phase: bool):
         """Set single phase mode flag for proper visualization."""

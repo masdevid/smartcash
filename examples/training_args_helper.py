@@ -92,8 +92,15 @@ Examples:
                        help='Learning rate for detection heads in phase 2 (default: 0.0001)')
     parser.add_argument('--backbone-lr', type=float, default=1e-05,
                        help='Learning rate for backbone (default: 1e-05)')
-    parser.add_argument('--batch-size', type=int, default=16,
-                       help='Batch size for training (default: 16, multiply LR by 3x when set to 32)')
+    
+    # Data loading arguments
+    data_group = parser.add_argument_group('Data Loading')
+    data_group.add_argument('--batch-size', type=int, default=16,
+                          help='batch size for training and validation')
+    data_group.add_argument('--num-workers', type=int, default=4,
+                          help='number of worker processes for data loading')
+    data_group.add_argument('--max-samples', type=int, default=None,
+                          help='maximum number of samples to use for training and validation (for testing)')
     
     # Optimizer configuration
     parser.add_argument('--optimizer', type=str, default='adamw',
@@ -314,12 +321,17 @@ def get_training_kwargs(args: Any) -> dict:
         # Single-phase specific parameters
         'single_phase_layer_mode': args.single_layer_mode,
         'single_phase_freeze_backbone': args.single_freeze_backbone,
+        # Data loading configuration
+        'data_config': {
+            'batch_size': args.batch_size,
+            'num_workers': args.num_workers,
+            'max_samples': args.max_samples,
+        },
         # Training configuration parameters
         'loss_type': args.loss_type,
         'head_lr_p1': args.head_lr_p1,
         'head_lr_p2': args.head_lr_p2,
         'backbone_lr': args.backbone_lr,
-        'batch_size': args.batch_size,
         # Optimizer and scheduler configuration parameters
         'optimizer': args.optimizer,
         'scheduler': args.scheduler,

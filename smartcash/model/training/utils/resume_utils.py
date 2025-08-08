@@ -9,6 +9,11 @@ import uuid
 from typing import Dict, Any, Tuple
 from smartcash.common.logger import get_logger
 from smartcash.model.core.checkpoints import CheckpointManager
+from smartcash.model.training.layers import (
+    validate_layer_params,
+    is_valid_layer_combination,
+    auto_determine_layer_mode
+)
 
 logger = get_logger(__name__)
 
@@ -191,7 +196,7 @@ def validate_training_mode_and_params(training_mode: str, single_phase_layer_mod
     
     Args:
         training_mode: Training mode ('single_phase', 'two_phase')
-        single_phase_layer_mode: Layer mode for single-phase training
+        single_phase_layer_mode: Layer mode for single-phase training ('single' or 'multi')
         single_phase_freeze_backbone: Whether to freeze backbone in single-phase training
         phase_2_epochs: Number of epochs for phase 2
         
@@ -203,16 +208,42 @@ def validate_training_mode_and_params(training_mode: str, single_phase_layer_mod
     if training_mode not in valid_modes:
         raise ValueError(f"Invalid training_mode: {training_mode}. Must be one of: {valid_modes}")
     
-    # Validate single-phase specific parameters
+    # Validate layer mode format
+    if not isinstance(single_phase_layer_mode, str) or single_phase_layer_mode.lower() not in ['single', 'multi']:
+        raise ValueError(
+            f"Invalid single_phase_layer_mode: {single_phase_layer_mode}. "
+            "Must be 'single' or 'multi'"
+        )
+    
+    # For single-phase training, validate layer mode
     if training_mode == 'single_phase':
-        valid_layer_modes = ['single', 'multi']
-        if single_phase_layer_mode not in valid_layer_modes:
-            raise ValueError(f"Invalid single_phase_layer_mode: {single_phase_layer_mode}. Must be one of: {valid_layer_modes}")
-        
-        # Warn about ignored phase_2_epochs in single-phase mode
-        if phase_2_epochs > 0:
-            logger.warning(f"⚠️ Single phase mode: ignoring phase2_epochs ({phase_2_epochs}), using only phase1_epochs")
+        # Use the new layer validation utilities
+        try:
+            # Validate layer parameters (will raise ValueError if invalid)
+            layer_mode, _ = validate_layer_params(
+                single_phase_layer_mode,
+                ['banknote']  # Default layer for validation
+            )
+            
+            # If layer mode was auto-corrected, log a warning
+            if layer_mode != single_phase_layer_mode:
+                logger.warning(
+                    f"Auto-corrected layer mode from '{single_phase_layer_mode}' to '{layer_mode}'"
+                )
+            
+            # Warn about ignored phase_2_epochs in single-phase mode
+            if phase_2_epochs > 0:
+                logger.warning(
+                    f"⚠️ Single phase mode: ignoring phase2_epochs ({phase_2_epochs}), "
+                    "using only phase1_epochs"
+                )
+                
+        except ValueError as ve:
+            raise ValueError(f"Invalid layer configuration: {str(ve)}")
     else:
-        # Log warning if single-phase parameters are used in two-phase mode
+        # For two-phase training, validate that single-phase parameters are not set
         if single_phase_layer_mode != 'multi' or single_phase_freeze_backbone != False:
-            logger.warning("⚠️ single_phase_layer_mode and single_phase_freeze_backbone are ignored in two_phase mode")
+            logger.warning(
+                "⚠️ single_phase_layer_mode and single_phase_freeze_backbone are "
+                "ignored in two_phase mode"
+            )

@@ -117,51 +117,49 @@ class PipelineFactory:
         return builders.get(aug_type, self._build_combined_pipeline)
     
     def _build_lighting_pipeline(self, intensity: float) -> A.Compose:
-        """🌟 Pipeline variasi pencahayaan - Updated to match augment_lighting.py extreme variations"""
+        """🌟 Pipeline variasi pencahayaan - BALANCED lighting variations (FIXED: reduced extreme values)"""
         lighting_config = self.aug_config.get('lighting', {})
         
-        # More extreme brightness ranges to match augment_lighting.py
-        # Original: (0.2, 0.5) for dark, (1.5, 2.5) for bright -> converted to albumentations format
-        brightness_limit = lighting_config.get('brightness_limit', 0.6) * intensity  # Increased from 0.2
-        contrast_limit = lighting_config.get('contrast_limit', 0.3) * intensity  # Increased from 0.15
-        hsv_hue = lighting_config.get('hsv_hue', 15)  # Increased from 10
-        hsv_saturation = lighting_config.get('hsv_saturation', 20)  # Increased from 15
+        # BALANCED brightness ranges - prevent complete black/white images
+        brightness_limit = lighting_config.get('brightness_limit', 0.3) * intensity  # Reduced from 0.6
+        contrast_limit = lighting_config.get('contrast_limit', 0.25) * intensity  # Reduced from 0.3
+        hsv_hue = lighting_config.get('hsv_hue', 12)  # Reduced from 15
+        hsv_saturation = lighting_config.get('hsv_saturation', 15)  # Reduced from 20
         
+        # FIXED: Create lighting pipeline with only pixel-level transforms (no bbox processing needed)
+        # This eliminates the bbox processor warning for pure lighting augmentation
         return A.Compose([
-            # Extreme brightness variations to match augment_lighting.py
+            # BALANCED lighting variations - prevent extreme black/white images
             A.OneOf([
-                # Dark variations (matches brightness 0.2-0.5 range)
-                A.RandomBrightnessContrast(brightness_limit=(-0.8, -0.5), contrast_limit=0, p=1.0),
-                # Bright variations (matches brightness 1.5-2.5 range)  
-                A.RandomBrightnessContrast(brightness_limit=(0.5, 1.5), contrast_limit=0, p=1.0),
-                # Normal contrast variations
+                # Subtle dark variations (FIXED: was -0.8 to -0.5, now more reasonable)
+                A.RandomBrightnessContrast(brightness_limit=(-0.3, -0.15), contrast_limit=(-0.2, 0.1), p=1.0),
+                # Subtle bright variations (FIXED: was 0.5 to 1.5, now more reasonable)  
+                A.RandomBrightnessContrast(brightness_limit=(0.15, 0.4), contrast_limit=(-0.1, 0.2), p=1.0),
+                # Standard brightness/contrast variations
                 A.RandomBrightnessContrast(
                     brightness_limit=brightness_limit,
                     contrast_limit=contrast_limit,
                     p=1.0
                 )
-            ], p=0.9),
+            ], p=0.8),
             
-            # Gamma correction to match augment_lighting.py (0.7, 1.3)
-            A.RandomGamma(gamma_limit=(70, 130), p=0.7),  # Increased probability and wider range
+            # Moderate gamma correction 
+            A.RandomGamma(gamma_limit=(85, 115), p=0.6),
             
-            # HSV variations to match augment_lighting.py ranges
+            # Moderate HSV variations
             A.HueSaturationValue(
-                hue_shift_limit=hsv_hue,  # Matches (-15, 15) range
-                sat_shift_limit=hsv_saturation,  # Matches (0.8, 1.2) scale
-                val_shift_limit=15,  # Increased for more variation
-                p=0.8  # Increased probability
+                hue_shift_limit=hsv_hue,
+                sat_shift_limit=hsv_saturation,
+                val_shift_limit=12,
+                p=0.7
             ),
             
-            # Keep some additional lighting effects but with lower probability
-            A.CLAHE(clip_limit=2.0 * intensity, tile_grid_size=(8, 8), p=0.3),  # Reduced probability
-            A.RandomShadow(
-                shadow_roi=(0, 0.5, 1, 1),
-                num_shadows_limit=(1, 2),
-                shadow_dimension=5,
-                p=0.2  # Reduced probability to focus on core lighting variations
-            )
-        ], bbox_params=A.BboxParams(format='yolo', label_fields=['class_labels']))
+            # Subtle lighting enhancement (FIXED: clip_limit must be >= 1.0)
+            A.CLAHE(clip_limit=max(1.0, 2.0 * intensity), tile_grid_size=(8, 8), p=0.2)
+            
+            # NOTE: Removed RandomShadow from lighting pipeline to eliminate bbox processor warning
+            # Shadow effects are better handled in combined/position pipelines where bbox processing is expected
+        ])
     
     def _build_position_pipeline(self, intensity: float) -> A.Compose:
         """📍 Pipeline variasi posisi"""
@@ -259,7 +257,7 @@ class PipelineFactory:
                 hue=0.1 * intensity,
                 p=0.5
             )
-        ], bbox_params=A.BboxParams(format='yolo', label_fields=['class_labels']))
+        ])  # FIXED: Removed bbox_params - color transforms don't affect bounding boxes
     
     def _build_noise_pipeline(self, intensity: float) -> A.Compose:
         """📡 Pipeline noise dan blur"""
@@ -272,7 +270,7 @@ class PipelineFactory:
             ),
             A.Blur(blur_limit=int(3 * intensity), p=0.3),
             A.MotionBlur(blur_limit=int(7 * intensity), p=0.3)
-        ], bbox_params=A.BboxParams(format='yolo', label_fields=['class_labels']))
+        ])  # FIXED: Removed bbox_params - noise/blur transforms don't affect bounding boxes
 
 
 # Utility functions

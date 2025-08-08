@@ -74,8 +74,6 @@ def main():
     os.makedirs(output_dir_base)
 
     source_dirs = [
-        "/Users/masdevid/Projects/smartcash/data/evaluation/lighting_variation",
-        "/Users/masdevid/Projects/smartcash/data/evaluation/position_variation",
         "/Users/masdevid/Projects/smartcash/data/preprocessed/valid",
         "/Users/masdevid/Projects/smartcash/data/preprocessed/test",
         "/Users/masdevid/Projects/smartcash/data/preprocessed/test_lighting",

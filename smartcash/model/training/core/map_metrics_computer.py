@@ -26,7 +26,7 @@ from typing import Dict, List, Union
 
 from smartcash.common.logger import get_logger
 from smartcash.model.utils.memory_optimizer import get_memory_optimizer
-from .yolo_utils_manager import get_ap_per_class
+from .ultralytics_utils_manager import get_ap_per_class
 
 logger = get_logger(__name__, level="DEBUG")
 

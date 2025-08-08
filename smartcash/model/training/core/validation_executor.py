@@ -12,7 +12,7 @@ from typing import Dict
 from smartcash.common.logger import get_logger
 from smartcash.model.architectures.model import SmartCashYOLOv5Model
 from .prediction_processor import PredictionProcessor
-from .yolov5_map_calculator import create_yolov5_map_calculator
+from .yolov5_map_calculator import YOLOv5MapCalculator
 from .validation_batch_processor import ValidationBatchProcessor
 from .validation_metrics_computer import ValidationMetricsComputer
 from .validation_model_manager import ValidationModelManager
@@ -66,11 +66,10 @@ class ValidationExecutor:
         # For SmartCash models, simplify the validation process
         if self.is_smartcash_model:
             # SmartCash model handles hierarchical processing internally
-            # Use its built-in class configuration
             model_info = model.get_model_config()
             num_classes = model_info.get('num_classes', 17)  # SmartCash default
-            layer_info = f"SmartCash: {num_classes} classes (internal inference processing)"
-            logger.info(f"🆕 Using SmartCashYOLOv5Model with {num_classes} classes (internal inference processing)")
+            layer_info = f"SmartCash: {num_classes} classes"
+            logger.debug(f"Using SmartCashYOLOv5Model with {num_classes} classes")
         else:
             # Legacy model processing - Extract phase-appropriate num_classes for standard mAP calculation
             if isinstance(raw_num_classes, dict):
@@ -110,7 +109,7 @@ class ValidationExecutor:
             training_context['smartcash_model'] = True
             training_context['disable_hierarchical'] = True
         
-        self.map_calculator = create_yolov5_map_calculator(
+        self.map_calculator = YOLOv5MapCalculator(
             num_classes=num_classes,
             conf_thres=0.001,  # Ultra-low threshold for early training with very low confidence predictions
             iou_thres=0.5,   # AGGRESSIVE: Very low threshold for scale learning phase
@@ -126,14 +125,7 @@ class ValidationExecutor:
         self.model_manager = ValidationModelManager(model)
         self.map_processor = ValidationMapProcessor(self.map_calculator, current_phase)
         
-        logger.info(f"Validation metrics configuration:")
-        logger.info(f"  • YOLOv5 mAP calculator: {layer_info} classes")
-        logger.info(f"  • mAP calculation mode: {'Standard (non-hierarchical)' if use_standard_map else 'Hierarchical'}")
-        if use_standard_map:
-            logger.info(f"  • Phase 2 using standard mAP for all 17 classes")
-        else:
-            logger.info(f"  • Using hierarchical validation (YOLOv5 + per-layer metrics)")
-        
+        logger.debug(f"mAP calculator: {layer_info} classes, mode: {'Standard' if use_standard_map else 'Hierarchical'}")
         if not self.map_calculator.yolov5_available:
             logger.warning("YOLOv5 not available - using fallback metrics")
         
@@ -173,9 +165,6 @@ class ValidationExecutor:
         # Clear cached mAP results in metrics computer to ensure fresh computation
         self.metrics_computer._cached_map_results = None
         
-        # Debug logging with optimization info
-        logger.debug(f"Starting validation epoch {display_epoch} with {num_batches} batches")
-        logger.debug(f"⚡ YOLOv5 mAP calculation enabled for Phase {phase_num}")
         if num_batches == 0:
             logger.warning("Validation loader is empty!")
             return self._get_empty_validation_metrics()
@@ -184,11 +173,7 @@ class ValidationExecutor:
         if epoch == 0:
             first_batch = next(iter(val_loader))
             actual_batch_size = first_batch[0].shape[0] if len(first_batch) > 0 else "unknown"
-            logger.info(f"📊 Validation Batch Configuration:")
-            logger.info(f"   • Configured Batch Size: {val_loader.batch_size}")
-            logger.info(f"   • Actual Batch Size: {actual_batch_size}")
-            logger.info(f"   • Total Batches: {num_batches}")
-            logger.info(f"   • Samples per Epoch: ~{num_batches * val_loader.batch_size}")
+            logger.debug(f"Validation batch size: {actual_batch_size} (config: {val_loader.batch_size}), batches: {num_batches}")
         
         # Initialize collectors
         all_predictions = {}

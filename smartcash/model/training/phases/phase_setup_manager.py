@@ -58,10 +58,14 @@ class PhaseSetupManager:
         try:
             phase_config = self.config['training_phases'][f'phase_{phase_num}']
             
-            # Set up data loaders
+            # Set up data loaders with max_samples if specified
             data_factory = DataLoaderFactory(self.config)
-            train_loader = data_factory.create_train_loader()
-            val_loader = data_factory.create_val_loader()
+            max_samples = self.config.get('training', {}).get('data', {}).get('max_samples')
+            train_loader = data_factory.create_train_loader(max_samples=max_samples)
+            val_loader = data_factory.create_val_loader(max_samples=max_samples)
+            
+            if max_samples:
+                logger.info(f"🔍 Limiting data loaders to {max_samples} samples each for testing")
             
             # Set up loss manager with phase awareness
             loss_manager = LossManager(self.config)

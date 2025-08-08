@@ -134,7 +134,7 @@ for result in detailed_results['detailed_results']:
 ```
 smartcash/model/
 ├── architectures/
-│   ├── direct_yolov5.py           # Core model with Ultralytics integration
+│   ├── model.py           # Core model with Ultralytics integration
 │   └── smartcash_yolov5.py        # Simplified public API
 ├── training/
 │   └── direct_training_manager.py # Two-phase training strategy

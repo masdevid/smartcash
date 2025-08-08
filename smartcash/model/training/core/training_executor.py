@@ -81,7 +81,16 @@ class TrainingExecutor:
             logger.info(f"   • Samples per Epoch: ~{num_batches * train_loader.batch_size}")
             self._batch_info_logged = True
         
-        logger.info(f"🚀 Starting training epoch {display_epoch}/{total_epochs} with {num_batches} batches")
+        # Calculate progress percentage
+        progress_pct = (display_epoch / total_epochs) * 100
+        phase_info = f"Phase {phase_num}" if hasattr(self, 'phase_num') else ""
+        logger.info(
+            f"🚀 Training {phase_info} | "
+            f"Epoch {display_epoch}/{total_epochs} "
+            f"({progress_pct:.1f}%) | "
+            f"{num_batches} batches | "
+            f"Batch size: {train_loader.batch_size}"
+        )
         
         for batch_idx, (images, targets) in enumerate(train_loader):
             # Check for shutdown signal much less frequently for better performance

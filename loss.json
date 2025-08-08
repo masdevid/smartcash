@@ -1,0 +1,59 @@
+{
+  "loss_computation": {
+    "total_loss": "lambda_box * L_box + lambda_obj * L_obj + lambda_cls * L_cls",
+    "components": {
+      "L_box": {
+        "description": "Bounding box regression loss",
+        "type": "CIoU",
+        "weight": 0.05
+      },
+      "L_obj": {
+        "description": "Objectness loss (is there an object?)",
+        "type": "BCE",
+        "weight": 1.0
+      },
+      "L_cls": {
+        "description": "Classification loss over 17 classes",
+        "type": "BCE (multi-label but single target active)",
+        "weight": 0.5
+      }
+    },
+    "training_notes": [
+      "Loss is calculated for nc=17 classes during training",
+      "Only positive anchors contribute to L_cls",
+      "Loss weights can be tuned depending on dataset balance"
+    ]
+  },
+  "class_mapping": {
+    "description": "Maps 17 fine-grained classes into 7 main denomination classes + 1 validation type",
+    "fine_classes": {
+      "0": "1000_whole",
+      "1": "2000_whole",
+      "2": "5000_whole",
+      "3": "10000_whole",
+      "4": "20000_whole",
+      "5": "50000_whole",
+      "6": "100000_whole",
+      "7": "1000_nominal_feature",
+      "8": "2000_nominal_feature",
+      "9": "5000_nominal_feature",
+      "10": "10000_nominal_feature",
+      "11": "20000_nominal_feature",
+      "12": "50000_nominal_feature",
+      "13": "100000_nominal_feature",
+      "14": "security_thread",
+      "15": "watermark",
+      "16": "special_sign"
+    },
+    "mapping_to_main": {
+      "0": 0, "1": 1, "2": 2, "3": 3, "4": 4, "5": 5, "6": 6,
+      "7": 0, "8": 1, "9": 2, "10": 3, "11": 4, "12": 5, "13": 6,
+      "14": "feature", "15": "feature", "16": "feature"
+    },
+    "inference_usage": [
+      "Run model with nc=17",
+      "Map fine_class → main_class after prediction",
+      "Feature classes (14–16) can be used for authenticity verification logic"
+    ]
+  }
+}

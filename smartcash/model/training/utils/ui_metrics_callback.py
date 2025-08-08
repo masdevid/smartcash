@@ -22,6 +22,29 @@ class UIMetricsCallback:
     for both console display and UI integration.
     """
     
+    def _get_safe_color_scheme(self, preferred_scheme: Optional[ColorScheme] = None) -> ColorScheme:
+        """
+        Get a safe color scheme, falling back to terminal colors if emojis aren't supported.
+        
+        Args:
+            preferred_scheme: The preferred color scheme, or None for auto-detect
+            
+        Returns:
+            A supported color scheme
+        """
+        if preferred_scheme is not None:
+            # If a specific scheme was requested, try to use it
+            try:
+                if preferred_scheme == ColorScheme.EMOJI:
+                    # Test if emojis are supported
+                    "".join(COLOR_MAPPINGS[ColorScheme.EMOJI].values())
+                return preferred_scheme
+            except (UnicodeEncodeError, UnicodeDecodeError, KeyError, AttributeError) as e:
+                logger.warning(f"Preferred color scheme '{preferred_scheme}' not available: {e}")
+        
+        # Default to terminal colors for safety
+        return ColorScheme.TERMINAL
+
     def __init__(self, verbose: bool = True, console_scheme: ColorScheme = None, 
                  training_logs_dir: str = "logs/training"):
         """
@@ -34,17 +57,9 @@ class UIMetricsCallback:
         """
         self.verbose = verbose
         
-        # Default to EMOJI scheme if not specified, but fall back to TERMINAL if emojis aren't supported
-        if console_scheme is None:
-            try:
-                # Try to use emoji scheme, fall back to terminal if there's an issue
-                "".join(COLOR_MAPPINGS[ColorScheme.EMOJI].values())
-                self.console_scheme = ColorScheme.EMOJI
-            except (UnicodeEncodeError, UnicodeDecodeError, KeyError):
-                logger.warning("Emoji not supported in this environment, falling back to terminal colors")
-                self.console_scheme = ColorScheme.TERMINAL
-        else:
-            self.console_scheme = console_scheme
+        # Set up color scheme with safe fallback
+        self.console_scheme = self._get_safe_color_scheme(console_scheme)
+        logger.debug(f"Using color scheme: {self.console_scheme}")
             
         self.colorizer = MetricColorizer(self.console_scheme)
         self.training_logs_dir = Path(training_logs_dir)
@@ -554,7 +569,7 @@ def create_ui_metrics_callback(verbose: bool = True,
                              ui_callback: Optional[Callable] = None,
                              training_logs_dir: str = "logs/training",
                              backbone: str = "unknown",
-                             data_name: str = "data") -> 'UIMetricsCallback':
+                             data_name: str = "data"):
     """
     Factory function to create a UI-enhanced metrics callback.
     
@@ -570,28 +585,39 @@ def create_ui_metrics_callback(verbose: bool = True,
     Returns:
         UIMetricsCallback instance
     """
-    # If no console_scheme is provided, let UIMetricsCallback auto-detect emoji support
-    callback = UIMetricsCallback(
-        verbose=verbose,
-        console_scheme=console_scheme,  # None will trigger auto-detection
-        training_logs_dir=training_logs_dir
-    )
-    
-    # Set the backbone and data name for filename generation
-    callback.backbone = backbone
-    callback.data_name = data_name
-    
-    # Set the UI callback if provided
-    if ui_callback is not None:
-        callback.set_ui_callback(ui_callback)
+    try:
+        # Create the callback with safe color scheme handling
+        callback = UIMetricsCallback(
+            verbose=verbose,
+            console_scheme=console_scheme,
+            training_logs_dir=training_logs_dir
+        )
         
-    return callback
+        # Set model and data info for logging
+        callback.backbone = backbone
+        callback.data_name = data_name
+        
+        # Set UI callback if provided
+        if ui_callback is not None:
+            callback.set_ui_callback(ui_callback)
+        
+        return callback
+        
+    except Exception as e:
+        logger.error(f"Failed to create metrics callback: {e}")
+        # Return a minimal working callback with terminal colors as fallback
+        return UIMetricsCallback(
+            verbose=verbose,
+            console_scheme=ColorScheme.TERMINAL,
+            training_logs_dir=training_logs_dir
+        )
 
 
 # Example UI callback function
 def example_ui_callback(phase: str, epoch: int, _metrics: Dict[str, Any], 
                        colored_metrics: Dict[str, Dict], loss_breakdown: Dict[str, Any] = None):
     """Example UI callback showing color data and loss breakdown handling."""
+    print(f"\n UI CALLBACK - {phase} Epoch {epoch}")
     print(f"\n🎨 UI CALLBACK - {phase} Epoch {epoch}")
     for metric_name, color_data in colored_metrics.items():
         if isinstance(color_data.get('value'), (int, float)):

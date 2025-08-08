@@ -42,8 +42,8 @@ class ValidationBatchProcessor:
         )
     
     def _is_yolov5_compatible_model(self) -> bool:
-        """Check if the model is compatible with YOLOv5 ComputeLoss."""
-        # Only YOLOv5-based models are compatible, not EfficientNet
+        """Check if the model is compatible with advanced loss computation."""
+        # Only YOLOv5-based models are compatible with advanced loss, not EfficientNet
         if hasattr(self.model, 'backbone_type'):
             return 'efficientnet' not in self.model.backbone_type.lower()
         if hasattr(self.model, 'model'):
@@ -51,61 +51,159 @@ class ValidationBatchProcessor:
             return 'efficientnet' not in model_str.lower()
         return True  # Default to assuming compatibility
     
+    def _is_modern_yolo_model(self) -> bool:
+        """Check if the model is a modern YOLO (v8+) compatible with v8DetectionLoss."""
+        # Check for YOLOv8+ specific attributes
+        if hasattr(self.model, 'model'):
+            try:
+                # Handle both list-like and direct access to model layers
+                if hasattr(self.model.model, '__getitem__'):
+                    detect_head = self.model.model[-1]
+                elif hasattr(self.model, '__getitem__'):
+                    detect_head = self.model[-1]
+                else:
+                    return False
+                
+                # YOLOv8+ detection heads have 'reg_max' attribute for DFL (Distribution Focal Loss)
+                # YOLOv5 models typically don't have this attribute
+                has_reg_max = hasattr(detect_head, 'reg_max') and getattr(detect_head, 'reg_max', 0) > 1
+                has_modern_features = hasattr(detect_head, 'anchors') or hasattr(detect_head, 'stride')
+                
+                return has_reg_max and has_modern_features
+                
+            except (IndexError, AttributeError):
+                return False
+        return False
+    
+    def _prepare_ultralytics_batch(self, targets: torch.Tensor, img_size: int) -> dict:
+        """Prepare batch in Ultralytics format for v8DetectionLoss."""
+        batch = {}
+        
+        if targets.numel() > 0:
+            # Extract components from YOLO format [image_idx, class_id, x, y, w, h] 
+            batch_idx = targets[:, 0].long()
+            cls = targets[:, 1].long()
+            bboxes = targets[:, 2:6]  # x, y, w, h (normalized)
+            
+            # Ensure bboxes are in correct format for v8DetectionLoss
+            # v8DetectionLoss expects normalized xywh format
+            batch['batch_idx'] = batch_idx
+            batch['cls'] = cls
+            batch['bboxes'] = bboxes
+            
+            logger.debug(f"Prepared Ultralytics batch: {batch_idx.shape[0]} targets, "
+                        f"img_size={img_size}, bbox_range=[{bboxes.min():.3f}, {bboxes.max():.3f}]")
+        else:
+            # Empty targets
+            device = targets.device
+            batch['batch_idx'] = torch.empty(0, dtype=torch.long, device=device)
+            batch['cls'] = torch.empty(0, dtype=torch.long, device=device) 
+            batch['bboxes'] = torch.empty(0, 4, device=device)
+            logger.debug("Prepared empty Ultralytics batch")
+        
+        return batch
+    
     def _compute_smartcash_loss(self, predictions, targets, img_size: int) -> torch.Tensor:
-        """Compute loss for SmartCash models (IMPROVED: no wrappers, direct fallback for EfficientNet)."""
-        # IMPROVED: Skip YOLOv5 ComputeLoss entirely for EfficientNet models
+        """Compute loss for SmartCash models (SMART: chooses best loss based on model architecture)."""
+        # IMPROVED: Skip advanced loss for EfficientNet models - use simple fallback
         if not self._is_yolov5_compatible_model():
-            logger.debug("EfficientNet model detected - using direct fallback loss computation")
+            logger.debug("EfficientNet model detected - using simple fallback loss computation")
             return self._compute_simple_yolo_loss(predictions, targets)
         
+        # SMART: Choose the best loss implementation based on model architecture
+        if self._is_modern_yolo_model():
+            return self._compute_ultralytics_v8_loss(predictions, targets, img_size)
+        else:
+            return self._compute_yolov5_loss(predictions, targets, img_size)
+    
+    def _compute_ultralytics_v8_loss(self, predictions, targets, img_size: int) -> torch.Tensor:
+        """Compute loss using modern Ultralytics v8DetectionLoss."""
         try:
-            # Only try YOLOv5 ComputeLoss for YOLOv5-based models
+            from ultralytics.utils.loss import v8DetectionLoss
+            
+            # Initialize modern Ultralytics loss computer
+            if not hasattr(self, '_ultralytics_loss_fn'):
+                self._ultralytics_loss_fn = v8DetectionLoss(self.model)
+                logger.debug("Successfully initialized Ultralytics v8DetectionLoss")
+            
+            # Prepare batch in Ultralytics format
+            batch = self._prepare_ultralytics_batch(targets, img_size)
+            
+            # Handle prediction format conversion for v8DetectionLoss
+            # v8DetectionLoss expects predictions as a tuple or list of feature maps
+            predictions = self._convert_predictions_to_list(predictions, "v8DetectionLoss")
+            
+            # CRITICAL: v8DetectionLoss expects predictions as feature maps, not processed outputs
+            # The v8DetectionLoss.__call__ method processes raw feature maps internally
+            # For compatibility, we need to pass predictions in the expected format
+            
+            # Compute loss using modern Ultralytics v8DetectionLoss
+            loss_outputs = self._ultralytics_loss_fn(predictions, batch)
+            
+            # v8DetectionLoss returns (loss_tensor, detached_loss) tuple
+            if isinstance(loss_outputs, tuple) and len(loss_outputs) == 2:
+                loss_tensor, _ = loss_outputs
+                # loss_tensor is a tensor with [box_loss, cls_loss, dfl_loss]
+                total_loss = loss_tensor.sum()
+            else:
+                # Fallback if return format is different
+                total_loss = loss_outputs.sum() if hasattr(loss_outputs, 'sum') else loss_outputs
+            
+            logger.debug(f"v8DetectionLoss computed: total={total_loss.item():.6f}")
+            
+            return total_loss
+            
+        except (ImportError, AttributeError, IndexError, RuntimeError, TypeError) as e:
+            logger.warning(f"Ultralytics v8DetectionLoss failed: {e}, using YOLOv5 fallback")
+            return self._compute_yolov5_loss(predictions, targets, img_size)
+    
+    def _compute_yolov5_loss(self, predictions, targets, img_size: int) -> torch.Tensor:
+        """Compute loss using original YOLOv5 ComputeLoss."""
+        try:
             import sys
             sys.path.insert(0, 'yolov5')
             from utils.loss import ComputeLoss
             
-            # Initialize YOLOv5 loss computer for YOLOv5 models only
+            # Initialize YOLOv5 loss computer
             if not hasattr(self, '_yolo_loss_fn'):
-                if hasattr(self.model, 'model'):
-                    # Add minimal hyperparameters directly to model
-                    if not hasattr(self.model, 'hyp'):
-                        self.model.hyp = {
-                            'box': 0.05, 'obj': 1.0, 'cls': 0.5,
-                            'cls_pw': 1.0, 'obj_pw': 1.0, 'anchor_t': 4.0,
-                            'fl_gamma': 0.0, 'label_smoothing': 0.0
-                        }
-                    
-                    self._yolo_loss_fn = ComputeLoss(self.model)
-                    logger.debug("Successfully initialized YOLOv5 ComputeLoss for YOLOv5 model")
-                else:
-                    raise AttributeError("Cannot find underlying model in SmartCash model")
+                # Add minimal hyperparameters directly to model  
+                if not hasattr(self.model, 'hyp'):
+                    self.model.hyp = {
+                        'box': 0.05, 'obj': 1.0, 'cls': 0.5,
+                        'cls_pw': 1.0, 'obj_pw': 1.0, 'anchor_t': 4.0,
+                        'fl_gamma': 0.0, 'label_smoothing': 0.0
+                    }
+                
+                self._yolo_loss_fn = ComputeLoss(self.model)
+                logger.debug("Successfully initialized YOLOv5 ComputeLoss")
             
-            # FIXED: Handle different prediction formats for SmartCash
-            if isinstance(predictions, dict):
-                # Convert dict predictions to list format expected by YOLOv5 loss
-                pred_list = []
-                for layer_name in ['layer_1', 'layer_2', 'layer_3']:
-                    if layer_name in predictions:
-                        pred_list.append(predictions[layer_name])
-                predictions = pred_list
-                logger.debug(f"Converted dict predictions to list for YOLOv5 loss. List length: {len(predictions)}")
-            elif isinstance(predictions, list):
-                # Already in correct format
-                logger.debug("Predictions are already in list format for YOLOv5 loss.")
-                pass
-            else:
-                # Single tensor, wrap in list
-                predictions = [predictions]
-                logger.debug(f"Wrapped single tensor prediction in list for YOLOv5 loss. Type: {type(predictions[0])}")
+            # Handle prediction format conversion
+            predictions = self._convert_predictions_to_list(predictions, "YOLOv5 ComputeLoss")
             
             # Compute loss using YOLOv5 loss function
             loss, _ = self._yolo_loss_fn(predictions, targets)
+            logger.debug(f"YOLOv5 ComputeLoss computed: loss={loss.item():.6f} for img_size={img_size}")
             return loss
             
         except (ImportError, AttributeError, IndexError) as e:
-            logger.warning(f"YOLOv5 loss computation failed: {e}, using fallback")
-            # Fallback to simplified loss computation
+            logger.warning(f"YOLOv5 ComputeLoss failed: {e}, using simple fallback")
             return self._compute_simple_yolo_loss(predictions, targets)
+    
+    def _convert_predictions_to_list(self, predictions, context: str):
+        """Convert predictions to list format expected by loss functions."""
+        if isinstance(predictions, dict):
+            pred_list = []
+            for layer_name in ['layer_1', 'layer_2', 'layer_3']:
+                if layer_name in predictions:
+                    pred_list.append(predictions[layer_name])
+            logger.debug(f"Converted dict predictions to list for {context}. Length: {len(pred_list)}")
+            return pred_list
+        elif isinstance(predictions, list):
+            logger.debug(f"Predictions already in list format for {context}.")
+            return predictions
+        else:
+            logger.debug(f"Wrapped single tensor prediction for {context}.")
+            return [predictions]
     
     def _compute_simple_yolo_loss(self, predictions, targets) -> torch.Tensor:
         """Simple fallback loss computation for SmartCash models."""

@@ -31,12 +31,12 @@ from smartcash.model.utils.memory_optimizer import get_memory_optimizer
 
 # Import specialized processors
 from .yolo_utils_manager import YOLOv5UtilitiesManager
-from .hierarchical_processor import HierarchicalProcessor
+# HierarchicalProcessor removed - SmartCash models handle processing internally
+# from .hierarchical_processor import HierarchicalProcessor
 from .memory_optimized_processor import MemoryOptimizedProcessor
 from .batch_processor import BatchProcessor
 
 # Import extracted modules
-from .map_debug_logger import MapDebugLogger
 from .map_statistics_processor import MapStatisticsProcessor
 from .map_metrics_computer import MapMetricsComputer
 
@@ -110,7 +110,6 @@ class YOLOv5MapCalculator:
         self.device = self.memory_optimizer.device
         
         # Initialize extracted modules
-        self.debug_logger = MapDebugLogger(training_context) if debug else None
         self.statistics_processor = MapStatisticsProcessor(debug)
         self.metrics_computer = MapMetricsComputer(debug)
         
@@ -192,12 +191,18 @@ class YOLOv5MapCalculator:
         # YOLOv5 utilities manager for lazy loading
         self.yolo_utils = YOLOv5UtilitiesManager()
         
-        # Hierarchical processor for multi-layer architecture
-        self.hierarchical_processor = HierarchicalProcessor(
+        # Hierarchical processor removed - SmartCash models handle processing internally
+        # Create stub for backward compatibility
+        class HierarchicalProcessorStub:
+            def __init__(self, **kwargs):
+                self.disable_hierarchical = kwargs.get('disable_hierarchical', True)
+                
+        self.hierarchical_processor = HierarchicalProcessorStub(
             device=self.device, 
             debug=self.debug,
             training_context=self.training_context,
-            use_standard_map=self.use_standard_map  # TASK.md: Pass standard mAP flag
+            use_standard_map=self.use_standard_map,
+            disable_hierarchical=self.training_context.get('disable_hierarchical', True)
         )
         
         # Memory-optimized processor for platform-aware operations

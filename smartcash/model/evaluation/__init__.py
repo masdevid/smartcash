@@ -9,8 +9,7 @@ from .scenario_manager import ScenarioManager, create_scenario_manager, setup_re
 from .checkpoint_selector import CheckpointSelector, create_checkpoint_selector, get_available_checkpoints
 from .processors.scenario_data_source_selector import ScenarioDataSourceSelector, create_scenario_data_source_selector, get_scenario_data_directory, validate_all_scenario_data_sources
 
-# New hierarchical metrics (replaces evaluation_metrics)
-from .metrics.hierarchical_metrics_calculator import HierarchicalMetricsCalculator, create_hierarchical_metrics_calculator
+# Hierarchical metrics removed - SmartCash models handle metrics internally
 
 # New modular components
 from .evaluators.scenario_evaluator import ScenarioEvaluator, create_scenario_evaluator
@@ -37,7 +36,6 @@ __all__ = [
     'ScenarioDataSourceSelector',
     
     # New modular components (SRP-compliant)
-    'HierarchicalMetricsCalculator',
     'ScenarioEvaluator',
     'InferenceProcessor',
     'EvaluationDataLoader',
@@ -58,7 +56,6 @@ __all__ = [
     'create_scenario_manager',
     'create_checkpoint_selector',
     'create_scenario_data_source_selector',
-    'create_hierarchical_metrics_calculator',
     'create_scenario_evaluator',
     'create_inference_processor',
     'create_evaluation_data_loader',

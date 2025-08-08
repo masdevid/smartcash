@@ -11,7 +11,8 @@ from smartcash.common.logger import get_logger
 from smartcash.model.training.core.yolov5_map_calculator import YOLOv5MapCalculator
 from smartcash.model.evaluation.processors.data_loader import create_evaluation_data_loader
 from smartcash.model.evaluation.processors.inference_processor import create_inference_processor
-from smartcash.model.evaluation.metrics.hierarchical_metrics_calculator import create_hierarchical_metrics_calculator
+# Hierarchical metrics calculator removed - SmartCash models handle metrics internally
+# from smartcash.model.evaluation.metrics.hierarchical_metrics_calculator import create_hierarchical_metrics_calculator
 from smartcash.model.evaluation.converters.yolov5_format_converter import create_yolov5_format_converter
 
 
@@ -26,7 +27,8 @@ class ScenarioEvaluator:
         
         # Initialize components
         self.data_loader = create_evaluation_data_loader()
-        self.hierarchical_metrics = create_hierarchical_metrics_calculator(num_classes=num_classes)
+        # Hierarchical metrics removed - SmartCash models handle metrics internally
+        self.hierarchical_metrics = None  # Placeholder for backward compatibility
         self.yolov5_converter = create_yolov5_format_converter(num_classes=num_classes)
         
         # Use training module's YOLOv5 mAP calculator for consistency
@@ -123,8 +125,8 @@ class ScenarioEvaluator:
             # Debug: log what the training module returned
             self.logger.info(f"📊 Training module map_results: {map_results}")
             
-            # Calculate denomination classification metrics (hierarchical classes)
-            denomination_metrics = self.hierarchical_metrics.calculate_denomination_metrics(predictions, ground_truths)
+            # Calculate denomination classification metrics (using standard metrics now)
+            denomination_metrics = self._calculate_standard_metrics(predictions, ground_truths)
             
             # Convert back to evaluation format with comprehensive metrics
             metrics = {
@@ -216,9 +218,8 @@ class ScenarioEvaluator:
                 for gt_ann in gt_annotations:
                     gt_class = gt_ann.get('class_id', -1)
                     
-                    # Use hierarchical matching logic
-                    if (pred_class == gt_class or 
-                        self.hierarchical_metrics._is_hierarchical_match(gt_class, pred_class)):
+                    # Use exact class matching (hierarchical logic removed)
+                    if pred_class == gt_class:
                         analysis['correct_denominations'] += 1
                         break
         
@@ -251,6 +252,41 @@ class ScenarioEvaluator:
             'ground_truth_distribution': gt_distribution,
             'classes_detected': len(pred_distribution),
             'classes_in_ground_truth': len(gt_distribution)
+        }
+    
+    def _calculate_standard_metrics(self, predictions: List[Dict], ground_truths: List[Dict]) -> Dict[str, Any]:
+        """Calculate standard classification metrics without hierarchical logic"""
+        true_positives = 0
+        total_predictions = 0
+        total_ground_truths = 0
+        
+        for pred, gt in zip(predictions, ground_truths):
+            pred_detections = pred.get('detections', [])
+            gt_annotations = gt.get('annotations', [])
+            
+            total_predictions += len(pred_detections)
+            total_ground_truths += len(gt_annotations)
+            
+            # Count exact matches
+            pred_classes = [d.get('class_id', -1) for d in pred_detections]
+            gt_classes = [a.get('class_id', -1) for a in gt_annotations]
+            
+            # Simple matching: count exact class matches
+            for pred_class in pred_classes:
+                if pred_class in gt_classes:
+                    true_positives += 1
+        
+        # Calculate metrics
+        precision = true_positives / total_predictions if total_predictions > 0 else 0.0
+        recall = true_positives / total_ground_truths if total_ground_truths > 0 else 0.0
+        f1_score = 2 * (precision * recall) / (precision + recall) if (precision + recall) > 0 else 0.0
+        accuracy = recall  # For detection tasks, accuracy ≈ recall
+        
+        return {
+            'accuracy': accuracy,
+            'precision': precision,
+            'recall': recall,
+            'f1_score': f1_score
         }
     
     def _get_empty_metrics(self, inference_times: List[float] = None) -> Dict[str, Any]:

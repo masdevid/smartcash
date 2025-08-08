@@ -248,6 +248,7 @@ def apply_configuration_overrides(config: Dict[str, Any], **kwargs) -> Dict[str,
              training_overrides['training']['early_stopping']['patience'] = kwargs['patience']
         if 'early_stopping_metric' in kwargs:
             training_overrides['training']['early_stopping']['metric'] = kwargs['early_stopping_metric']
+            training_overrides['training']['early_stopping']['monitor'] = kwargs['early_stopping_metric']  # Also set monitor field
         if 'early_stopping_mode' in kwargs:
             training_overrides['training']['early_stopping']['mode'] = kwargs['early_stopping_mode']
         if 'early_stopping_min_delta' in kwargs:

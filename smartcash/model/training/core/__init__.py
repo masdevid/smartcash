@@ -6,8 +6,8 @@ Single Responsibility Principle (SRP) design.
 """
 
 from .training_executor import TrainingExecutor
-from .validation_executor import ValidationExecutor
-from .prediction_processor import PredictionProcessor
+from .validation.validation_executor import ValidationExecutor
+from .prediction.prediction_processor import PredictionProcessor
 from .progress_manager import ProgressManager
 
 # Import mAP calculator and utilities

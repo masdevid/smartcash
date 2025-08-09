@@ -52,24 +52,46 @@ class StandardEarlyStopping(BaseEarlyStopping):
         Check if training should stop based on monitored metric.
         
         Args:
-            metrics: Dictionary containing training metrics
+            metrics: Dictionary containing training metrics or direct score
             model: Model for weight saving/restoration
             epoch: Current epoch number
             
         Returns:
             True if training should stop, False otherwise
         """
-        # Get current score
+        # Get current score with robust handling
         if isinstance(metrics, dict):
             current_score = metrics.get(self.metric)
             if current_score is None:
-                if self.verbose:
-                    print(f"⚠️ Metric '{self.metric}' not found in metrics: {list(metrics.keys())}")
-                return False
+                # Try alternative metric names
+                alt_names = {
+                    'val_loss': ['loss', 'val_loss', 'validation_loss'],
+                    'val_accuracy': ['accuracy', 'val_accuracy', 'validation_accuracy'],
+                    'loss': ['loss', 'val_loss', 'total_loss']
+                }
+                
+                for alt_name in alt_names.get(self.metric, [self.metric]):
+                    current_score = metrics.get(alt_name)
+                    if current_score is not None:
+                        if self.verbose and alt_name != self.metric:
+                            print(f"📋 Using {alt_name} instead of {self.metric}")
+                        break
+                
+                if current_score is None:
+                    if self.verbose:
+                        available_metrics = [k for k, v in metrics.items() if isinstance(v, (int, float))]
+                        print(f"⚠️ Metric '{self.metric}' not found. Available: {available_metrics}")
+                    return False
         else:
-            # Support direct score input for backward compatibility
+            # Support direct score input
             current_score = float(metrics)
         
+        # Ensure we have a valid numeric score
+        if not isinstance(current_score, (int, float)) or current_score != current_score:  # NaN check
+            if self.verbose:
+                print(f"⚠️ Invalid score for {self.metric}: {current_score}")
+            return False
+            
         epoch = epoch or len(self.history['scores'])
         
         # Record history
@@ -110,19 +132,30 @@ class StandardEarlyStopping(BaseEarlyStopping):
             
             # Restore best weights
             if self.restore_best_weights and model is not None:
-                self.restore_best_weights(model)
+                restored = self.restore_best_weights(model)
+                if self.verbose and restored:
+                    print(f"🔄 Restored model to best weights from epoch {self.best_epoch + 1}")
         
         return self.should_stop
     
     def _is_improvement(self, score: float) -> bool:
-        """Check if current score is improvement."""
+        """Check if current score is improvement with robust comparison."""
         if self.best_score is None:
             return True
         
+        # Ensure we have valid scores
+        if not isinstance(score, (int, float)) or score != score:  # NaN check
+            return False
+            
+        if not isinstance(self.best_score, (int, float)) or self.best_score != self.best_score:
+            return True  # Reset if best_score is invalid
+        
         if self.mode == 'max':
-            return score > (self.best_score + self.min_delta)
+            improvement = score > (self.best_score + self.min_delta)
         else:  # mode == 'min'
-            return score < (self.best_score - self.min_delta)
+            improvement = score < (self.best_score - self.min_delta)
+            
+        return improvement
     
     def reset(self) -> None:
         """Reset early stopping state for new training session."""

@@ -1,41 +1,60 @@
 #!/usr/bin/env python3
 """
-Ultralytics-based mAP calculator for SmartCash validation phase.
+Ultralytics-based mAP calculator for SmartCash validation.
 
-Modern replacement for YOLOv5-based mAP calculation using the official
-Ultralytics package. Provides enhanced mAP computation with mAP50-95
-support, improved performance, and standardized evaluation metrics.
-
-Key improvements over YOLOv5 calculator:
-- Official Ultralytics package support
-- Enhanced mAP calculation with mAP50-95
-- Modern NMS with comprehensive parameters
-- Better error handling and logging
+This module provides a modern implementation of mAP calculation using the
+Ultralytics package with enhanced features:
+- mAP50 and mAP50-95 computation
+- Progressive confidence/IoU thresholds
 - Platform-aware optimizations
-- Progressive threshold scheduling
+- Enhanced debug logging
+- SmartCash model compatibility
+"""
+
+"""
+Ultralytics mAP Calculator for SmartCash YOLO Training
+
+This module provides a modern mAP calculator using Ultralytics utilities for SmartCash YOLO models.
+It handles both standard and progressive thresholding for improved training stability.
 """
 
 import torch
-from typing import Dict, Optional
+from typing import Any, Dict, List, Optional, Tuple, TypedDict, Union
 
 from smartcash.common.logger import get_logger
 from smartcash.model.utils.memory_optimizer import get_memory_optimizer
-from .ultralytics_utils_manager import (
-    get_ultralytics_manager,
-    get_box_iou, 
-    get_ap_per_class,
-    get_non_max_suppression,
-    get_xywh2xyxy
-)
+from smartcash.model.training.core.ultralytics_utils_manager import get_ultralytics_manager
 
 logger = get_logger(__name__)
+
+# Type definitions for better code clarity
+class MetricsDict(TypedDict):
+    """Type definition for metrics dictionary returned by compute_map()."""
+    map50: float
+    map50_95: float
+    precision: float
+    recall: float
+    f1: float
+    accuracy: float
+
+BatchStats = Tuple[
+    torch.Tensor,  # tp: True positive mask
+    torch.Tensor,  # conf: Prediction confidences
+    torch.Tensor,  # pred_cls: Predicted class indices
+    torch.Tensor   # target_cls: Target class indices
+]
+
+# Type aliases for better readability
+TensorDict = Dict[str, torch.Tensor]
+MetricsDict = Dict[str, float]
+BatchStats = Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]
 
 
 class UltralyticsMapCalculator:
     """
     Modern mAP calculator using Ultralytics utilities.
     
-    Provides comprehensive mAP calculation with enhanced features:
+    This class provides comprehensive mAP calculation with enhanced features:
     - mAP50 and mAP50-95 computation
     - Progressive confidence/IoU thresholds
     - Platform-aware memory optimization
@@ -49,19 +68,19 @@ class UltralyticsMapCalculator:
         conf_thres: float = 0.001,
         iou_thres: float = 0.5,
         debug: bool = False,
-        training_context: Optional[dict] = None,
+        training_context: Optional[Dict[str, Any]] = None,
         use_progressive_thresholds: bool = True,
         use_standard_map: bool = True
-    ):
+    ) -> None:
         """
-        Initialize Ultralytics mAP calculator.
+        Initialize the Ultralytics mAP calculator.
         
         Args:
-            num_classes: Number of classes
-            conf_thres: Base confidence threshold
-            iou_thres: Base IoU threshold
+            num_classes: Number of classes (default: 17 for SmartCash)
+            conf_thres: Base confidence threshold (0.001-1.0)
+            iou_thres: Base IoU threshold (0.1-0.95)
             debug: Enable debug logging
-            training_context: Training context information
+            training_context: Optional training context for metrics
             use_progressive_thresholds: Enable progressive threshold scheduling
             use_standard_map: Use standard mAP calculation (recommended)
         """
@@ -74,47 +93,45 @@ class UltralyticsMapCalculator:
         self.training_context = training_context or {}
         self.use_progressive_thresholds = use_progressive_thresholds
         self.use_standard_map = use_standard_map
-        
-        # Initialize current epoch for progressive thresholds
         self.current_epoch = 0
         
         # Initialize device and memory management
         self.memory_optimizer = get_memory_optimizer()
         self.device = self.memory_optimizer.device
-        
-        # Initialize Ultralytics manager
         self.ultralytics_manager = get_ultralytics_manager()
         
         # Storage for batch statistics
-        self.stats = []
+        self.stats: List[BatchStats] = []
         self._batch_count = 0
         
-        # Check Ultralytics availability
-        if not self.ultralytics_manager.is_available():
-            logger.warning("Ultralytics not available - mAP calculation may be limited")
-        else:
+        # Log initialization
+        if self.ultralytics_manager.is_available():
             version_info = self.ultralytics_manager.get_version_info()
             logger.info(f"✅ Ultralytics mAP calculator initialized with {version_info['ultralytics_version']}")
     
-    @property
-    def yolov5_available(self) -> bool:
-        """Backward compatibility property - returns Ultralytics availability."""
-        return self.ultralytics_manager.is_available()
-    
-    def update_epoch(self, epoch: int):
-        """Update current epoch and recalculate progressive thresholds if enabled."""
+    def update_epoch(self, epoch: int) -> None:
+        """
+        Update current epoch and recalculate progressive thresholds if enabled.
+        
+        Args:
+            epoch: Current training epoch (0-based)
+        """
         self.current_epoch = epoch
         
-        if self.use_progressive_thresholds:
-            old_conf, old_iou = self.conf_thres, self.iou_thres
-            self.conf_thres, self.iou_thres = self._calculate_progressive_thresholds(epoch)
+        if not self.use_progressive_thresholds:
+            return
             
-            if old_conf != self.conf_thres or old_iou != self.iou_thres:
-                logger.info(f"📈 Epoch {epoch}: Progressive thresholds updated - "
-                           f"conf: {old_conf:.3f}→{self.conf_thres:.3f}, "
-                           f"iou: {old_iou:.3f}→{self.iou_thres:.3f}")
+        old_conf, old_iou = self.conf_thres, self.iou_thres
+        self.conf_thres, self.iou_thres = self._calculate_progressive_thresholds(epoch)
+        
+        if old_conf != self.conf_thres or old_iou != self.iou_thres:
+            logger.info(
+                f"📈 Epoch {epoch}: Progressive thresholds updated - "
+                f"conf: {old_conf:.3f}→{self.conf_thres:.3f}, "
+                f"iou: {old_iou:.3f}→{self.iou_thres:.3f}"
+            )
     
-    def _calculate_progressive_thresholds(self, epoch: int) -> tuple:
+    def _calculate_progressive_thresholds(self, epoch: int) -> Tuple[float, float]:
         """
         Calculate progressive confidence and IoU thresholds based on training epoch.
         
@@ -130,89 +147,89 @@ class UltralyticsMapCalculator:
             Tuple of (conf_thres, iou_thres)
         """
         if epoch < 10:
-            # Very early phase: Ultra-low confidence, lenient IoU
-            return 0.001, 0.3
+            return 0.001, 0.3  # Very early phase
         elif epoch < 20:
-            # Early phase: Low confidence, moderate IoU
-            return 0.005, 0.4
+            return 0.005, 0.4  # Early phase
         elif epoch < 40:
-            # Mid phase: Moderate confidence, standard IoU
-            return 0.01, 0.5
+            return 0.01, 0.5   # Mid phase
         elif epoch < 60:
-            # Late-mid phase: Higher confidence, tighter IoU
-            return 0.05, 0.6
-        else:
-            # Final phase: Balanced thresholds for production
-            return 0.25, 0.65
+            return 0.05, 0.6   # Late-mid phase
+        return 0.25, 0.65      # Final phase
     
-    def reset(self):
+    def reset(self) -> None:
         """Reset accumulated statistics for new validation run."""
-        if self.debug:
+        if self.debug and self.stats:
             logger.debug(f"Resetting mAP calculator - had {len(self.stats)} stat batches")
         
         self.stats.clear()
         self._batch_count = 0
-        
-        # Clean memory
         self.memory_optimizer.cleanup_memory()
     
-    def update(self, predictions: torch.Tensor, targets: torch.Tensor, epoch: int = 0):
+    def update(
+        self, 
+        predictions: torch.Tensor, 
+        targets: torch.Tensor, 
+        epoch: int = 0
+    ) -> None:
         """
         Update mAP statistics with batch predictions and targets.
         
         Args:
             predictions: Model predictions tensor
-            targets: Ground truth targets tensor  
+            targets: Ground truth targets tensor
             epoch: Current epoch number
         """
         self.current_epoch = epoch
         self.update_epoch(epoch)
         
-        if not self.ultralytics_manager.is_available():
-            logger.warning("Ultralytics not available - skipping mAP update")
-            return
-            
-        if predictions is None or targets is None:
-            logger.warning("None predictions or targets - skipping update")
-            return
-            
-        # Validate input tensors
-        if not isinstance(predictions, torch.Tensor) or not isinstance(targets, torch.Tensor):
-            logger.warning(f"Invalid input types: predictions={type(predictions)}, targets={type(targets)}")
-            return
-            
-        if predictions.numel() == 0 or targets.numel() == 0:
-            logger.warning("Empty predictions or targets - skipping update")
+        # Input validation
+        if not self._validate_inputs(predictions, targets):
             return
         
         self._batch_count += 1
         
         try:
-            # Process batch for statistics
             batch_stats = self._process_batch_for_stats(predictions, targets)
-            
             if batch_stats is not None:
                 self.stats.append(batch_stats)
-                
                 if self.debug and self._batch_count <= 3:
-                    logger.debug(f"Batch {self._batch_count}: Added stats with "
-                               f"{len(batch_stats[0])} detections")
-            
+                    logger.debug(
+                        f"Batch {self._batch_count}: Added stats with "
+                        f"{len(batch_stats[0])} detections"
+                    )
         except Exception as e:
             logger.warning(f"Error processing batch {self._batch_count}: {e}")
-            # Continue processing - don't let one batch failure stop mAP calculation
     
-    def _process_batch_for_stats(self, predictions: torch.Tensor, targets: torch.Tensor):
-        """
-        Process batch predictions and targets to generate statistics for mAP calculation.
-        
-        Args:
-            predictions: Batch predictions tensor
-            targets: Batch targets tensor
+    def _validate_inputs(
+        self, 
+        predictions: torch.Tensor, 
+        targets: torch.Tensor
+    ) -> bool:
+        """Validate input tensors for mAP calculation."""
+        if not self.ultralytics_manager.is_available():
+            logger.warning("Ultralytics not available - skipping mAP update")
+            return False
             
-        Returns:
-            Processed statistics tuple or None if processing fails
-        """
+        if predictions is None or targets is None:
+            logger.warning("None predictions or targets - skipping update")
+            return False
+            
+        if not isinstance(predictions, torch.Tensor) or not isinstance(targets, torch.Tensor):
+            logger.warning(f"Invalid input types: predictions={type(predictions)}, targets={type(targets)}")
+            return False
+            
+        if predictions.numel() == 0 or targets.numel() == 0:
+            logger.warning("Empty predictions or targets - skipping update")
+            return False
+            
+        return True
+    
+    def _process_batch_for_stats(
+        self, 
+        predictions: torch.Tensor, 
+        targets: torch.Tensor
+    ) -> Optional[BatchStats]:
+        """Process batch predictions and targets to generate mAP statistics."""
         try:
             # Move tensors to device
             predictions = predictions.to(self.device, non_blocking=True)
@@ -230,28 +247,22 @@ class UltralyticsMapCalculator:
                 return None
                 
             pred_filtered = nms_predictions[0]
-            
-            # Extract prediction components
-            pred_boxes = pred_filtered[:, :4]  # xyxy format expected
+            pred_boxes = pred_filtered[:, :4]  # xyxy format
             pred_conf = pred_filtered[:, 4]
             pred_cls = pred_filtered[:, 5].long()
             
-            # Process targets - assume format [batch_idx, class, x, y, w, h]
+            # Process targets - format: [batch_idx, class, x, y, w, h]
             if targets.dim() == 2 and targets.shape[1] >= 6:
                 target_cls = targets[:, 1].long()
                 target_boxes = targets[:, 2:6]  # xywh format
-                
-                # Convert target boxes to xyxy format for IoU calculation
                 target_boxes_xyxy = self.ultralytics_manager.convert_xywh_to_xyxy(target_boxes)
             else:
                 logger.warning(f"Unexpected target format: {targets.shape}")
                 return None
             
-            # Compute IoU between predictions and targets
+            # Compute IoU and match predictions to targets
             if len(pred_boxes) > 0 and len(target_boxes_xyxy) > 0:
                 iou_matrix = self.ultralytics_manager.compute_box_iou(pred_boxes, target_boxes_xyxy)
-                
-                # Determine true positives
                 max_iou, max_indices = iou_matrix.max(dim=1)
                 tp_mask = max_iou >= self.iou_thres
                 
@@ -261,7 +272,6 @@ class UltralyticsMapCalculator:
                     if is_tp and pred_cls[i] == target_cls[target_idx]:
                         tp[i] = True
                 
-                # Return statistics in format expected by ap_per_class
                 return (tp, pred_conf, pred_cls, target_cls)
             
             return None
@@ -270,7 +280,7 @@ class UltralyticsMapCalculator:
             logger.warning(f"Error in batch stats processing: {e}")
             return None
     
-    def compute_map(self) -> Dict[str, float]:
+    def compute_map(self) -> MetricsDict:
         """
         Compute final mAP metrics from accumulated statistics.
         
@@ -281,24 +291,16 @@ class UltralyticsMapCalculator:
             logger.warning("Ultralytics not available - returning zero metrics")
             return self._create_zero_metrics()
         
-        if not self.stats or len(self.stats) == 0:
-            logger.warning(f"No statistics accumulated for mAP calculation "
-                          f"({self._batch_count} batches processed)")
+        if not self.stats:
+            logger.warning(
+                f"No statistics accumulated for mAP calculation "
+                f"({self._batch_count} batches processed)"
+            )
             return self._create_zero_metrics()
         
         try:
             # Concatenate all batch statistics
-            all_tp = []
-            all_conf = []
-            all_pred_cls = []
-            all_target_cls = []
-            
-            for batch_stats in self.stats:
-                tp, conf, pred_cls, target_cls = batch_stats
-                all_tp.append(tp)
-                all_conf.append(conf)
-                all_pred_cls.append(pred_cls)
-                all_target_cls.append(target_cls)
+            all_tp, all_conf, all_pred_cls, all_target_cls = zip(*self.stats)
             
             # Concatenate tensors
             tp_concat = torch.cat(all_tp)
@@ -310,7 +312,7 @@ class UltralyticsMapCalculator:
                 logger.warning("No valid predictions found after concatenation")
                 return self._create_zero_metrics()
             
-            # Compute mAP using Ultralytics ap_per_class
+            # Compute mAP using Ultralytics
             results = self.ultralytics_manager.compute_map_with_ultralytics(
                 tp_concat, conf_concat, pred_cls_concat, target_cls_concat
             )
@@ -323,7 +325,7 @@ class UltralyticsMapCalculator:
             recall_mean = recall.mean().item() if len(recall) > 0 else 0.0
             f1_mean = f1.mean().item() if len(f1) > 0 else 0.0
             
-            metrics = {
+            metrics: MetricsDict = {
                 'map50': map50,
                 'map50_95': map50,  # For now, same as mAP50
                 'precision': precision_mean,
@@ -333,12 +335,14 @@ class UltralyticsMapCalculator:
             }
             
             if self.debug:
-                logger.info(f"📊 Ultralytics mAP calculation complete:")
-                logger.info(f"   • mAP50: {map50:.3f}")
-                logger.info(f"   • Precision: {precision_mean:.3f}")
-                logger.info(f"   • Recall: {recall_mean:.3f}")
-                logger.info(f"   • F1: {f1_mean:.3f}")
-                logger.info(f"   • Processed {len(tp_concat)} detections from {self._batch_count} batches")
+                logger.info(
+                    f"📊 Ultralytics mAP calculation complete:\n"
+                    f"   • mAP50: {map50:.3f}\n"
+                    f"   • Precision: {precision_mean:.3f}\n"
+                    f"   • Recall: {recall_mean:.3f}\n"
+                    f"   • F1: {f1_mean:.3f}\n"
+                    f"   • Processed {len(tp_concat)} detections from {self._batch_count} batches"
+                )
             
             return metrics
             
@@ -346,7 +350,7 @@ class UltralyticsMapCalculator:
             logger.error(f"Error computing Ultralytics mAP: {e}")
             return self._create_zero_metrics()
     
-    def _create_zero_metrics(self) -> Dict[str, float]:
+    def _create_zero_metrics(self) -> MetricsDict:
         """Create zero metrics dictionary for error/empty cases."""
         return {
             'map50': 0.0,
@@ -357,8 +361,13 @@ class UltralyticsMapCalculator:
             'accuracy': 0.0
         }
     
-    def get_processing_stats(self) -> Dict[str, any]:
-        """Get comprehensive processing statistics."""
+    def get_processing_stats(self) -> Dict[str, Any]:
+        """
+        Get comprehensive processing statistics.
+        
+        Returns:
+            Dictionary containing processing statistics and configuration
+        """
         return {
             'calculator_stats': {
                 'num_classes': self.num_classes,
@@ -381,39 +390,34 @@ def create_ultralytics_map_calculator(
     conf_thres: float = 0.001,
     iou_thres: float = 0.5,
     debug: bool = False,
-    training_context: dict = None,
+    training_context: Optional[Dict[str, Any]] = None,
     use_progressive_thresholds: bool = True,
     use_standard_map: bool = True
 ) -> UltralyticsMapCalculator:
     """
-    Factory function to create Ultralytics mAP calculator.
+    Create and configure an UltralyticsMapCalculator instance.
     
     Args:
-        num_classes: Number of classes
-        conf_thres: Base confidence threshold
-        iou_thres: Base IoU threshold
+        num_classes: Number of classes (default: 17 for SmartCash)
+        conf_thres: Base confidence threshold (0.001-1.0)
+        iou_thres: Base IoU threshold (0.1-0.95)
         debug: Enable debug logging
-        training_context: Training context information
+        training_context: Optional training context for metrics
         use_progressive_thresholds: Enable progressive threshold scheduling
-        use_standard_map: Use standard mAP calculation
+        use_standard_map: Use standard mAP calculation (recommended)
         
     Returns:
-        UltralyticsMapCalculator instance
+        Configured UltralyticsMapCalculator instance
     """
     return UltralyticsMapCalculator(
         num_classes=num_classes,
         conf_thres=conf_thres,
         iou_thres=iou_thres,
         debug=debug,
-        training_context=training_context,
+        training_context=training_context or {},
         use_progressive_thresholds=use_progressive_thresholds,
         use_standard_map=use_standard_map
     )
-
-
-# Backward compatibility alias
-YOLOv5MapCalculator = UltralyticsMapCalculator
-create_yolov5_map_calculator = create_ultralytics_map_calculator
 
 
 # Re-export utility functions for backward compatibility

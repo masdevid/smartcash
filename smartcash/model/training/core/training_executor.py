@@ -11,7 +11,7 @@ from torch.amp import autocast
 from typing import Dict, Any, Optional
 
 from smartcash.common.logger import get_logger
-from .prediction_processor import PredictionProcessor
+from .prediction.prediction_processor import PredictionProcessor
 
 logger = get_logger(__name__)
 

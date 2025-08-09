@@ -360,28 +360,55 @@ class ProgressManager(CallbacksMixin):
             # Log early stopping configuration
             logger.debug(f"Early stopping config: patience={early_stopping.patience}, metric={early_stopping.metric}, mode={early_stopping.mode}")
             
-            # Use val_accuracy for early stopping (more reliable than val_map50)
-            monitor_metric = final_metrics.get('val_accuracy', 0)
+            # Use val_loss for early stopping (most stable metric)
+            # If val_loss not available, fall back to general loss, then val_accuracy
+            if 'val_loss' in final_metrics and final_metrics['val_loss'] > 0:
+                monitor_metric = final_metrics['val_loss']
+                # Set mode to 'min' for loss (lower is better)
+                if hasattr(early_stopping, 'mode'):
+                    early_stopping.mode = 'min'
+            elif 'loss' in final_metrics and final_metrics['loss'] > 0:
+                monitor_metric = final_metrics['loss']
+                if hasattr(early_stopping, 'mode'):
+                    early_stopping.mode = 'min'
+            else:
+                monitor_metric = final_metrics.get('val_accuracy', 0.001)  # Non-zero default
+                if hasattr(early_stopping, 'mode'):
+                    early_stopping.mode = 'max'
+            
+            logger.debug(f"Early stopping monitoring: {monitor_metric:.6f} (mode: {getattr(early_stopping, 'mode', 'unknown')})")
             should_stop = early_stopping(monitor_metric, None, epoch)  # Don't pass model for saving
             
-            # Show legacy early stopping status for visibility (even when not stopping)
-            if hasattr(early_stopping, 'wait') and early_stopping.wait > 0:
-                print(f"⏳ Early stopping: {early_stopping.metric} ({early_stopping.wait}/{early_stopping.patience}) - Best: {early_stopping.best_score:.6f}")
+            # Show legacy early stopping status for visibility
+            if hasattr(early_stopping, 'wait'):
+                current_wait = getattr(early_stopping, 'wait', 0)
+                best_score = getattr(early_stopping, 'best_score', 0)
+                metric_name = getattr(early_stopping, 'metric', 'metric')
+                
+                # Always show status if we have valid data
+                if best_score is not None:
+                    if current_wait > 0:
+                        print(f"⏳ Early stopping: {metric_name} ({current_wait}/{early_stopping.patience}) - Best: {best_score:.6f}")
+                    elif best_score > 0:  # Show improvement
+                        print(f"✨ Early stopping: {metric_name} improved to {monitor_metric:.6f} - Best: {best_score:.6f}")
             
             if should_stop:
                 # Use print for immediate console feedback (visible to user)
                 print(f"🛑 Legacy early stopping triggered at epoch {epoch + 1}")
                 print(f"   Monitoring val_accuracy: no improvement for {early_stopping.patience} epochs")
-                print(f"   Best val_accuracy: {early_stopping.best_score:.6f} at epoch {early_stopping.best_epoch + 1}")
+                metric_name = getattr(early_stopping, 'metric', 'metric')
+                print(f"   Best {metric_name}: {early_stopping.best_score:.6f} at epoch {early_stopping.best_epoch + 1}")
                 # Also log for debugging
                 logger.info(f"🛑 Legacy early stopping triggered at epoch {epoch + 1}")
                 logger.info(f"   Monitoring val_accuracy: no improvement for {early_stopping.patience} epochs")
-                logger.info(f"   Best val_accuracy: {early_stopping.best_score:.6f} at epoch {early_stopping.best_epoch + 1}")
+                metric_name = getattr(early_stopping, 'metric', 'metric')
+                logger.info(f"   Best {metric_name}: {early_stopping.best_score:.6f} at epoch {early_stopping.best_epoch + 1}")
                 
                 # Add early stopping info to final metrics
                 final_metrics['early_stopped'] = True
                 final_metrics['early_stop_epoch'] = epoch + 1
-                final_metrics['early_stop_reason'] = f"No improvement in {early_stopping.metric} for {early_stopping.patience} epochs"
+                metric_name = getattr(early_stopping, 'metric', 'monitored_metric')
+                final_metrics['early_stop_reason'] = f"No improvement in {metric_name} for {early_stopping.patience} epochs"
             
             return should_stop
     

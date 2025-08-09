@@ -55,5 +55,26 @@
       "Map fine_class → main_class after prediction",
       "Feature classes (14–16) can be used for authenticity verification logic"
     ]
+  },
+  "mAP_calculation": {
+    "training_mAP": {
+      "input": "17 fine-grained classes",
+      "iou_threshold": 0.5,
+      "description": "Computed separately for each fine class 0–16, then averaged",
+      "formula": "mAP@.5 = mean(AP_class_0..AP_class_16)"
+    },
+    "merged_mAP": {
+      "input": "Predictions and ground truth mapped to main_id using class_mapping.full_map",
+      "main_classes": 8,
+      "mapping_source": "class_mapping.full_map",
+      "description": "Evaluates model accuracy at the main denomination level",
+      "procedure": [
+        "Step 1: Map fine_id to main_id for both predictions and ground truth",
+        "Step 2: Group detections by main_id",
+        "Step 3: Apply IoU matching ≥ 0.5",
+        "Step 4: Compute AP per main_id",
+        "Step 5: Average AP across all main_ids to get mAP@.5"
+      ]
+    }
   }
 }

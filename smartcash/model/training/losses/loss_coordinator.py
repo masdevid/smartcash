@@ -28,9 +28,9 @@ class LossCoordinator:
         
         # Loss weights - AGGRESSIVE TUNING FOR BANKNOTE SCALE LEARNING
         # Very high box_weight to force model to learn proper banknote sizes
-        self.box_weight = loss_config.get('box_weight', 0.5)   # Increased from 0.25 to 0.5 for scale crisis
-        self.obj_weight = loss_config.get('obj_weight', 1.5)   # Further reduced to balance total loss
-        self.cls_weight = loss_config.get('cls_weight', 0.5)   # Keep classification weight stable
+        self.box_weight = loss_config.get('box_weight', 0.05)   # From loss.json
+        self.obj_weight = loss_config.get('obj_weight', 1.0)   # From loss.json
+        self.cls_weight = loss_config.get('cls_weight', 0.5)   # From loss.json
         self.focal_loss = loss_config.get('focal_loss', False)
         self.label_smoothing = loss_config.get('label_smoothing', 0.0)
         

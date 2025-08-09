@@ -61,8 +61,8 @@ class UncertaintyMultiTaskLoss(nn.Module):
             num_classes = config.get('num_classes', 7)
             self.layer_losses[layer_name] = YOLOLoss(
                 num_classes=num_classes,
-                box_weight=self.loss_config.get('box_weight', 0.5),   # Aggressive: force scale learning
-                obj_weight=self.loss_config.get('obj_weight', 1.5),  # Aggressive: further balanced
+                box_weight=self.loss_config.get('box_weight', 0.05),   # From loss.json
+                obj_weight=self.loss_config.get('obj_weight', 1.0),  # From loss.json
                 cls_weight=self.loss_config.get('cls_weight', 0.5),
                 focal_loss=self.loss_config.get('focal_loss', False),
                 label_smoothing=self.loss_config.get('label_smoothing', 0.0)

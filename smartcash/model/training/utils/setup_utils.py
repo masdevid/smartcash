@@ -192,6 +192,19 @@ def apply_configuration_overrides(config: Dict[str, Any], **kwargs) -> Dict[str,
     Returns:
         Updated configuration with overrides applied
     """
+    # Optimizer and scheduler overrides (moved to top to prevent being overwritten)
+    if 'optimizer' in kwargs and kwargs['optimizer']:
+        if 'training' not in config:
+            config['training'] = {}
+        config['training']['optimizer'] = kwargs['optimizer']
+        logger.debug(f"🎯 Optimizer override: {kwargs['optimizer']}")
+    
+    if 'scheduler' in kwargs and kwargs['scheduler']:
+        if 'training' not in config:
+            config['training'] = {}
+        config['training']['scheduler'] = kwargs['scheduler']
+        logger.debug(f"🎯 Scheduler override: {kwargs['scheduler']}")
+    
     # Apply specific training parameter overrides
     training_overrides = {}
     
@@ -292,9 +305,7 @@ def apply_configuration_overrides(config: Dict[str, Any], **kwargs) -> Dict[str,
                     config['training_phases'][phase]['learning_rates'] = {}
                 config['training_phases'][phase]['learning_rates']['backbone'] = kwargs['backbone_lr']
                 
-                # For Phase 2 (unfrozen backbone), also set main learning_rate
-                if phase == 'phase_2':
-                    config['training_phases'][phase]['learning_rate'] = kwargs['backbone_lr']
+                # Note: main learning_rate should remain as head LR for optimizer factory
             logger.debug(f"🎯 Backbone LR override (both phases): {kwargs['backbone_lr']}")
             logger.debug(f"🎯 Phase 2 main LR set to backbone LR: {kwargs['backbone_lr']}")
 
@@ -409,9 +420,7 @@ def apply_training_overrides(config: Dict[str, Any], **kwargs) -> Dict[str, Any]
                     config['training_phases'][phase]['learning_rates'] = {}
                 config['training_phases'][phase]['learning_rates']['backbone'] = kwargs['backbone_lr']
                 
-                # For Phase 2 (unfrozen backbone), also set main learning_rate
-                if phase == 'phase_2':
-                    config['training_phases'][phase]['learning_rate'] = kwargs['backbone_lr']
+                # Note: main learning_rate should remain as head LR for optimizer factory
             logger.debug(f"🎯 Backbone LR override (both phases): {kwargs['backbone_lr']}")
             logger.debug(f"🎯 Phase 2 main LR set to backbone LR: {kwargs['backbone_lr']}")
 
@@ -453,18 +462,7 @@ def apply_training_overrides(config: Dict[str, Any], **kwargs) -> Dict[str, Any]
         config['model']['pretrained'] = kwargs['pretrained']
         logger.debug(f"🎯 Pretrained override: {kwargs['pretrained']}")
     
-    # Optimizer and scheduler overrides
-    if 'optimizer' in kwargs and kwargs['optimizer']:
-        if 'training' not in config:
-            config['training'] = {}
-        config['training']['optimizer'] = kwargs['optimizer']
-        logger.debug(f"🎯 Optimizer override: {kwargs['optimizer']}")
-    
-    if 'scheduler' in kwargs and kwargs['scheduler']:
-        if 'training' not in config:
-            config['training'] = {}
-        config['training']['scheduler'] = kwargs['scheduler']
-        logger.debug(f"🎯 Scheduler override: {kwargs['scheduler']}")
+    # Note: Optimizer and scheduler overrides moved to top of function to prevent being overwritten
     
     if 'weight_decay' in kwargs and kwargs['weight_decay'] is not None:
         if 'training' not in config:

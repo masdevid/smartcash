@@ -10,7 +10,10 @@ from torch.optim.lr_scheduler import (
     CosineAnnealingLR, StepLR, ReduceLROnPlateau, 
     ExponentialLR, MultiStepLR, CyclicLR
 )
-from torch.cuda.amp import GradScaler
+try:
+    from torch.amp import GradScaler
+except ImportError:
+    from torch.cuda.amp import GradScaler
 from typing import Dict, List, Tuple, Optional, Any, Union
 import math
 
@@ -52,7 +55,14 @@ class OptimizerFactory:
         self.cosine_eta_min = self.training_config.get('cosine_eta_min', 1e-6)
         
         # Scaler untuk mixed precision
-        self.scaler = GradScaler('cuda') if self.mixed_precision else None
+        if self.mixed_precision:
+            try:
+                self.scaler = GradScaler('cuda')
+            except (TypeError, ValueError):
+                # Fallback to old API
+                self.scaler = GradScaler()
+        else:
+            self.scaler = None
     
     def create_optimizer(self, model: nn.Module, custom_lr: Optional[float] = None) -> torch.optim.Optimizer:
         """
@@ -70,14 +80,48 @@ class OptimizerFactory:
         # Create parameter groups dengan learning rate yang berbeda
         param_groups = self._create_parameter_groups(model, lr)
         
-        # Default to AdamW with the specified configuration (lr=5e-4 for phase 2)
-        optimizer = optim.AdamW(
-            param_groups,
-            lr=lr,
-            weight_decay=self.weight_decay,
-            betas=self.adamw_betas,
-            eps=self.adamw_eps
-        )
+        # Create optimizer based on configuration
+        if self.optimizer_type == 'adamw':
+            optimizer = optim.AdamW(
+                param_groups,
+                lr=lr,
+                weight_decay=self.weight_decay,
+                betas=self.adamw_betas,
+                eps=self.adamw_eps
+            )
+        elif self.optimizer_type == 'adam':
+            optimizer = optim.Adam(
+                param_groups,
+                lr=lr,
+                weight_decay=self.weight_decay,
+                betas=self.adamw_betas,
+                eps=self.adamw_eps
+            )
+        elif self.optimizer_type == 'sgd':
+            optimizer = optim.SGD(
+                param_groups,
+                lr=lr,
+                weight_decay=self.weight_decay,
+                momentum=0.9,
+                nesterov=True
+            )
+        elif self.optimizer_type == 'rmsprop':
+            optimizer = optim.RMSprop(
+                param_groups,
+                lr=lr,
+                weight_decay=self.weight_decay,
+                momentum=0.9
+            )
+        else:
+            # Fallback to AdamW if unknown optimizer type
+            print(f"Warning: Unknown optimizer type '{self.optimizer_type}', defaulting to AdamW")
+            optimizer = optim.AdamW(
+                param_groups,
+                lr=lr,
+                weight_decay=self.weight_decay,
+                betas=self.adamw_betas,
+                eps=self.adamw_eps
+            )
         
         return optimizer
     
@@ -162,8 +206,7 @@ class OptimizerFactory:
                 mode='max',  # Monitor mAP (higher is better)
                 factor=0.5,  # Reduce LR by half
                 patience=5,  # Wait 5 epochs
-                min_lr=self.learning_rate * 0.001,
-                verbose=True
+                min_lr=self.learning_rate * 0.001
             )
         
         elif self.scheduler_type == 'exponential':
@@ -193,7 +236,11 @@ class OptimizerFactory:
     def setup_mixed_precision(self) -> Optional[GradScaler]:
         """Setup mixed precision training"""
         if self.mixed_precision and torch.cuda.is_available():
-            return GradScaler('cuda')
+            try:
+                return GradScaler('cuda')
+            except (TypeError, ValueError):
+                # Fallback to old API
+                return GradScaler()
         return None
     
     def step_optimizer(self, optimizer: torch.optim.Optimizer, loss: torch.Tensor,

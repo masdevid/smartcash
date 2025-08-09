@@ -2,25 +2,20 @@
 SmartCash Model Builder with YOLOv5 Integration
 Multi-Layer Banknote Detection System
 
-This module provides a model builder that creates and configures models for the SmartCash system.
-It supports both training and inference with various backbones and configurations.
+This module provides a model builder that creates and configures YOLOv5-based models
+for the SmartCash system, supporting various backbones and configurations.
 """
 
 import torch
 import torch.nn as nn
-from typing import Dict, Any, List, Optional, Union
+from typing import Dict, Any, List, Optional, Union, Tuple
 
 from smartcash.common.logger import get_logger
 from smartcash.model.training.utils.progress_tracker import TrainingProgressTracker
 
-# Import the new modular YOLOv5 integration
+# Import YOLOv5 model factory
 try:
-    from smartcash.model.architectures.yolov5 import (
-        SmartCashYOLOv5Integration,
-        create_training_model,
-        create_smartcash_yolov5_model,
-        YOLOv5ModelFactory
-    )
+    from smartcash.model.architectures.yolov5.model_factory import YOLOv5ModelFactory
     YOLOV5_AVAILABLE = True
 except ImportError as e:
     get_logger("model.builder").warning(f"YOLOv5 integration not available: {e}")
@@ -89,64 +84,59 @@ class ModelBuilder:
         
         return device
     
-    def build(self, backbone: str = 'efficientnet_b4', detection_layers: List[str] = None,
-              layer_mode: str = 'multi', num_classes: int = 7, img_size: int = 640,
-              feature_optimization: Dict = None, pretrained: bool = True, **kwargs) -> nn.Module:
+    def build(self, backbone: str = 'yolov5s', num_classes: int = 17, 
+              img_size: int = 640, pretrained: bool = True, **kwargs) -> nn.Module:
         """
-        Build model with YOLOv5 architecture
+        Build a YOLOv5-based SmartCash model.
         
         Args:
-            backbone: Backbone type ('cspdarknet', 'efficientnet_b4')
-            detection_layers: Detection layers to use
-            layer_mode: 'single', 'multi' for layer mode
-            num_classes: Number of classes for primary detection layer
-            img_size: Input image size
-            feature_optimization: Feature optimization settings
-            pretrained: Use pretrained weights
-            **kwargs: Additional arguments
-            
+            backbone: Backbone type ('yolov5s', 'yolov5m', 'yolov5l', 'yolov5x', 'efficientnet_b4')
+            num_classes: Number of output classes (default: 17 for SmartCash)
+            img_size: Input image size (must be multiple of 32, default: 640)
+            pretrained: Whether to use pretrained weights (default: True)
+            **kwargs: Additional model configuration options:
+                - device: Device to place model on ('auto', 'cuda', 'mps', 'cpu')
+                - freeze: List of layer names to freeze (e.g., ['backbone', 'neck'])
+                
         Returns:
-            YOLOv5 integrated model instance
+            nn.Module: Configured YOLOv5 model instance
+            
+        Raises:
+            RuntimeError: If model creation fails or YOLOv5 is not available
         """
-        detection_layers = detection_layers or ['layer_1', 'layer_2', 'layer_3']
-        feature_optimization = feature_optimization or {'enabled': True}
-        
-        if self.progress_bridge:
-            self.progress_bridge.update_operation(1, 4, f"Building SmartCash YOLOv5 model: {backbone} | Mode: {layer_mode} | Architecture: yolov5")
-        else:
-            self.logger.info(f"🏗️ Building SmartCash YOLOv5 model: {backbone} | Mode: {layer_mode} | Architecture: yolov5")
-        
-        # Always use YOLOv5 architecture
-        if self.YOLOV5_AVAILABLE and self.model_factory is not None:
-            try:
-                # Use the model factory to create the model
-                model = self.model_factory.create_model(
-                    backbone=backbone,
-                    num_classes=num_classes,
-                    img_size=img_size,
-                    pretrained=pretrained,
-                    **kwargs
-                )
-                
-                # Apply feature optimization
-                if feature_optimization.get('enabled', True):
-                    model = self._optimize_model_features(model, feature_optimization)
-                
-                # Log model info
-                model_info = self.get_model_info(model)
-                self.logger.info(f"✅ Model built successfully: {model_info.get('parameters', 0):,} parameters")
-                
-                return model
-                
-            except Exception as e:
-                error_msg = f"Failed to build YOLOv5 model: {str(e)}"
-                self.logger.error(error_msg, exc_info=True)
-                raise RuntimeError(error_msg) from e
-        else:
-            error_msg = "❌ YOLOv5 integration is required but not available. "
-            error_msg += "Please ensure YOLOv5 is properly installed and the model factory is initialized."
+        if not self.YOLOV5_AVAILABLE or self.model_factory is None:
+            error_msg = ("❌ YOLOv5 integration is required but not available. "
+                        "Please ensure YOLOv5 is properly installed.")
             self.logger.error(error_msg)
             raise RuntimeError(error_msg)
+        
+        # Log model creation
+        if self.progress_bridge:
+            self.progress_bridge.update_operation(1, 3, f"Building YOLOv5 model: {backbone}")
+        self.logger.info(f"🏗️ Building YOLOv5 model with backbone: {backbone}, "
+                        f"classes: {num_classes}, img_size: {img_size}")
+        
+        try:
+            # Create model using the factory
+            model = self.model_factory.create_model(
+                backbone=backbone,
+                num_classes=num_classes,
+                img_size=img_size,
+                pretrained=pretrained,
+                **kwargs
+            )
+            
+            # Log successful model creation
+            model_info = self.get_model_info(model)
+            param_count = model_info.get('parameters', 0)
+            self.logger.info(f"✅ Model built successfully: {param_count:,} parameters")
+            
+            return model
+            
+        except Exception as e:
+            error_msg = f"❌ Failed to build YOLOv5 model: {str(e)}"
+            self.logger.error(error_msg, exc_info=True)
+            raise RuntimeError(error_msg) from e
     
     
     def _optimize_model_features(self, model: nn.Module, optimization_config: Dict) -> nn.Module:
@@ -206,66 +196,77 @@ class ModelBuilder:
             model: The model to get info for
             
         Returns:
-            Dictionary containing model information
+            Dictionary containing model information including:
+            - parameters: Number of trainable parameters
+            - device: Device the model is on
+            - class_names: List of class names (if available)
+            - model_stride: Model stride (if available)
         """
         info = {
             'parameters': self._count_parameters(model),
             'device': str(next(model.parameters()).device) if hasattr(model, 'parameters') and list(model.parameters()) else 'unknown'
         }
         
-        # Add model-specific info if available
-        if hasattr(model, 'get_model_info'):
-            
-            # Try to get YOLOv5-specific model information
-            try:
+        # Get YOLOv5 model information if available
+        try:
+            if hasattr(model, 'yolov5_model'):
                 yolo_model = model.yolov5_model
                 
-                # Handle YOLOv5 DetectionModel
-                if hasattr(yolo_model, 'model') and hasattr(yolo_model.model, 'model'):
-                    # For YOLOv5Wrapper -> DetectionModel -> Sequential
-                    detection_model = yolo_model.model
-                    if hasattr(detection_model, 'model') and isinstance(detection_model.model, nn.Sequential):
-                        model_layers = detection_model.model
-                        if len(model_layers) > 0:
-                            last_layer = model_layers[-1]
-                            if hasattr(last_layer, 'get_layer_info'):
-                                info.update(last_layer.get_layer_info())
-                elif hasattr(yolo_model, 'model') and isinstance(yolo_model.model, nn.Sequential):
-                    # Direct sequential model
-                    model_layers = yolo_model.model
-                    if len(model_layers) > 0:
-                        last_layer = model_layers[-1]
-                        if hasattr(last_layer, 'get_layer_info'):
-                            info.update(last_layer.get_layer_info())
-                
-                # Add YOLOv5-specific info if available
-                if hasattr(yolo_model, 'names'):
-                    info['class_names'] = yolo_model.names
-                if hasattr(yolo_model, 'stride'):
-                    info['model_stride'] = yolo_model.stride.tolist() if hasattr(yolo_model.stride, 'tolist') else str(yolo_model.stride)
-                    
-            except Exception as e:
-                self.logger.debug(f"Could not extract YOLOv5 model info: {e}")
-                
-        # Legacy architecture support removed
+                # Extract model information using the model factory if available
+                if self.model_factory and hasattr(self.model_factory, 'get_model_info'):
+                    yolo_info = self.model_factory.get_model_info(yolo_model)
+                    info.update(yolo_info)
+                else:
+                    # Fallback to direct attribute access
+                    if hasattr(yolo_model, 'names'):
+                        info['class_names'] = yolo_model.names
+                    if hasattr(yolo_model, 'stride'):
+                        info['model_stride'] = yolo_model.stride.tolist() \
+                            if hasattr(yolo_model.stride, 'tolist') else str(yolo_model.stride)
+                            
+        except Exception as e:
+            self.logger.debug(f"Could not extract YOLOv5 model info: {e}")
         
         return info
 
 
-def create_model(backbone: str = 'cspdarknet', **kwargs) -> nn.Module:
+def create_model(backbone: str = 'yolov5s', num_classes: int = 17, 
+                img_size: int = 640, pretrained: bool = True, **kwargs) -> nn.Module:
     """
-    Convenience function to create SmartCash YOLOv5 model
+    Create a SmartCash YOLOv5 model with the specified configuration.
+    
+    This is a convenience wrapper around ModelBuilder that provides a simple interface
+    for creating pre-configured YOLOv5 models for SmartCash.
     
     Args:
-        backbone: Backbone type
-        **kwargs: Model parameters
-        
+        backbone: Backbone architecture. One of: 'yolov5s', 'yolov5m', 'yolov5l', 'yolov5x', 'efficientnet_b4'.
+                 Default: 'yolov5s' (smallest and fastest).
+        num_classes: Number of output classes. Default: 17 (for SmartCash).
+        img_size: Input image size (height=width). Must be multiple of 32. Default: 640.
+        pretrained: Whether to load pretrained weights. Default: True.
+        **kwargs: Additional arguments passed to ModelBuilder.build():
+            - device: Device to place model on ('auto', 'cuda', 'mps', 'cpu')
+            - freeze: List of layer names to freeze (e.g., ['backbone', 'neck'])
+            
     Returns:
-        YOLOv5 integrated model instance
+        nn.Module: Configured YOLOv5 model ready for training or inference.
+        
+    Example:
+        >>> # Create a small YOLOv5 model
+        >>> model = create_model('yolov5s', num_classes=17)
+        >>> 
+        >>> # Create a larger model with custom image size
+        >>> model = create_model('yolov5m', num_classes=17, img_size=1280)
     """
+    # Create model builder with default config
     builder = ModelBuilder(config={})
+    
+    # Build and return the model
     return builder.build(
         backbone=backbone,
+        num_classes=num_classes,
+        img_size=img_size,
+        pretrained=pretrained,
         **kwargs
     )
 

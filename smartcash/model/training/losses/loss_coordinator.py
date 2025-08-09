@@ -269,69 +269,156 @@ class LossCoordinator:
     
     def _compute_individual_losses(self, predictions: Dict[str, list], 
                                   targets: torch.Tensor, img_size: int = 640) -> Tuple[torch.Tensor, Dict[str, Any]]:
-        """Compute loss using individual YOLO losses (backward compatibility)"""
-        device = targets.device if hasattr(targets, 'shape') and targets.numel() > 0 else torch.device('cpu')
-        total_loss = torch.tensor(0.0, device=device, requires_grad=True)
-        loss_breakdown = {}
+        """
+        Compute loss using the exact specification from loss.json.
         
-        # Debug: Check if we have targets
-        if not hasattr(targets, 'shape') or targets.numel() == 0:
-            self.logger.warning(f"Individual loss computation: No targets available. Targets type: {type(targets)}")
-            return torch.tensor(1e-6, device=device, requires_grad=True), loss_breakdown
+        Loss Components (from loss.json):
+        - L_box: CIoU loss for bounding box regression (weight: 0.05)
+        - L_obj: BCE loss for objectness (weight: 1.0)
+        - L_cls: BCE loss for classification (weight: 0.5)
         
-        # Handle single layer mode
-        if not self._is_multilayer_mode():
-            layer_name = list(predictions.keys())[0]  # Primary layer
-            layer_preds = predictions[layer_name]
-            loss_fn = self.loss_functions.get('banknote', self.loss_functions[layer_name])
+        Total Loss = 0.05 * L_box + 1.0 * L_obj + 0.5 * L_cls
+        """
+        import torch
+        import torch.nn.functional as F
+        from torchvision.ops import box_convert
+        import math
+        
+        # Initialize losses
+        lbox = torch.tensor(0., device=targets.device)
+        lobj = torch.tensor(0., device=targets.device)
+        lcls = torch.tensor(0., device=targets.device)
+        
+        # Process each prediction scale (P3, P4, P5)
+        for pi, pred in enumerate(predictions.get('layer_1', [])):  # Assuming layer_1 contains the main predictions
+            # pred shape: [batch, anchors, grid_y, grid_x, box_attrs]
+            batch_size, num_anchors, grid_h, grid_w, _ = pred.shape
             
-            layer_loss, layer_components = loss_fn(layer_preds, targets, img_size)
-            total_loss = total_loss + layer_loss
-            loss_breakdown.update(layer_components)
-        
-        # Handle multilayer mode
-        else:
-            layer_losses = []
-            active_layers = 0
+            # Reshape predictions
+            pred = pred.view(batch_size, num_anchors, -1, grid_h, grid_w).permute(0, 1, 3, 4, 2).contiguous()
             
-            for layer_name, layer_preds in predictions.items():
-                if layer_name in self.loss_functions:
-                    # Filter targets for this layer
-                    layer_targets = filter_targets_for_layer(targets, layer_name)
+            # Get predictions
+            pred_xy = torch.sigmoid(pred[..., 0:2])  # Center coordinates (sigmoid)
+            pred_wh = torch.exp(pred[..., 2:4])  # Width/height (exponential)
+            pred_obj = torch.sigmoid(pred[..., 4:5])  # Objectness score (sigmoid)
+            pred_cls = torch.sigmoid(pred[..., 5:])  # Class predictions (sigmoid for multi-label)
+            
+            # Build target tensors
+            tbox = torch.zeros_like(pred[..., 0:4])  # Target boxes
+            tobj = torch.zeros_like(pred[..., 4:5])  # Target objectness
+            tcls = torch.zeros_like(pred_cls)  # Target classes
+            
+            # Process each image in the batch
+            for bi in range(batch_size):
+                # Get targets for this image
+                img_targets = targets[targets[:, 0] == bi]  # [num_targets, 6] (img_idx, class, x, y, w, h)
+                if len(img_targets) == 0:
+                    continue
                     
-                    # Safe check for tensor size - avoid Boolean tensor comparison
-                    has_targets = False
-                    if torch.is_tensor(layer_targets) and layer_targets.numel() > 0:
-                        has_targets = True
-                    elif isinstance(layer_targets, (list, tuple)) and len(layer_targets) > 0:
-                        has_targets = True
-                    
-                    if has_targets:
-                        loss_fn = self.loss_functions[layer_name]
-                        layer_loss, layer_components = loss_fn(layer_preds, layer_targets, img_size)
-                        
-                        # Add layer prefix to component names
-                        prefixed_components = {f"{layer_name}_{k}": v for k, v in layer_components.items()}
-                        loss_breakdown.update(prefixed_components)
-                        
-                        layer_losses.append(layer_loss)
-                        active_layers += 1
+                # Convert targets to grid coordinates
+                target_boxes = img_targets[:, 2:] * torch.tensor(
+                    [grid_w, grid_h, grid_w, grid_h], 
+                    device=targets.device
+                )
+                
+                # Convert from [x_center, y_center, w, h] to [x1, y1, x2, y2]
+                target_boxes = box_convert(target_boxes, 'cxcywh', 'xyxy')
+                
+                # Get grid indices
+                grid_x = (img_targets[:, 2] * grid_w).long()
+                grid_y = (img_targets[:, 3] * grid_h).long()
+                
+                # Set objectness target (1 for cells with objects)
+                tobj[bi, :, grid_y, grid_x, :] = 1.0
+                
+                # Set class targets (one-hot encoding)
+                tcls[bi, :, grid_y, grid_x, img_targets[:, 1].long()] = 1.0
+                
+                # Set box targets (relative to grid cell)
+                tbox[bi, :, grid_y, grid_x, 0] = img_targets[:, 2] * grid_w - grid_x.float()  # gx - cx
+                tbox[bi, :, grid_y, grid_x, 1] = img_targets[:, 3] * grid_h - grid_y.float()  # gy - cy
+                tbox[bi, :, grid_y, grid_x, 2] = torch.log(img_targets[:, 4] * grid_w + 1e-16)  # log(gw)
+                tbox[bi, :, grid_y, grid_x, 3] = torch.log(img_targets[:, 5] * grid_h + 1e-16)  # log(gh)
             
-            # Average the losses instead of summing to prevent high values in multi-layer mode
-            if layer_losses:
-                if active_layers > 1:
-                    # Multi-layer: average the losses
-                    total_loss = torch.stack(layer_losses).mean()
-                    pass  # Removed verbose logging
-                else:
-                    # Single layer: use the loss directly
-                    total_loss = layer_losses[0]
+            # Calculate CIoU loss for bounding boxes
+            pred_boxes = torch.cat([pred_xy, pred_wh], -1)
+            ciou = self.bbox_iou(pred_boxes, tbox, CIoU=True).squeeze()
+            lbox += (1.0 - ciou).mean()
+            
+            # Calculate objectness loss (BCE with logits)
+            lobj += F.binary_cross_entropy(pred_obj, tobj, reduction='mean')
+            
+            # Calculate classification loss (BCE with logits, multi-label)
+            if pred_cls.numel() > 0:
+                lcls += F.binary_cross_entropy(pred_cls, tcls, reduction='mean')
         
-        # Add overall metrics
-        loss_breakdown['total_loss'] = total_loss
-        loss_breakdown['num_targets'] = targets.shape[0] if hasattr(targets, 'shape') and len(targets.shape) > 0 else 0
+        # Apply weights from loss.json
+        lbox *= 0.05  # lambda_box = 0.05
+        lobj *= 1.0   # lambda_obj = 1.0
+        lcls *= 0.5   # lambda_cls = 0.5
         
-        return total_loss, loss_breakdown
+        # Total loss
+        loss = lbox + lobj + lcls
+        
+        # Prepare loss breakdown
+        loss_breakdown = {
+            'total_loss': loss.item(),
+            'box_loss': lbox.item(),
+            'obj_loss': lobj.item(),
+            'cls_loss': lcls.item(),
+            'metrics': {
+                'box_ciou': (1.0 - lbox/0.05).item() if lbox > 0 else 0.0,
+                'obj_accuracy': (tobj == (pred_obj > 0.5)).float().mean().item(),
+                'cls_accuracy': (tcls == (pred_cls > 0.5)).float().mean().item() if pred_cls.numel() > 0 else 0.0,
+            }
+        }
+        
+        return loss, loss_breakdown
+    
+    def bbox_iou(self, box1, box2, x1y1x2y2=False, GIoU=False, DIoU=False, CIoU=False, eps=1e-7):
+        """
+        Calculate IoU, GIoU, DIoU, or CIoU between two sets of boxes
+        """
+        # Get the coordinates of bounding boxes
+        if x1y1x2y2:  # x1, y1, x2, y2 = box1
+            b1_x1, b1_y1, b1_x2, b1_y2 = box1[..., 0], box1[..., 1], box1[..., 2], box1[..., 3]
+            b2_x1, b2_y1, b2_x2, b2_y2 = box2[..., 0], box2[..., 1], box2[..., 2], box2[..., 3]
+        else:  # transform from xywh to xyxy
+            b1_x1, b1_x2 = box1[..., 0] - box1[..., 2] / 2, box1[..., 0] + box1[..., 2] / 2
+            b1_y1, b1_y2 = box1[..., 1] - box1[..., 3] / 2, box1[..., 1] + box1[..., 3] / 2
+            b2_x1, b2_x2 = box2[..., 0] - box2[..., 2] / 2, box2[..., 0] + box2[..., 2] / 2
+            b2_y1, b2_y2 = box2[..., 1] - box2[..., 3] / 2, box2[..., 1] + box2[..., 3] / 2
+        
+        # Intersection area
+        inter = (torch.min(b1_x2, b2_x2) - torch.max(b1_x1, b2_x1)).clamp(0) * \
+                (torch.min(b1_y2, b2_y2) - torch.max(b1_y1, b2_y1)).clamp(0)
+        
+        # Union Area
+        w1, h1 = b1_x2 - b1_x1, b1_y2 - b1_y1 + eps
+        w2, h2 = b2_x2 - b2_x1, b2_y2 - b2_y1 + eps
+        union = w1 * h1 + w2 * h2 - inter + eps
+        
+        # IoU
+        iou = inter / union
+        
+        if CIoU or DIoU or GIoU:
+            cw = torch.max(b1_x2, b2_x2) - torch.min(b1_x1, b2_x1)  # convex (smallest enclosing box) width
+            ch = torch.max(b1_y2, b2_y2) - torch.min(b1_y1, b2_y1)  # convex height
+            if CIoU or DIoU:  # Distance or Complete IoU https://arxiv.org/abs/1911.08287v1
+                c2 = cw ** 2 + ch ** 2 + eps  # convex diagonal squared
+                rho2 = ((b2_x1 + b2_x2 - b1_x1 - b1_x2) ** 2 +
+                        (b2_y1 + b2_y2 - b1_y1 - b1_y2) ** 2) / 4  # center distance squared
+                if DIoU:
+                    return iou - rho2 / c2  # DIoU
+                elif CIoU:  # https://github.com/Zzh-tju/DIoU-SSD-pytorch/blob/master/utils/box/box_utils.py#L47
+                    v = (4 / math.pi ** 2) * torch.pow(torch.atan(w2 / h2) - torch.atan(w1 / h1), 2)
+                    with torch.no_grad():
+                        alpha = v / (v - iou + (1 + eps))
+                    return iou - (rho2 / c2 + v * alpha)  # CIoU
+            else:  # GIoU https://arxiv.org/pdf/1902.09630.pdf
+                c_area = cw * ch + eps  # convex area
+                return iou - (c_area - union) / c_area  # GIoU
+        return iou  # IoU
     
     def _get_empty_metrics(self, targets: torch.Tensor) -> Dict[str, Any]:
         """Get empty metrics dictionary"""

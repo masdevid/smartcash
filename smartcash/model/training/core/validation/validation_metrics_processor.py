@@ -83,7 +83,9 @@ class ValidationMetricsProcessor:
     
     def compute_loss_metrics(self, predictions: torch.Tensor, targets: torch.Tensor) -> Dict[str, float]:
         """
-        Compute loss metrics from predictions and targets.
+        Compute loss metrics from predictions and targets using the same LossCoordinator as training.
+        
+        This ensures consistent loss computation between training and validation phases.
         
         Args:
             predictions: Model predictions tensor
@@ -114,32 +116,52 @@ class ValidationMetricsProcessor:
             else:
                 formatted_preds = {'layer_1': [predictions]}
             
-            # Compute loss with proper format
-            total_loss, loss_breakdown = self.loss_manager.compute_loss(
+            # Get the underlying LossCoordinator from the LossManager
+            if hasattr(self.loss_manager, '_coordinator'):
+                loss_coordinator = self.loss_manager._coordinator
+            else:
+                loss_coordinator = self.loss_manager
+            
+            # Compute loss with proper format using the same method as training
+            total_loss, loss_breakdown = loss_coordinator.compute_loss(
                 formatted_preds, targets, img_size=640
             )
             
             # Extract loss values properly
             loss_val = total_loss.item() if hasattr(total_loss, 'item') else float(total_loss)
             
+            # Update metrics with the same loss components as training
             metrics.update({
                 'loss': max(loss_val, 1e-6),  # Ensure non-zero loss
                 'box_loss': float(loss_breakdown.get('box_loss', 0.0)),
                 'obj_loss': float(loss_breakdown.get('obj_loss', 0.0)),
                 'cls_loss': float(loss_breakdown.get('cls_loss', 0.0)),
-                'val_loss': max(loss_val, 1e-6)  # For early stopping
+                'val_loss': max(loss_val, 1e-6),  # For early stopping
+                # Include detailed metrics from loss breakdown
+                'val_box_loss': float(loss_breakdown.get('box_loss', 0.0)),
+                'val_obj_loss': float(loss_breakdown.get('obj_loss', 0.0)),
+                'val_cls_loss': float(loss_breakdown.get('cls_loss', 0.0)),
+                'val_ciou': float(loss_breakdown.get('metrics', {}).get('ciou', 0.0)),
+                'val_obj_accuracy': float(loss_breakdown.get('metrics', {}).get('obj_acc', 0.0)),
+                'val_cls_accuracy': float(loss_breakdown.get('metrics', {}).get('cls_acc', 0.0))
             })
             
-            # Add validation metrics if available
-            for key in ['val_map50', 'val_precision', 'val_recall', 'val_f1', 'val_accuracy']:
-                if key in loss_breakdown:
-                    metrics[key] = float(loss_breakdown[key])
+            # Add any additional metrics from the loss breakdown
+            if 'metrics' in loss_breakdown:
+                for key, value in loss_breakdown['metrics'].items():
+                    if key not in metrics and key not in ['ciou', 'obj_acc', 'cls_acc']:
+                        metrics[f'val_{key}'] = float(value)
             
         except Exception as e:
-            logger.warning(f"Loss computation error: {e}")
+            logger.warning(f"Loss computation error during validation: {e}")
             # Set non-zero fallback loss for early stopping
             metrics['loss'] = 0.1
             metrics['val_loss'] = 0.1
+            
+            # Log the full error for debugging
+            logger.debug(f"Full error details: {str(e)}")
+            import traceback
+            logger.debug(f"Traceback: {traceback.format_exc()}")
         
         return metrics
     

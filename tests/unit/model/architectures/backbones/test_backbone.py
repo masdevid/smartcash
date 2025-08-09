@@ -7,7 +7,8 @@ import pytest
 import torch
 from unittest.mock import MagicMock, patch
 
-from smartcash.model.architectures.backbones import YOLOv5Backbone, BackboneFactory, BackboneConfig
+from smartcash.model.architectures.backbones.yolov5_backbone import YOLOv5Backbone
+from smartcash.model.utils.backbone_factory import BackboneFactory
 from smartcash.common.logger import SmartCashLogger
 
 
@@ -50,16 +51,12 @@ def test_yolov5_backbone_forward():
 
 def test_backbone_factory_create_yolov5():
     """Test BackboneFactory with YOLOv5 backbone."""
-    # Create a config
-    config = BackboneConfig(
+    backbone = BackboneFactory.create_backbone(
         backbone_type='yolov5',
         model_size='s',
         pretrained=False,
         freeze=False
     )
-    
-    # Create backbone using factory
-    backbone = BackboneFactory.create_backbone(config)
     
     # Verify the correct type was created
     assert isinstance(backbone, YOLOv5Backbone)
@@ -74,16 +71,13 @@ def test_yolov5_backbone_factory_mock(mock_backbone):
     mock_instance = MagicMock()
     mock_backbone.return_value = mock_instance
     
-    # Create config
-    config = BackboneConfig(
+    # Create backbone
+    backbone = BackboneFactory.create_backbone(
         backbone_type='yolov5',
         model_size='m',
         pretrained=True,
         freeze=True
     )
-    
-    # Create backbone
-    backbone = BackboneFactory.create_backbone(config)
     
     # Verify factory called the constructor correctly
     mock_backbone.assert_called_once_with(

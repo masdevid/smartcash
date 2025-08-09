@@ -43,8 +43,8 @@ with patch.dict('sys.modules', {
     'yolov5.models.experimental': MagicMock(),
 }):
     # Now import our modules
-    from smartcash.model.architectures.backbones.backbone import YOLOv5Backbone
-    from smartcash.model.architectures.backbones.backbone_factory import BackboneFactory, BackboneConfig
+    from smartcash.model.architectures.backbones.yolov5_backbone import YOLOv5Backbone
+    from smartcash.model.utils.backbone_factory import BackboneFactory
 
 
 def test_yolov5_backbone_initialization():
@@ -76,15 +76,12 @@ def test_yolov5_backbone_forward():
 
 def test_backbone_factory_create_yolov5():
     """Test BackboneFactory with YOLOv5 backbone."""
-    config = BackboneConfig(
+    backbone = BackboneFactory.create_backbone(
         backbone_type='yolov5',
         model_size='s',
         pretrained=False,
         freeze=False
     )
-    
-    with patch('torch.jit.trace', return_value=MockYOLOv5Model()):
-        backbone = BackboneFactory.create_backbone(config)
     
     assert backbone.model_size == 's'
     assert not backbone.pretrained
@@ -93,10 +90,8 @@ def test_backbone_factory_create_yolov5():
 
 def test_backbone_factory_invalid_type():
     """Test BackboneFactory with invalid backbone type."""
-    config = BackboneConfig(backbone_type='invalid')
-    
     with pytest.raises(ValueError):
-        BackboneFactory.create_backbone(config)
+        BackboneFactory.create_backbone(backbone_type='invalid')
 
 
 if __name__ == "__main__":

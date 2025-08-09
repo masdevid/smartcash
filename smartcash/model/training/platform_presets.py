@@ -141,7 +141,7 @@ class PlatformPresets:
             base_batch = 16
             config.update({
                 'batch_size': base_batch,
-                'num_workers': 10,  # Disable multiprocessing for MPS
+                'num_workers': 8,  # Disable multiprocessing for MPS
                 'pin_memory': False,  # Not needed for MPS
                 'persistent_workers': True,  # Disable for MPS
                 'prefetch_factor': 2,  # Conservative prefetch

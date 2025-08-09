@@ -11,8 +11,8 @@ import torch
 import numpy as np
 
 # Import the class to test
-from smartcash.model.training.core.validation_batch_processor import ValidationBatchProcessor
-from smartcash.model.training.core.prediction_processor import PredictionProcessor
+from smartcash.model.training.core.validation import create_validation_batch_processor
+from smartcash.model.training.core import PredictionProcessor
 
 
 class TestValidationBatchProcessor(unittest.TestCase):
@@ -61,9 +61,9 @@ class TestValidationBatchProcessor(unittest.TestCase):
         self.prediction_processor = MagicMock(spec=PredictionProcessor)
         
         # Initialize the processor
-        self.processor = ValidationBatchProcessor(
+        self.processor = create_validation_batch_processor(
             model=self.model,
-            config=self.config,
+            loss_manager=self.loss_manager,
             prediction_processor=self.prediction_processor
         )
         
@@ -137,9 +137,9 @@ class TestValidationBatchProcessor(unittest.TestCase):
         )
         
         # Create a processor with the mock model
-        processor = ValidationBatchProcessor(
+        processor = create_validation_batch_processor(
             model=mock_model,
-            config=self.config,
+            loss_manager=self.loss_manager,
             prediction_processor=self.prediction_processor
         )
         
@@ -200,9 +200,9 @@ class TestValidationBatchProcessor(unittest.TestCase):
         mock_model.yolov5_model = mock_yolov5_model
         
         # Create a new processor with the mock model
-        processor = ValidationBatchProcessor(
+        processor = create_validation_batch_processor(
             model=mock_model,
-            config=self.config,
+            loss_manager=self.loss_manager,
             prediction_processor=self.prediction_processor
         )
         
@@ -454,9 +454,9 @@ class TestValidationBatchProcessor(unittest.TestCase):
         mock_model.parameters.return_value = iter([mock_param])
         
         # Create a new processor with the mock model
-        processor = ValidationBatchProcessor(
+        processor = create_validation_batch_processor(
             model=mock_model,
-            config=self.config,
+            loss_manager=self.loss_manager,
             prediction_processor=self.prediction_processor
         )
         

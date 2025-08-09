@@ -13,7 +13,8 @@ class YOLOv5Backbone(BaseBackbone):
     def __init__(self, backbone: str, num_classes: int, pretrained: bool, device: str):
         super().__init__(num_classes, pretrained, device)
         self.backbone_type = backbone
-        self.feature_dims = [128, 256, 512] if backbone == 'yolov5s' else [256, 512, 1024]
+        # OPTIMIZATION: Always use small variant channels for efficiency (<10M target)
+        self.feature_dims = [128, 256, 512]  # Small variant for all backbones
         self.backbone = self.create_backbone()
         self.neck = self.create_neck(self.feature_dims)
         self.head = self.create_head(self.feature_dims)
@@ -22,7 +23,8 @@ class YOLOv5Backbone(BaseBackbone):
         self.logger.info(f"✅ Created YOLOv5Backbone: {backbone}, {num_classes} classes")
     
     def create_backbone(self) -> nn.ModuleList:
-        channels = [32, 64, 128, 256, 512] if self.backbone_type == 'yolov5s' else [64, 128, 256, 512, 1024]
+        # OPTIMIZATION: Always use small channels for efficiency (<10M params target)
+        channels = [32, 64, 128, 256, 512]  # Small variant for all backbone types
         return nn.ModuleList([
             Conv(3, channels[0], 6, 2, 2),
             Conv(channels[0], channels[1], 3, 2),

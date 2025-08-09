@@ -8,7 +8,7 @@ from smartcash.common.logger import SmartCashLogger
 from .memory_manager import YOLOv5MemoryManager
 from .config_manager import YOLOv5ConfigManager
 from .pretrained_weights import YOLOv5PretrainedWeights
-from .model_factory import YOLOv5ModelFactory
+from .model_factory import model_factory
 from .training_compatibility import SmartCashTrainingCompatibilityWrapper
 
 # Import YOLOv5 registration
@@ -45,7 +45,7 @@ class SmartCashYOLOv5Integration:
         self.memory_manager = YOLOv5MemoryManager(logger=self.logger)
         self.config_manager = YOLOv5ConfigManager(logger=self.logger)
         self.weights_manager = YOLOv5PretrainedWeights(logger=self.logger)
-        self.model_factory = YOLOv5ModelFactory(logger=self.logger)
+        self.model_factory = model_factory
         
         # Perform memory cleanup before initialization
         self.memory_manager.initial_cleanup()
@@ -53,7 +53,7 @@ class SmartCashYOLOv5Integration:
         # Register custom components with YOLOv5
         if YOLOV5_AVAILABLE:
             register_yolov5_components()
-            self.model_factory.register_custom_components()
+            
         
         self.logger.info("✅ SmartCash YOLOv5 integration initialized")
     
@@ -94,7 +94,14 @@ class SmartCashYOLOv5Integration:
             anchors = config.get('anchors')
             
             # Create the model wrapper
-            model = self.model_factory.create_yolov5_wrapper(config, ch, nc, anchors)
+            model = self.model_factory.create_model(
+                backbone=backbone_type,
+                num_classes=config['nc'],
+                img_size=config['img_size'],
+                pretrained=kwargs.get('pretrained', False),
+                ch=config['ch'],
+                anchors=config.get('anchors')
+            )
             
             # Store pretrained weights path if specified
             if kwargs.get('pretrained', False):

@@ -86,7 +86,7 @@ class ValidationBatchProcessor:
         )
         
         # Initialize AMP scaler if needed
-        self.scaler = GradScaler() if self.use_amp else None
+        self.scaler = GradScaler('cuda') if self.use_amp else None
         
         # Ensure model is on correct device and in eval mode
         model.to(self.device).eval()
@@ -122,10 +122,10 @@ class ValidationBatchProcessor:
         
         # Optimized progress reporting (only every 10 batches)
         if progress_callback and batch_idx % 10 == 0:
-            progress_callback(
-                current=batch_idx,
-                total=num_batches,
-                message=f"Batch {batch_idx + 1}/{num_batches}",
+            progress_callback.update_batch_progress(
+                current_batch=batch_idx,
+                total_batches=num_batches,
+                message=f"Validating batch {batch_idx + 1}/{num_batches}",
                 phase=f"val_phase_{phase_num}"
             )
         

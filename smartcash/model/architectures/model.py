@@ -45,36 +45,11 @@ class SmartCashYOLOv5Model(nn.Module):
             model = EfficientNetBackbone(self.num_classes, pretrained, self.device)
             self._set_phase_1_on_backbone(model)
             return model
-        elif self.backbone_type.startswith("yolov5"):
-            # Use optimized native YOLO for YOLOv5 variants
-            return self._create_optimized_yolo_model(pretrained)
         else:
             # Fallback to custom YOLOv5 backbone
             model = YOLOv5Backbone(self.backbone_type, self.num_classes, pretrained, self.device)
             self._set_phase_1_on_backbone(model)
             return model
-    
-    def _create_optimized_yolo_model(self, pretrained: bool) -> YOLO:
-        """Create optimized native YOLO model for YOLOv5 variants"""
-        model_configs = {
-            "yolov5n": "yolov5nu.pt" if pretrained else "yolov5n.yaml",
-            "yolov5s": "yolov5su.pt" if pretrained else "yolov5s.yaml",  
-            "yolov5m": "yolov5mu.pt" if pretrained else "yolov5m.yaml",
-        }
-        
-        config = model_configs.get(self.backbone_type, model_configs["yolov5s"])
-        model = YOLO(config)
-        
-        # Modify detection head for our class count
-        if hasattr(model.model, 'model') and len(model.model.model) > 0:
-            detect_layer = model.model.model[-1]
-            if hasattr(detect_layer, 'nc'):
-                detect_layer.nc = self.num_classes
-                self._reinitialize_detection_head(detect_layer)
-        
-        model.to(self.device)
-        self._set_phase_1_on_model(model)
-        return model
     
     def _reinitialize_detection_head(self, detect_layer):
         """Reinitialize detection head weights for new class count"""
@@ -269,15 +244,16 @@ class SmartCashYOLOv5Model(nn.Module):
     @staticmethod
     def get_supported_backbones() -> List[str]:
         """Get list of supported backbones for research comparison"""
-        return ["yolov5s", "efficientnet_b4", "yolov5n", "yolov5m"]  # Research + optimized options
+        return ["cspdarknet", "efficientnet_b4", "yolov5s", "yolov5n", "yolov5m"]  # Optimized + research options
     
     @staticmethod
     def get_backbone_info() -> Dict[str, Dict]:
         """Get information about each backbone for research comparison"""
         return {
-            "yolov5s": {"params": "~7.2M", "speed": "Fast", "use_case": "Research baseline (YOLOv5)"},
-            "efficientnet_b4": {"params": "~19.4M", "speed": "Slow", "use_case": "Research comparison (EfficientNet)"},
-            "yolov5n": {"params": "~1.9M", "speed": "Fastest", "use_case": "Fast prototyping"},
+            "yolov5s": {"params": "~9.2M", "speed": "Fast", "use_case": "YOLOv5 baseline"},
+            "yolov5n": {"params": "~2.7M", "speed": "Fastest", "use_case": "Lightweight option"},
+            "cspdarknet": {"params": "~7.9M", "speed": "Fast", "use_case": "Optimized CSP backbone"}, 
+            "efficientnet_b4": {"params": "~17.4M", "speed": "Medium", "use_case": "Optimized EfficientNet (reduced bloat)"},
             "yolov5m": {"params": "~21M", "speed": "Medium", "use_case": "High accuracy when needed"}
         }
     

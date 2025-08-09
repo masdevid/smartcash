@@ -16,7 +16,7 @@ from unittest.mock import MagicMock
 from smartcash.model.architectures.model import SmartCashYOLOv5Model
 from smartcash.model.training.pipeline.model_manager import ModelManager
 from smartcash.model.api.core import SmartCashModelAPI
-from smartcash.model.training.core.validation_executor import ValidationExecutor
+from smartcash.model.training.core import ValidationExecutor
 
 
 class TestSmartCashArchitectureIntegration:
@@ -85,7 +85,7 @@ class TestSmartCashArchitectureIntegration:
     
     def test_model_api_smartcash_creation(self, config):
         """Test that ModelAPI can create SmartCash models."""
-        api = SmartCashModelAPI(config=config, use_smartcash_architecture=True)
+        api = SmartCashModelAPI(config=config)
         
         # Build model with SmartCash architecture
         result = api.build_model(use_smartcash_architecture=True)
@@ -107,7 +107,6 @@ class TestSmartCashArchitectureIntegration:
         # Setup model with SmartCash architecture
         model_api, model = manager.setup_model(
             config, 
-            use_smartcash_architecture=True, 
             is_resuming=False
         )
         
@@ -164,16 +163,16 @@ class TestSmartCashArchitectureIntegration:
         dummy_input = torch.randn(1, 3, 640, 640)
         
         # Test training mode forward pass
-        model.train()
-        training_output = model(dummy_input, training=True)
+        model.train
+        training_output = model(dummy_input)
         # YOLOv5 models return List[torch.Tensor] for multi-scale outputs
         assert isinstance(training_output, list)
         assert all(isinstance(t, torch.Tensor) for t in training_output)
         
         # Test inference mode forward pass
-        model.eval()
+        model.eval
         with torch.no_grad():
-            inference_output = model(dummy_input, training=False)
+            inference_output = model(dummy_input)
         
         assert isinstance(inference_output, list)
         assert len(inference_output) == 1  # Single batch

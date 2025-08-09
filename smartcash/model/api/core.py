@@ -235,12 +235,15 @@ class SmartCashModelAPI:
             
             # Get model info
             total_params = sum(p.numel() for p in self.model.parameters() if p.requires_grad)
+            model_info = self.model_builder.get_model_info(self.model)
             
             return {
                 'success': True,
-                'model': str(self.model),
+                'model': self.model,
                 'parameters': total_params,
-                'device': str(self.device)
+                'device': str(self.device),
+                'architecture_type': 'SmartCashYOLOv5Model',
+                'model_info': model_info
             }
             
         except Exception as e:

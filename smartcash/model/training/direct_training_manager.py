@@ -304,7 +304,7 @@ class DirectTrainingManager:
             optimizer.zero_grad()
             
             # Forward pass
-            outputs = self.model(images, training=True)
+            outputs = self.model(images)
             
             # Compute loss using YOLOv5's loss function
             loss = self._compute_loss(outputs, targets)

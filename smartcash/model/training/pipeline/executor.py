@@ -95,12 +95,13 @@ class PipelineExecutor(CallbacksMixin):
 
             # Step 2: Set up model (includes Build Model and initial Validate Model)
             self.progress_tracker.update_overall_progress("Setting up Model", current_overall_step, TOTAL_OVERALL_STEPS)
-            model_api, model = self.model_manager.setup_model(config, self.use_yolov5_integration, is_resuming=self.is_resuming)
+            model_api, _ = self.model_manager.setup_model(config, self.use_yolov5_integration, is_resuming=self.is_resuming)
             current_overall_step += 1
 
             # Step 3: Execute training pipeline orchestration
             self.progress_tracker.update_overall_progress("Executing Training Pipeline", current_overall_step, TOTAL_OVERALL_STEPS)
-            results = self.orchestrator.execute_pipeline(config, model_api, model)
+            # Only pass the model API wrapper
+            results = self.orchestrator.execute_pipeline(config, model_api)
             current_overall_step += 1
 
             # Add model info to results
@@ -160,16 +161,19 @@ class PipelineExecutor(CallbacksMixin):
             self.emit_log('info', f'🚀 Executing fresh training pipeline for session {session_id}')
 
             # Set up model
-            model_api, model = self.model_manager.setup_model(config, self.use_yolov5_integration)
+            model_api, _ = self.model_manager.setup_model(config, self.use_yolov5_integration)
 
             # Delete last checkpoint if it exists (now that checkpoint_manager is initialized)
-            last_checkpoint_path = self.model_manager.checkpoint_manager.get_last_checkpoint_path()
-            if last_checkpoint_path:
-                self.emit_log('info', f'🗑️ Deleting last checkpoint: {last_checkpoint_path}')
-                self.model_manager.checkpoint_manager.delete_checkpoint(last_checkpoint_path)
+            if self.model_manager.checkpoint_manager:
+                last_checkpoint_path = self.model_manager.checkpoint_manager.get_last_checkpoint_path()
+                if last_checkpoint_path:
+                    self.emit_log('info', f'🗑️ Deleting last checkpoint: {last_checkpoint_path}')
+                    self.model_manager.checkpoint_manager.delete_checkpoint(last_checkpoint_path)
+            else:
+                self.emit_log('warning', '⚠️ Checkpoint manager not available - skipping cleanup')
 
-            # Execute training pipeline orchestration
-            results = self.orchestrator.execute_pipeline(config, model_api, model)
+            # Execute training pipeline orchestration with the model API wrapper
+            results = self.orchestrator.execute_pipeline(config, model_api)
 
             # Add model info to results
             results['model_info'] = self.model_manager.get_model_info()
@@ -197,10 +201,10 @@ class PipelineExecutor(CallbacksMixin):
             config['resume_phase'] = resume_info.get('phase', 1)
             
             # Set up model (may load from checkpoint)
-            model_api, model = self.model_manager.setup_model(config, self.use_yolov5_integration)
+            model_api, _ = self.model_manager.setup_model(config, self.use_yolov5_integration, is_resuming=True)
             
-            # Execute training pipeline orchestration
-            results = self.orchestrator.execute_pipeline(config, model_api, model)
+            # Execute training pipeline orchestration with the model API wrapper
+            results = self.orchestrator.execute_pipeline(config, model_api)
             
             # Add model info and resume info to results
             results['model_info'] = self.model_manager.get_model_info()

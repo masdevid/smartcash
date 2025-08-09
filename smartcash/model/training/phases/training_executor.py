@@ -15,6 +15,7 @@ from smartcash.model.training.utils.signal_handler import (
     install_training_signal_handlers, register_cleanup_callback, is_shutdown_requested
 )
 from smartcash.model.training.core import TrainingExecutor, ValidationExecutor, ProgressManager
+from smartcash.model.training.core.prediction.prediction_processor import PredictionProcessor
 from smartcash.model.core.checkpoints.checkpoint_manager import create_checkpoint_manager
 
 from smartcash.common.logger import get_logger
@@ -45,8 +46,8 @@ class TrainingPhaseExecutor(CallbacksMixin, MetricsProcessingMixin):
         Initialize training phase executor.
         
         Args:
-            model: PyTorch model
-            model_api: Model API instance
+            model: PyTorch model (for backward compatibility)
+            model_api: Model API instance (preferred interface)
             config: Training configuration
             progress_tracker: Progress tracking instance
             log_callback: Callback for log messages
@@ -56,8 +57,10 @@ class TrainingPhaseExecutor(CallbacksMixin, MetricsProcessingMixin):
         """
         super().__init__()
         
-        self.model = model
+        # Store model API as the primary interface
         self.model_api = model_api
+        # For backward compatibility, store model from API if available
+        self.model = getattr(model_api, 'model', model) if model_api is not None else model
         self.config = config
         self.progress_tracker = progress_tracker
         
@@ -133,18 +136,27 @@ class TrainingPhaseExecutor(CallbacksMixin, MetricsProcessingMixin):
                               total_epochs: int, start_epoch: int) -> Dict[str, Any]:
         """Execute the core training loop for a phase."""
         
-        # Initialize executors
+        # Initialize executors with model API only (no raw model)
         training_executor = TrainingExecutor(
-            model=self.model,
+            model=None,  # Don't pass raw model, only use model_api
             config=self.config,
-            progress_tracker=self.progress_tracker
+            progress_tracker=self.progress_tracker,
+            model_api=self.model_api  # Primary interface
         )
         
         validation_executor = ValidationExecutor(
-            model=self.model,
+            model=None,  # Don't pass raw model, only use model_api
             config=self.config,
             progress_tracker=self.progress_tracker,
-            phase_num=phase_num
+            phase_num=phase_num,
+            model_api=self.model_api  # Primary interface
+        )
+        
+        # Initialize prediction processor with model API only
+        self.prediction_processor = PredictionProcessor(
+            config=self.config,
+            model=None,  # Don't pass raw model, only use model_api
+            model_api=self.model_api  # Primary interface
         )
         
         # Initialize progress manager with callbacks

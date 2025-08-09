@@ -199,10 +199,15 @@ class ConfigurationBuilder:
     
     def _build_training_params(self, base_config: Dict[str, Any]) -> Dict[str, Any]:
         """Build training parameters configuration."""
+        # Get batch size from data_config if available, otherwise use default
+        data_config = base_config.get('data_config', {})
+        batch_size = data_config.get('batch_size', 16)
+        num_workers = data_config.get('num_workers', 0 if base_config['force_cpu'] else 4)
+        
         return {
             'mixed_precision': False,  # Disable for CPU
-            'batch_size': 16,  # Default batch size as specified
-            'num_workers': 0 if base_config['force_cpu'] else 4,
+            'batch_size': batch_size,  # Use batch size from arguments
+            'num_workers': num_workers,
             'pin_memory': False,
             'training_mode': base_config['training_mode'],
             'early_stopping': {

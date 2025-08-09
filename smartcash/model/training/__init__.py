@@ -1,10 +1,19 @@
 """
-File: smartcash/model/training/__init__.py
-Description: Training package exports for the SmartCash model training pipeline
+SmartCash Model Training Package
+
+This package provides the training pipeline and utilities for training SmartCash models.
+
+Key components:
+- TrainingPipeline: Main pipeline for model training
+- DataLoaderFactory: Creates data loaders for training and validation
+- OptimizerFactory: Creates optimizers and learning rate schedulers
+- LossManager: Manages loss computation and tracking
+- EarlyStopping: Implements various early stopping strategies
 """
+from typing import Dict, Any, Optional, Callable
 
 # Core training components
-from . import layers  # New layers package
+from . import layers
 from .data_loader_factory import DataLoaderFactory, create_data_loaders, get_dataset_stats
 from .utils.metrics_history import create_metrics_recorder
 from .optimizer_factory import (
@@ -24,47 +33,49 @@ from .early_stopping import (
 )
 from .platform_presets import PlatformPresets, get_platform_presets, get_platform_config
 from .training_pipeline import TrainingPipeline
-# run_full_training_pipeline moved to smartcash.model.api.core
 
-# Main training API - now uses merged training pipeline
-def start_training(backbone='cspdarknet', phase_1_epochs=1, phase_2_epochs=1, 
-                  progress_callback=None, **kwargs):
+# Main training API
+def start_training(api: 'SmartCashModelAPI', 
+                 config: Dict[str, Any], 
+                 epochs: int = 10,
+                 ui_components: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     """
-    Quick start training using merged training pipeline
+    Start training a SmartCash model.
     
     Args:
-        backbone: Model backbone ('cspdarknet' or 'efficientnet_b4')
-        phase_1_epochs: Number of epochs for phase 1
-        phase_2_epochs: Number of epochs for phase 2
-        progress_callback: Progress callback function
-        **kwargs: Additional configuration overrides
+        api: Initialized SmartCashModelAPI instance
+        config: Training configuration dictionary
+        epochs: Total number of training epochs
+        ui_components: Dictionary of UI components for progress tracking
         
     Returns:
-        Training results
+        Dictionary with training results
     """
-    from smartcash.model.api.core import run_full_training_pipeline
-    return run_full_training_pipeline(
-        backbone=backbone,
-        phase_1_epochs=phase_1_epochs,
-        phase_2_epochs=phase_2_epochs,
-        progress_callback=progress_callback,
-        **kwargs
+    # Create and configure the training pipeline
+    pipeline = TrainingPipeline()
+    
+    # Set up progress tracking if UI components are provided
+    if ui_components and 'progress_callback' in ui_components:
+        pipeline.set_progress_callback(ui_components['progress_callback'])
+    
+    # Start training
+    return pipeline.run_training(
+        epochs=epochs,
+        config=config
     )
 
-def get_training_info(config=None):
-    """Get training configuration dan dataset info"""
-    data_factory = DataLoaderFactory(config)
-    dataset_info = data_factory.get_dataset_info()
+def get_training_info(config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    """Get training configuration and dataset information.
     
-    training_config = config or {}
-    
-    return {
-        'dataset_info': dataset_info,
-        'training_config': training_config.get('training', {}),
-        'available_optimizers': ['adam', 'adamw', 'sgd', 'rmsprop'],
-        'available_schedulers': ['cosine', 'step', 'plateau', 'exponential', 'multistep', 'cyclic'],
-        'device_info': 'cuda' if __import__('torch').cuda.is_available() else 'cpu'
-    }
+    Args:
+        config: Optional configuration dictionary. If None, default config is used.
+        
+    Returns:
+        Dictionary containing training configuration and dataset information
+    """
+    from .training_pipeline import TrainingPipeline
+    pipeline = TrainingPipeline()
+    return pipeline.get_training_info(config or {})
 
 # Export main components
 __all__ = [

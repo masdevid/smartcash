@@ -24,25 +24,31 @@ logger = get_logger(__name__)
 class ValidationExecutor:
     """Orchestrates validation epoch execution using SRP-compliant components."""
     
-    def __init__(self, model: SmartCashYOLOv5Model, config: Dict, progress_tracker, phase_num: int = 1):
+    def __init__(self, model, config: Dict, progress_tracker, phase_num: int = 1, model_api=None):
         """
         Initialize validation executor.
         
         Args:
-            model: SmartCashYOLOv5Model instance
+            model: PyTorch model instance (for backward compatibility)
             config: Training configuration
             progress_tracker: Progress tracking instance
             phase_num: Current phase number (default: 1)
+            model_api: Model API instance that wraps the model (preferred)
         """
         self.model = model
+        self.model_api = model_api
         self.config = config
         self.progress_tracker = progress_tracker
         
-        # Initialize core components
-        self.prediction_processor = PredictionProcessor(config, model)
+        # Initialize core components with model API if available, otherwise use model directly
+        self.prediction_processor = PredictionProcessor(config, model_api if model_api is not None else model)
         
         # Get model configuration
-        model_info = model.get_model_config()
+        if model_api is not None and hasattr(model_api, 'get_model_config'):
+            model_info = model_api.get_model_config()
+        else:
+            model_info = getattr(model, 'get_model_config', lambda: {})()
+            
         num_classes = 17  # Fixed for SmartCashYOLO
         
         # Training context for logging
@@ -65,10 +71,11 @@ class ValidationExecutor:
             use_standard_map=True
         )
         
-        # Initialize SRP components
-        self.batch_processor = ValidationBatchProcessor(model, config, self.prediction_processor)
-        self.metrics_processor = ValidationMetricsProcessor(model, config, map_calculator=self.map_calculator)
-        self.model_manager = ValidationModelManager(model)
+        # Initialize SRP components with model_api if available, otherwise use model
+        model_to_use = model_api if model_api is not None else model
+        self.batch_processor = ValidationBatchProcessor(model_to_use, config, self.prediction_processor)
+        self.metrics_processor = ValidationMetricsProcessor(model_to_use, config, map_calculator=self.map_calculator)
+        self.model_manager = ValidationModelManager(model_to_use)
         self.map_processor = ValidationMapProcessor(self.map_calculator, phase_num)
         
         logger.debug(f"Initialized validation executor with {num_classes} classes")
@@ -96,7 +103,10 @@ class ValidationExecutor:
             Dictionary containing validation metrics
         """
         # Switch model to evaluation mode
-        self.model_manager.switch_to_eval_mode()
+        if self.model_api is not None and hasattr(self.model_api, 'eval'):
+            self.model_api.eval()
+        else:
+            self.model_manager.switch_to_eval_mode()
         
         running_val_loss = 0.0
         num_batches = len(val_loader)

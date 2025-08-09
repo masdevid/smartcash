@@ -202,13 +202,8 @@ def create_smartcash_yolov5(
     return SmartCashYOLO(backbone=backbone, pretrained=pretrained, device=device)
 
 
-# Backward compatibility aliases
-SmartCashYOLOv5Integration = SmartCashYOLO
-create_smartcash_yolov5_model = create_smartcash_yolov5
 
 __all__ = [
     'SmartCashYOLO',
     'create_smartcash_yolov5',
-    'SmartCashYOLOv5Integration',
-    'create_smartcash_yolov5_model'
 ]

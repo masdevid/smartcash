@@ -54,105 +54,66 @@ class ModelManager(CallbacksMixin):
         self.memory_optimizer = None
         self.checkpoint_manager = None # Initialize to None
 
-    def setup_model(self, config: Dict[str, Any], use_yolov5_integration: bool = True, use_smartcash_architecture: bool = True, is_resuming: bool = False) -> Tuple[Any, Any]:
+    def setup_model(self, config: Dict[str, Any], is_resuming: bool = False) -> Tuple[Any, Any]:
         """
-        Set up model API and build model according to configuration.
+        Set up and build the SmartCashYOLOv5Model.
         
         Args:
             config: Training configuration
-            use_yolov5_integration: Whether to use YOLOv5 integration (legacy)
-            use_smartcash_architecture: Whether to use new SmartCashYOLOv5Model directly
             is_resuming: Whether this is a resume operation
             
         Returns:
             Tuple of (model_api, built_model)
         """
         try:
-            self.emit_log('info', '🏗️ Setting up model for training pipeline')
+            self.emit_log('info', '🚀 Setting up SmartCashYOLOv5Model...')
             
-            # Initialize checkpoint manager here, where config is available
-            self.checkpoint_manager = create_checkpoint_manager(config, is_resuming=is_resuming)
-
-            if use_smartcash_architecture:
-                # Use new SmartCashYOLOv5Model directly
-                self.emit_log('info', '🆕 Using SmartCashYOLOv5Model architecture')
-                self.model = self._create_smartcash_model_directly(config)
-                
-                # For SmartCash model, we create a lightweight API wrapper
-                self.model_api = self._create_smartcash_api_wrapper(config)
-                
-                # Move model to appropriate device
-                device = next(self.model.parameters()).device
-                self.model = self.model.to(device)
-                
-            else:
-                # Use legacy approach for backward compatibility
-                self.emit_log('info', '🔄 Using legacy model API approach')
-                # Create model API
-                self.model_api = self._create_model_api(config, use_yolov5_integration)
-                # Build model
-                self.model = self._build_model(config)
-                # Validate model architecture
-                self._validate_model_architecture()
+            # Create and configure the model
+            self.model = self._create_smartcash_model_directly(config)
+            self.model_api = self._create_smartcash_api_wrapper(config)
             
-            # Setup memory optimization
+            # Build and validate model
+            build_result = self._build_model(config)
+            if not build_result.get('success', False):
+                raise RuntimeError(f"Model building failed: {build_result.get('error', 'Unknown error')}")
+                
+            self._validate_model_architecture()
+            
+            # Set up memory optimization
             self._setup_memory_optimization()
             
-            self.emit_log('info', '✅ Model setup completed successfully')
+            # Set up checkpoint manager
+            self._setup_checkpoint_manager(config)
             
-            return self.model_api, self.model
+            # Ensure the model is properly initialized in the API wrapper
+            if not hasattr(self.model_api, 'model'):
+                self.model_api.model = self.model
+                
+            # Set the log callback on the API wrapper
+            self.model_api.log_callback = self.log_callback
+                
+            self.emit_log('info', '✅ SmartCashYOLOv5Model setup completed successfully')
+            
+            # Only return the API wrapper, which has all necessary methods
+            return self.model_api, self.model_api.model
             
         except Exception as e:
             self.emit_log('error', f'❌ Model setup failed: {str(e)}')
             raise
     
-    def _create_model_api(self, config: Dict[str, Any], use_yolov5_integration: bool) -> Any:
-        """Create and initialize model API."""
-        self.progress_tracker.start_operation("Model Setup", 4)
-        self.progress_tracker.update_operation(1, "🏗️ Creating model API...")
-        
-        try:
-            # Import here to avoid circular dependency
-            from smartcash.model.api.core import create_api
-            
-            model_api = create_api(
-                config=config,
-                use_yolov5_integration=use_yolov5_integration
-            )
-            
-            self.emit_log('info', '✅ Model API created successfully', {
-                'yolov5_integration': use_yolov5_integration,
-                'config_keys': list(config.keys())
-            })
-            
-            return model_api
-            
-        except Exception as e:
-            self.emit_log('error', f'❌ Failed to create model API: {str(e)}')
-            raise
-    
     def _create_smartcash_model_directly(self, config: Dict[str, Any]) -> SmartCashYOLOv5Model:
-        """Create SmartCashYOLOv5Model directly without the model API wrapper."""
+        """Create and initialize the SmartCashYOLOv5Model."""
         try:
             model_config = config.get('model', {})
             
-            # Extract parameters for SmartCashYOLOv5Model
+            # Extract model parameters
             backbone = model_config.get('backbone', 'yolov5s')
-            
-            # CRITICAL FIX: SmartCash architecture always uses 17 classes (never the legacy dict format)
-            raw_num_classes = model_config.get('num_classes', 17)
-            if isinstance(raw_num_classes, dict):
-                # Legacy format detected - force to 17 for SmartCash
-                num_classes = 17
-                self.emit_log('info', '🔧 Fixed SmartCash num_classes: dict format overridden to 17', {})
-            else:
-                num_classes = raw_num_classes
+            num_classes = 17  # Fixed for SmartCash architecture
             img_size = model_config.get('img_size', 640)
             pretrained = model_config.get('pretrained', True)
             device = config.get('device', {}).get('type', 'auto')
             
-            
-            # Create the SmartCash YOLOv5 model
+            # Create the model
             model = SmartCashYOLOv5Model(
                 backbone=backbone,
                 num_classes=num_classes,
@@ -161,9 +122,8 @@ class ModelManager(CallbacksMixin):
                 device=device
             )
             
-            self.emit_log('info', '✅ SmartCashYOLOv5Model created directly', {
+            self.emit_log('info', '✅ SmartCashYOLOv5Model created', {
                 'backbone': backbone,
-                'num_classes': num_classes,
                 'img_size': img_size,
                 'pretrained': pretrained,
                 'device': device
@@ -172,61 +132,187 @@ class ModelManager(CallbacksMixin):
             return model
             
         except Exception as e:
-            self.emit_log('error', f'❌ Failed to create SmartCashYOLOv5Model: {str(e)}')
+            self.emit_log('error', f'❌ Failed to create model: {str(e)}')
             raise
     
     def _create_smartcash_api_wrapper(self, config: Dict[str, Any]) -> Any:
         """Create a lightweight API wrapper for SmartCashYOLOv5Model."""
         
         class SmartCashAPIWrapper:
-            """Lightweight API wrapper for SmartCashYOLOv5Model to maintain interface compatibility."""
+            """Lightweight API wrapper for SmartCashYOLOv5Model."""
             
             def __init__(self, model: SmartCashYOLOv5Model, config: Dict[str, Any]):
                 self.model = model
                 self.config = config
                 self.is_model_built = True
+                self.log_callback = None  # Will be set by ModelManager
+                
+            def __call__(self, *args, **kwargs):
+                """Forward call to the underlying model."""
+                return self.model(*args, **kwargs)
                 
             def get_backbone_name(self) -> str:
-                """Get backbone name from the model."""
-                return self.model.backbone_type
+                """Get the backbone architecture name."""
+                return getattr(self.model, 'backbone_type', 'yolov5')
+                
+            def get(self, key, default=None):
+                """Dictionary-like get method for compatibility."""
+                return getattr(self, key, default)
                 
             def validate_model(self) -> Dict[str, Any]:
-                """Validate the model."""
+                """Validate the model with a test forward pass."""
                 try:
-                    # Simple validation by checking if model can process dummy input
-                    dummy_input = torch.randn(1, 3, 640, 640).to(self.model.device)
+                    device = getattr(self.model, 'device', 'cpu')
+                    if isinstance(device, torch.device):
+                        device = str(device)
+                    
+                    dummy_input = torch.randn(1, 3, 640, 640).to(device)
                     with torch.no_grad():
                         output = self.model(dummy_input)
+                        
+                    # Handle different output formats
+                    if isinstance(output, (list, tuple)):
+                        output_shape = [o.shape if hasattr(o, 'shape') else type(o).__name__ for o in output]
+                    elif hasattr(output, 'shape'):
+                        output_shape = output.shape
+                    else:
+                        output_shape = str(type(output))
+                    
                     return {
-                        'success': True,
-                        'output_type': 'smartcash_yolov5',
-                        'backbone': self.model.backbone_type,
-                        'num_classes': self.model.num_classes
+                        'valid': True,
+                        'input_shape': (1, 3, 640, 640),
+                        'output_shape': output_shape,
+                        'device': device
                     }
                 except Exception as e:
                     return {
-                        'success': False,
-                        'error': str(e)
+                        'valid': False,
+                        'error': str(e),
+                        'exception_type': type(e).__name__
                     }
-            
-            def save_checkpoint(self, **kwargs) -> str:
-                """Save checkpoint using the model's own configuration."""
-                # Get model configuration for checkpoint
-                model_config = self.model.get_model_config()
+                    
+            def emit_log(self, level: str, message: str, **kwargs):
+                """Emit a log message through the parent's log callback."""
+                if self.log_callback:
+                    self.log_callback(level, message, **kwargs)
+                else:
+                    logger.log(level.upper(), message, **kwargs)
+                    
+            def to(self, device):
+                """Move model to specified device."""
+                try:
+                    if hasattr(self.model, 'to'):
+                        self.model = self.model.to(device)
+                        return self
+                    else:
+                        self.emit_log('warning', 'Model does not support .to() method')
+                        return self
+                except Exception as e:
+                    self.emit_log('error', f'Failed to move model to device {device}: {str(e)}')
+                    return self
+                    
+            def cpu(self):
+                """Move model to CPU."""
+                return self.to('cpu')
                 
-                # Basic checkpoint structure for SmartCash model
-                checkpoint = {
-                    'model_state_dict': self.model.state_dict(),
-                    'model_config': model_config,
-                    'architecture': 'SmartCashYOLOv5Model',
-                    **kwargs
-                }
+            def cuda(self):
+                """Move model to CUDA."""
+                return self.to('cuda')
                 
-                # Generate checkpoint path if not provided
-                checkpoint_path = kwargs.get('checkpoint_path', 'data/checkpoints/smartcash_checkpoint.pt')
-                torch.save(checkpoint, checkpoint_path)
+            def eval(self):
+                """Set model to evaluation mode."""
+                try:
+                    if hasattr(self.model, 'eval'):
+                        self.model.eval()
+                        return self
+                    else:
+                        self.emit_log('warning', 'Model does not support .eval() method')
+                        return self
+                except Exception as e:
+                    self.emit_log('error', f'Failed to set model to eval mode: {str(e)}')
+                    return self
+                    
+            def train(self, mode=True):
+                """Set model to training mode."""
+                try:
+                    if hasattr(self.model, 'train'):
+                        self.model.train(mode)
+                        return self
+                    else:
+                        self.emit_log('warning', 'Model does not support .train() method')
+                        return self
+                except Exception as e:
+                    self.emit_log('error', f'Failed to set model to train mode: {str(e)}')
+                    return self
                 
-                return checkpoint_path
+            def cleanup(self):
+                """Clean up model resources."""
+                try:
+                    if hasattr(self.model, 'cpu'):
+                        self.model.cpu()
+                    if torch.cuda.is_available():
+                        torch.cuda.empty_cache()
+                    return True
+                except Exception as e:
+                    self.emit_log('warning', f'Error during model cleanup: {str(e)}')
+                    return False
+                    
+            def build_model(self, model_config=None):
+                """Build the model with the given configuration."""
+                try:
+                    # If model is already built, just return success
+                    if self.is_model_built:
+                        # Safe parameter calculation
+                        try:
+                            if hasattr(self.model, 'model') and hasattr(self.model.model, 'parameters'):
+                                # YOLO model
+                                total_params = sum(p.numel() for p in self.model.model.parameters())
+                                trainable_params = sum(p.numel() for p in self.model.model.parameters() if p.requires_grad)
+                                size_mb = sum(p.numel() * p.element_size() for p in self.model.model.parameters()) / (1024 * 1024)
+                            else:
+                                # Custom backbone
+                                total_params = sum(p.numel() for p in self.model.parameters())
+                                trainable_params = sum(p.numel() for p in self.model.parameters() if p.requires_grad)
+                                size_mb = sum(p.numel() * p.element_size() for p in self.model.parameters()) / (1024 * 1024)
+                        except Exception as param_error:
+                            # Fallback if parameter calculation fails
+                            total_params = 0
+                            trainable_params = 0
+                            size_mb = 0.0
+                            logger.warning(f"Parameter calculation failed: {param_error}")
+                        
+                        return {
+                            'success': True,
+                            'model': self.model,
+                            'model_info': {
+                                'backbone': getattr(self.model, 'backbone_type', 'yolov5'),
+                                'total_parameters': trainable_params,
+                                'model_size_mb': size_mb
+                            }
+                        }
+                        
+                    # If we need to build the model, implement that logic here
+                    # For now, just mark as built and return success
+                    self.is_model_built = True
+                    return self.build_model(model_config)  # Recursively call after setting built flag
+                    
+                except Exception as e:
+                    import traceback
+                    error_msg = f'Failed to build model: {str(e)}'
+                    error_traceback = traceback.format_exc()
+                    logger.error(f"Build model error: {error_msg}")
+                    logger.error(f"Full traceback: {error_traceback}")
+                    
+                    # Also emit log for the callback system
+                    if hasattr(self, 'log_callback') and self.log_callback:
+                        self.log_callback('error', error_msg)
+                        
+                    return {
+                        'success': False,
+                        'error': error_msg,
+                        'exception_type': type(e).__name__,
+                        'traceback': error_traceback
+                    }
         
         return SmartCashAPIWrapper(self.model, config)
     
@@ -238,13 +324,20 @@ class ModelManager(CallbacksMixin):
             # Get model configuration
             model_config = config.get('model', {})
             
-            # Build model
+            # Build model using the API wrapper
             build_result = self.model_api.build_model(model_config=model_config)
             
             if not build_result['success']:
                 raise RuntimeError(f"Model building failed: {build_result.get('error', 'Unknown error')}")
             
-            model = build_result['model']
+            # Ensure the model is set in the API wrapper
+            if 'model' in build_result:
+                self.model = build_result['model']
+                
+                # Ensure the model is set in the API wrapper
+                if hasattr(self.model_api, 'model'):
+                    self.model_api.model = self.model
+            
             model_info = build_result.get('model_info', {})
             
             self.progress_tracker.update_operation(3, "✅ Model architecture built")
@@ -256,11 +349,32 @@ class ModelManager(CallbacksMixin):
                 'model_size_mb': model_info.get('model_size_mb', 0)
             })
             
-            return model
+            # Return success result with API wrapper
+            return {
+                'success': True,
+                'model_api': self.model_api,
+                'model_info': model_info
+            }
             
         except Exception as e:
             self.emit_log('error', f'❌ Failed to build model: {str(e)}')
             raise
+    
+    def _setup_checkpoint_manager(self, config: Dict[str, Any]):
+        """Setup checkpoint manager for the training session."""
+        try:
+            # Create checkpoint manager 
+            self.checkpoint_manager = create_checkpoint_manager(
+                config=config,
+                is_resuming=False
+            )
+            
+            self.emit_log('info', '✅ Checkpoint manager initialized')
+            
+        except Exception as e:
+            self.emit_log('error', f'❌ Failed to setup checkpoint manager: {str(e)}')
+            # Don't raise - checkpoint manager is not critical for training to start
+            self.checkpoint_manager = None
     
     def _validate_model_architecture(self):
         """Validate model architecture compatibility."""

@@ -34,10 +34,8 @@ except ImportError as e:
     LOGGER = None
     models = None
 
-from smartcash.model.architectures.backbones.yolov5_backbone import (
-    YOLOv5CSPDarknetAdapter, YOLOv5EfficientNetAdapter
-)
-from smartcash.model.architectures.heads.yolov5_head import YOLOv5MultiLayerDetect
+from smartcash.model.architectures.backbones.yolov5_backbone import YOLOv5Backbone
+from smartcash.model.architectures.heads.yolov5_head import YOLOv5Head
 
 
 class YOLOv5ModelFactory:
@@ -68,6 +66,93 @@ class YOLOv5ModelFactory:
             YOLOv5 wrapper model
         """
         return YOLOv5Wrapper(config, ch, nc, anchors, logger=self.logger)
+        
+    def create_model(self, backbone: str = 'yolov5s', num_classes: int = 1, 
+                    img_size: int = 640, pretrained: bool = True, **kwargs):
+        """
+        Create a YOLOv5 model with the specified configuration.
+        
+        Args:
+            backbone: Backbone type (e.g., 'yolov5s')
+            num_classes: Number of output classes
+            img_size: Input image size
+            pretrained: Whether to load pretrained weights
+            **kwargs: Additional model configuration
+            
+        Returns:
+            YOLOv5 model instance
+        """
+        try:
+            # Default anchor boxes for YOLOv5 (taken from YOLOv5s)
+            anchors = [
+                [10,13, 16,30, 33,23],  # P3/8
+                [30,61, 62,45, 59,119],  # P4/16
+                [116,90, 156,198, 373,326]  # P5/32
+            ]
+            
+            # Create a basic YOLOv5 model configuration
+            config = {
+                'nc': num_classes,
+                'depth_multiple': 0.33,  # model depth multiple
+                'width_multiple': 0.50,  # layer channel multiple
+                'anchors': anchors,
+                'backbone': [
+                    # [from, number, module, args]
+                    [-1, 1, 'Conv', [64, 6, 2, 2]],  # 0-P1/2
+                    [-1, 1, 'Conv', [128, 3, 2]],  # 1-P2/4
+                    [-1, 3, 'C3', [128]],
+                    [-1, 1, 'Conv', [256, 3, 2]],  # 3-P3/8
+                    [-1, 6, 'C3', [256]],
+                    [-1, 1, 'Conv', [512, 3, 2]],  # 5-P4/16
+                    [-1, 9, 'C3', [512]],
+                    [-1, 1, 'Conv', [1024, 3, 2]],  # 7-P5/32
+                    [-1, 3, 'C3', [1024]],
+                    [-1, 1, 'SPPF', [1024, 5]],  # 9
+                ],
+                'head': [
+                    [-1, 1, 'Conv', [512, 1, 1]],
+                    [-1, 1, 'nn.Upsample', [None, 2, 'nearest']],
+                    [[-1, 6], 1, 'Concat', [1]],  # cat backbone P4
+                    [-1, 3, 'C3', [512, False]],  # 13
+
+                    [-1, 1, 'Conv', [256, 1, 1]],
+                    [-1, 1, 'nn.Upsample', [None, 2, 'nearest']],
+                    [[-1, 4], 1, 'Concat', [1]],  # cat backbone P3
+                    [-1, 3, 'C3', [256, False]],  # 17 (P3/8-small)
+
+                    [-1, 1, 'Conv', [256, 3, 2]],
+                    [[-1, 14], 1, 'Concat', [1]],  # cat head P4
+                    [-1, 3, 'C3', [512, False]],  # 20 (P4/16-medium)
+
+                    [-1, 1, 'Conv', [512, 3, 2]],
+                    [[-1, 10], 1, 'Concat', [1]],  # cat head P5
+                    [-1, 3, 'C3', [1024, False]],  # 23 (P5/32-large)
+
+                    [[17, 20, 23], 1, 'Detect', [num_classes, anchors]],  # Detect(P3, P4, P5)
+                ],
+                'pretrained': pretrained,
+                'img_size': img_size,
+                **kwargs
+            }
+            
+            # Create a wrapper for the model
+            model = YOLOv5Wrapper(
+                config=config,
+                ch=3,  # RGB input channels
+                nc=num_classes,
+                anchors=anchors,
+                logger=self.logger
+            )
+            
+            # Initialize the model with a dummy input
+            dummy_input = torch.randn(1, 3, img_size, img_size)
+            model(dummy_input)
+            
+            return model
+            
+        except Exception as e:
+            self.logger.error(f"Failed to create YOLOv5 model: {e}", exc_info=True)
+            raise
     
     def register_custom_components(self):
         """Register SmartCash components with YOLOv5 parsing system"""
@@ -210,9 +295,8 @@ class YOLOv5Wrapper(nn.Module):
                 original_globals = models.yolo.__dict__.copy()
                 
                 # Add our classes to YOLOv5's module globals
-                models.yolo.__dict__['YOLOv5CSPDarknetAdapter'] = YOLOv5CSPDarknetAdapter
-                models.yolo.__dict__['YOLOv5EfficientNetAdapter'] = YOLOv5EfficientNetAdapter
-                models.yolo.__dict__['YOLOv5MultiLayerDetect'] = YOLOv5MultiLayerDetect
+                models.yolo.__dict__['YOLOv5Backbone'] = YOLOv5Backbone
+                models.yolo.__dict__['YOLOv5Head'] = YOLOv5Head
                 
                 try:
                     # Initialize the model using YOLOv5's Model class which handles the config properly
@@ -239,9 +323,16 @@ class YOLOv5Wrapper(nn.Module):
                         # Check if we should use our custom SmartCash model for multi-layer support
                         if 'multi_layer_nc' in config:
                             # Multi-layer configuration detected, but for now use standard YOLOModel
-                            # The multi-layer logic will be handled in the training phase manager
-                            self.logger.info("Using standard YOLOModel with multi-layer workaround")
-                            temp_model = YOLOModel(temp_yaml_path, ch=config['ch'])
+                            # Use the modern YOLOv5Backbone implementation
+                            self.logger.info("Using modern YOLOv5Backbone implementation")
+                            backbone = 'yolov5s'  # Default backbone, can be configured
+                            num_classes = config.get('nc', 1)
+                            temp_model = YOLOv5Backbone(
+                                backbone=backbone,
+                                num_classes=num_classes,
+                                pretrained=True,
+                                device='cuda' if torch.cuda.is_available() else 'cpu'
+                            )
                         else:
                             # Standard single-layer configuration
                             temp_model = YOLOModel(temp_yaml_path, ch=config['ch'])

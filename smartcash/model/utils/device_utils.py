@@ -76,12 +76,18 @@ def get_device_info() -> Dict[str, Any]:
             'gpu_name': torch.cuda.get_device_name(current_device),
             'gpu_memory_gb': torch.cuda.get_device_properties(current_device).total_memory / (1024**3),
             'gpu_compute_capability': torch.cuda.get_device_properties(current_device).major,
+            'device': 'cuda',
         })
     elif hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
         info.update({
             'device_type': 'mps',
             'device_name': 'Apple Silicon GPU (MPS)',
-            'optimization': 'Metal Performance Shaders'
+            'optimization': 'Metal Performance Shaders',
+            'device': 'mps',
+        })
+    else:
+        info.update({
+            'device': 'cpu',
         })
     
     return info

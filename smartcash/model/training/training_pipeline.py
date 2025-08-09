@@ -32,24 +32,29 @@ class TrainingPipeline:
     """
     
     def __init__(self, 
-                 use_yolov5_integration: bool = True,
                  progress_callback: Optional[Callable] = None, 
                  log_callback: Optional[Callable] = None,
                  metrics_callback: Optional[Callable] = None,
                  live_chart_callback: Optional[Callable] = None,
                  verbose: bool = True):
-        """Initialize simplified training pipeline facade."""
-        # Store parameters for PipelineExecutor
-        self.use_yolov5_integration = use_yolov5_integration
+        """Initialize the training pipeline.
+        
+        Args:
+            progress_callback: Callback for training progress updates
+            log_callback: Callback for log messages
+            metrics_callback: Callback for training metrics
+            live_chart_callback: Callback for live chart updates
+            verbose: Whether to print verbose output
+        """
         self.verbose = verbose
         self.log_callback = log_callback
         self.metrics_callback = metrics_callback
         self.live_chart_callback = live_chart_callback
         
-        # Create progress tracker
+        # Create progress tracker with only expected parameters
         self.progress_tracker = TrainingProgressTracker(
             progress_callback=progress_callback,
-            verbose=verbose
+            metrics_callback=metrics_callback
         )
         
         # Create session manager for tracking
@@ -57,29 +62,37 @@ class TrainingPipeline:
         
         logger.info(f"🚀 Training pipeline initialized (simplified)")
     
-    def run_full_training_pipeline(self, **kwargs) -> Dict[str, Any]:
+    def run_training(self, 
+                    epochs: int = 10,
+                    config: Optional[Dict[str, Any]] = None,
+                    **kwargs) -> Dict[str, Any]:
         """
-        Simplified training pipeline - direct delegation to PipelineExecutor.
+        Run the training pipeline with the given configuration.
         
-        This method has been streamlined to remove redundancy while maintaining
-        the same interface for backward compatibility.
+        Args:
+            epochs: Total number of training epochs
+            config: Training configuration dictionary
+            **kwargs: Additional training parameters
+            
+        Returns:
+            Dictionary containing training results
         """
         try:
             # Create session and extract basic parameters
             session_id, resume_info = self.session_manager.create_session(
-                backbone=kwargs.get('backbone', 'cspdarknet'),
-                training_mode=kwargs.get('training_mode', 'two_phase'),
-                resume_from_checkpoint=kwargs.get('resume_from_checkpoint', False),  # Default to fresh training
-                checkpoint_dir=kwargs.get('checkpoint_dir', 'data/checkpoints'),
+                backbone=config.get('backbone', 'cspdarknet') if config else 'cspdarknet',
+                training_mode=config.get('training_mode', 'two_phase') if config else 'two_phase',
+                resume_from_checkpoint=kwargs.get('resume_from_checkpoint', False),
+                checkpoint_dir=config.get('checkpoint_dir', 'data/checkpoints') if config else 'data/checkpoints',
                 resume_info=kwargs.get('resume_info')
             )
             
             # Validate parameters
             validate_training_mode_and_params(
-                kwargs.get('training_mode', 'two_phase'), 
-                kwargs.get('single_phase_layer_mode', 'multi'),
-                kwargs.get('single_phase_freeze_backbone', False), 
-                kwargs.get('phase_2_epochs', 1)
+                config.get('training_mode', 'two_phase') if config else 'two_phase',
+                config.get('single_phase_layer_mode', 'multi') if config else 'multi',
+                config.get('single_phase_freeze_backbone', False) if config else False,
+                config.get('phase_2_epochs', 1) if config else 1
             )
             
             # Create PipelineExecutor
@@ -87,37 +100,54 @@ class TrainingPipeline:
                 progress_tracker=self.progress_tracker,
                 log_callback=self.log_callback,
                 metrics_callback=self.metrics_callback,
-                use_yolov5_integration=self.use_yolov5_integration,
                 is_resuming=bool(resume_info)
             )
             
-            # Build configuration
-            config_builder = ConfigurationBuilder(session_id)
-            config = config_builder.build_training_config(**kwargs)
+            # Merge config with any additional kwargs
+            training_config = config.copy() if config else {}
+            training_config.update({
+                'epochs': epochs,
+                'session_id': session_id,
+                'start_time': self.session_manager.training_start_time,
+                **kwargs
+            })
             
-            # Execute pipeline directly
+            # Execute pipeline
             if resume_info:
                 result = executor.execute_resume_pipeline(
-                    resume_info, config, session_id, self.session_manager.training_start_time
+                    resume_info=resume_info,
+                    config=training_config,
+                    session_id=session_id,
+                    start_time=self.session_manager.training_start_time
                 )
             else:
                 result = executor.execute_fresh_pipeline(
-                    config, session_id, self.session_manager.training_start_time
+                    config=training_config,
+                    session_id=session_id,
+                    start_time=self.session_manager.training_start_time
                 )
             
             return result
             
         except Exception as e:
-            logger.error(f"❌ Training pipeline failed: {str(e)}")
+            error_msg = f"❌ Training pipeline failed: {str(e)}"
+            logger.error(error_msg)
+            logger.debug(traceback.format_exc())
+            
+            # Emergency cleanup to free resources
             emergency_cleanup()
             
+            # Log error through callback if available
             if self.log_callback:
-                self.log_callback('error', f"Training pipeline failed: {traceback.format_exc()}", {
-                    'error_type': type(e).__name__
+                self.log_callback('error', error_msg, {
+                    'error_type': type(e).__name__,
+                    'traceback': traceback.format_exc()
                 })
             
             return {
                 'success': False,
-                'error': traceback.format_exc(),
-                'session_id': getattr(self, 'session_id', 'unknown')
+                'error': str(e),
+                'error_type': type(e).__name__,
+                'traceback': traceback.format_exc(),
+                'session_id': session_id if 'session_id' in locals() else 'unknown'
             }

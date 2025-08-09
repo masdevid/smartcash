@@ -21,7 +21,7 @@ from smartcash.common.logger import SmartCashLogger
 logger = SmartCashLogger(__name__)
 
 
-def create_real_dataloader(data_dir, batch_size=8, limit_samples=100, shuffle=True):
+def create_real_dataloader(data_dir, batch_size=8, limit_samples=None, shuffle=True):
     """Create data loader from real preprocessed data"""
     class SmartCashDataset(torch.utils.data.Dataset):
         def __init__(self, data_dir, limit_samples=None):
@@ -121,20 +121,20 @@ def train_yolov5s_example():
     model = create_smartcash_yolov5(
         backbone="yolov5s",
         pretrained=False,
-        device="cpu"
+        device="mps"
     )
     
     # Create data loaders from real preprocessed data
     train_loader = create_real_dataloader(
         data_dir="data/preprocessed/train", 
-        batch_size=4, 
-        limit_samples=80,  # 80 samples for training
+        batch_size=16, 
+        limit_samples=None,  # 80 samples for training
         shuffle=True
     )
     val_loader = create_real_dataloader(
         data_dir="data/preprocessed/valid", 
-        batch_size=4, 
-        limit_samples=20,  # 20 samples for validation
+        batch_size=16, 
+        limit_samples=None,  # 20 samples for validation
         shuffle=False
     )
     
@@ -155,7 +155,7 @@ def train_yolov5s_example():
     trainer.setup_phase_1(learning_rate=1e-3)
     
     phase1_history = trainer.train_phase_1(
-        epochs=5,  # Short demo
+        epochs=10,  # Short demo
         save_best=True,
         patience=3
     )
@@ -167,7 +167,7 @@ def train_yolov5s_example():
     trainer.setup_phase_2(learning_rate=1e-4)
     
     phase2_history = trainer.train_phase_2(
-        epochs=5,  # Short demo
+        epochs=30,  # Short demo
         save_best=True,
         patience=3,
         load_phase1_weights=True
@@ -193,20 +193,20 @@ def train_efficientnet_b4_example():
     model = create_smartcash_yolov5(
         backbone="efficientnet_b4",
         pretrained=True,  # Use pretrained backbone
-        device="cpu"
+        device="mps"
     )
     
     # Create data loaders from real preprocessed data
     train_loader = create_real_dataloader(
         data_dir="data/preprocessed/train", 
-        batch_size=2,  # Smaller batch for larger model
-        limit_samples=80,  # 80 samples for training
+        batch_size=16,  # Smaller batch for larger model
+        limit_samples=None,  # 80 samples for training
         shuffle=True
     )
     val_loader = create_real_dataloader(
         data_dir="data/preprocessed/valid", 
-        batch_size=2, 
-        limit_samples=20,  # 20 samples for validation
+        batch_size=16, 
+        limit_samples=None,  # 20 samples for validation
         shuffle=False
     )
     
@@ -227,7 +227,7 @@ def train_efficientnet_b4_example():
     trainer.setup_phase_1(learning_rate=5e-4)  # Lower LR for pretrained backbone
     
     phase1_history = trainer.train_phase_1(
-        epochs=3,  # Short demo
+        epochs=10,  # Short demo
         save_best=True,
         patience=2
     )
@@ -239,7 +239,7 @@ def train_efficientnet_b4_example():
     trainer.setup_phase_2(learning_rate=1e-5)  # Very low LR for pretrained backbone
     
     phase2_history = trainer.train_phase_2(
-        epochs=3,  # Short demo
+        epochs=30,  # Short demo
         save_best=True,
         patience=2,
         load_phase1_weights=True
@@ -277,13 +277,13 @@ def compare_backbones():
         # Quick training test with real data
         train_loader = create_real_dataloader(
             data_dir="data/preprocessed/train", 
-            batch_size=2, 
-            limit_samples=50,  # 50 samples for quick comparison
+            batch_size=16, 
+            limit_samples=None,  # 50 samples for quick comparison
             shuffle=True
         )
         val_loader = create_real_dataloader(
             data_dir="data/preprocessed/valid", 
-            batch_size=2, 
+            batch_size=16, 
             limit_samples=10,  # 10 samples for quick validation
             shuffle=False
         )
@@ -297,7 +297,7 @@ def compare_backbones():
         
         # Quick phase 1 training
         trainer.setup_phase_1()
-        history = trainer.train_phase_1(epochs=2, save_best=False, patience=10)
+        history = trainer.train_phase_1(epochs=10, save_best=False, patience=10)
         
         model_info = model.get_model_info()
         results[backbone] = {
@@ -331,18 +331,18 @@ if __name__ == "__main__":
         yolov5s_model, yolov5s_trainer = train_yolov5s_example()
         
         # Example 2: EfficientNet-B4 training  
-        logger.info("\n" + "=" * 60)
-        logger.info("EXAMPLE 2: EfficientNet-B4 Training")
-        logger.info("=" * 60)
+        # logger.info("\n" + "=" * 60)
+        # logger.info("EXAMPLE 2: EfficientNet-B4 Training")
+        # logger.info("=" * 60)
         
-        efficientnet_model, efficientnet_trainer = train_efficientnet_b4_example()
+        # efficientnet_model, efficientnet_trainer = train_efficientnet_b4_example()
         
-        # Example 3: Backbone comparison
-        logger.info("\n" + "=" * 60)
-        logger.info("EXAMPLE 3: Backbone Comparison")
-        logger.info("=" * 60)
+        # # Example 3: Backbone comparison
+        # logger.info("\n" + "=" * 60)
+        # logger.info("EXAMPLE 3: Backbone Comparison")
+        # logger.info("=" * 60)
         
-        comparison_results = compare_backbones()
+        # comparison_results = compare_backbones()
         
         logger.info("\n🎉 All training examples completed successfully!")
         

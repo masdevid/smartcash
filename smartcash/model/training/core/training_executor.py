@@ -19,24 +19,43 @@ logger = get_logger(__name__)
 class TrainingExecutor:
     """Handles training epoch execution and batch processing."""
     
-    def __init__(self, model, config, progress_tracker):
+    def __init__(self, model, config, progress_tracker, model_api=None):
         """
         Initialize training executor.
         
         Args:
-            model: PyTorch model
+            model: PyTorch model (for backward compatibility)
             config: Training configuration
             progress_tracker: Progress tracking instance
+            model_api: Model API instance that wraps the model (preferred)
         """
         self.model = model
+        self.model_api = model_api
         self.config = config
         self.progress_tracker = progress_tracker
-        self.prediction_processor = PredictionProcessor(config, model)
+        self.prediction_processor = PredictionProcessor(config, model_api if model_api is not None else model)
+        
+        # Use model from API wrapper if available, otherwise use the provided model
+        if model_api is not None:
+            self.model = model_api.model if hasattr(model_api, 'model') else model_api
+        else:
+            self.model = model
         
         # State for metrics calculation - accumulate all batches
         self._accumulated_predictions = {}
         self._accumulated_targets = {}
         self._batch_count = 0
+        
+        # Cache SmartCash model check for performance  
+        self._cached_is_smartcash = self._check_if_smartcash_model()
+    
+    def _check_if_smartcash_model(self) -> bool:
+        """Check if the model is a SmartCash model."""
+        try:
+            from smartcash.model.architectures.model import SmartCashYOLOv5Model
+            return isinstance(self.model, SmartCashYOLOv5Model)
+        except Exception:
+            return False
     
     def train_epoch(self, train_loader, optimizer, loss_manager, scaler, 
                    epoch: int, total_epochs: int, phase_num: int, display_epoch: int = None) -> Dict[str, float]:
@@ -56,7 +75,11 @@ class TrainingExecutor:
         Returns:
             Dictionary containing training metrics
         """
-        self.model.train()
+        # Use model API's train method if available, otherwise use model directly
+        if self.model_api is not None and hasattr(self.model_api, 'train'):
+            self.model_api.train()
+        else:
+            self.model.train()
         running_loss = 0.0
         num_batches = len(train_loader)
         
@@ -162,10 +185,18 @@ class TrainingExecutor:
     
     def _process_training_batch(self, images, targets, loss_manager, batch_idx, num_batches, phase_num):
         """Process a single training batch (OPTIMIZED)."""
-        # OPTIMIZATION: Cache device detection and model type for performance
+        # Always use model_api for device detection and forward pass
         if not hasattr(self, '_cached_device'):
-            self._cached_device = next(self.model.parameters()).device
-            self._cached_is_smartcash = self._is_smartcash_model()
+            # Get device from model API
+            if self.model_api is not None:
+                # Get model from API wrapper if it has a model attribute, otherwise use the API directly
+                model_to_use = self.model_api.model if hasattr(self.model_api, 'model') else self.model_api
+                self._cached_device = next(model_to_use.parameters()).device
+            else:
+                # Fallback to direct model access if no API available
+                self._cached_device = next(self.model.parameters()).device
+            
+            # Cache AMP setting
             self._cached_use_amp = hasattr(self, 'scaler') and self.scaler is not None
         
         # Move data to device efficiently with pre-cached device
@@ -173,10 +204,14 @@ class TrainingExecutor:
         targets = targets.to(self._cached_device, non_blocking=True)
         
         with autocast('cuda', enabled=self._cached_use_amp):
-            predictions = self.model(images)
+            # Always use model_api for forward pass if available
+            if self.model_api is not None:
+                predictions = self.model_api(images)
+            else:
+                predictions = self.model(images)
             
-            # Normalize predictions format - skip for SmartCash models (use cached check)
-            if not self._cached_is_smartcash:
+            # Normalize predictions format - use model_api for processing if available
+            if self.model_api is not None:
                 predictions = self.prediction_processor.normalize_training_predictions(
                     predictions, phase_num, batch_idx
                 )
@@ -208,7 +243,9 @@ class TrainingExecutor:
     
     def _is_smartcash_model(self) -> bool:
         """Check if the model is a SmartCash YOLOv5 model."""
-        return hasattr(self.model, '__class__') and 'SmartCashYOLOv5Model' in str(self.model.__class__)
+        # Check both model_api and model for SmartCash model type
+        model_to_check = self.model_api if self.model_api is not None else self.model
+        return hasattr(model_to_check, '__class__') and 'SmartCashYOLOv5Model' in str(model_to_check.__class__)
     
     def _compute_smartcash_loss(self, predictions, targets, img_size: int) -> torch.Tensor:
         """Compute loss for SmartCash models using YOLOv5 loss."""
@@ -300,26 +337,41 @@ class TrainingExecutor:
         # Use full processing if we have multi-layer predictions regardless of phase
         if isinstance(predictions, dict) and len(predictions) > 1:
             return True
+    
+        # Use full processing if we have multi-layer predictions regardless of phase
+        if isinstance(predictions, dict) and len(predictions) > 1:
+            return True
         
         # Default to lightweight processing for Phase 1 or single-layer
         return False
     
     def _backward_pass(self, loss, optimizer, scaler):
-        """Perform backward pass with optional mixed precision."""
-        optimizer.zero_grad()
-        if scaler:
-            scaler.scale(loss).backward()
-            scaler.step(optimizer)
-            scaler.update()
+        """Perform backward pass with gradient accumulation support."""
+        # Use model_api for backward pass if available
+        if self.model_api is not None and hasattr(self.model_api, 'backward'):
+            self.model_api.backward(loss, optimizer, scaler)
         else:
-            loss.backward()
+            # Fallback to standard backward pass
+            if scaler is not None:
+                scaler.scale(loss).backward()
+            else:
+                loss.backward()
             optimizer.step()
+            if scaler is not None:
+                scaler.update()
     
     def _reset_accumulated_metrics(self):
         """Reset accumulated metrics for a new epoch."""
         self._accumulated_predictions = {}
         self._accumulated_targets = {}
         self._batch_count = 0
+    
+    def _accumulate_batch_metrics(self, processed_predictions, processed_targets, batch_idx: int):
+        """
+        Accumulate predictions and targets from current batch (MEMORY OPTIMIZED).
+        
+        OPTIMIZED: Use memory-efficient accumulation with size limits and sampling.
+        """
     
     def _accumulate_batch_metrics(self, processed_predictions, processed_targets, batch_idx: int):
         """

@@ -72,6 +72,8 @@ Examples:
                        help='Use pretrained weights for backbone (default: False, train from scratch)')
     parser.add_argument('--use-smartcash-architecture', action='store_true',
                        help='Use new SmartCash YOLOv5 architecture (17 classes with post-inference mapping)')
+    parser.add_argument('--epochs', type=int, default=None,
+                       help='Total epochs (auto-distributed: 20%% phase 1, 80%% phase 2) (overrides individual phase settings)')
     parser.add_argument('--phase1-epochs', type=int, default=1,
                        help='Number of epochs for phase 1 (frozen backbone training) (default: 1)')
     parser.add_argument('--phase2-epochs', type=int, default=1,
@@ -309,18 +311,31 @@ def get_training_kwargs(args: Any) -> dict:
     Returns:
         Dictionary of keyword arguments for the training pipeline
     """
+    # Handle automatic epoch distribution if --epochs is specified
+    if args.epochs is not None:
+        # Automatic distribution: 20% phase 1, 80% phase 2
+        phase_1_epochs = max(1, int(args.epochs * 0.2))  # At least 1 epoch
+        phase_2_epochs = args.epochs - phase_1_epochs
+        print(f"🔄 Auto-distributing {args.epochs} epochs: Phase 1 = {phase_1_epochs}, Phase 2 = {phase_2_epochs}")
+    else:
+        # Use individual phase settings
+        phase_1_epochs = args.phase1_epochs
+        phase_2_epochs = args.phase2_epochs
+    
     return {
         'backbone': args.backbone,
         'pretrained': args.pretrained,
         'use_smartcash_architecture': args.use_smartcash_architecture,
-        'phase_1_epochs': args.phase1_epochs,
-        'phase_2_epochs': args.phase2_epochs,
+        'phase_1_epochs': phase_1_epochs,
+        'phase_2_epochs': phase_2_epochs,
         'checkpoint_dir': args.checkpoint_dir,
         'force_cpu': args.force_cpu,
         'training_mode': args.training_mode,
         # Single-phase specific parameters
         'single_phase_layer_mode': args.single_layer_mode,
         'single_phase_freeze_backbone': args.single_freeze_backbone,
+        # Batch size as top-level parameter for setup_utils override
+        'batch_size': args.batch_size,
         # Data loading configuration
         'data_config': {
             'batch_size': args.batch_size,

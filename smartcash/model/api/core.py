@@ -3,20 +3,18 @@ SmartCash Model API with YOLOv5 Integration
 Multi-Layer Banknote Detection System
 """
 
-import os
-import yaml
-import torch
 from pathlib import Path
-from typing import Dict, Any, Optional, List, Callable, Union
+from typing import Dict, Any, Optional, Callable, List
+import yaml
 from datetime import datetime
 
 from smartcash.common.logger import get_logger
 from smartcash.model.core.model_builder import ModelBuilder
-from smartcash.model.architectures.model import SmartCashYOLOv5Model
 from smartcash.model.core.checkpoints.checkpoint_manager import CheckpointManager
 from smartcash.model.utils.device_utils import setup_device, get_device_info
 from smartcash.model.training.utils.progress_tracker import TrainingProgressTracker
 from smartcash.model.utils.memory_optimizer import get_memory_optimizer
+from smartcash.model.architectures.model import SmartCashYOLOv5Model
 
 
 
@@ -27,23 +25,17 @@ class SmartCashModelAPI:
     
     def __init__(self, config_path: Optional[str] = None, 
                  progress_callback: Optional[Callable] = None, 
-                 config: Optional[Dict[str, Any]] = None,
-                 use_yolov5_integration: bool = True,
-                 use_smartcash_architecture: bool = True):
+                 config: Optional[Dict[str, Any]] = None):
         """
-        Initialize SmartCash API with YOLOv5 integration
+        Initialize SmartCash Model API
         
         Args:
             config_path: Path to configuration file
             progress_callback: Progress callback function
             config: Configuration dictionary
-            use_yolov5_integration: Enable YOLOv5 integration (legacy)
-            use_smartcash_architecture: Enable new SmartCashYOLOv5Model directly
         """
         self.logger = get_logger("model.api")
         self.progress_bridge = TrainingProgressTracker(progress_callback, True, 'single_phase')
-        self.use_yolov5_integration = use_yolov5_integration
-        self.use_smartcash_architecture = use_smartcash_architecture
         
         # Load configuration
         if config is not None:
@@ -58,10 +50,9 @@ class SmartCashModelAPI:
         self.memory_optimizer = get_memory_optimizer(self.device)
         memory_config = self.memory_optimizer.setup_memory_efficient_settings()
         
-        # Initialize YOLOv5-compatible model builder
+        # Initialize model builder and checkpoint manager
         self.model_builder = ModelBuilder(self.config, self.progress_bridge)
         self.checkpoint_manager = CheckpointManager(self.config)
-        
         
         # Model state
         self.model = None
@@ -71,11 +62,16 @@ class SmartCashModelAPI:
         self.memory_config = memory_config
         
         self.logger.debug("✅ SmartCash Model API initialized")
-        self.logger.debug(f"🔧 YOLOv5 integration: {'enabled' if use_yolov5_integration else 'disabled'}")
         
         # Log available architectures
         available_archs = self.model_builder.get_available_architectures()
         self.logger.debug(f"🏗️ Available architectures: {available_archs}")
+        
+        # Log device info
+        device_info = get_device_info()
+        self.logger.info(f"🔧 Using device: {device_info['device']}")
+        if device_info['device'] == 'cuda':
+            self.logger.info(f"   GPU: {device_info['gpu_name']}, Memory: {device_info['gpu_memory']}MB")
     
     def _load_config(self, config_path: Optional[str]) -> Dict[str, Any]:
         """Load configuration from file or use defaults"""
@@ -148,85 +144,196 @@ class SmartCashModelAPI:
                 'model': None
             }
     
-    def _build_smartcash_model(self, model_config: Dict[str, Any]) -> Dict[str, Any]:
-        """Build model using new SmartCashYOLOv5Model architecture."""
-        # Extract parameters for SmartCashYOLOv5Model
-        backbone = model_config.get('backbone', 'yolov5s')
-        num_classes = model_config.get('num_classes', 17)  # Default to 17 for SmartCash
-        img_size = model_config.get('img_size', 640)
-        pretrained = model_config.get('pretrained', True)
-        device = str(self.device)
+    def _build_smartcash_model(self, config: Dict[str, Any]) -> bool:
+        """
+        Build the SmartCash model with the given configuration.
         
-        self.logger.debug(f"🔧 Building SmartCashYOLOv5Model: {backbone} | Classes: {num_classes}")
-        
-        # Create SmartCash model
-        self.model = SmartCashYOLOv5Model(
-            backbone=backbone,
-            num_classes=num_classes,
-            img_size=img_size,
-            pretrained=pretrained,
-            device=device
-        )
-        
-        # Move to device
-        self.model = self.model.to(self.device)
-        self.is_model_built = True
-        
-        # Get model info
-        model_info = self._get_smartcash_model_info()
-        
-        self.progress_bridge.complete(4, "SmartCash model build complete")
-        
-        result = {
-            'success': True,
-            'model': self.model,
-            'model_info': model_info,
-            'architecture_type': 'SmartCashYOLOv5Model',
-            'device': str(self.device),
-            'memory_config': self.memory_config
-        }
-        
-        self.logger.info(f"✅ SmartCashYOLOv5Model built successfully: {model_info.get('total_parameters', 0):,} parameters")
-        return result
+        Args:
+            config: Model configuration
+            
+        Returns:
+            bool: True if model was built successfully, False otherwise
+        """
+        try:
+            self.progress_bridge.start_operation("build_model", 4)  # 4 steps
+            
+            # Initialize model builder if not already done
+            if not hasattr(self, 'model_builder'):
+                self.model_builder = ModelBuilder(
+                    config=config,
+                    device=self.device,
+                    logger=self.logger
+                )
+            
+            # Build the model
+            self.progress_bridge.update_substep(1, 4, "Initializing model architecture...")
+            self.model = self.model_builder.build()
+            
+            if self.model is None:
+                error_msg = "Failed to build model: Model builder returned None"
+                self.logger.error(error_msg)
+                self.progress_bridge.error(error_msg)
+                return False
+            
+            self.progress_bridge.update_substep(2, 4, "Model architecture initialized")
+            
+            # Move model to device
+            self.progress_bridge.update_substep(3, 4, f"Moving model to {self.device}...")
+            self.model = self.model.to(self.device)
+            self.progress_bridge.update_substep(4, 4, f"Model moved to {self.device}")
+            
+            # Initialize checkpoint manager with proper configuration
+            checkpoint_config = {
+                'checkpoint': {
+                    'save_dir': config.get('checkpoint_dir', 'checkpoints'),
+                    'max_checkpoints': config.get('max_checkpoints', 5),
+                    'auto_cleanup': True
+                },
+                'model': {
+                    'backbone': config.get('backbone', 'yolov5s')
+                }
+            }
+            
+            self.checkpoint_manager = CheckpointManager(
+                config=checkpoint_config,
+                is_resuming=config.get('resume_training', False)
+            )
+            
+            self.progress_bridge.complete_operation(4, "Model built successfully")
+            return True
+            
+        except Exception as e:
+            error_msg = f"Failed to build model: {str(e)}"
+            self.logger.error(error_msg, exc_info=True)
+            self.progress_bridge.error(error_msg)
+            return False
     
-    def _build_legacy_model(self, model_config: Dict[str, Any]) -> Dict[str, Any]:
-        """Build model using legacy model builder."""
-        # Set defaults
-        backbone = model_config.get('backbone', 'cspdarknet')
+    def build_model(self, **kwargs) -> Dict[str, Any]:
+        """
+        Build the model with the given configuration.
         
-        self.logger.debug(f"🔧 Building legacy model: {backbone} | Architecture: yolov5")
+        Args:
+            **kwargs: Model configuration parameters
+            
+        Returns:
+            Dict containing build status and model info
+        """
+        try:
+            # Update config with any provided parameters
+            if kwargs:
+                self.config.update(kwargs)
+            
+            # Build the model
+            success = self._build_smartcash_model(self.config)
+            
+            if not success or self.model is None:
+                return {
+                    'success': False,
+                    'error': 'Failed to build model',
+                    'model': None
+                }
+            
+            # Get model info
+            total_params = sum(p.numel() for p in self.model.parameters() if p.requires_grad)
+            
+            return {
+                'success': True,
+                'model': str(self.model),
+                'parameters': total_params,
+                'device': str(self.device)
+            }
+            
+        except Exception as e:
+            error_msg = f"Error building model: {str(e)}"
+            self.logger.error(error_msg, exc_info=True)
+            return {
+                'success': False,
+                'error': error_msg,
+                'model': None
+            }
+            
+    def train_model(self, train_data: str, val_data: str, epochs: int, 
+                   batch_size: int, learning_rate: float, checkpoint_dir: str, 
+                   log_dir: str, progress_callback: Optional[Callable] = None, 
+                   **kwargs) -> Dict[str, Any]:
+        """
+        Train the model with the given parameters.
         
-        # Build model
-        self.model = self.model_builder.build(
-            backbone=backbone,
-            detection_layers=model_config.get('detection_layers', ['layer_1', 'layer_2', 'layer_3']),
-            layer_mode=model_config.get('layer_mode', 'multi'),
-            num_classes=model_config.get('num_classes', 7),
-            img_size=model_config.get('img_size', 640),
-            pretrained=model_config.get('pretrained', True),
-            feature_optimization=model_config.get('feature_optimization', {'enabled': True})
-        )
+        Args:
+            train_data: Path to training data
+            val_data: Path to validation data
+            epochs: Number of training epochs
+            batch_size: Batch size for training
+            learning_rate: Learning rate for optimizer
+            checkpoint_dir: Directory to save checkpoints
+            log_dir: Directory to save logs
+            progress_callback: Callback for training progress updates
+            **kwargs: Additional training parameters
+            
+        Returns:
+            Dict containing training results
+        """
+        from smartcash.model.training.training_pipeline import TrainingPipeline
         
-        # Move to device
-        self.model = self.model.to(self.device)
-        self.is_model_built = True
-        
-        # Get model info
-        model_info = self.model_builder.get_model_info(self.model)
-        
-        self.progress_bridge.complete(4, "Legacy model build complete")
-        
-        result = {
-            'success': True,
-            'model': self.model,
-            'model_info': model_info,
-            'architecture_type': 'yolov5',
-            'device': str(self.device),
-            'memory_config': self.memory_config
-        }
-        
-        self.logger.info(f"✅ Legacy model built successfully: {model_info.get('total_parameters', 0):,} parameters")
-        return result
+        try:
+            # Update config with training parameters
+            self.config.update({
+                'train_data': train_data,
+                'val_data': val_data,
+                'epochs': epochs,
+                'batch_size': batch_size,
+                'learning_rate': learning_rate,
+                'checkpoint_dir': checkpoint_dir,
+                'log_dir': log_dir,
+                **kwargs
+            })
+            
+            # Initialize training pipeline
+            training_pipeline = TrainingPipeline(
+                progress_callback=progress_callback,
+                verbose=kwargs.get('verbose', True)
+            )
+            
+            # Start training
+            self.logger.info("🚀 Starting model training...")
+            
+            # Update config with model and device info
+            training_config = self.config.copy()
+            training_config.update({
+                'model': self.model,
+                'device': self.device,
+                'checkpoint_manager': self.checkpoint_manager,
+                'train_data': train_data,
+                'val_data': val_data,
+                'epochs': epochs,
+                'batch_size': batch_size,
+                'learning_rate': learning_rate,
+                'checkpoint_dir': checkpoint_dir,
+                'log_dir': log_dir,
+                **kwargs
+            })
+            
+            # Call run_training with the updated config
+            result = training_pipeline.run_training(
+                epochs=epochs,
+                config=training_config
+            )
+            
+            if result.get('success', False):
+                self.logger.info("✅ Training completed successfully")
+            else:
+                self.logger.error(f"❌ Training failed: {result.get('error', 'Unknown error')}")
+                
+            return result
+            
+        except Exception as e:
+            error_msg = f"Error during training: {str(e)}"
+            self.logger.error(error_msg, exc_info=True)
+            return {
+                'success': False,
+                'error': error_msg,
+                'exception': str(e)
+            }
     
     def _get_smartcash_model_info(self) -> Dict[str, Any]:
         """Get model information for SmartCash model."""
@@ -555,71 +662,79 @@ class SmartCashModelAPI:
             }
 
 
-def create_api(config_path: Optional[str] = None, **kwargs) -> SmartCashModelAPI:
+def create_api(config_path: Optional[str] = None, **kwargs) -> 'SmartCashModelAPI':
     """
-    Convenience function to create SmartCash API instance
+    Create a new SmartCash Model API instance
     
     Args:
-        config_path: Configuration file path
-        **kwargs: Additional API parameters
+        config_path: Path to configuration file
+        **kwargs: Additional configuration parameters
         
     Returns:
         SmartCashModelAPI instance
     """
-    # Default to using SmartCash architecture unless explicitly disabled
-    if 'use_smartcash_architecture' not in kwargs:
-        kwargs['use_smartcash_architecture'] = True
-        
     return SmartCashModelAPI(config_path=config_path, **kwargs)
 
 
-# Training pipeline function for backwards compatibility
 def run_full_training_pipeline(**kwargs) -> Dict[str, Any]:
     """
-    Run full training pipeline using SmartCash YOLOv5 architecture
+    Run full training pipeline with simplified interface for examples.
     
     Args:
         **kwargs: Training configuration parameters
         
     Returns:
-        Training result dictionary
+        Dictionary containing training results
     """
     from smartcash.model.training.training_pipeline import TrainingPipeline
+    from smartcash.model.training.pipeline.configuration_builder import ConfigurationBuilder
+    import uuid
     
-    # Extract pipeline constructor arguments
-    pipeline_args = {
-        'progress_callback': kwargs.pop('progress_callback', None),
-        'log_callback': kwargs.pop('log_callback', None),
-        'live_chart_callback': kwargs.pop('live_chart_callback', None),
-        'metrics_callback': kwargs.pop('metrics_callback', None),
-        'verbose': kwargs.pop('verbose', True),
-        'use_yolov5_integration': kwargs.pop('use_yolov5_integration', True)
-    }
-    
-    # Create training pipeline
-    pipeline = TrainingPipeline(**pipeline_args)
-    
-    # Run training
-    return pipeline.run_full_training_pipeline(patience=kwargs.pop('patience', 30), **kwargs)
-
-
-# Backwards compatibility aliases
-def create_model_api(config_path: Optional[str] = None, **kwargs) -> SmartCashModelAPI:
-    """Backwards compatibility function"""
-    return SmartCashModelAPI(config_path=config_path, **kwargs)
-
-
-def quick_build_model(backbone: str = 'cspdarknet', **kwargs):
-    """Quick model building function for backwards compatibility"""
-    api = SmartCashModelAPI()
-    return api.build_model({'backbone': backbone, **kwargs})
+    try:
+        # Extract callbacks
+        progress_callback = kwargs.pop('progress_callback', None)
+        log_callback = kwargs.pop('log_callback', None)
+        metrics_callback = kwargs.pop('metrics_callback', None)
+        verbose = kwargs.pop('verbose', True)
+        
+        # Create training pipeline
+        pipeline = TrainingPipeline(
+            progress_callback=progress_callback,
+            log_callback=log_callback,
+            metrics_callback=metrics_callback,
+            verbose=verbose
+        )
+        
+        # Create session ID if not provided
+        session_id = kwargs.get('session_id', str(uuid.uuid4())[:8])
+        
+        # CRITICAL FIX: Use ConfigurationBuilder to create structured config
+        config_builder = ConfigurationBuilder(session_id)
+        structured_config = config_builder.build_training_config(**kwargs)
+        
+        # Extract training parameters for the pipeline interface
+        total_epochs = structured_config.get('phase_1_epochs', 10) + structured_config.get('phase_2_epochs', 0)
+        
+        # Run training with properly structured configuration
+        result = pipeline.run_training(
+            epochs=total_epochs,
+            config=structured_config  # Use structured config instead of flat kwargs
+        )
+        
+        return result
+        
+    except Exception as e:
+        logger = get_logger(__name__)
+        logger.error(f"❌ Full training pipeline failed: {str(e)}")
+        return {
+            'success': False,
+            'error': str(e)
+        }
 
 
 # Export key classes and functions
 __all__ = [
     'SmartCashModelAPI',
     'create_api',
-    'create_model_api',
-    'quick_build_model', 
     'run_full_training_pipeline'
 ]

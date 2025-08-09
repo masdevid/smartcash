@@ -1,32 +1,42 @@
 """
 SmartCash Model Builder with YOLOv5 Integration
 Multi-Layer Banknote Detection System
+
+This module provides a model builder that creates and configures models for the SmartCash system.
+It supports both training and inference with various backbones and configurations.
 """
 
 import torch
 import torch.nn as nn
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional, Union
 
 from smartcash.common.logger import get_logger
 from smartcash.model.training.utils.progress_tracker import TrainingProgressTracker
 
-# Import YOLOv5 integration components
+# Import the new modular YOLOv5 integration
 try:
-    from smartcash.model.architectures.yolov5_integration import (
-        SmartCashYOLOv5Integration, 
-        create_training_model
+    from smartcash.model.architectures.yolov5 import (
+        SmartCashYOLOv5Integration,
+        create_training_model,
+        create_smartcash_yolov5_model,
+        YOLOv5ModelFactory
     )
-    YOLOV5_INTEGRATION_AVAILABLE = True
-except ImportError:
-    YOLOV5_INTEGRATION_AVAILABLE = False
-
-# Legacy components removed - using YOLOv5 integration only
+    YOLOV5_AVAILABLE = True
+except ImportError as e:
+    get_logger("model.builder").warning(f"YOLOv5 integration not available: {e}")
+    YOLOV5_AVAILABLE = False
 
 
 class ModelBuilder:
     """
-    SmartCash model builder with YOLOv5 integration for multi-layer banknote detection
+    SmartCash model builder with YOLOv5 integration for multi-layer banknote detection.
+    
+    This class handles the creation and configuration of models for the SmartCash system,
+    supporting various backbones and training configurations.
     """
+    
+    # Class variable to track YOLOv5 availability
+    YOLOV5_AVAILABLE = YOLOV5_AVAILABLE
     
     def __init__(self, config: Dict[str, Any], progress_bridge: TrainingProgressTracker = None):
         """
@@ -34,32 +44,50 @@ class ModelBuilder:
         
         Args:
             config: Configuration dictionary
-            progress_bridge: Progress tracking bridge
+            progress_bridge: Progress tracking bridge for reporting progress
         """
         self.config = config
         self.progress_bridge = progress_bridge
         self.logger = get_logger("model.builder") or get_logger("smartcash")
         
-        # Force CPU mode to avoid MPS issues
-        self.device = torch.device("cpu")
+        # Set device based on availability
+        self.device = self._setup_device()
         
-        # Set environment variables to prevent MPS usage
+        # Initialize YOLOv5 model factory if available
+        self.model_factory = None
+        if self.YOLOV5_AVAILABLE:
+            try:
+                self.model_factory = YOLOv5ModelFactory(logger=self.logger)
+                self.logger.info("✅ YOLOv5 model factory initialized")
+            except Exception as e:
+                self.logger.error(f"❌ Failed to initialize YOLOv5 model factory: {e}")
+                self.YOLOV5_AVAILABLE = False
+        
+        if not self.YOLOV5_AVAILABLE:
+            self.logger.warning("⚠️ YOLOv5 integration not available. Some features may be limited.")
+    
+    def _setup_device(self) -> torch.device:
+        """Set up the device for model training/inference."""
+        # Check for CUDA first
+        if torch.cuda.is_available():
+            device = torch.device("cuda")
+            self.logger.info(f"Using CUDA device: {torch.cuda.get_device_name(0)}")
+        # Then check for MPS (Apple Silicon)
+        elif hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
+            device = torch.device("mps")
+            self.logger.info("Using MPS (Metal Performance Shaders) on Apple Silicon")
+        # Fall back to CPU
+        else:
+            device = torch.device("cpu")
+            self.logger.info("Using CPU (no CUDA or MPS available)")
+        
+        # Set environment variables for optimal performance
         import os
         os.environ['PYTORCH_ENABLE_MPS_FALLBACK'] = '1'
-        # Set valid MPS ratios even when disabling to prevent errors
         os.environ['PYTORCH_MPS_HIGH_WATERMARK_RATIO'] = '0.8'
         os.environ['PYTORCH_MPS_LOW_WATERMARK_RATIO'] = '0.3'
         
-        
-        
-        # Legacy builder removed - using YOLOv5 integration only
-        
-        # Initialize YOLOv5 integration if available
-        if YOLOV5_INTEGRATION_AVAILABLE:
-            self.yolov5_integration = SmartCashYOLOv5Integration(logger=self.logger)
-        else:
-            self.yolov5_integration = None
-            self.logger.warning("⚠️ YOLOv5 integration not available, using legacy mode only")
+        return device
     
     def build(self, backbone: str = 'efficientnet_b4', detection_layers: List[str] = None,
               layer_mode: str = 'multi', num_classes: int = 7, img_size: int = 640,
@@ -89,23 +117,41 @@ class ModelBuilder:
             self.logger.info(f"🏗️ Building SmartCash YOLOv5 model: {backbone} | Mode: {layer_mode} | Architecture: yolov5")
         
         # Always use YOLOv5 architecture
-        if self.yolov5_integration:
-            return self._build_yolov5_model(
-                backbone=backbone,
-                detection_layers=detection_layers,
-                layer_mode=layer_mode,
-                num_classes=num_classes,
-                img_size=img_size,
-                pretrained=pretrained,
-                **kwargs
-            )
+        if self.YOLOV5_AVAILABLE and self.model_factory is not None:
+            try:
+                # Use the model factory to create the model
+                model = self.model_factory.create_model(
+                    backbone=backbone,
+                    num_classes=num_classes,
+                    img_size=img_size,
+                    pretrained=pretrained,
+                    **kwargs
+                )
+                
+                # Apply feature optimization
+                if feature_optimization.get('enabled', True):
+                    model = self._optimize_model_features(model, feature_optimization)
+                
+                # Log model info
+                model_info = self.get_model_info(model)
+                self.logger.info(f"✅ Model built successfully: {model_info.get('parameters', 0):,} parameters")
+                
+                return model
+                
+            except Exception as e:
+                error_msg = f"Failed to build YOLOv5 model: {str(e)}"
+                self.logger.error(error_msg, exc_info=True)
+                raise RuntimeError(error_msg) from e
         else:
-            raise RuntimeError("❌ YOLOv5 integration is required but not available. Please ensure YOLOv5 is properly installed.")
+            error_msg = "❌ YOLOv5 integration is required but not available. "
+            error_msg += "Please ensure YOLOv5 is properly installed and the model factory is initialized."
+            self.logger.error(error_msg)
+            raise RuntimeError(error_msg)
     
     
     def _optimize_model_features(self, model: nn.Module, optimization_config: Dict) -> nn.Module:
         """
-        Apply feature optimization to the model
+        Apply feature optimization to the model.
         
         Args:
             model: The model to optimize
@@ -117,144 +163,58 @@ class ModelBuilder:
         if not optimization_config.get('enabled', True):
             return model
             
-        if self.progress_bridge:
-            self.progress_bridge.update_substep(1, 2, "Applying feature optimization...")
-        else:
-            self.logger.info("🔧 Applying feature optimization...")
+        self.logger.info("🔧 Applying feature optimization...")
         
-        # Freeze backbone layers if specified
-        if optimization_config.get('freeze_backbone', False):
-            for name, param in model.named_parameters():
-                if 'model.0.' in name or 'model.1.' in name:  # First few layers are typically the backbone
-                    param.requires_grad = False
-            self.logger.debug("  - Frozen backbone layers")
-        
-        # Apply other optimizations as needed
-        if optimization_config.get('use_amp', False):
-            model.forward = lambda x: model.forward(x.to(next(model.parameters()).device))
-            self.logger.debug("  - Applied mixed precision training (AMP)")
+        try:
+            # Apply optimizations if the model supports them
+            if hasattr(model, 'freeze_backbone'):
+                model.freeze_backbone()
+                self.logger.info("  - Frozen backbone layers")
+                
+            if hasattr(model, 'enable_gradient_checkpointing'):
+                model.enable_gradient_checkpointing()
+                self.logger.info("  - Enabled gradient checkpointing")
+                
+            # Apply custom learning rates if specified
+            custom_lr = optimization_config.get('custom_lr')
+            if custom_lr and hasattr(model, 'set_parameter_lrs'):
+                model.set_parameter_lrs(custom_lr)
+                self.logger.info("  - Applied custom learning rates")
+                
+        except Exception as e:
+            self.logger.warning(f"Feature optimization partially failed: {e}")
             
         return model
         
-    def _build_yolov5_model(self, backbone: str, detection_layers: List[str],
-                           layer_mode: str, num_classes: int, img_size: int,
-                           pretrained: bool, feature_optimization: Dict = None, **kwargs) -> nn.Module:
-        """
-        Build YOLOv5 model with SmartCash integration
-        """
-        
-        if not YOLOV5_INTEGRATION_AVAILABLE or self.yolov5_integration is None:
-            raise RuntimeError("YOLOv5 integration is not available")
-            
-        try:
-            if self.progress_bridge:
-                self.progress_bridge.update_substep(1, 4, f"🔧 Building YOLOv5 {backbone} model...")
-            
-            # Prepare model configuration
-            model_config = {
-                'backbone_type': backbone,
-                'num_classes': num_classes,
-                'img_size': img_size,
-                'pretrained': pretrained,
-                'nc': num_classes,  # YOLOv5 uses 'nc' for number of classes
-                'ch': 3,  # RGB channels
-                'model_size': kwargs.get('model_size', 's'),  # Default to small model
-                'anchors': kwargs.get('anchors', None)  # Optional custom anchors
-            }
-            
-            # Filter out None values to avoid passing them to create_training_model
-            model_config = {k: v for k, v in model_config.items() if v is not None}
-            
-            self.logger.debug(f"Creating YOLOv5 model with config: {model_config}")
-            
-            # Create the model using the YOLOv5 integration
-            if self.yolov5_integration is not None:
-                model = self.yolov5_integration.create_training_compatible_model(
-                    backbone_type=backbone,
-                    **{k: v for k, v in model_config.items() if k != 'backbone_type'}
-                )
-            else:
-                # Fallback to direct creation if integration is not available
-                model = create_training_model(**model_config)
-            
-            if self.progress_bridge:
-                self.progress_bridge.update_substep(2, 4, "🔧 Applying feature optimization...")
-            
-            # Initialize default optimization config if not provided
-            if feature_optimization is None:
-                feature_optimization = {'enabled': True}
-                
-            if feature_optimization.get('enabled', True):
-                model = self._optimize_model_features(model, feature_optimization)
-                
-            if self.progress_bridge:
-                self.progress_bridge.update_substep(3, 4, "🔧 Moving model to device...")
-                
-            # Move model to device if it's a PyTorch model
-            if hasattr(model, 'to') and callable(getattr(model, 'to', None)):
-                model = model.to(self.device)
-            else:
-                self.logger.warning("Model does not support .to() method, skipping device move")
-            
-            if self.progress_bridge:
-                self.progress_bridge.update_substep(4, 4, "✅ Model build complete!")
-            
-            # Store backbone information for later retrieval
-            if hasattr(model, '__dict__'):
-                model._smartcash_backbone = backbone
-                model._smartcash_layer_mode = layer_mode
-                model._smartcash_detection_layers = detection_layers
-                
-            if self.progress_bridge:
-                self.progress_bridge.complete_operation(4, f"YOLOv5 model built successfully ({backbone})")
-            else:
-                self.logger.info(f"✅ YOLOv5 model built successfully ({backbone})")
-            return model
-            
-        except Exception as e:
-            self.logger.error(f"YOLOv5 model building failed: {e}", exc_info=True)
-            raise ValueError(f"Failed to build YOLOv5 model: {str(e)}") from e
-    
-    
     def _count_parameters(self, model: nn.Module) -> int:
-        """Count total parameters in model"""
-        return sum(p.numel() for p in model.parameters())
+        """Count total trainable parameters in the model."""
+        return sum(p.numel() for p in model.parameters() if p.requires_grad)
     
     def get_available_architectures(self) -> List[str]:
-        """Get list of available architecture types"""
-        if YOLOV5_INTEGRATION_AVAILABLE:
-            return ['yolov5']
-        else:
-            return []  # No architectures available without YOLOv5
+        """Get list of available architecture types."""
+        return ['yolov5']  # Only YOLOv5 is supported
     
     def get_available_backbones(self) -> List[str]:
-        """Get list of available backbones for YOLOv5 architecture"""
-        return ['cspdarknet', 'efficientnet_b4']
+        """Get list of available backbones for the architecture."""
+        return ['cspdarknet', 'efficientnet_b4']  # Supported backbones
     
     def get_model_info(self, model: nn.Module) -> Dict[str, Any]:
-        """Get comprehensive model information"""
-        total_params = sum(p.numel() for p in model.parameters())
-        trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+        """
+        Get comprehensive model information.
         
+        Args:
+            model: The model to get info for
+            
+        Returns:
+            Dictionary containing model information
+        """
         info = {
-            'total_parameters': total_params,
-            'trainable_parameters': trainable_params,
-            'model_size_mb': total_params * 4 / (1024 * 1024),
-            'architecture_type': 'unknown',
-            'backbone': 'unknown'
+            'parameters': self._count_parameters(model),
+            'device': str(next(model.parameters()).device) if hasattr(model, 'parameters') and list(model.parameters()) else 'unknown'
         }
         
-        # Extract stored SmartCash configuration
-        if hasattr(model, '_smartcash_backbone'):
-            info['backbone'] = model._smartcash_backbone
-        if hasattr(model, '_smartcash_layer_mode'):
-            info['layer_mode'] = model._smartcash_layer_mode
-        if hasattr(model, '_smartcash_detection_layers'):
-            info['detection_layers'] = model._smartcash_detection_layers
-        
-        # Determine architecture type
-        if hasattr(model, 'yolov5_model'):
-            info['architecture_type'] = 'yolov5_integrated'
+        # Add model-specific info if available
+        if hasattr(model, 'get_model_info'):
             
             # Try to get YOLOv5-specific model information
             try:

@@ -75,7 +75,6 @@ class PipelineOrchestrator(CallbacksMixin):
         # Pipeline state
         self.config = None
         self.model_api = None
-        self.model = None
         self.training_results = {}
         self.pipeline_start_time = None
 
@@ -85,12 +84,21 @@ class PipelineOrchestrator(CallbacksMixin):
         self.visualization_manager = None  # Updated to use new visualization package
 
     def _initialize_components(self, model, config):
-        """Initialize all pipeline components."""
+        """Initialize all pipeline components.
+        
+        Args:
+            model: The actual PyTorch model instance
+            config: Training configuration
+        """
         try:
-            # Initialize model configuration manager
+            # Validate that we have a model
+            if model is None:
+                raise ValueError("model cannot be None")
+                
+            # Initialize model configuration manager with the actual model
             self.model_config_manager = create_model_configuration_manager(model, config)
             
-            # Initialize phase setup manager
+            # Initialize phase setup manager with the actual model
             self.phase_setup_manager = create_phase_setup_manager(model, config)
             
             # Initialize visualization manager with the new package
@@ -121,15 +129,14 @@ class PipelineOrchestrator(CallbacksMixin):
             raise
 
     def execute_pipeline(
-        self, config: Dict[str, Any], model_api, model
+        self, config: Dict[str, Any], model_api
     ) -> Dict[str, Any]:
         """
         Execute the complete training pipeline.
 
         Args:
             config: Training configuration
-            model_api: Model API instance
-            model: PyTorch model instance
+            model_api: Model API instance that wraps the model
 
         Returns:
             Dictionary containing pipeline execution results
@@ -137,10 +144,12 @@ class PipelineOrchestrator(CallbacksMixin):
         self.pipeline_start_time = time.time()
         self.config = config
         self.model_api = model_api
-        self.model = model
+        
+        # Get the model from the API wrapper and store it
+        self.model = model_api.model if hasattr(model_api, 'model') else None
 
-        # Initialize pipeline components
-        self._initialize_components(model, config)
+        # Initialize pipeline components with the model from the API wrapper
+        self._initialize_components(self.model, config)
 
         try:
             self.emit_log("info", "🚀 Starting training pipeline orchestration")

@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 from typing import Dict, List, Tuple, Union
-from ultralytics.utils.ops import non_max_suppression
+from ultralytics import YOLO
 from smartcash.model.architectures.backbones.yolov5_backbone import YOLOv5Backbone
 from smartcash.model.architectures.backbones.efficientnet_backbone import EfficientNetBackbone
 from smartcash.common.logger import get_logger
@@ -15,7 +15,9 @@ class SmartCashYOLOv5Model(nn.Module):
         self.num_classes = num_classes
         self.img_size = img_size
         self.backbone_type = backbone
-        # Handle device selection properly
+        self.current_phase = 1
+        
+        # Device selection
         if device == "auto":
             if torch.cuda.is_available():
                 self.device = torch.device("cuda")
@@ -25,15 +27,97 @@ class SmartCashYOLOv5Model(nn.Module):
                 self.device = torch.device("cpu")
         else:
             self.device = torch.device(device)
+        
         self.class_mapping = self._create_class_mapping()
-        self.current_phase = 1
         self.model = self._create_model(pretrained)
-        self.logger.info(f"✅ Created SmartCashYOLOv5Model: {backbone}, {num_classes} classes, phase {self.current_phase}")
+        
+        # Get parameter count based on model type
+        if hasattr(self.model, 'model') and hasattr(self.model.model, 'parameters'):
+            param_count = sum(p.numel() for p in self.model.model.parameters())
+        else:
+            param_count = sum(p.numel() for p in self.model.parameters())
+        self.logger.info(f"✅ SmartCashYOLOv5Model: {backbone} ({param_count:,} params, phase {self.current_phase})")
     
-    def _create_model(self, pretrained: bool) -> nn.Module:
+    def _create_model(self, pretrained: bool) -> Union[nn.Module, YOLO]:
+        """Create model based on backbone type - supports research comparison between backbones"""
         if self.backbone_type == "efficientnet_b4":
-            return EfficientNetBackbone(self.num_classes, pretrained, self.device)
-        return YOLOv5Backbone(self.backbone_type, self.num_classes, pretrained, self.device)
+            # Use custom EfficientNet-B4 backbone for research
+            model = EfficientNetBackbone(self.num_classes, pretrained, self.device)
+            self._set_phase_1_on_backbone(model)
+            return model
+        elif self.backbone_type.startswith("yolov5"):
+            # Use optimized native YOLO for YOLOv5 variants
+            return self._create_optimized_yolo_model(pretrained)
+        else:
+            # Fallback to custom YOLOv5 backbone
+            model = YOLOv5Backbone(self.backbone_type, self.num_classes, pretrained, self.device)
+            self._set_phase_1_on_backbone(model)
+            return model
+    
+    def _create_optimized_yolo_model(self, pretrained: bool) -> YOLO:
+        """Create optimized native YOLO model for YOLOv5 variants"""
+        model_configs = {
+            "yolov5n": "yolov5nu.pt" if pretrained else "yolov5n.yaml",
+            "yolov5s": "yolov5su.pt" if pretrained else "yolov5s.yaml",  
+            "yolov5m": "yolov5mu.pt" if pretrained else "yolov5m.yaml",
+        }
+        
+        config = model_configs.get(self.backbone_type, model_configs["yolov5s"])
+        model = YOLO(config)
+        
+        # Modify detection head for our class count
+        if hasattr(model.model, 'model') and len(model.model.model) > 0:
+            detect_layer = model.model.model[-1]
+            if hasattr(detect_layer, 'nc'):
+                detect_layer.nc = self.num_classes
+                self._reinitialize_detection_head(detect_layer)
+        
+        model.to(self.device)
+        self._set_phase_1_on_model(model)
+        return model
+    
+    def _reinitialize_detection_head(self, detect_layer):
+        """Reinitialize detection head weights for new class count"""
+        if hasattr(detect_layer, 'm') and isinstance(detect_layer.m, nn.ModuleList):
+            for conv in detect_layer.m:
+                if hasattr(conv, 'weight'):
+                    nn.init.normal_(conv.weight, 0, 0.01)
+                if hasattr(conv, 'bias') and conv.bias is not None:
+                    nn.init.constant_(conv.bias, 0)
+    
+    def _set_phase_1_on_model(self, model):
+        """Phase 1: Freeze backbone, train detection head only - for YOLO models"""
+        for name, param in model.model.named_parameters():
+            if 'model.24' in name or 'head' in name.lower():  # Detection head
+                param.requires_grad = True
+            else:  # Backbone and neck
+                param.requires_grad = False
+        self.logger.info("🔒 Phase 1: Backbone frozen, head trainable")
+    
+    def _set_phase_1_on_backbone(self, model):
+        """Phase 1: Freeze backbone, train detection head only - for custom backbones"""
+        # Custom backbones already handle phase setup in their constructors
+        pass
+    
+    def _set_phase_1(self):
+        """Phase 1: Freeze backbone, train detection head only"""
+        if hasattr(self.model, 'model'):  # YOLO model
+            self._set_phase_1_on_model(self.model)
+        else:  # Custom backbone
+            self._set_phase_1_on_backbone(self.model)
+    
+    def _set_phase_2(self):
+        """Phase 2: Unfreeze entire model for fine-tuning"""
+        if hasattr(self.model, 'model'):  # YOLO model
+            for param in self.model.model.parameters():
+                param.requires_grad = True
+        else:  # Custom backbone
+            if hasattr(self.model, 'setup_phase_2'):
+                self.model.setup_phase_2(self.model)
+            else:
+                for param in self.model.parameters():
+                    param.requires_grad = True
+        self.logger.info("🔓 Phase 2: Full model trainable")
     
     def _create_class_mapping(self) -> Dict[int, int]:
         mapping = {i: i for i in range(7)}
@@ -42,15 +126,53 @@ class SmartCashYOLOv5Model(nn.Module):
         mapping.update({14: -1, 15: -1, 16: -1})
         return mapping
     
-    def forward(self, x: torch.Tensor, training: bool = None) -> Union[torch.Tensor, List[Dict[str, torch.Tensor]]]:
-        if training is None:
-            training = self.training
-        output = self.model(x)
-        return output if training else self._process_inference_output(output, x.shape)
+    def forward(self, x: torch.Tensor) -> Union[torch.Tensor, List[Dict[str, torch.Tensor]]]:
+        """Forward pass with training/inference mode handling"""
+        if self.training:
+            # Training mode: return raw outputs for loss computation
+            if hasattr(self.model, 'model'):  # YOLO model
+                return self.model.model(x)
+            else:  # Custom backbone
+                return self.model(x)
+        else:
+            # Inference mode: return processed predictions with class mapping
+            if hasattr(self.model, 'model'):  # YOLO model
+                results = self.model(x, verbose=False)
+                return self._process_inference_results(results)
+            else:  # Custom backbone
+                output = self.model(x)
+                return self._process_inference_output_from_tensor(output, x.shape)
     
-    def _process_inference_output(self, output: torch.Tensor, input_shape: Tuple[int, ...]) -> List[Dict[str, torch.Tensor]]:
+    def _process_inference_results(self, results) -> List[Dict[str, torch.Tensor]]:
+        """Process YOLO inference results with 17→7 class mapping"""
+        processed_results = []
+        
+        for result in results:
+            if result.boxes is None or len(result.boxes) == 0:
+                processed_results.append({
+                    'boxes': torch.empty(0, 4),
+                    'scores': torch.empty(0),
+                    'labels': torch.empty(0, dtype=torch.long),
+                    'denomination_scores': torch.zeros(7)
+                })
+                continue
+                
+            boxes = result.boxes.xyxy
+            scores = result.boxes.conf
+            classes = result.boxes.cls.long()
+            
+            mapped_result = self._map_classes_and_adjust_confidence(boxes, scores, classes)
+            processed_results.append(mapped_result)
+            
+        return processed_results
+    
+    def _process_inference_output_from_tensor(self, output: torch.Tensor, input_shape: Tuple[int, ...]) -> List[Dict[str, torch.Tensor]]:
+        """Process tensor output from custom backbones"""
+        from ultralytics.utils.ops import non_max_suppression
+        
         predictions = non_max_suppression(output, conf_thres=0.25, iou_thres=0.45)
         processed_results = []
+        
         for pred in predictions:
             if pred is None or len(pred) == 0:
                 processed_results.append({
@@ -60,8 +182,10 @@ class SmartCashYOLOv5Model(nn.Module):
                     'denomination_scores': torch.zeros(7)
                 })
                 continue
+                
             boxes, scores, classes = pred[:, :4], pred[:, 4], pred[:, 5].long()
             processed_results.append(self._map_classes_and_adjust_confidence(boxes, scores, classes))
+            
         return processed_results
     
     def _map_classes_and_adjust_confidence(self, boxes: torch.Tensor, scores: torch.Tensor, classes: torch.Tensor) -> Dict[str, torch.Tensor]:
@@ -103,34 +227,59 @@ class SmartCashYOLOv5Model(nn.Module):
         return min(adjusted, 1.0)
     
     def get_phase_info(self) -> Dict:
-        trainable_params = sum(p.numel() for p in self.model.parameters() if p.requires_grad)
-        total_params = sum(p.numel() for p in self.model.parameters())
+        """Get current phase information and parameter counts"""
+        if hasattr(self.model, 'model'):  # YOLO model
+            trainable_params = sum(p.numel() for p in self.model.model.parameters() if p.requires_grad)
+            total_params = sum(p.numel() for p in self.model.model.parameters())
+        else:  # Custom backbone
+            trainable_params = sum(p.numel() for p in self.model.parameters() if p.requires_grad)
+            total_params = sum(p.numel() for p in self.model.parameters())
+            
         return {
             'phase': self.current_phase,
-            'backbone_frozen': not all(p.requires_grad for p in self.model.parameters()),
+            'backbone_frozen': self.current_phase == 1,
             'trainable_params': trainable_params,
             'total_params': total_params,
-            'trainable_ratio': trainable_params / total_params
+            'trainable_ratio': trainable_params / total_params,
+            'model_size': self.backbone_type
         }
     
     def get_model_config(self) -> Dict:
+        """Get model configuration"""
+        if hasattr(self.model, 'model'):  # YOLO model
+            total_params = sum(p.numel() for p in self.model.model.parameters())
+        else:  # Custom backbone
+            total_params = sum(p.numel() for p in self.model.parameters())
+            
         return {
             'backbone': self.backbone_type,
             'num_classes': self.num_classes,
             'img_size': self.img_size,
             'phase': self.current_phase,
             'class_mapping': self.class_mapping,
-            'architecture': 'SmartCashYOLOv5Model'
+            'architecture': 'SmartCashYOLOv5Model',
+            'total_params': total_params,
         }
     
     def setup_phase_2(self):
+        """Switch to Phase 2: full model fine-tuning"""
         self.current_phase = 2
-        self.model.setup_phase_2(self.model)
+        self._set_phase_2()
     
     @staticmethod
     def get_supported_backbones() -> List[str]:
-        """Get list of supported YOLOv5 backbones"""
-        return ["yolov5s", "yolov5m", "yolov5l", "yolov5x", "efficientnet_b4"]
+        """Get list of supported backbones for research comparison"""
+        return ["yolov5s", "efficientnet_b4", "yolov5n", "yolov5m"]  # Research + optimized options
+    
+    @staticmethod
+    def get_backbone_info() -> Dict[str, Dict]:
+        """Get information about each backbone for research comparison"""
+        return {
+            "yolov5s": {"params": "~7.2M", "speed": "Fast", "use_case": "Research baseline (YOLOv5)"},
+            "efficientnet_b4": {"params": "~19.4M", "speed": "Slow", "use_case": "Research comparison (EfficientNet)"},
+            "yolov5n": {"params": "~1.9M", "speed": "Fastest", "use_case": "Fast prototyping"},
+            "yolov5m": {"params": "~21M", "speed": "Medium", "use_case": "High accuracy when needed"}
+        }
     
     @staticmethod
     def get_class_names() -> Dict[str, List[str]]:

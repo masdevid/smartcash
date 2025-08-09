@@ -293,9 +293,23 @@ class DataLoaderFactory:
         # Get config with platform overrides
         data_config = {**platform_config, **self.config.get('training', {}).get('data', {})}
         
-        # Get batch size with platform override
-        batch_size = self.config.get('training', {}).get('batch_size', platform_config.get('batch_size', 16))
-        batch_size_source = "config" if 'batch_size' in self.config.get('training', {}) else "platform"
+        # Get batch size with proper precedence: training.batch_size > training.data.batch_size > platform
+        training_config = self.config.get('training', {})
+        batch_size = training_config.get('batch_size')
+        if batch_size is None:
+            # Check data config within training config
+            batch_size = training_config.get('data', {}).get('batch_size')
+        if batch_size is None:
+            # Fall back to platform config
+            batch_size = platform_config.get('batch_size', 16)
+        
+        # Determine source for logging
+        if 'batch_size' in training_config:
+            batch_size_source = "training.batch_size"
+        elif 'batch_size' in training_config.get('data', {}):
+            batch_size_source = "training.data.batch_size"
+        else:
+            batch_size_source = "platform"
         
         print(f"📊 Training DataLoader Configuration:")
         print(f"   • Batch Size: {batch_size} (source: {batch_size_source})")
@@ -377,9 +391,23 @@ class DataLoaderFactory:
         # Get config with platform overrides
         data_config = {**platform_config, **self.config.get('training', {}).get('data', {})}
         
-        # Get batch size with platform override
-        batch_size = self.config.get('training', {}).get('batch_size', platform_config.get('batch_size', 16))
-        batch_size_source = "config" if 'batch_size' in self.config.get('training', {}) else "platform"
+        # Get batch size with proper precedence: training.batch_size > training.data.batch_size > platform
+        training_config = self.config.get('training', {})
+        batch_size = training_config.get('batch_size')
+        if batch_size is None:
+            # Check data config within training config
+            batch_size = training_config.get('data', {}).get('batch_size')
+        if batch_size is None:
+            # Fall back to platform config
+            batch_size = platform_config.get('batch_size', 16)
+        
+        # Determine source for logging
+        if 'batch_size' in training_config:
+            batch_size_source = "training.batch_size"
+        elif 'batch_size' in training_config.get('data', {}):
+            batch_size_source = "training.data.batch_size"
+        else:
+            batch_size_source = "platform"
         
         print(f"📊 Validation DataLoader Configuration:")
         print(f"   • Batch Size: {batch_size} (source: {batch_size_source})")

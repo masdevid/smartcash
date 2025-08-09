@@ -24,20 +24,32 @@ class PredictionProcessor:
     and implements caching for maximum throughput during training.
     """
     
-    def __init__(self, config: Dict, model):
+    def __init__(self, config: Dict, model, model_api=None):
         """
         Initialize prediction processor for SmartCash YOLO models.
         
         Args:
             config: Training configuration dictionary
-            model: SmartCashYOLO model instance
+            model: PyTorch model instance (for backward compatibility)
+            model_api: Model API instance that wraps the model (preferred)
         """
         self.config = config
-        self.model = model
+        self.model_api = model_api
+        # Store the model for backward compatibility, but prefer model_api
+        self.model = model_api.model if model_api is not None else model
         
-        # Initialize specialized components
+        # Initialize specialized components with model_api if available, otherwise use model
         self.cache = PredictionCache()
-        self.classification_extractor = ClassificationExtractor(model=model, cache=self.cache)
+        
+        # Get the model to use for processing (prefer model_api)
+        processing_model = model_api if model_api is not None else model
+        
+        # If we have a model_api that has a model attribute, use that
+        if hasattr(processing_model, 'model'):
+            processing_model = processing_model.model
+            
+        # Initialize components with the correct model
+        self.classification_extractor = ClassificationExtractor(model=processing_model, cache=self.cache)
         self.target_processor = TargetProcessor(cache=self.cache)
         
         # Total classes configuration

@@ -9,7 +9,7 @@ import json
 from pathlib import Path
 from typing import Dict, Any, Callable, Optional, Tuple
 from smartcash.model.training.utils.metric_color_utils import (
-    MetricColorizer, ColorScheme, get_metrics_with_colors
+    MetricColorizer, ColorScheme, get_metrics_with_colors, COLOR_MAPPINGS
 )
 from smartcash.common.logger import get_logger
 

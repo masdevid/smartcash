@@ -132,14 +132,6 @@ class TrainingProgressTracker:
             # This method is called by the executor to update its overall progress
             # The orchestrator's progress_tracker is a sub-tracker
             self.progress_callback('overall', current_step, total_steps, current_phase_name)
-
-    def update_overall_progress(self, current_phase_name: str, current_step: int, total_steps: int):
-        """Update the overall progress bar with named steps."""
-        if self.progress_callback:
-            # The overall progress bar is managed by the executor, not the orchestrator
-            # This method is called by the executor to update its overall progress
-            # The orchestrator's progress_tracker is a sub-tracker
-            self.progress_callback('overall', current_step, total_steps, current_phase_name)
     
     def start_epoch_tracking(self, total_epochs: int):
         """Start epoch progress tracking."""
@@ -650,7 +642,9 @@ class TrainingProgressTracker:
                 logger.warning("⚠️ Invalid progress callback format")
                 
         except Exception as e:
-            logger.warning(f"⚠️ Error calling progress callback: {str(e)}")
+            logger.error(f"⚠️ Error calling progress callback: {str(e)}")
+            import traceback
+            logger.debug(f"Progress callback error traceback: {traceback.format_exc()}")
     
     def _reset_operation_state(self) -> None:
         """Reset internal operation state."""

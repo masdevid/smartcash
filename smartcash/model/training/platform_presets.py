@@ -137,20 +137,21 @@ class PlatformPresets:
             })
         
         elif self.platform_info['is_m1_mac']:
-            # M1 Mac: MAXIMUM SPEED - unified memory allows aggressive optimization
-            base_batch = 16  # INCREASED: Take advantage of unified memory
+            # M1 Mac: Optimized for stability with MPS
+            base_batch = 16
             config.update({
                 'batch_size': base_batch,
-                'num_workers': 8,  # MAXIMUM: Use all 8 workers for speed
-                'pin_memory': False,  # Not beneficial for MPS
-                'persistent_workers': True,  # Always enable for speed
-                'prefetch_factor': 4,  # MAXIMUM: 4x prefetch despite unified memory
-                'timeout': 90  # Longer timeout for stability with high worker count
+                'num_workers': 10,  # Disable multiprocessing for MPS
+                'pin_memory': False,  # Not needed for MPS
+                'persistent_workers': True,  # Disable for MPS
+                'prefetch_factor': 2,  # Conservative prefetch
+                'timeout': 30,  # Shorter timeout
+                'multiprocessing_context': 'forkserver'  # Better process management
             })
             
-            # Set MPS memory environment with valid ratios
-            os.environ['PYTORCH_MPS_HIGH_WATERMARK_RATIO'] = '0.8'  # Valid range: 0.0 to 1.0
-            os.environ['PYTORCH_MPS_LOW_WATERMARK_RATIO'] = '0.3'   # Must be < HIGH_WATERMARK_RATIO
+            # Set MPS memory environment with conservative ratios
+            os.environ['PYTORCH_MPS_HIGH_WATERMARK_RATIO'] = '0.7'  # More conservative memory usage
+            os.environ['PYTORCH_MPS_LOW_WATERMARK_RATIO'] = '0.2'   # More aggressive cleanup
             os.environ['PYTORCH_MPS_ALLOCATOR_POLICY'] = 'native'
         
         elif self.platform_info['is_cuda_workstation']:

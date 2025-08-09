@@ -63,8 +63,9 @@ class TrainingExecutor:
         # Reset accumulated metrics for new epoch
         self._reset_accumulated_metrics()
         
-        # Progress update frequency optimized for maximum performance
-        update_freq = max(1, num_batches // 20)  # Update 20 times per epoch max for better performance
+        # Progress update frequency optimized for visibility and performance
+        # Update more frequently for better user feedback, but not every batch for large datasets
+        update_freq = max(1, min(num_batches // 10, 5))  # Update at least every 5 batches, up to 10 times per epoch
         
         # Calculate display epoch if not provided
         if display_epoch is None:
@@ -122,7 +123,10 @@ class TrainingExecutor:
             if batch_idx % update_freq == 0 or batch_idx == num_batches - 1:
                 avg_loss = running_loss / (batch_idx + 1)
                 
-                # Update batch progress
+                # Update batch progress with debug logging
+                if batch_idx == 0 or batch_idx % (update_freq * 2) == 0:  # Debug log every few updates
+                    logger.debug(f"📊 Progress update: batch {batch_idx + 1}/{num_batches}, loss={avg_loss:.4f}")
+                
                 self.progress_tracker.update_batch_progress(
                     batch_idx + 1, num_batches,
                     f"Training batch {batch_idx + 1}/{num_batches}",

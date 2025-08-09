@@ -346,6 +346,7 @@ class ValidationMetricsProcessor:
         log_validation_summary(phase_num, standardized_metrics)
 
         return standardized_metrics
+        
     
     def _compute_classification_metrics(self, all_predictions: Dict, all_targets: Dict) -> Dict[str, float]:
         """Compute classification metrics from collected predictions and targets."""

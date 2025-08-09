@@ -194,8 +194,29 @@ class DataLoaderFactory:
     
     def _get_fallback_config(self) -> Dict[str, Any]:
         """Fallback config jika file tidak ada."""
-        # Detect PyTorch version and adjust multiprocessing settings
         import torch
+        
+        # Check if running on Apple Silicon (MPS)
+        is_mps = hasattr(torch.backends, 'mps') and torch.backends.mps.is_available()
+        
+        if is_mps:
+            # Optimized settings for Apple Silicon (MPS)
+            return {
+                'training': {
+                    'batch_size': 16,
+                    'data': {
+                        'num_workers': 0,  # Disable multiprocessing for MPS
+                        'pin_memory': False,  # Not needed for MPS
+                        'persistent_workers': False,  # Disable for MPS
+                        'prefetch_factor': 2,
+                        'drop_last': True,
+                        'multiprocessing_context': 'forkserver',
+                        'timeout': 30
+                    }
+                }
+            }
+        
+        # Default settings for non-MPS devices
         pytorch_version = tuple(map(int, torch.__version__.split('.')[:2]))
         
         # Determine optimal number of workers based on CPU count
@@ -204,7 +225,7 @@ class DataLoaderFactory:
             # Set optimal workers to a safe value (e.g., half of CPU cores, max 8)
             optimal_workers = min(cpu_count // 2 if cpu_count > 1 else 1, 8)
         except NotImplementedError:
-            optimal_workers = 2 # Fallback for systems where cpu_count is not available
+            optimal_workers = 2  # Fallback for systems where cpu_count is not available
 
         # For PyTorch 2.7+, reduce multiprocessing complexity to avoid worker issues
         if pytorch_version >= (2, 7):
@@ -264,22 +285,17 @@ class DataLoaderFactory:
             max_samples=max_samples
         )
         
-        data_config = self.config.get('training', {}).get('data', {})
-        batch_size = self.config.get('training', {}).get('batch_size', 16)
+        # Get platform-specific configuration
+        from smartcash.model.training.platform_presets import PlatformPresets
+        presets = PlatformPresets()
+        platform_config = presets.get_data_config()
         
-        # Handle auto batch size detection
-        if batch_size is None:
-            # Import platform presets for auto-detection
-            from smartcash.model.training.platform_presets import PlatformPresets
-            presets = PlatformPresets()
-            
-            # Get recommended batch size for current platform
-            data_config = presets.get_data_config()
-            batch_size = data_config.get('batch_size', 16)
-            batch_size_source = "auto-detected"
-            print(f"🤖 Auto-detected batch size: {batch_size} for platform: {presets.platform_info.get('platform_name', 'unknown')}")
-        else:
-            batch_size_source = "config" if 'batch_size' in self.config.get('training', {}) else "default"
+        # Get config with platform overrides
+        data_config = {**platform_config, **self.config.get('training', {}).get('data', {})}
+        
+        # Get batch size with platform override
+        batch_size = self.config.get('training', {}).get('batch_size', platform_config.get('batch_size', 16))
+        batch_size_source = "config" if 'batch_size' in self.config.get('training', {}) else "platform"
         
         print(f"📊 Training DataLoader Configuration:")
         print(f"   • Batch Size: {batch_size} (source: {batch_size_source})")
@@ -353,22 +369,17 @@ class DataLoaderFactory:
             max_samples=max_samples
         )
         
-        data_config = self.config.get('training', {}).get('data', {})
-        batch_size = self.config.get('training', {}).get('batch_size', 16)
+        # Get platform-specific configuration
+        from smartcash.model.training.platform_presets import PlatformPresets
+        presets = PlatformPresets()
+        platform_config = presets.get_data_config()
         
-        # Handle auto batch size detection
-        if batch_size is None:
-            # Import platform presets for auto-detection
-            from smartcash.model.training.platform_presets import PlatformPresets
-            presets = PlatformPresets()
-            
-            # Get recommended batch size for current platform
-            data_config = presets.get_data_config()
-            batch_size = data_config.get('batch_size', 16)
-            batch_size_source = "auto-detected"
-            print(f"🤖 Auto-detected validation batch size: {batch_size} for platform: {presets.platform_info.get('platform_name', 'unknown')}")
-        else:
-            batch_size_source = "config" if 'batch_size' in self.config.get('training', {}) else "default"
+        # Get config with platform overrides
+        data_config = {**platform_config, **self.config.get('training', {}).get('data', {})}
+        
+        # Get batch size with platform override
+        batch_size = self.config.get('training', {}).get('batch_size', platform_config.get('batch_size', 16))
+        batch_size_source = "config" if 'batch_size' in self.config.get('training', {}) else "platform"
         
         print(f"📊 Validation DataLoader Configuration:")
         print(f"   • Batch Size: {batch_size} (source: {batch_size_source})")

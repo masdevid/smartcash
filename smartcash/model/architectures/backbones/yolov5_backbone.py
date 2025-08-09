@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 from typing import List
 from ultralytics.nn.modules import Conv, C2f, SPPF
-from .backbone import BaseBackbone
+from smartcash.model.architectures.backbones.backbone import BaseBackbone
 from smartcash.model.architectures.necks.yolov5_neck import YOLOv5Neck
 from smartcash.model.architectures.heads.yolov5_head import YOLOv5Head
 from smartcash.common.logger import SmartCashLogger
@@ -13,8 +13,8 @@ class YOLOv5Backbone(BaseBackbone):
     def __init__(self, backbone: str, num_classes: int, pretrained: bool, device: str):
         super().__init__(num_classes, pretrained, device)
         self.backbone_type = backbone
-        # OPTIMIZATION: Always use small variant channels for efficiency (<10M target)
-        self.feature_dims = [128, 256, 512]  # Small variant for all backbones
+        # OPTIMIZATION: Use ultra-small channels for <10M parameter target
+        self.feature_dims = [96, 192, 384]  # Ultra-small variant for all backbones
         self.backbone = self.create_backbone()
         self.neck = self.create_neck(self.feature_dims)
         self.head = self.create_head(self.feature_dims)
@@ -23,8 +23,8 @@ class YOLOv5Backbone(BaseBackbone):
         self.logger.info(f"✅ Created YOLOv5Backbone: {backbone}, {num_classes} classes")
     
     def create_backbone(self) -> nn.ModuleList:
-        # OPTIMIZATION: Always use small channels for efficiency (<10M params target)
-        channels = [32, 64, 128, 256, 512]  # Small variant for all backbone types
+        # OPTIMIZATION: Use ultra-small channels for <10M parameter target
+        channels = [24, 48, 96, 192, 384]  # Ultra-small variant for all backbone types
         return nn.ModuleList([
             Conv(3, channels[0], 6, 2, 2),
             Conv(channels[0], channels[1], 3, 2),

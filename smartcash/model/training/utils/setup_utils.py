@@ -86,7 +86,7 @@ def prepare_training_environment(
         
         # Step 2: Load platform-optimized configuration
         logger.debug("⚙️ Loading platform-optimized configuration")
-        config = get_platform_config(backbone, phase_1_epochs, phase_2_epochs)
+        config = get_platform_config(backbone, phase_1_epochs, phase_2_epochs, force_cpu=force_cpu)
         
         # Step 3: Set pretrained flag and training mode in configuration
         if 'model' in config:
@@ -105,7 +105,7 @@ def prepare_training_environment(
         logger.debug("🔧 Detecting platform and applying optimizations")
         target_device = None
         if force_cpu:
-            target_device = torch.device('cpu')
+            target_device = 'cpu'
         setup_platform_optimizations_with_device(target_device)
         
         # Step 6: Apply custom overrides

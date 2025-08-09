@@ -60,11 +60,13 @@ class ValidationModelInference:
                 else:
                     outputs = self.model(images)
             
-            # Fast output processing
+            # Fast output processing - keep multi-scale predictions for validation
             if isinstance(outputs, (list, tuple)):
                 if not outputs:
                     raise ValueError("Model returned empty output")
-                outputs = outputs[0]
+                # For validation, we may need all scales - return the full list
+                # The downstream components will handle multi-scale processing
+                return outputs
             
             if not isinstance(outputs, torch.Tensor):
                 raise ValueError(f"Expected tensor output, got {type(outputs)}")

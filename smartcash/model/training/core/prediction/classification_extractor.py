@@ -33,9 +33,9 @@ class ClassificationExtractor:
         """
         self.model = model
         self.cache = cache or PredictionCache()
-        # SmartCash configuration aligned with loss.json
+        # SmartCash configuration aligned with custom detection head
         self.num_classes = 17  # Fixed for SmartCash (0-6: main, 7-13: features, 14-16: auth)
-        self.output_channels = 66  # 17 classes * (5 bbox + 1 conf) per anchor = 17 * 3 + 5*3 for YOLOv5
+        self.output_channels = 66  # 3 anchors * (17 classes + 5 bbox) = 3 * 22 = 66
     
     def extract_classification_predictions(self, layer_preds, batch_size: int, device: torch.device) -> torch.Tensor:
         """
@@ -64,9 +64,10 @@ class ClassificationExtractor:
         """Fast classification prediction extraction with parallel processing.
         
         Optimized version using vectorized operations and memory-efficient processing.
+        Handles both 4D [batch, 66, h, w] and 5D [batch, anchors, h, w, features] formats.
         
         Args:
-            layer_preds: YOLO model predictions tensor
+            layer_preds: YOLO model predictions tensor 
             batch_size: Number of samples in the batch
             device: Target device for the output tensor
             
@@ -74,9 +75,41 @@ class ClassificationExtractor:
             Tensor of shape [batch_size] containing predicted class indices
         """
         try:
-            if layer_preds.dim() == 5:  # YOLOv5 format [batch, anchors, h, w, features]
+            # Handle 4D format from our custom SmartCashDetectionHead
+            if layer_preds.dim() == 4 and layer_preds.shape[1] == 66:  # [batch, 66, h, w]
+                with torch.no_grad():
+                    # Reshape to [batch, 3_anchors, 22_features, h, w]
+                    reshaped = layer_preds.view(batch_size, 3, 22, layer_preds.shape[2], layer_preds.shape[3])
+                    
+                    # Extract class predictions (channels 5:22 = 17 classes) for all anchors
+                    class_preds = reshaped[:, :, 5:22, :, :]  # [batch, 3, 17, h, w]
+                    
+                    # Flatten spatial dimensions: [batch, 3, 17, h*w]
+                    class_preds = class_preds.view(batch_size, 3, 17, -1)
+                    
+                    # Get objectness scores (channel 0) for weighting
+                    obj_scores = reshaped[:, :, 0, :, :].view(batch_size, 3, -1)  # [batch, 3, h*w]
+                    
+                    # Apply sigmoid to objectness and softmax to classes
+                    obj_scores = torch.sigmoid(obj_scores)
+                    class_probs = F.softmax(class_preds, dim=2)
+                    
+                    # Weight class probabilities by objectness
+                    weighted_probs = class_probs * obj_scores.unsqueeze(2)  # [batch, 3, 17, h*w]
+                    
+                    # Find best prediction across all anchors and spatial locations
+                    weighted_probs = weighted_probs.view(batch_size, -1, 17)  # [batch, 3*h*w, 17]
+                    max_probs, max_classes = torch.max(weighted_probs, dim=2)  # [batch, 3*h*w]
+                    
+                    # Get best prediction per batch item
+                    best_pred_idx = torch.argmax(max_probs, dim=1)  # [batch]
+                    best_classes = torch.gather(max_classes, 1, best_pred_idx.unsqueeze(1)).squeeze(1)
+                    
+                    return best_classes.float()
+                    
+            elif layer_preds.dim() == 5:  # YOLOv5 format [batch, anchors, h, w, features]
                 features = layer_preds.shape[-1]
-                if features >= 22:  # Has class predictions (5 bbox + 1 conf + 17 classes)
+                if features >= 22:  # Has class predictions (5 bbox + 17 classes)
                     # Ultra-fast vectorized operations with memory optimization
                     with torch.no_grad():
                         # Reshape and extract class probabilities in one operation

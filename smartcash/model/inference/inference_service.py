@@ -4,7 +4,7 @@ Service for handling model inference.
 from typing import Dict, Any, List
 import torch
 from smartcash.common.logger import get_logger
-from smartcash.model.architectures.smartcash_yolov5 import create_smartcash_yolov5
+from smartcash.model.core.model_builder import create_model
 from smartcash.model.inference.post_prediction_mapper import PostPredictionMapper
 
 class InferenceService:
@@ -23,13 +23,26 @@ class InferenceService:
 
         Args:
             checkpoint_path (str): The path to the model checkpoint.
-            backbone (str): The model backbone.
+            backbone (str): The model backbone (e.g., 'yolov5s', 'efficientnet_b4').
             pretrained (bool): Whether to use a pretrained model.
         """
         self.logger.info(f"Loading model from checkpoint: {checkpoint_path}")
         try:
-            self.model = create_smartcash_yolov5(backbone=backbone, pretrained=pretrained)
-            self.model.load_state_dict(torch.load(checkpoint_path)['model'])
+            # Create model with the specified backbone
+            self.model = create_model(backbone=backbone, pretrained=pretrained)
+            
+            # Load checkpoint
+            checkpoint = torch.load(checkpoint_path, map_location='cpu')
+            
+            # Handle different checkpoint formats
+            if 'model' in checkpoint:
+                # Old format: {'model': state_dict, ...}
+                state_dict = checkpoint['model']
+            else:
+                # New format: direct state dict
+                state_dict = checkpoint
+                
+            self.model.load_state_dict(state_dict)
             self.model.eval()
             self.logger.info("Model loaded successfully.")
         except Exception as e:

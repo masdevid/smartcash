@@ -106,8 +106,8 @@ class PredictionProcessor:
             return predictions  # Already in expected format
             
         if isinstance(predictions, (list, tuple)) and len(predictions) > 0:
-            # For list/tuple, use first prediction head
-            return {'predictions': predictions[0]}
+            # For list/tuple of multi-scale predictions, keep the full list for loss computation
+            return {'predictions': list(predictions)}
             
         # For tensor or any other format, wrap in dict
         return {'predictions': predictions}

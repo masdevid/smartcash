@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import timm
 from typing import List
-from .backbone import BaseBackbone
+from smartcash.model.architectures.backbones.backbone import BaseBackbone
 from smartcash.model.architectures.necks.yolov5_neck import YOLOv5Neck
 from smartcash.model.architectures.heads.yolov5_head import YOLOv5Head
 from smartcash.common.logger import SmartCashLogger

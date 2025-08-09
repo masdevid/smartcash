@@ -78,8 +78,21 @@ class PlatformPresets:
         
         return info
     
-    def get_device_config(self) -> Dict[str, Any]:
-        """Get optimized device configuration for current platform."""
+    def get_device_config(self, force_cpu: bool = False) -> Dict[str, Any]:
+        """Get optimized device configuration for current platform.
+        
+        Args:
+            force_cpu: Force CPU mode regardless of available accelerators
+        """
+        # Force CPU mode overrides all platform detection
+        if force_cpu:
+            return {
+                'device': 'cpu',
+                'mixed_precision': False,
+                'memory_fraction': 1.0,
+                'allow_tf32': False
+            }
+        
         if self.platform_info['is_colab']:
             return {
                 'device': 'cuda' if self.platform_info['cuda_available'] else 'cpu',
@@ -112,9 +125,9 @@ class PlatformPresets:
                 'allow_tf32': False
             }
     
-    def get_data_config(self, backbone: str = 'cspdarknet') -> Dict[str, Any]:
+    def get_data_config(self, backbone: str = 'cspdarknet', force_cpu: bool = False) -> Dict[str, Any]:
         """Get optimized data loading configuration with deferred memory optimization."""
-        device_config = self.get_device_config()
+        device_config = self.get_device_config(force_cpu=force_cpu)
         
         # MAXIMUM SPEED: Use platform-optimized configuration with performance focus
         config = {
@@ -141,11 +154,11 @@ class PlatformPresets:
             base_batch = 16
             config.update({
                 'batch_size': base_batch,
-                'num_workers': 8,  # Disable multiprocessing for MPS
+                'num_workers': 10,  # Disable multiprocessing for MPS
                 'pin_memory': False,  # Not needed for MPS
                 'persistent_workers': True,  # Disable for MPS
-                'prefetch_factor': 2,  # Conservative prefetch
-                'timeout': 30,  # Shorter timeout
+                'prefetch_factor': 4,  # Conservative prefetch
+                'timeout': 10,  # Shorter timeout
                 'multiprocessing_context': 'forkserver'  # Better process management
             })
             
@@ -173,10 +186,10 @@ class PlatformPresets:
         
         return config
     
-    def get_training_config(self, backbone: str = 'cspdarknet') -> Dict[str, Any]:
+    def get_training_config(self, backbone: str = 'cspdarknet', force_cpu: bool = False) -> Dict[str, Any]:
         """Get complete training configuration optimized for platform."""
-        device_config = self.get_device_config()
-        data_config = self.get_data_config(backbone)
+        device_config = self.get_device_config(force_cpu=force_cpu)
+        data_config = self.get_data_config(backbone, force_cpu=force_cpu)
         
         # Base training configuration with AdamW defaults (lr=5e-4)
         config = {
@@ -242,9 +255,9 @@ class PlatformPresets:
         
         return config
     
-    def get_model_config(self, backbone: str = 'cspdarknet') -> Dict[str, Any]:
+    def get_model_config(self, backbone: str = 'cspdarknet', force_cpu: bool = False) -> Dict[str, Any]:
         """Get model configuration optimized for platform."""
-        device_config = self.get_device_config()
+        device_config = self.get_device_config(force_cpu=force_cpu)
         
         config = {
             'backbone': backbone,
@@ -294,12 +307,13 @@ class PlatformPresets:
         }
     
     def get_full_config(self, backbone: str = 'cspdarknet', 
-                       phase_1_epochs: int = 1, phase_2_epochs: int = 1) -> Dict[str, Any]:
+                       phase_1_epochs: int = 1, phase_2_epochs: int = 1, 
+                       force_cpu: bool = False) -> Dict[str, Any]:
         """Get complete platform-optimized configuration."""
-        device_config = self.get_device_config()
-        data_config = self.get_data_config(backbone)
-        training_config = self.get_training_config(backbone)
-        model_config = self.get_model_config(backbone)
+        device_config = self.get_device_config(force_cpu=force_cpu)
+        data_config = self.get_data_config(backbone, force_cpu=force_cpu)
+        training_config = self.get_training_config(backbone, force_cpu=force_cpu)
+        model_config = self.get_model_config(backbone, force_cpu=force_cpu)
         phase_config = self.get_phase_config(phase_1_epochs, phase_2_epochs)
         
         return {
@@ -357,10 +371,11 @@ def get_platform_presets() -> PlatformPresets:
 
 def get_platform_config(backbone: str = 'cspdarknet', 
                        phase_1_epochs: int = 1, 
-                       phase_2_epochs: int = 1) -> Dict[str, Any]:
+                       phase_2_epochs: int = 1,
+                       force_cpu: bool = False) -> Dict[str, Any]:
     """Get platform-optimized configuration."""
     presets = get_platform_presets()
-    return presets.get_full_config(backbone, phase_1_epochs, phase_2_epochs)
+    return presets.get_full_config(backbone, phase_1_epochs, phase_2_epochs, force_cpu=force_cpu)
 
 def setup_platform_optimizations():
     """Setup platform-specific optimizations with memory optimization."""

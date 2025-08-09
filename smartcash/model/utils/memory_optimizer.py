@@ -22,7 +22,7 @@ import os
 import gc
 import torch
 import psutil
-from typing import Dict, Any, Optional, Tuple
+from typing import Dict, Any, Optional, Tuple, Union
 from smartcash.common.logger import get_logger
 
 logger = get_logger(__name__)
@@ -31,9 +31,16 @@ logger = get_logger(__name__)
 class MemoryOptimizer:
     """Comprehensive memory optimization for training and model building."""
     
-    def __init__(self, device: Optional[torch.device] = None):
+    def __init__(self, device: Optional[Union[torch.device, str]] = None):
         """Initialize memory optimizer with device detection."""
-        self.device = device or self._detect_optimal_device()
+        if device is not None:
+            # Handle both string and device inputs
+            if isinstance(device, str):
+                self.device = torch.device(device)
+            else:
+                self.device = device
+        else:
+            self.device = self._detect_optimal_device()
         self.platform_info = self._get_platform_info()
         logger.debug(f"🧠 Memory optimizer initialized for {self.device}")
     
@@ -315,7 +322,7 @@ class MemoryOptimizer:
 # Global instance for easy access
 _memory_optimizer = None
 
-def get_memory_optimizer(device: Optional[torch.device] = None) -> MemoryOptimizer:
+def get_memory_optimizer(device: Optional[Union[torch.device, str]] = None) -> MemoryOptimizer:
     """Get global memory optimizer instance."""
     global _memory_optimizer
     if _memory_optimizer is None or (device and _memory_optimizer.device != device):

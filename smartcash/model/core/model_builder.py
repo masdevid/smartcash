@@ -1,8 +1,8 @@
 """
-SmartCash Model Builder with YOLOv5 Integration
+SmartCash Model Builder
 Multi-Layer Banknote Detection System
 
-This module provides a model builder that creates and configures YOLOv5-based models
+This module provides a model builder that creates and configures models
 for the SmartCash system, supporting various backbones and configurations.
 """
 
@@ -12,14 +12,7 @@ from typing import Dict, Any, List, Optional, Union, Tuple
 
 from smartcash.common.logger import get_logger
 from smartcash.model.training.utils.progress_tracker import TrainingProgressTracker
-
-# Import YOLOv5 model factory
-try:
-    from smartcash.model.architectures.yolov5.model_factory import YOLOv5ModelFactory
-    YOLOV5_AVAILABLE = True
-except ImportError as e:
-    get_logger("model.builder").warning(f"YOLOv5 integration not available: {e}")
-    YOLOV5_AVAILABLE = False
+from smartcash.model.architectures.model import SmartCashYOLOv5Model
 
 
 class ModelBuilder:
@@ -30,8 +23,8 @@ class ModelBuilder:
     supporting various backbones and training configurations.
     """
     
-    # Class variable to track YOLOv5 availability
-    YOLOV5_AVAILABLE = YOLOV5_AVAILABLE
+    # Class variable for backward compatibility
+    YOLOV5_AVAILABLE = True
     
     def __init__(self, config: Dict[str, Any], progress_bridge: TrainingProgressTracker = None):
         """
@@ -84,46 +77,40 @@ class ModelBuilder:
         
         return device
     
-    def build(self, backbone: str = 'yolov5s', num_classes: int = 17, 
-              img_size: int = 640, pretrained: bool = True, **kwargs) -> nn.Module:
+    def build(self, model_cfg: Optional[Dict[str, Any]] = None, device: str = 'auto') -> nn.Module:
         """
-        Build a YOLOv5-based SmartCash model.
+        Build a SmartCash model based on the configuration.
         
         Args:
-            backbone: Backbone type ('yolov5s', 'yolov5m', 'yolov5l', 'yolov5x', 'efficientnet_b4')
-            num_classes: Number of output classes (default: 17 for SmartCash)
-            img_size: Input image size (must be multiple of 32, default: 640)
-            pretrained: Whether to use pretrained weights (default: True)
-            **kwargs: Additional model configuration options:
-                - device: Device to place model on ('auto', 'cuda', 'mps', 'cpu')
-                - freeze: List of layer names to freeze (e.g., ['backbone', 'neck'])
-                
-        Returns:
-            nn.Module: Configured YOLOv5 model instance
+            model_cfg: Model configuration (uses self.config if None)
+            device: Device to place model on ('auto', 'cuda', 'mps', 'cpu')
             
-        Raises:
-            RuntimeError: If model creation fails or YOLOv5 is not available
+        Returns:
+            Configured SmartCash model
         """
-        if not self.YOLOV5_AVAILABLE or self.model_factory is None:
-            error_msg = ("❌ YOLOv5 integration is required but not available. "
-                        "Please ensure YOLOv5 is properly installed.")
-            self.logger.error(error_msg)
-            raise RuntimeError(error_msg)
+        cfg = model_cfg or self.config.get('model', {})
+        
+        # Get model configuration with defaults
+        backbone = cfg.get('backbone', 'yolov5s')
+        num_classes = cfg.get('num_classes', 17)
+        img_size = cfg.get('img_size', 640)
+        pretrained = cfg.get('pretrained', True)
         
         # Log model creation
         if self.progress_bridge:
-            self.progress_bridge.update_operation(1, 3, f"Building YOLOv5 model: {backbone}")
-        self.logger.info(f"🏗️ Building YOLOv5 model with backbone: {backbone}, "
-                        f"classes: {num_classes}, img_size: {img_size}")
+            self.progress_bridge.update_operation(1, 3, f"Building model: {backbone}")
+            
+        self.logger.info(f"Building model with backbone: {backbone}, "
+                       f"classes: {num_classes}, img_size: {img_size}")
         
         try:
-            # Create model using the factory
-            model = self.model_factory.create_model(
+            # Create model using the new SmartCashYOLOv5Model
+            model = SmartCashYOLOv5Model(
                 backbone=backbone,
                 num_classes=num_classes,
                 img_size=img_size,
                 pretrained=pretrained,
-                **kwargs
+                device=device
             )
             
             # Log successful model creation
@@ -134,10 +121,9 @@ class ModelBuilder:
             return model
             
         except Exception as e:
-            error_msg = f"❌ Failed to build YOLOv5 model: {str(e)}"
+            error_msg = f"❌ Failed to build model: {str(e)}"
             self.logger.error(error_msg, exc_info=True)
             raise RuntimeError(error_msg) from e
-    
     
     def _optimize_model_features(self, model: nn.Module, optimization_config: Dict) -> nn.Module:
         """
@@ -231,12 +217,12 @@ class ModelBuilder:
 
 
 def create_model(backbone: str = 'yolov5s', num_classes: int = 17, 
-                img_size: int = 640, pretrained: bool = True, **kwargs) -> nn.Module:
+                img_size: int = 640, pretrained: bool = True, **kwargs):
     """
-    Create a SmartCash YOLOv5 model with the specified configuration.
+    Create a SmartCash model with the specified configuration.
     
     This is a convenience wrapper around ModelBuilder that provides a simple interface
-    for creating pre-configured YOLOv5 models for SmartCash.
+    for creating pre-configured models for SmartCash.
     
     Args:
         backbone: Backbone architecture. One of: 'yolov5s', 'yolov5m', 'yolov5l', 'yolov5x', 'efficientnet_b4'.
@@ -249,26 +235,31 @@ def create_model(backbone: str = 'yolov5s', num_classes: int = 17,
             - freeze: List of layer names to freeze (e.g., ['backbone', 'neck'])
             
     Returns:
-        nn.Module: Configured YOLOv5 model ready for training or inference.
+        nn.Module: Configured model ready for training or inference.
         
     Example:
-        >>> # Create a small YOLOv5 model
+        >>> # Create a small model
         >>> model = create_model('yolov5s', num_classes=17)
         >>> 
         >>> # Create a larger model with custom image size
         >>> model = create_model('yolov5m', num_classes=17, img_size=1280)
     """
-    # Create model builder with default config
-    builder = ModelBuilder(config={})
+    # Create a minimal config dictionary
+    config = {
+        'model': {
+            'backbone': backbone,
+            'num_classes': num_classes,
+            'img_size': img_size,
+            'pretrained': pretrained
+        }
+    }
     
-    # Build and return the model
-    return builder.build(
-        backbone=backbone,
-        num_classes=num_classes,
-        img_size=img_size,
-        pretrained=pretrained,
-        **kwargs
-    )
+    # Get device from kwargs or use 'auto'
+    device = kwargs.get('device', 'auto')
+    
+    # Create model builder and build the model
+    builder = ModelBuilder(config=config)
+    return builder.build(device=device)
 
 
 # Export key classes and functions

@@ -279,6 +279,12 @@ def _set_gain_from_prediction_shape(pred_shape: torch.Size, gain: torch.Tensor,
         grid_size = pred_shape[2]  # assuming square grid
         gain[2:6] = torch.tensor([grid_size, grid_size, grid_size, grid_size], 
                                device=device)
+    elif len(pred_shape) == 4:  # [batch, channels, grid_h, grid_w] - our custom detection head format
+        if logger:
+            logger.debug(f"📐 Processing 4D tensor (custom detection head): {pred_shape}")
+        grid_size = pred_shape[2]  # grid height (assuming square grid)
+        gain[2:6] = torch.tensor([grid_size, grid_size, grid_size, grid_size], 
+                               device=device)
     elif len(pred_shape) == 3:  # [batch, num_anchors * grid_y * grid_x, features]
         if logger:
             logger.debug(f"📐 Processing 3D tensor: {pred_shape}")

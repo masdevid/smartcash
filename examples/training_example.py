@@ -15,7 +15,6 @@ if str(project_root) not in sys.path:
     sys.path.insert(0, str(project_root))
 
 from smartcash.model.architectures.yolo import create_smartcash_yolov5
-from smartcash.model.training.direct_training_manager import DirectTrainingManager
 from smartcash.common.logger import SmartCashLogger
 
 logger = SmartCashLogger(__name__)

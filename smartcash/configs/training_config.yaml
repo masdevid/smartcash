@@ -152,9 +152,9 @@ training_phases:
 # Platform-specific presets (auto-applied based on detection)
 platform_presets:
   apple_silicon_mac:
-    batch_size: 6  # Conservative for unified memory
+    batch_size: 16  # Conservative for unified memory
     mixed_precision: false  # Avoid MPS issues
-    num_workers: 6
+    num_workers: 8
     pin_memory: false
     memory_fraction: 0.7
     
